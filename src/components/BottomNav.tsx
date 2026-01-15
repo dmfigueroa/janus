@@ -9,7 +9,7 @@ export function BottomNav() {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-md border-t border-border z-50 padding-safe-bottom">
+    <div className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-md border-t border-border z-50 pb-[env(safe-area-inset-bottom)]">
       <div className="max-w-md mx-auto px-6 h-16 flex items-center justify-around">
         {navItems.map((item) => (
           <Link

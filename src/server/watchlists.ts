@@ -11,12 +11,16 @@ const watchlistSchema = z.object({
   description: z.string().optional(),
 });
 
+const deleteWatchlistSchema = z.object({
+  id: z.number(),
+});
+
 export const getWatchlists = createServerFn().handler(async () => {
   return await db.select().from(watchlists).orderBy(desc(watchlists.createdAt));
 });
 
 export const createWatchlist = createServerFn()
-  .inputValidator((data: z.infer<typeof watchlistSchema>) => watchlistSchema.parse(data))
+  .inputValidator((data) => watchlistSchema.parse(data))
   .handler(async ({ data }) => {
     const [newItem] = await db
       .insert(watchlists)
@@ -29,7 +33,7 @@ export const createWatchlist = createServerFn()
   });
 
 export const deleteWatchlist = createServerFn()
-  .inputValidator((data: { id: number }) => data)
+  .inputValidator((data) => deleteWatchlistSchema.parse(data))
   .handler(async ({ data }) => {
     await db.delete(watchlists).where(eq(watchlists.id, data.id));
     return { success: true };

@@ -5,10 +5,9 @@ import { CreateWatchlistCard } from "@/components/CreateWatchlistCard";
 import { CreateWatchlistDialog } from "@/components/CreateWatchlistDialog";
 import { BottomNav } from "@/components/BottomNav";
 import { SearchBar } from "@/components/SearchBar";
-import { Settings, CheckCircle2, Clock } from "lucide-react";
+import { Settings } from "lucide-react";
 import { useLoaderData } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/utils/cn";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -17,12 +16,6 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const watchlists = useLoaderData({ from: "/" });
-
-  const tabs = [
-    { label: "All Lists", active: true },
-    { label: "In Progress", icon: Clock },
-    { label: "Completed", icon: CheckCircle2 },
-  ];
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans pb-24">
@@ -44,24 +37,6 @@ function Index() {
           <SearchBar />
         </div>
 
-        {/* Filter Tabs */}
-        <div className="px-6 mb-8 flex gap-3 overflow-x-auto no-scrollbar pb-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.label}
-              className={cn(
-                "flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors",
-                tab.active
-                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                  : "bg-card text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {tab.icon && <tab.icon className="w-4 h-4" />}
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
         {/* Watchlists Grid */}
         <section className="px-6">
           <div className="grid grid-cols-2 gap-x-4 gap-y-8">
@@ -77,7 +52,7 @@ function Index() {
         {/* Floating Action Button (Mobile) */}
         <CreateWatchlistDialog />
 
-        {/* Bottom Navigation */}
+        {/* B ottom Navigation */}
         <BottomNav />
       </div>
     </div>
