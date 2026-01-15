@@ -7,7 +7,10 @@
     "build": "vite build",
     "preview": "vite preview",
     "db:studio": "drizzle-kit studio",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "oxlint .",
+    "format": "oxfmt . --write",
+    "prepare": "simple-git-hooks"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -44,9 +47,25 @@
     "better-sqlite3": "^12.6.0",
     "drizzle-kit": "^0.31.8",
     "jsdom": "^27.0.0",
+    "lint-staged": "^16.2.7",
+    "oxfmt": "^0.24.0",
+    "oxlint": "^1.39.0",
+    "simple-git-hooks": "^2.13.1",
     "typescript": "^5.7.2",
     "vite": "^7.1.7",
     "vitest": "^3.0.5",
     "web-vitals": "^5.1.0"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "bun lint-staged"
+  },
+  "lint-staged": {
+    "*.{js,ts,jsx,tsx,mjs,cjs}": [
+      "oxlint --fix",
+      "oxfmt --write"
+    ],
+    "*.{json,css,html,md}": [
+      "oxfmt --write"
+    ]
   }
 }

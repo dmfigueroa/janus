@@ -1,10 +1,10 @@
 "use server";
 
-import { createServerFn } from '@tanstack/react-start';
-import { db } from '../db';
-import { watchlists } from '../db/schema';
-import { eq, desc } from 'drizzle-orm';
-import { z } from 'zod';
+import { createServerFn } from "@tanstack/react-start";
+import { db } from "../db";
+import { watchlists } from "../db/schema";
+import { eq, desc } from "drizzle-orm";
+import { z } from "zod";
 
 const watchlistSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -12,17 +12,20 @@ const watchlistSchema = z.object({
 });
 
 export const getWatchlists = createServerFn().handler(async () => {
-    return await db.select().from(watchlists).orderBy(desc(watchlists.createdAt));
+  return await db.select().from(watchlists).orderBy(desc(watchlists.createdAt));
 });
 
 export const createWatchlist = createServerFn()
   .inputValidator((data: z.infer<typeof watchlistSchema>) => watchlistSchema.parse(data))
   .handler(async ({ data }) => {
-     const [newItem] = await db.insert(watchlists).values({
-         name: data.name,
-         description: data.description,
-     }).returning();
-     return newItem;
+    const [newItem] = await db
+      .insert(watchlists)
+      .values({
+        name: data.name,
+        description: data.description,
+      })
+      .returning();
+    return newItem;
   });
 
 export const deleteWatchlist = createServerFn()

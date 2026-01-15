@@ -15,10 +15,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus } from "lucide-react";
-import { cn } from "@/utils/cn";
 
 interface CreateWatchlistDialogProps {
-    asCard?: boolean;
+  asCard?: boolean;
 }
 
 export function CreateWatchlistDialog({ asCard }: CreateWatchlistDialogProps) {
@@ -48,16 +47,21 @@ export function CreateWatchlistDialog({ asCard }: CreateWatchlistDialogProps) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {asCard ? (
-             <div className="w-full h-full flex flex-col items-center justify-center gap-2">
-                <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center group-hover:bg-[#FF0055] transition-colors">
-                    <Plus className="w-6 h-6 text-zinc-400 group-hover:text-white" />
-                </div>
-                <span className="text-zinc-500 font-medium group-hover:text-zinc-300">Create New List</span>
-             </div>
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+            <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center group-hover:bg-[#FF0055] transition-colors">
+              <Plus className="w-6 h-6 text-zinc-400 group-hover:text-white" />
+            </div>
+            <span className="text-zinc-500 font-medium group-hover:text-zinc-300">
+              Create New List
+            </span>
+          </div>
         ) : (
-            <Button size="icon" className="h-14 w-14 rounded-full shadow-lg bg-[#FF0055] hover:bg-[#FF0055]/90 text-white fixed bottom-24 right-6 z-40 md:hidden">
-                <Plus className="w-7 h-7" />
-            </Button>
+          <Button
+            size="icon"
+            className="h-14 w-14 rounded-full shadow-lg bg-[#FF0055] hover:bg-[#FF0055]/90 text-white fixed bottom-24 right-6 z-40 md:hidden"
+          >
+            <Plus className="w-7 h-7" />
+          </Button>
         )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px] bg-[#1a1a1a] border-zinc-800 text-white">
@@ -90,7 +94,11 @@ export function CreateWatchlistDialog({ asCard }: CreateWatchlistDialogProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={loading} className="bg-[#FF0055] hover:bg-[#D40046] text-white">
+            <Button
+              type="submit"
+              disabled={loading}
+              className="bg-[#FF0055] hover:bg-[#D40046] text-white"
+            >
               {loading ? "Creating..." : "Create List"}
             </Button>
           </DialogFooter>
