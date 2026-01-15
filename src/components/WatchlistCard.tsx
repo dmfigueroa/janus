@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/utils/cn";
+import { toast } from "sonner";
 
 interface WatchlistCardProps {
   watchlist: Watchlist;
@@ -34,8 +35,10 @@ export function WatchlistCard({ watchlist, featured }: WatchlistCardProps) {
     try {
       await deleteWatchlist({ data: { id: watchlist.id } });
       router.invalidate();
+      toast.success("Watchlist deleted successfully");
     } catch (error) {
       console.error("Failed to delete", error);
+      toast.error("Failed to delete watchlist. Please try again.");
       setDeleting(false);
     }
   };
