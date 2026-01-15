@@ -4,7 +4,7 @@ import { CreateWatchlistDialog } from "./CreateWatchlistDialog";
 export function CreateWatchlistCard() {
   return (
     <div className="flex flex-col gap-2 h-full">
-      <div className="aspect-[2/3] rounded-2xl border-2 border-dashed border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/40 transition-colors flex flex-col items-center justify-center p-6 text-center cursor-pointer group">
+      <div className="aspect-[2/3] rounded-2xl border-2 border-dashed border-border hover:border-muted-foreground hover:bg-secondary/40 transition-colors flex flex-col items-center justify-center p-6 text-center cursor-pointer group">
         <CreateWatchlistDialog asCard />
       </div>
       <div className="px-1 opacity-0">.</div> {/* Spacer for alignment */}

@@ -48,27 +48,27 @@ export function CreateWatchlistDialog({ asCard }: CreateWatchlistDialogProps) {
       <DialogTrigger asChild>
         {asCard ? (
           <div className="w-full h-full flex flex-col items-center justify-center gap-2">
-            <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center group-hover:bg-[#FF0055] transition-colors">
-              <Plus className="w-6 h-6 text-zinc-400 group-hover:text-white" />
+            <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center group-hover:bg-primary transition-colors">
+              <Plus className="w-6 h-6 text-muted-foreground group-hover:text-primary-foreground" />
             </div>
-            <span className="text-zinc-500 font-medium group-hover:text-zinc-300">
+            <span className="text-muted-foreground font-medium group-hover:text-foreground">
               Create New List
             </span>
           </div>
         ) : (
           <Button
             size="icon"
-            className="h-14 w-14 rounded-full shadow-lg bg-[#FF0055] hover:bg-[#FF0055]/90 text-white fixed bottom-24 right-6 z-40 md:hidden"
+            className="h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 text-primary-foreground fixed bottom-24 right-6 z-40 md:hidden"
           >
             <Plus className="w-7 h-7" />
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] bg-[#1a1a1a] border-zinc-800 text-white">
+      <DialogContent className="sm:max-w-[425px] bg-popover border-border text-popover-foreground">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Create New List</DialogTitle>
-            <DialogDescription className="text-zinc-400">
+            <DialogDescription className="text-muted-foreground">
               Create a new watchlist to track your movies and shows.
             </DialogDescription>
           </DialogHeader>
@@ -80,7 +80,7 @@ export function CreateWatchlistDialog({ asCard }: CreateWatchlistDialogProps) {
                 name="name"
                 placeholder="e.g., Marvel Cinematic Universe"
                 required
-                className="bg-zinc-900 border-zinc-700 focus-visible:ring-[#FF0055]"
+                className="bg-input border-border focus-visible:ring-ring"
               />
             </div>
             <div className="grid gap-2">
@@ -89,7 +89,7 @@ export function CreateWatchlistDialog({ asCard }: CreateWatchlistDialogProps) {
                 id="description"
                 name="description"
                 placeholder="Optional description..."
-                className="bg-zinc-900 border-zinc-700 focus-visible:ring-[#FF0055]"
+                className="bg-input border-border focus-visible:ring-ring"
               />
             </div>
           </div>
@@ -97,7 +97,7 @@ export function CreateWatchlistDialog({ asCard }: CreateWatchlistDialogProps) {
             <Button
               type="submit"
               disabled={loading}
-              className="bg-[#FF0055] hover:bg-[#D40046] text-white"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               {loading ? "Creating..." : "Create List"}
             </Button>

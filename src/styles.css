@@ -65,37 +65,42 @@
 }
 
 /* Base Shadcn Variables - Dark Mode Default with Vibrant Red Accent */
+/* Base Shadcn Variables - Dark Mode Default with Vibrant Red Accent */
 :root {
   /* Dark Mode Default - Deep Brownish/Purple Dark for Premium feel */
-  --background: 345 6% 13%; /* #221F20 -ish but deeper */
-  --background: 260 14% 8%; /* Deep dark purple/black */
-  --foreground: 0 0% 98%;
+  /* Was #121016 -> hsl(260 20% 8%) */
+  --background: hsl(260 20% 8%);
+  --foreground: hsl(0 0% 98%);
 
-  --card: 260 14% 12%;
-  --card-foreground: 0 0% 98%;
+  /* Card Background - Was #1F1C25 -> hsl(260 14% 13%) */
+  --card: hsl(260 14% 13%);
+  --card-foreground: hsl(0 0% 98%);
 
-  --popover: 260 14% 12%;
-  --popover-foreground: 0 0% 98%;
+  --popover: hsl(260 14% 13%);
+  --popover-foreground: hsl(0 0% 98%);
 
-  /* Vibrant Pink/Red Primary - #FF0055 approx */
-  --primary: 340 100% 50%;
-  --primary-foreground: 0 0% 100%;
+  /* Vibrant Pink/Red Primary - #FF0055 -> hsl(340 100% 50%) */
+  --primary: hsl(340 100% 50%);
+  --primary-foreground: hsl(0 0% 100%);
 
-  --secondary: 260 10% 20%;
-  --secondary-foreground: 0 0% 98%;
+  /* Secondary - Was #2A2631 -> hsl(262 13% 17%) roughly, let's harmonize */
+  --secondary: hsl(260 15% 18%);
+  --secondary-foreground: hsl(0 0% 98%);
 
-  --muted: 260 10% 20%;
-  --muted-foreground: 260 10% 65%;
+  /* Muted - used for backgrounds */
+  --muted: hsl(260 15% 18%);
+  /* Muted Foreground - text-zinc-500/400 approx */
+  --muted-foreground: hsl(260 10% 65%);
 
-  --accent: 260 10% 20%;
-  --accent-foreground: 0 0% 98%;
+  --accent: hsl(260 15% 18%);
+  --accent-foreground: hsl(0 0% 98%);
 
-  --destructive: 0 85% 60%;
-  --destructive-foreground: 0 0% 98%;
+  --destructive: hsl(0 85% 60%);
+  --destructive-foreground: hsl(0 0% 98%);
 
-  --border: 260 10% 20%;
-  --input: 260 10% 20%;
-  --ring: 340 100% 50%;
+  --border: hsl(260 15% 18%);
+  --input: hsl(260 15% 18%);
+  --ring: hsl(340 100% 50%);
 
   --radius: 1rem; /* More rounded */
 }
@@ -105,7 +110,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-[#121016] text-foreground antialiased font-sans selection:bg-primary/30;
+    @apply bg-background text-foreground antialiased font-sans selection:bg-primary/30;
   }
 }
 
@@ -114,6 +119,6 @@
     @apply bg-white/5 backdrop-blur-lg border border-white/10;
   }
   .glass-card {
-    @apply bg-[#2A272F] border-none shadow-xl;
+    @apply bg-card border-none shadow-xl;
   }
 }

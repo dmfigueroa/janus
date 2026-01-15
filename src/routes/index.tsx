@@ -25,15 +25,15 @@ function Index() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#121016] text-foreground font-sans pb-24">
+    <div className="min-h-screen bg-background text-foreground font-sans pb-24">
       <div className="max-w-md mx-auto min-h-screen relative">
         {/* Header */}
         <header className="px-6 pt-8 pb-4 flex justify-between items-center">
-          <h1 className="text-3xl font-extrabold tracking-tight text-white">My Lists</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground">My Lists</h1>
           <Button
             size="icon"
             variant="ghost"
-            className="rounded-full bg-[#1F1C25] hover:bg-[#2A2631] text-zinc-400"
+            className="rounded-full bg-card hover:bg-secondary text-muted-foreground"
           >
             <Settings className="w-5 h-5" />
           </Button>
@@ -52,8 +52,8 @@ function Index() {
               className={cn(
                 "flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors",
                 tab.active
-                  ? "bg-[#FF0055] text-white shadow-lg shadow-[#FF0055]/20"
-                  : "bg-[#1F1C25] text-zinc-400 hover:text-white",
+                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                  : "bg-card text-muted-foreground hover:text-foreground",
               )}
             >
               {tab.icon && <tab.icon className="w-4 h-4" />}

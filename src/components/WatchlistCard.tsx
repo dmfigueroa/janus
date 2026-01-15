@@ -55,7 +55,7 @@ export function WatchlistCard({ watchlist, featured }: WatchlistCardProps) {
         <div className="absolute inset-0 bg-black/20" />
 
         {/* "Up Next" Badge Mockup */}
-        <div className="absolute top-3 left-3 bg-[#FF0055] text-white text-[10px] font-bold px-2 py-1 rounded-md shadow-lg">
+        <div className="absolute top-3 left-3 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-1 rounded-md shadow-lg">
           UP NEXT
         </div>
 
@@ -81,21 +81,20 @@ export function WatchlistCard({ watchlist, featured }: WatchlistCardProps) {
 
       {/* Info Section */}
       <div className="px-1">
-        <h3 className="font-bold text-lg text-white leading-tight truncate">{watchlist.name}</h3>
-        <div className="flex items-center gap-2 text-xs text-zinc-500 mt-0.5 mb-1">
+        <h3 className="font-bold text-lg text-foreground leading-tight truncate">
+          {watchlist.name}
+        </h3>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 mb-1">
           <span>{itemCount} items</span>
           <span>•</span>
-          <span className={cn(progress === 100 ? "text-green-500" : "text-[#FF0055]")}>
+          <span className={cn(progress === 100 ? "text-green-500" : "text-primary")}>
             {progress}%
           </span>
         </div>
         {/* Progress Bar */}
-        <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
+        <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
           <div
-            className={cn(
-              "h-full rounded-full",
-              progress === 100 ? "bg-green-500" : "bg-[#FF0055]",
-            )}
+            className={cn("h-full rounded-full", progress === 100 ? "bg-green-500" : "bg-primary")}
             style={{ width: `${progress}%` }}
           />
         </div>
