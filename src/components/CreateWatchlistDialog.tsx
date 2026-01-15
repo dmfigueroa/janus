@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { useRouter } from "@tanstack/react-router";
 import { createWatchlist } from "@/server/watchlists";
 import { Button } from "@/components/ui/button";
@@ -36,8 +37,10 @@ export function CreateWatchlistDialog({ asCard }: CreateWatchlistDialogProps) {
       await createWatchlist({ data: { name, description } });
       setOpen(false);
       router.invalidate();
+      toast.success("Watchlist created successfully");
     } catch (error) {
       console.error("Failed to create watchlist", error);
+      toast.error("Failed to create watchlist. Please try again.");
     } finally {
       setLoading(false);
     }
