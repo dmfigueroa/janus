@@ -4,9 +4,20 @@ import type { Watchlist } from "@/db/schema";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import { cn } from "@/utils/cn";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface WatchlistCardProps {
   watchlist: Watchlist;
@@ -30,7 +41,6 @@ export function WatchlistCard({ watchlist, featured }: WatchlistCardProps) {
   const gradient = gradients[watchlist.id % gradients.length];
 
   const handleDelete = async () => {
-    if (!confirm("Delete this list?")) return;
     setDeleting(true);
     try {
       await deleteWatchlist({ data: { id: watchlist.id } });
@@ -65,18 +75,43 @@ export function WatchlistCard({ watchlist, featured }: WatchlistCardProps) {
         </div>
 
         {/* Delete Button (Hidden till hover) */}
-        <Button
-          variant="destructive"
-          size="icon"
-          className="absolute top-2 right-2 w-8 h-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDelete();
-          }}
-          disabled={deleting}
-        >
-          <X className="w-4 h-4" />
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="destructive"
+              size="icon"
+              className="absolute top-2 right-2 w-8 h-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg"
+              onClick={(e: MouseEvent) => {
+                e.stopPropagation();
+              }}
+              disabled={deleting}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent onClick={(e: MouseEvent) => e.stopPropagation()}>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Watchlist</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete "{watchlist.name}"? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={(e: MouseEvent) => e.stopPropagation()}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={(e: MouseEvent) => {
+                  e.stopPropagation();
+                  handleDelete();
+                }}
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </Card>
 
       {/* Info Section */}
