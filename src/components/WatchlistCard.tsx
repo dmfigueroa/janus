@@ -24,13 +24,13 @@ interface WatchlistCardProps {
   featured?: boolean; // Mock prop for size/emphasis
 }
 
-export function WatchlistCard({ watchlist, featured }: WatchlistCardProps) {
+export function WatchlistCard({ watchlist }: WatchlistCardProps) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
 
   // Mocking visual data for the "demo" look
-  const itemCount = Math.floor(Math.random() * 50) + 1;
-  const progress = Math.floor(Math.random() * 100);
+  const itemCount = ((watchlist.id * 7) % 50) + 1;
+  const progress = (watchlist.id * 13) % 100;
   // Using generic cinematic gradients as placeholders for now
   const gradients = [
     "bg-gradient-to-br from-indigo-900 to-purple-800",
@@ -71,7 +71,7 @@ export function WatchlistCard({ watchlist, featured }: WatchlistCardProps) {
 
         {/* Poster Stack Effect (Visual flair) */}
         <div className="absolute right-3 bottom-3 bg-black/60 backdrop-blur-md rounded-full px-2 py-0.5 text-[10px] text-white font-medium border border-white/10">
-          +{Math.floor(Math.random() * 20)} more
+          +{(watchlist.id * 3) % 20} more
         </div>
 
         {/* Delete Button (Hidden till hover) */}
