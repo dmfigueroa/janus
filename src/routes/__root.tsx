@@ -12,6 +12,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import appCss from "../styles.css?url";
 
 import { ThemeProvider } from "next-themes";
+import { NotFound } from "@/components/NotFound";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -36,6 +37,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   }),
 
   shellComponent: RootDocument,
+  notFoundComponent: NotFound,
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
