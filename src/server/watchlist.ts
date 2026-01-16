@@ -4,7 +4,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "../db";
 import { watchlistItems } from "../db/schema";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { getTVDetails, getSeasonDetails, getMovieDetails } from "./tmdb";
 
 export type { Watchlist, WatchlistItem } from "../db/schema";
@@ -23,17 +23,6 @@ const addToWatchlistSchema = z.object({
     overview: z.string(),
   }),
 });
-
-export const getWatchlistDetails = createServerFn({ method: "GET" })
-  .inputValidator((data) => z.object({ watchlistId: z.number() }).parse(data))
-  .handler(async ({ data }) => {
-    const items = await db
-      .select()
-      .from(watchlistItems)
-      .where(eq(watchlistItems.watchlistId, data.watchlistId))
-      .orderBy(asc(watchlistItems.releaseDate)); // Chronological order
-    return items;
-  });
 
 export const toggleWatched = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({ itemId: z.number(), isWatched: z.boolean() }).parse(data))
