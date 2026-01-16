@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 export const watchlists = sqliteTable("watchlists", {
@@ -27,7 +27,7 @@ export const watchlistItems = sqliteTable("watchlist_items", {
   episode: integer("episode"),
   posterPath: text("poster_path"),
   releaseDate: text("release_date"),
-  voteAverage: integer("vote_average"),
+  voteAverage: real("vote_average"),
   runtime: integer("runtime"), // In minutes
   isWatched: integer("is_watched", { mode: "boolean" }).default(false),
   addedAt: text("added_at")
