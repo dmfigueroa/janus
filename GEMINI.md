@@ -64,8 +64,39 @@ experience with a modern aesthetic.
 
 - **Server State**: Leverage TanStack Query (via TanStack Start) for data
   fetching.
+  - **IMPORTANT**: When defining server functions with `createServerFn`, ALWAYS
+    use `.inputValidator((data) => schema.parse(data))` instead of
+    `.validator(schema)`. The `.validator` method does not exist on the current
+    version of TanStack Start used in this project.
 - **Validation**: Use Zod for schema validation (forms, API responses).
 - **Accessibility**: Ensure all components are accessible (aria labels, keyboard
   nav).
 - **Docker**: Ensure the app builds and runs correctly in a containerized
   environment.
+
+## 8. Critical Implementation Notes (LLM Guidelines)
+
+- **Data Fetching Strategy**:
+  - **Prefer Route Loaders**: Always fetch initial route data server-side using
+    the `loader` function in `createFileRoute`.
+  - **Consume with `useLoaderData`**: Access this data via
+    `Route.useLoaderData()`.
+  - **Avoid `useQuery` for Route Data**: Do not use client-side `useQuery` for
+    primary route data; it causes waterfalls and hydration mismatches in this
+    specific stack.
+
+- **Loading States**:
+  - **Subtle Loading**: Use `useRouterState` (checking `isLoading`) to show
+    spinners or progress bars while keeping the current page visible.
+  - **Avoid `pendingComponent`**: Unless you want to completely unmount the
+    current view and show a full-page skeleton, avoid `pendingComponent` as it
+    can feel jarring.
+
+- **Imports**:
+  - **Relative over Alias**: If you encounter "Failed to resolve import" errors
+    with `@/...`, fallback to relative imports (e.g.,
+    `../../components/ui/...`).
+
+- **Server Functions**:
+  - **Validator**: MUST use `.inputValidator((d) => schema.parse(d))` for
+    `createServerFn`. usage of `.validator(schema)` will fail.
