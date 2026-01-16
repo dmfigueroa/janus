@@ -25,6 +25,43 @@ export interface TMDBSearchResponse {
   total_results: number;
 }
 
+async function fetchFromTMDB(
+  query: string,
+  page: number,
+  apiKey: string,
+  depth = 0,
+): Promise<TMDBSearchResponse> {
+  const url = new URL(`${TMDB_BASE_URL}/search/multi`);
+  const params = new URLSearchParams({
+    api_key: apiKey,
+    query: query,
+    page: page.toString(),
+    include_adult: "false",
+    language: "en-US",
+  });
+  url.search = params.toString();
+
+  const response = await fetch(url.toString());
+
+  if (!response.ok) {
+    console.error("TMDB API Error:", await response.text());
+    throw new Error("Failed to fetch data from TMDB");
+  }
+
+  const json = (await response.json()) as TMDBSearchResponse;
+  const filteredResults = json.results.filter(
+    (item) => item.media_type === "movie" || item.media_type === "tv",
+  );
+
+  // If we filtered out all results, but there are more pages, keep looking
+  // Limit recursion to avoid timeouts (e.g. 5 attempts)
+  if (filteredResults.length === 0 && json.page < json.total_pages && depth < 5) {
+    return fetchFromTMDB(query, page + 1, apiKey, depth + 1);
+  }
+
+  return { ...json, results: filteredResults };
+}
+
 export const searchMultimedia = createServerFn({ method: "GET" })
   .inputValidator((data) =>
     z
@@ -42,27 +79,5 @@ export const searchMultimedia = createServerFn({ method: "GET" })
       throw new Error("TMDB_API_KEY is not configured");
     }
 
-    const url = new URL(`${TMDB_BASE_URL}/search/multi`);
-    const params = new URLSearchParams({
-      api_key: apiKey,
-      query: query,
-      page: page.toString(),
-      include_adult: "false",
-      language: "en-US",
-    });
-    url.search = params.toString();
-
-    const response = await fetch(url.toString());
-
-    if (!response.ok) {
-      console.error("TMDB API Error:", await response.text());
-      throw new Error("Failed to fetch data from TMDB");
-    }
-
-    const json = (await response.json()) as TMDBSearchResponse;
-    const filteredResults = json.results.filter(
-      (item) => item.media_type === "movie" || item.media_type === "tv",
-    );
-
-    return { ...json, results: filteredResults };
+    return fetchFromTMDB(query, page, apiKey);
   });

@@ -1,26 +1,38 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 interface UseIntersectionObserverProps {
   threshold?: number;
   root?: Element | null;
   rootMargin?: string;
+  onIntersect?: () => void;
+  enabled?: boolean;
 }
 
 export function useIntersectionObserver({
   threshold = 0,
   root = null,
   rootMargin = "0%",
+  onIntersect,
+  enabled = true,
 }: UseIntersectionObserverProps = {}) {
   const ref = useRef<HTMLDivElement | null>(null);
-  const [isIntersecting, setIntersecting] = useState(false);
+  const onIntersectRef = useRef(onIntersect);
 
   useEffect(() => {
+    onIntersectRef.current = onIntersect;
+  }, [onIntersect]);
+
+  useEffect(() => {
+    if (!enabled) return;
+
     const node = ref.current;
     if (!node) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setIntersecting(entry.isIntersecting);
+        if (entry.isIntersecting) {
+          onIntersectRef.current?.();
+        }
       },
       {
         threshold,
@@ -34,7 +46,7 @@ export function useIntersectionObserver({
     return () => {
       observer.disconnect();
     };
-  }, [threshold, root, rootMargin]);
+  }, [threshold, root, rootMargin, enabled]);
 
-  return { ref, isIntersecting };
+  return { ref };
 }

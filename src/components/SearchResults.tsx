@@ -1,7 +1,6 @@
 import { TMDBMedia } from "../server/tmdb";
 import { MediaCard } from "./MediaCard";
 import { useIntersectionObserver } from "../hooks/useIntersectionObserver";
-import { useEffect } from "react";
 
 interface SearchResultsProps {
   results: TMDBMedia[];
@@ -16,13 +15,10 @@ export function SearchResults({
   hasNextPage,
   isFetchingNextPage,
 }: SearchResultsProps) {
-  const { ref, isIntersecting } = useIntersectionObserver();
-
-  useEffect(() => {
-    if (isIntersecting && hasNextPage && !isFetchingNextPage) {
-      fetchNextPage();
-    }
-  }, [isIntersecting, fetchNextPage, hasNextPage, isFetchingNextPage]);
+  const { ref } = useIntersectionObserver({
+    onIntersect: fetchNextPage,
+    enabled: hasNextPage && !isFetchingNextPage,
+  });
 
   if (results.length === 0) {
     return (
