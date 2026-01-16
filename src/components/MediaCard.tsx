@@ -44,11 +44,6 @@ export function MediaCard({ media }: MediaCardProps) {
             <span>{rating}</span>
           </div>
         )}
-
-        {/* Type Badge */}
-        <div className="absolute bottom-2 left-2 rounded-sm bg-black/60 px-1.5 py-0.5 text-[10px] uppercase font-bold tracking-wider text-white/90 backdrop-blur-md">
-          {media.media_type === "movie" ? "Movie" : "TV"}
-        </div>
       </div>
 
       <div className="space-y-0.5 px-1">

@@ -6,35 +6,37 @@ import { useCallback } from "react";
 import { createFileRoute, useNavigate, useSearch, useRouterState } from "@tanstack/react-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { z } from "zod";
+import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
 
 const searchSchema = z.object({
   query: z.string().optional().default(""),
   page: z.coerce.number().optional().default(1),
+  type: z.enum(["movie", "tv"]).optional().default("movie"),
 });
 
 export const Route = createFileRoute("/search")({
   validateSearch: searchSchema,
-  loaderDeps: ({ search: { query } }) => ({ query }),
-  loader: async ({ deps: { query } }) => {
+  loaderDeps: ({ search: { query, type } }) => ({ query, type }),
+  loader: async ({ deps: { query, type } }) => {
     if (!query) {
       return { results: [], page: 1, total_pages: 0, total_results: 0 };
     }
 
-    return searchMultimedia({ data: { query, page: 1 } });
+    return searchMultimedia({ data: { query, page: 1, type } });
   },
   component: Search,
 });
 
 function Search() {
   const navigate = useNavigate({ from: Route.fullPath });
-  const { query } = useSearch({ from: Route.fullPath });
+  const { query, type } = useSearch({ from: Route.fullPath });
   const initialData = Route.useLoaderData();
 
   const isLoadingRoute = useRouterState({ select: (s) => s.isLoading });
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ["search", query],
-    queryFn: ({ pageParam }) => searchMultimedia({ data: { query, page: pageParam } }),
+    queryKey: ["search", query, type],
+    queryFn: ({ pageParam }) => searchMultimedia({ data: { query, page: pageParam, type } }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
       lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined,
@@ -49,10 +51,23 @@ function Search() {
       navigate({
         search: {
           query: newQuery,
+          type,
         },
       });
     },
-    [navigate],
+    [navigate, type],
+  );
+
+  const handleTabChange = useCallback(
+    (newType: string) => {
+      navigate({
+        search: {
+          query,
+          type: newType as "movie" | "tv",
+        },
+      });
+    },
+    [navigate, query],
   );
 
   return (
@@ -67,6 +82,18 @@ function Search() {
         </p>
 
         <SearchInput onSearch={handleSearch} defaultValue={query} isLoading={isLoadingRoute} />
+
+        <Tabs
+          defaultValue={type}
+          value={type}
+          onValueChange={handleTabChange}
+          className="w-full max-w-sm"
+        >
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="movie">Movies</TabsTrigger>
+            <TabsTrigger value="tv">TV Shows</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       <div className="mt-8">
