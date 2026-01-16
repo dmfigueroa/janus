@@ -1,11 +1,29 @@
 import { TMDBMedia } from "../server/tmdb";
 import { MediaCard } from "./MediaCard";
+import { useIntersectionObserver } from "../hooks/useIntersectionObserver";
+import { useEffect } from "react";
 
 interface SearchResultsProps {
   results: TMDBMedia[];
+  fetchNextPage: () => void;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
 }
 
-export function SearchResults({ results }: SearchResultsProps) {
+export function SearchResults({
+  results,
+  fetchNextPage,
+  hasNextPage,
+  isFetchingNextPage,
+}: SearchResultsProps) {
+  const { ref, isIntersecting } = useIntersectionObserver();
+
+  useEffect(() => {
+    if (isIntersecting && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [isIntersecting, fetchNextPage, hasNextPage, isFetchingNextPage]);
+
   if (results.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -16,10 +34,18 @@ export function SearchResults({ results }: SearchResultsProps) {
   }
 
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-      {results.map((item) => (
-        <MediaCard key={item.id} media={item} />
-      ))}
+    <div className="space-y-8">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        {results.map((item) => (
+          <MediaCard key={item.id} media={item} />
+        ))}
+      </div>
+
+      {(hasNextPage || isFetchingNextPage) && (
+        <div ref={ref} className="flex justify-center py-4">
+          <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      )}
     </div>
   );
 }

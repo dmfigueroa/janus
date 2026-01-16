@@ -3,6 +3,7 @@ import { SearchResults } from "../components/SearchResults";
 import { searchMultimedia } from "../server/tmdb";
 import { useCallback } from "react";
 import { createFileRoute, useNavigate, useSearch, useRouterState } from "@tanstack/react-router";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { z } from "zod";
 
 const searchSchema = z.object({
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/search")({
       return { results: [], page: 1, total_pages: 0, total_results: 0 };
     }
 
-    return searchMultimedia({ data: { query } });
+    return searchMultimedia({ data: { query, page: 1 } });
   },
   component: Search,
 });
@@ -25,9 +26,21 @@ export const Route = createFileRoute("/search")({
 function Search() {
   const navigate = useNavigate({ from: Route.fullPath });
   const { query } = useSearch({ from: Route.fullPath });
-  const data = Route.useLoaderData();
+  const initialData = Route.useLoaderData();
 
-  const isLoading = useRouterState({ select: (s) => s.isLoading });
+  const isLoadingRoute = useRouterState({ select: (s) => s.isLoading });
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ["search", query],
+    queryFn: ({ pageParam }) => searchMultimedia({ data: { query, page: pageParam } }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined,
+    initialData: { pages: [initialData], pageParams: [1] },
+    enabled: !!query,
+  });
+
+  const allResults = data?.pages.flatMap((page) => page.results) || [];
 
   const handleSearch = useCallback(
     (newQuery: string) => {
@@ -51,11 +64,16 @@ function Search() {
           Find where to stream new, popular & upcoming entertainment.
         </p>
 
-        <SearchInput onSearch={handleSearch} defaultValue={query} isLoading={isLoading} />
+        <SearchInput onSearch={handleSearch} defaultValue={query} isLoading={isLoadingRoute} />
       </div>
 
       <div className="mt-8">
-        <SearchResults results={data?.results || []} />
+        <SearchResults
+          results={allResults}
+          fetchNextPage={fetchNextPage}
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+        />
       </div>
     </div>
   );
