@@ -81,7 +81,7 @@ Janus uses Drizzle ORM with SQLite. The database file is created locally.
   bun run test
   ```
 
-## � Deployment
+## 🚀 Deployment
 
 To build the application for production:
 
@@ -98,7 +98,7 @@ bun run preview
 **Docker**:
 The project is designed to be containerized. Ensure your `Dockerfile` (pending creation if not present) handles the build output and serves it using a Bun runtime.
 
-## �📂 Project Structure
+## 📂 Project Structure
 
 - `src/routes`: TanStack Start file-based routing.
 - `src/components`: Reusable UI components (shadcn/ui customised).
