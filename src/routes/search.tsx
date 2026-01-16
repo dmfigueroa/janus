@@ -1,5 +1,6 @@
 import { SearchInput } from "../components/SearchInput";
 import { SearchResults } from "../components/SearchResults";
+import { BottomNav } from "../components/BottomNav";
 import { searchMultimedia } from "../server/tmdb";
 import { useCallback } from "react";
 import { createFileRoute, useNavigate, useSearch, useRouterState } from "@tanstack/react-router";
@@ -54,7 +55,7 @@ function Search() {
   );
 
   return (
-    <div className="container mx-auto min-h-screen px-4 py-8 md:px-8">
+    <div className="container mx-auto min-h-screen px-4 py-8 md:px-8 pb-24">
       <div className="mb-8 flex flex-col items-center gap-6">
         <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-5xl">
           <span className="text-primary">Discover</span>{" "}
@@ -75,6 +76,7 @@ function Search() {
           isFetchingNextPage={isFetchingNextPage}
         />
       </div>
+      <BottomNav />
     </div>
   );
 }
