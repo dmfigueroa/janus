@@ -1,6 +1,8 @@
 import { TMDBMedia } from "../server/tmdb";
 import { MediaCard } from "./MediaCard";
 import { useIntersectionObserver } from "../hooks/useIntersectionObserver";
+import { useState } from "react";
+import { MediaDetailSheet } from "./MediaDetailSheet";
 
 interface SearchResultsProps {
   results: TMDBMedia[];
@@ -15,6 +17,8 @@ export function SearchResults({
   hasNextPage,
   isFetchingNextPage,
 }: SearchResultsProps) {
+  const [selectedMedia, setSelectedMedia] = useState<TMDBMedia | null>(null);
+
   const { ref } = useIntersectionObserver({
     onIntersect: fetchNextPage,
     enabled: hasNextPage && !isFetchingNextPage,
@@ -33,7 +37,7 @@ export function SearchResults({
     <div className="space-y-8">
       <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
         {results.map((item) => (
-          <MediaCard key={item.id} media={item} />
+          <MediaCard key={item.id} media={item} onClick={() => setSelectedMedia(item)} />
         ))}
       </div>
 
@@ -42,6 +46,12 @@ export function SearchResults({
           <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
       )}
+
+      <MediaDetailSheet
+        media={selectedMedia}
+        isOpen={!!selectedMedia}
+        onClose={() => setSelectedMedia(null)}
+      />
     </div>
   );
 }
