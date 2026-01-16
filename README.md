@@ -1,283 +1,123 @@
-Welcome to your new TanStack app!
+# Janus
 
-# Getting Started
+**Janus** is a premium watchlist application designed to help you track movies and TV shows in their functionality release order. built with a modern stack focusing on performance, aesthetics, and user experience.
 
-To run this application:
+## ✨ Features
 
-```bash
-bun install
-bun --bun run dev
-```
+- **Timeline View**: Track your content in the exact order it released. Perfect for cinematic universes (Marvel, DC, Star Wars).
+- **Smart Watchlists**: Create multiple lists for different franchises or viewing goals.
+- **TMDB Integration**: Seamless search and data fetching from The Movie Database (movies & TV episodes).
+- **Progress Tracking**: Visual indicators for your viewing progress and what's "Up Next".
+- **Premium UI/UX**:
+  - Dark/Light mode support (system sync).
+  - Smooth micro-animations and transitions.
+  - Mobile-optimized with safe-area handling.
+  - Glassmorphism and vibrant accent colors.
+- **Local-First Architecture**: Powered by SQLite for fast, reliable data persistence.
 
-# Building For Production
+## 🛠️ Tech Stack
 
-To build this application for production:
+- **Framework**: [TanStack Start](https://tanstack.com/start) (Full-stack React framework)
+- **Database**: [SQLite](https://sqlite.org/) via [Drizzle ORM](https://orm.drizzle.team/)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) & [shadcn/ui](https://ui.shadcn.com/)
+- **Runtime**: [Bun](https://bun.sh/)
+- **Quality**: [Oxlint](https://oxc-project.github.io/op/oxlint) & [Vitest](https://vitest.dev/)
 
-```bash
-bun --bun run build
-```
+## 🚀 Getting Started
 
-## Testing
+### Prerequisites
 
-This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
+- [Bun](https://bun.sh/) (v1.0 or later)
 
-```bash
-bun --bun run test
-```
+### Installation
 
-## Styling
+1.  Clone the repository:
 
-This project uses CSS for styling.
+    ```bash
+    git clone https://github.com/yourusername/janus.git
+    cd janus
+    ```
 
-## Routing
+2.  Install dependencies:
 
-This project uses [TanStack Router](https://tanstack.com/router). The initial setup is a file based router. Which means that the routes are managed as files in `src/routes`.
+    ```bash
+    bun install
+    ```
 
-### Adding A Route
+3.  Set up environment variables:
+    Create a `.env` file in the root directory (if required by your TMDB helper, though checking the code, it might be hardcoded or using a default for now. _Note: Ensure you have a valid TMDB API Key if strictly required_).
 
-To add a new route to your application just add another a new file in the `./src/routes` directory.
+### Running Locally
 
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you use the `<Outlet />` component.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { Outlet, createRootRoute } from "@tanstack/react-router";
-import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-
-import { Link } from "@tanstack/react-router";
-
-export const Route = createRootRoute({
-  component: () => (
-    <>
-      <header>
-        <nav>
-          <Link to="/">Home</Link>
-          <Link to="/about">About</Link>
-        </nav>
-      </header>
-      <Outlet />
-      <TanStackRouterDevtools />
-    </>
-  ),
-});
-```
-
-The `<TanStackRouterDevtools />` component is not required so you can remove it if you don't want it in your layout.
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-const peopleRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/people",
-  loader: async () => {
-    const response = await fetch("https://swapi.dev/api/people");
-    return response.json() as Promise<{
-      results: {
-        name: string;
-      }[];
-    }>;
-  },
-  component: () => {
-    const data = peopleRoute.useLoaderData();
-    return (
-      <ul>
-        {data.results.map((person) => (
-          <li key={person.name}>{person.name}</li>
-        ))}
-      </ul>
-    );
-  },
-});
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-### React-Query
-
-React-Query is an excellent addition or alternative to route loading and integrating it into you application is a breeze.
-
-First add your dependencies:
+Start the development server:
 
 ```bash
-bun install @tanstack/react-query @tanstack/react-query-devtools
+bun run dev
 ```
 
-Next we'll need to create a query client and provider. We recommend putting those in `main.tsx`.
+Visit `http://localhost:3000` to see the app.
 
-```tsx
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+### Database Management
 
-// ...
+Janus uses Drizzle ORM with SQLite. The database file is created locally.
 
-const queryClient = new QueryClient();
+- **View Database UI**:
 
-// ...
+  ```bash
+  bun run db:studio
+  ```
 
-if (!rootElement.innerHTML) {
-  const root = ReactDOM.createRoot(rootElement);
+  This opens Drizzle Studio, allowing you to visually manage your SQLite data.
 
-  root.render(
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-    </QueryClientProvider>,
-  );
-}
-```
+- **Lint & Format**:
 
-You can also add TanStack Query Devtools to the root route (optional).
+  ```bash
+  bun run lint
+  bun run format
+  ```
 
-```tsx
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+- **Run Tests**:
+  ```bash
+  bun run test
+  ```
 
-const rootRoute = createRootRoute({
-  component: () => (
-    <>
-      <Outlet />
-      <ReactQueryDevtools buttonPosition="top-right" />
-      <TanStackRouterDevtools />
-    </>
-  ),
-});
-```
+## � Deployment
 
-Now you can use `useQuery` to fetch your data.
-
-```tsx
-import { useQuery } from "@tanstack/react-query";
-
-import "./App.css";
-
-function App() {
-  const { data } = useQuery({
-    queryKey: ["people"],
-    queryFn: () =>
-      fetch("https://swapi.dev/api/people")
-        .then((res) => res.json())
-        .then((data) => data.results as { name: string }[]),
-    initialData: [],
-  });
-
-  return (
-    <div>
-      <ul>
-        {data.map((person) => (
-          <li key={person.name}>{person.name}</li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-export default App;
-```
-
-You can find out everything you need to know on how to use React-Query in the [React-Query documentation](https://tanstack.com/query/latest/docs/framework/react/overview).
-
-## State Management
-
-Another common requirement for React applications is state management. There are many options for state management in React. TanStack Store provides a great starting point for your project.
-
-First you need to add TanStack Store as a dependency:
+To build the application for production:
 
 ```bash
-bun install @tanstack/store
+bun run build
 ```
 
-Now let's create a simple counter in the `src/App.tsx` file as a demonstration.
+This will compile the application. You can preview the production build locally using:
 
-```tsx
-import { useStore } from "@tanstack/react-store";
-import { Store } from "@tanstack/store";
-import "./App.css";
-
-const countStore = new Store(0);
-
-function App() {
-  const count = useStore(countStore);
-  return (
-    <div>
-      <button onClick={() => countStore.setState((n) => n + 1)}>Increment - {count}</button>
-    </div>
-  );
-}
-
-export default App;
+```bash
+bun run preview
 ```
 
-One of the many nice features of TanStack Store is the ability to derive state from other state. That derived state will update when the base state updates.
+**Docker**:
+The project is designed to be containerized. Ensure your `Dockerfile` (pending creation if not present) handles the build output and serves it using a Bun runtime.
 
-Let's check this out by doubling the count using derived state.
+## �📂 Project Structure
 
-```tsx
-import { useStore } from "@tanstack/react-store";
-import { Store, Derived } from "@tanstack/store";
-import "./App.css";
+- `src/routes`: TanStack Start file-based routing.
+- `src/components`: Reusable UI components (shadcn/ui customised).
+- `src/db`: Drizzle schema (`schema.ts`) and connection logic.
+- `src/server`: Server-side logic and TMDB API integration.
+- `src/utils`: Helper functions.
 
-const countStore = new Store(0);
+## 📝 Roadmap & Todo
 
-const doubledStore = new Derived({
-  fn: () => countStore.state * 2,
-  deps: [countStore],
-});
-doubledStore.mount();
+- [ ] **Add Dockerfile**: Create a Dockerfile to containerize the application.
+- [ ] **Delete items**: Add functionality to delete movies and shows from the watchlist.
+- [ ] **Infinite Scroll Polish**: Optimize the search results pagination and infinite loading experience.
+- [ ] **Watchlist visual polish**: Enhance the "Up Next" cover art logic and progress bars in the card view.
+- [ ] **Authentication**: Add user accounts (e.g., via BetterAuth or Auth.js) to support multiple users and cloud sync.
+- [ ] **Detailed Views**: Create dedicated pages for Movie/TV Show details with more metadata (cast, crew, related).
+- [ ] **Import/Export**: Allow exporting watchlists to JSON/CSV.
+- [ ] **Advanced Filtering**: Filter timelines by watched status, runtimes, or release years.
+- [ ] **Unit Testing**: Increase test coverage for critical utility functions and components.
 
-function App() {
-  const count = useStore(countStore);
-  const doubledCount = useStore(doubledStore);
+## 📄 License
 
-  return (
-    <div>
-      <button onClick={() => countStore.setState((n) => n + 1)}>Increment - {count}</button>
-      <div>Doubled - {doubledCount}</div>
-    </div>
-  );
-}
-
-export default App;
-```
-
-We use the `Derived` class to create a new store that is derived from another store. The `Derived` class has a `mount` method that will start the derived store updating.
-
-Once we've created the derived store we can use it in the `App` component just like we would any other store using the `useStore` hook.
-
-You can find out everything you need to know on how to use TanStack Store in the [TanStack Store documentation](https://tanstack.com/store/latest).
-
-# Demo files
-
-Files prefixed with `demo` can be safely deleted. They are there to provide a starting point for you to play around with the features you've installed.
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
+MIT
