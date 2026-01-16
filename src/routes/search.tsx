@@ -1,6 +1,7 @@
 import { SearchInput } from "../components/SearchInput";
 import { SearchResults } from "../components/SearchResults";
 import { searchMultimedia } from "../server/tmdb";
+import { useCallback } from "react";
 import { createFileRoute, useNavigate, useSearch, useRouterState } from "@tanstack/react-router";
 import { z } from "zod";
 
@@ -28,13 +29,16 @@ function Search() {
 
   const isLoading = useRouterState({ select: (s) => s.isLoading });
 
-  const handleSearch = (newQuery: string) => {
-    navigate({
-      search: {
-        query: newQuery,
-      },
-    });
-  };
+  const handleSearch = useCallback(
+    (newQuery: string) => {
+      navigate({
+        search: {
+          query: newQuery,
+        },
+      });
+    },
+    [navigate],
+  );
 
   return (
     <div className="container mx-auto min-h-screen px-4 py-8 md:px-8">
