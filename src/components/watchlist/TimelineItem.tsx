@@ -64,7 +64,7 @@ export function TimelineItem({ item }: TimelineItemProps) {
       <div
         className={cn(
           "relative shrink-0 overflow-hidden font-bold shadow-md ring-1 ring-border",
-          isMovie ? "h-24 w-16 rounded-lg" : "h-16 w-16 rounded-full",
+          isMovie ? "h-24 w-16 rounded-lg" : "h-16 w-28 rounded-md",
         )}
       >
         {posterUrl ? (

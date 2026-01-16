@@ -54,8 +54,9 @@ export const getWatchlists = createServerFn().handler(async () => {
     // Find next unwatched item (sorted by release date)
     const nextUnwatched = listItems.find((i) => !i.isWatched) || null;
 
-    // Fallback cover: use the first item's poster if all are watched, or null if empty
-    const coverImage = nextUnwatched?.posterPath || listItems[0]?.posterPath || null;
+    const coverItem = nextUnwatched || listItems[0] || null;
+    const coverImage = coverItem?.posterPath || null;
+    const coverMediaType = coverItem?.mediaType || null;
 
     return {
       ...list,
@@ -65,6 +66,7 @@ export const getWatchlists = createServerFn().handler(async () => {
         progress: totalItems > 0 ? Math.round((watchedItems / totalItems) * 100) : 0,
         nextUnwatched,
         coverImage,
+        coverMediaType,
       },
     };
   });

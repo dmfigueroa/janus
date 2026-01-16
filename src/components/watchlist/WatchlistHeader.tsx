@@ -21,7 +21,7 @@ export function WatchlistHeader({
   const percentage = totalItems > 0 ? Math.round((watchedItems / totalItems) * 100) : 0;
 
   return (
-    <div className="sticky top-16 z-10 bg-background/95 pb-6 pt-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="sticky top-0 z-40 bg-background/95 pb-6 pt-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex items-center justify-between mb-2">
         <h1 className="text-2xl font-bold tracking-tight">{watchlist.name}</h1>
         {watchlist.description && (

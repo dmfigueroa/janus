@@ -27,6 +27,7 @@ interface EnrichedWatchlist extends Watchlist {
     progress: number;
     nextUnwatched: WatchlistItem | null;
     coverImage: string | null;
+    coverMediaType: "movie" | "episode" | "tv" | null;
   };
 }
 
@@ -56,6 +57,7 @@ export function WatchlistCard({ watchlist }: WatchlistCardProps) {
 
   const { stats } = watchlist;
   const hasUnwatched = !!stats.nextUnwatched;
+  const isEpisodeCover = stats.coverMediaType === "episode";
 
   return (
     <div className="flex flex-col gap-2 group relative">
@@ -71,11 +73,34 @@ export function WatchlistCard({ watchlist }: WatchlistCardProps) {
           )}
         >
           {stats.coverImage ? (
-            <img
-              src={`https://image.tmdb.org/t/p/w500${stats.coverImage}`}
-              alt={watchlist.name}
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            />
+            <>
+              {isEpisodeCover ? (
+                // Episode Layout: Blurred Background + Centered Landscape Image
+                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 overflow-hidden">
+                  {/* Blurred Background */}
+                  <img
+                    src={`https://image.tmdb.org/t/p/w500${stats.coverImage}`}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover blur-2xl scale-150 opacity-80"
+                  />
+                  {/* Main Image */}
+                  <div className="relative z-10 w-full aspect-video shadow-2xl">
+                    <img
+                      src={`https://image.tmdb.org/t/p/w500${stats.coverImage}`}
+                      alt={watchlist.name}
+                      className="w-full h-full object-cover rounded-sm shadow-black/50"
+                    />
+                  </div>
+                </div>
+              ) : (
+                // Movie/Default Layout: Full Cover
+                <img
+                  src={`https://image.tmdb.org/t/p/w500${stats.coverImage}`}
+                  alt={watchlist.name}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+              )}
+            </>
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/20">
               {/* Could add an icon here */}
@@ -87,7 +112,7 @@ export function WatchlistCard({ watchlist }: WatchlistCardProps) {
 
           {/* "Up Next" Badge - Only if there is something specifically next */}
           {hasUnwatched && (
-            <div className="absolute top-3 left-3 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-1 rounded-md shadow-lg">
+            <div className="absolute top-3 left-3 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-1 rounded-md shadow-lg z-20">
               UP NEXT
             </div>
           )}
