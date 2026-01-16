@@ -67,6 +67,40 @@
 /* Base Shadcn Variables - Dark Mode Default with Vibrant Red Accent */
 /* Base Shadcn Variables - Dark Mode Default with Vibrant Red Accent */
 :root {
+  /* Light Mode - Premium Clean */
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(260 20% 10%);
+
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(260 20% 10%);
+
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(260 20% 10%);
+
+  /* Primary - Vibrant Pink/Red */
+  --primary: hsl(340 100% 50%);
+  --primary-foreground: hsl(0 0% 100%);
+
+  --secondary: hsl(260 10% 96%);
+  --secondary-foreground: hsl(260 20% 10%);
+
+  --muted: hsl(260 10% 96%);
+  --muted-foreground: hsl(260 5% 45%);
+
+  --accent: hsl(260 10% 96%);
+  --accent-foreground: hsl(260 20% 10%);
+
+  --destructive: hsl(0 85% 60%);
+  --destructive-foreground: hsl(0 0% 98%);
+
+  --border: hsl(260 10% 90%);
+  --input: hsl(260 10% 90%);
+  --ring: hsl(340 100% 50%);
+
+  --radius: 1rem;
+}
+
+.dark {
   /* Dark Mode Default - Deep Brownish/Purple Dark for Premium feel */
   /* Was #121016 -> hsl(260 20% 8%) */
   --background: hsl(260 20% 8%);
@@ -101,8 +135,6 @@
   --border: hsl(260 15% 18%);
   --input: hsl(260 15% 18%);
   --ring: hsl(340 100% 50%);
-
-  --radius: 1rem; /* More rounded */
 }
 
 @layer base {
@@ -116,7 +148,7 @@
 
 @layer utilities {
   .glass {
-    @apply bg-white/5 backdrop-blur-lg border border-white/10;
+    @apply bg-black/5 border-black/10 dark:bg-white/5 dark:border-white/10 backdrop-blur-lg border;
   }
   .glass-card {
     @apply bg-card border-none shadow-xl;
