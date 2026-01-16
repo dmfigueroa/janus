@@ -30,7 +30,7 @@ export const searchMultimedia = createServerFn({ method: "GET" })
     z
       .object({
         query: z.string().min(1),
-        page: z.number().default(1),
+        page: z.coerce.number().default(1),
       })
       .parse(data),
   )
@@ -42,11 +42,17 @@ export const searchMultimedia = createServerFn({ method: "GET" })
       throw new Error("TMDB_API_KEY is not configured");
     }
 
-    const response = await fetch(
-      `${TMDB_BASE_URL}/search/multi?api_key=${apiKey}&query=${encodeURIComponent(
-        query,
-      )}&page=${page}&include_adult=false&language=en-US`,
-    );
+    const url = new URL(`${TMDB_BASE_URL}/search/multi`);
+    const params = new URLSearchParams({
+      api_key: apiKey,
+      query: query,
+      page: page.toString(),
+      include_adult: "false",
+      language: "en-US",
+    });
+    url.search = params.toString();
+
+    const response = await fetch(url.toString());
 
     if (!response.ok) {
       console.error("TMDB API Error:", await response.text());

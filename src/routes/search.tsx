@@ -9,6 +9,7 @@ import { z } from "zod";
 
 const searchSchema = z.object({
   query: z.string().optional().default(""),
+  page: z.coerce.number().optional().default(1),
 });
 
 export const Route = createFileRoute("/search")({
