@@ -36,6 +36,8 @@ COPY --from=prod-deps /app/node_modules .output/server/node_modules
 # Copy migrations folder
 COPY drizzle drizzle
 
+USER node
+
 # Expose port
 EXPOSE 3000
 
