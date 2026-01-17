@@ -24,7 +24,7 @@ const ComicVineVolumeSchema = z.object({
       small_url: z.string().nullable().optional(),
     })
     .optional(),
-  start_year: z.string().optional(),
+  start_year: z.string().nullable().optional(),
   deck: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
 });
@@ -89,7 +89,7 @@ export async function searchComics(
       source: "comicvine" as const,
       title: item.name || "Unknown Title",
       poster: item.image?.medium_url || item.image?.small_url || null,
-      year: item.start_year,
+      year: item.start_year || undefined,
       rating: undefined,
       overview: item.deck || item.description || undefined,
     }));

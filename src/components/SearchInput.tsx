@@ -12,6 +12,10 @@ export function SearchInput({ onSearch, defaultValue = "", isLoading }: SearchIn
   const [value, setValue] = useState(defaultValue);
 
   useEffect(() => {
+    setValue(defaultValue);
+  }, [defaultValue]);
+
+  useEffect(() => {
     const handler = setTimeout(() => {
       onSearch(value);
     }, 500);

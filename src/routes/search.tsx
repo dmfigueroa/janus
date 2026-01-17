@@ -84,12 +84,7 @@ function Search() {
 
         <SearchInput onSearch={handleSearch} defaultValue={query} isLoading={isLoadingRoute} />
 
-        <Tabs
-          defaultValue={type}
-          value={type}
-          onValueChange={handleTabChange}
-          className="w-full max-w-2xl"
-        >
+        <Tabs value={type} onValueChange={handleTabChange} className="w-full max-w-2xl">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="movie">Movies</TabsTrigger>
             <TabsTrigger value="tv">TV</TabsTrigger>
