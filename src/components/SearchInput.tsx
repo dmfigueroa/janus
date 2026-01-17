@@ -1,4 +1,5 @@
 import { Input } from "./ui/input";
+import { Button } from "./ui/button";
 import { SearchIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -15,31 +16,31 @@ export function SearchInput({ onSearch, defaultValue = "", isLoading }: SearchIn
     setValue(defaultValue);
   }, [defaultValue]);
 
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      onSearch(value);
-    }, 500);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, onSearch]);
+  const handleSubmit = () => {
+    onSearch(value);
+  };
 
   return (
-    <div className="relative w-full max-w-lg">
-      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-        {isLoading ? (
-          <div className="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        ) : (
+    <div className="flex w-full max-w-lg items-center gap-2">
+      <div className="relative flex-1">
+        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
           <SearchIcon className="size-4" />
-        )}
+        </div>
+        <Input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+          placeholder="Search..."
+          className="pl-10 h-10 bg-secondary/50 border-transparent focus-visible:ring-primary/20 focus-visible:border-primary/50 transition-all rounded-xl"
+        />
       </div>
-      <Input
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="Search for movies or TV shows..."
-        className="pl-10 h-10 bg-secondary/50 border-transparent focus-visible:ring-primary/20 focus-visible:border-primary/50 transition-all rounded-xl"
-      />
+      <Button onClick={handleSubmit} disabled={isLoading}>
+        {isLoading ? (
+          <div className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+        ) : (
+          "Search"
+        )}
+      </Button>
     </div>
   );
 }
