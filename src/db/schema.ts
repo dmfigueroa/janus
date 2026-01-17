@@ -29,7 +29,7 @@ export const watchlistItems = sqliteTable(
     title: text("title").notNull(),
     parentTitle: text("parent_title"), // For TV Show name
     season: integer("season"),
-    episode: integer("episode"),
+    episode: text("episode"),
     posterPath: text("poster_path"),
     releaseDate: text("release_date"),
     voteAverage: real("vote_average"),

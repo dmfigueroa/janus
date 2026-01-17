@@ -167,7 +167,7 @@ const addTVShowToWatchList = async (
       title: ep.name,
       parentTitle: media.title,
       season: ep.season_number,
-      episode: ep.episode_number,
+      episode: ep.episode_number.toString(),
       posterPath: ep.still_path || showDetails.poster_path,
       releaseDate: ep.air_date,
       voteAverage: ep.vote_average,
@@ -205,8 +205,7 @@ const addComicToWatchList = async (
     title: issue.title,
     parentTitle: media.title,
     season: null,
-    episode:
-      issue.issueNumber && !isNaN(parseInt(issue.issueNumber)) ? parseInt(issue.issueNumber) : null,
+    episode: issue.issueNumber,
     posterPath: issue.poster,
     releaseDate: issue.coverDate,
     voteAverage: 0,

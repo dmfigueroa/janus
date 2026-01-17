@@ -147,8 +147,6 @@ export async function getComicIssues(volumeId: string, apiKey: string): Promise<
       totalResults = data.number_of_total_results;
       offset += results.length;
 
-      console.log(`Fetched ${results.length} issues (Total: ${allIssues.length}/${totalResults})`);
-
       if (results.length === 0) break;
     }
 
