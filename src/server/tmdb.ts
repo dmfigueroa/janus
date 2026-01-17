@@ -2,6 +2,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { type UnifiedMedia } from "./external-apis";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
@@ -51,7 +52,6 @@ async function fetchFromTMDB(
 
   const data = (await response.json()) as TMDBSearchResponse;
 
-  // TMDB specific search endpoints don't always return media_type, so we inject it.
   data.results = data.results.map((item) => ({
     ...item,
     media_type: item.media_type || type,
@@ -70,16 +70,46 @@ export const searchMultimedia = createServerFn({ method: "GET" })
       })
       .parse(data),
   )
-  .handler(async ({ data }) => {
-    const { query, page, type } = data;
-    const apiKey = process.env.TMDB_API_KEY;
+  .handler(
+    async ({
+      data,
+    }): Promise<{
+      results: UnifiedMedia[];
+      page: number;
+      total_pages: number;
+      total_results: number;
+    }> => {
+      const { query, page, type } = data;
+      const apiKey = process.env.TMDB_API_KEY;
 
-    if (!apiKey) {
-      throw new Error("TMDB_API_KEY is not configured");
-    }
+      if (!apiKey) {
+        throw new Error("TMDB_API_KEY is not configured");
+      }
 
-    return fetchFromTMDB(query, page, type, apiKey);
-  });
+      const tmdbData = await fetchFromTMDB(query, page, type, apiKey);
+
+      const results: UnifiedMedia[] = tmdbData.results.map((item) => ({
+        id: item.id.toString(),
+        mediaType: item.media_type || type,
+        source: "tmdb",
+        title: item.title || item.name || "Untitled",
+        poster: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null,
+        backdrop: item.backdrop_path
+          ? `https://image.tmdb.org/t/p/w1280${item.backdrop_path}`
+          : null,
+        year: (item.release_date || item.first_air_date)?.split("-")[0],
+        rating: item.vote_average,
+        overview: item.overview,
+      }));
+
+      return {
+        results,
+        page: tmdbData.page,
+        total_pages: tmdbData.total_pages,
+        total_results: tmdbData.total_results,
+      };
+    },
+  );
 
 export async function getTVDetails(id: number, apiKey: string) {
   const url = new URL(`${TMDB_BASE_URL}/tv/${id}`);

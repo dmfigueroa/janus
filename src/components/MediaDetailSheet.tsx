@@ -1,22 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { TMDBMedia } from "@/server/tmdb";
+import { useState } from "react";
+import { UnifiedMedia } from "@/server/external-apis";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetDescription,
-  SheetFooter,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Star, Calendar, Info } from "lucide-react";
 import { addToWatchlist } from "@/server/watchlist";
 import { getWatchlists } from "@/server/watchlists";
 import { toast } from "sonner";
-// We might need a Select component if we have multiple watchlists.
-// Checking availability or defaulting to a simple list if not available.
 import {
   Select,
   SelectContent,
@@ -27,20 +24,13 @@ import {
 import { useQuery, useMutation } from "@tanstack/react-query";
 
 interface MediaDetailSheetProps {
-  media: TMDBMedia | null;
+  media: UnifiedMedia | null;
   isOpen: boolean;
   onClose: () => void;
 }
 
 export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetProps) {
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string>("");
-
-  // Reset selected watchlist on open
-  useEffect(() => {
-    if (isOpen) {
-      setSelectedWatchlistId("");
-    }
-  }, [isOpen]);
 
   const { data: watchlists } = useQuery({
     queryKey: ["watchlists"],
@@ -74,17 +64,18 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
 
   if (!media) return null;
 
-  const title = media.title || media.name || "Unknown Title";
-  const date = media.release_date || media.first_air_date;
-  const year = date ? new Date(date).getFullYear() : "TBA";
-  const backdropUrl = media.backdrop_path
-    ? `https://image.tmdb.org/t/p/w1280${media.backdrop_path}`
-    : null;
-  const posterUrl = media.poster_path
-    ? `https://image.tmdb.org/t/p/w500${media.poster_path}`
-    : null;
+  const {
+    title,
+    year,
+    poster: posterUrl,
+    backdrop: backdropUrl,
+    rating,
+    overview,
+    mediaType,
+  } = media;
 
-  const rating = media.vote_average ? media.vote_average.toFixed(1) : "N/A";
+  // Rating might be undefined, handle gracefully
+  const displayRating = rating ? rating.toFixed(1) : "N/A";
 
   const handleAddToWatchlist = () => {
     if (!selectedWatchlistId) {
@@ -101,30 +92,40 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
           {backdropUrl && (
             <div className="relative -mx-6 -mt-6 mb-4 aspect-video w-[calc(100%+3rem)] overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent z-10" />
-              <img src={backdropUrl} alt={title} className="w-full h-full object-cover" />
+              <img
+                src={backdropUrl}
+                alt={title}
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
             </div>
           )}
           <div className="flex gap-4 items-start">
             {posterUrl && !backdropUrl && (
-              <img src={posterUrl} alt={title} className="w-24 rounded-md shadow-md" />
+              <img
+                src={posterUrl}
+                alt={title}
+                className="w-24 rounded-md shadow-md"
+                referrerPolicy="no-referrer"
+              />
             )}
             <div className="space-y-1">
               <SheetTitle className="text-2xl font-bold">{title}</SheetTitle>
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  <Calendar className="size-3.5" /> {year}
+                  <Calendar className="size-3.5" /> {year || "TBA"}
                 </span>
                 <span className="flex items-center gap-1">
-                  <Star className="size-3.5 text-yellow-500 fill-yellow-500" /> {rating}
+                  <Star className="size-3.5 text-yellow-500 fill-yellow-500" /> {displayRating}
                 </span>
                 <span className="capitalize border px-1.5 py-0.5 rounded text-xs">
-                  {media.media_type === "tv" ? "TV Series" : "Movie"}
+                  {mediaType === "tv" ? "TV Series" : mediaType}
                 </span>
               </div>
             </div>
           </div>
           <SheetDescription className="text-base leading-relaxed text-foreground/90">
-            {media.overview}
+            {overview || "No description available."}
           </SheetDescription>
         </SheetHeader>
 
@@ -157,7 +158,7 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
               {addToWatchlistMutation.isPending ? "Adding..." : "Add"}
             </Button>
           </div>
-          {media.media_type === "tv" && (
+          {mediaType === "tv" && (
             <div className="flex items-start gap-2 text-xs text-muted-foreground bg-secondary/50 p-3 rounded-md">
               <Info className="size-4 shrink-0 mt-0.5" />
               <p>
@@ -167,8 +168,6 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
             </div>
           )}
         </div>
-
-        <SheetFooter className="mt-8 sm:justify-start">{/* Optional footer actions */}</SheetFooter>
       </SheetContent>
     </Sheet>
   );

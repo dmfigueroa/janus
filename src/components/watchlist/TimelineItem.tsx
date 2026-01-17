@@ -1,24 +1,122 @@
 "use client";
 
 import { cn } from "@/utils/cn";
-import { Check, Film, Tv } from "lucide-react";
+import { Check, Film, Tv, Gamepad2, Book, BookOpen } from "lucide-react";
 import { WatchlistItem } from "@/server/watchlist";
-import { format } from "date-fns";
+import { formatReleaseDate, formatRuntime } from "@/utils/datetime";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { toggleWatched } from "@/server/watchlist";
 import { useRouter } from "@tanstack/react-router";
 
-interface TimelineItemProps {
+type TimelineItemProps = {
   item: WatchlistItem;
-}
+};
+
+const getMediaConfig = (type: string) => {
+  switch (type) {
+    case "movie":
+      return { label: "Movie", icon: Film, isPortrait: true };
+    case "episode":
+      return { label: null, icon: Tv, isPortrait: false };
+    case "game":
+      return { label: "Game", icon: Gamepad2, isPortrait: true };
+    case "book":
+      return { label: "Book", icon: Book, isPortrait: true };
+    case "comic":
+      return { label: "Comic", icon: BookOpen, isPortrait: true };
+    default:
+      return { label: null, icon: Film, isPortrait: true };
+  }
+};
+
+const Poster = ({ mediaType, posterPath, title }: WatchlistItem) => {
+  const config = getMediaConfig(mediaType);
+  const Icon = config.icon;
+
+  const posterUrl = posterPath
+    ? posterPath.startsWith("http")
+      ? posterPath
+      : `https://image.tmdb.org/t/p/w200${posterPath}`
+    : null;
+
+  return (
+    <div className="flex w-28 shrink-0 justify-center">
+      <div
+        className={cn(
+          "relative shrink-0 overflow-hidden font-bold shadow-md ring-1 ring-border",
+          config.isPortrait ? "h-32 w-20 rounded-lg" : "h-16 w-full rounded-md",
+        )}
+      >
+        {posterUrl ? (
+          <img
+            src={posterUrl}
+            alt={title}
+            className="h-full w-full object-cover"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-secondary text-muted-foreground">
+            <Icon size={20} />
+          </div>
+        )}
+
+        {config.label && (
+          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5 text-center text-[10px] uppercase tracking-wider text-white backdrop-blur-[2px]">
+            {config.label}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const Content = ({
+  parentTitle,
+  title,
+  mediaType,
+  season,
+  episode,
+  releaseDate,
+  runtime,
+}: WatchlistItem) => {
+  const formattedDate = formatReleaseDate(releaseDate);
+  const runtimeStr = formatRuntime(runtime);
+
+  return (
+    <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
+      {parentTitle && (
+        <span className="text-xs font-medium uppercase tracking-wider text-primary">
+          {parentTitle}
+        </span>
+      )}
+      <h3 className="line-clamp-1 text-lg font-semibold leading-tight text-foreground">{title}</h3>
+      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+        {mediaType !== "movie" && (
+          <>
+            {mediaType === "comic" && episode ? (
+              <span>Issue #{episode}</span>
+            ) : season && episode ? (
+              <span>
+                S{season} E{episode}
+              </span>
+            ) : null}
+          </>
+        )}
+
+        <span>{formattedDate}</span>
+
+        {runtimeStr && <span className="flex items-center gap-1">• {runtimeStr}</span>}
+      </div>
+    </div>
+  );
+};
 
 export function TimelineItem({ item }: TimelineItemProps) {
   const router = useRouter();
 
   const toggleMutation = useMutation({
     mutationFn: async () => {
-      // Optimistically toggle? For now just wait for server.
       await toggleWatched({ data: { itemId: item.id, isWatched: !item.isWatched } });
     },
     onSuccess: () => {
@@ -29,30 +127,6 @@ export function TimelineItem({ item }: TimelineItemProps) {
     },
   });
 
-  const isMovie = item.mediaType === "movie";
-
-  // Fix hydration mismatch: Parse YYYY-MM-DD as local date to avoid timezone shifts
-  let date = null;
-  if (item.releaseDate) {
-    const [year, month, day] = item.releaseDate.split("-").map(Number);
-    date = new Date(year, month - 1, day);
-  }
-
-  const formattedDate = date ? format(date, "MMMM d") : "TBA";
-
-  // Runtime formatting
-  const formatRuntime = (mins: number | null) => {
-    if (!mins) return "";
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    if (h > 0) return `${h}h ${m}m`;
-    return `${m}m`;
-  };
-
-  const runtimeStr = formatRuntime(item.runtime);
-
-  const posterUrl = item.posterPath ? `https://image.tmdb.org/t/p/w200${item.posterPath}` : null;
-
   return (
     <div
       className={cn(
@@ -60,53 +134,9 @@ export function TimelineItem({ item }: TimelineItemProps) {
         item.isWatched && "opacity-60",
       )}
     >
-      {/* Poster / Thumbnail */}
-      <div
-        className={cn(
-          "relative shrink-0 overflow-hidden font-bold shadow-md ring-1 ring-border",
-          isMovie ? "h-24 w-16 rounded-lg" : "h-16 w-28 rounded-md",
-        )}
-      >
-        {posterUrl ? (
-          <img src={posterUrl} alt={item.title} className="h-full w-full object-cover" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-secondary text-muted-foreground">
-            {isMovie ? <Film size={20} /> : <Tv size={20} />}
-          </div>
-        )}
+      <Poster {...item} />
+      <Content {...item} />
 
-        {isMovie && (
-          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5 text-center text-[10px] uppercase tracking-wider text-white backdrop-blur-[2px]">
-            Movie
-          </div>
-        )}
-      </div>
-
-      {/* Content */}
-      <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
-        {item.parentTitle && (
-          <span className="text-xs font-medium uppercase tracking-wider text-primary">
-            {item.parentTitle}
-          </span>
-        )}
-        <h3 className="line-clamp-1 text-lg font-semibold leading-tight text-foreground">
-          {item.title}
-        </h3>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          {/* Season/Ep for TV */}
-          {!isMovie && item.season && item.episode && (
-            <span>
-              S{item.season} E{item.episode}
-            </span>
-          )}
-
-          <span>{formattedDate}</span>
-
-          {runtimeStr && <span className="flex items-center gap-1">• {runtimeStr}</span>}
-        </div>
-      </div>
-
-      {/* Action */}
       <button
         onClick={() => toggleMutation.mutate()}
         disabled={toggleMutation.isPending}

@@ -21,8 +21,11 @@ export const watchlistItems = sqliteTable(
     watchlistId: integer("watchlist_id")
       .references(() => watchlists.id, { onDelete: "cascade" })
       .notNull(),
-    tmdbId: integer("tmdb_id").notNull(),
-    mediaType: text("media_type", { enum: ["movie", "episode"] }).notNull(),
+    tmdbId: text("tmdb_id").notNull(), // Stores external ID (TMDB, ISBN, etc.)
+    source: text("source").notNull().default("tmdb"),
+    mediaType: text("media_type", {
+      enum: ["movie", "episode", "game", "book", "comic"], // Expanded enum
+    }).notNull(),
     title: text("title").notNull(),
     parentTitle: text("parent_title"), // For TV Show name
     season: integer("season"),
@@ -37,7 +40,11 @@ export const watchlistItems = sqliteTable(
       .notNull(),
   },
   (table) => ({
-    uniqueWatchlistItem: uniqueIndex("unique_watchlist_item").on(table.watchlistId, table.tmdbId),
+    uniqueWatchlistItem: uniqueIndex("unique_watchlist_item").on(
+      table.watchlistId,
+      table.tmdbId,
+      table.mediaType,
+    ),
   }),
 );
 

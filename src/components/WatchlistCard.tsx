@@ -1,45 +1,100 @@
 import { useRouter, Link } from "@tanstack/react-router";
 import { deleteWatchlist } from "@/server/watchlists";
-import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
-import { useState, type MouseEvent } from "react";
+import { useState } from "react";
 import { cn } from "@/utils/cn";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-
 import type { Watchlist } from "@/db/schema";
 import type { WatchlistItem } from "@/db/schema";
+import { DeleteWatchlistButton } from "./DeleteWatchlistButton";
 
-interface EnrichedWatchlist extends Watchlist {
+export type EnrichedWatchlist = {
   stats: {
     totalItems: number;
     watchedItems: number;
     progress: number;
     nextUnwatched: WatchlistItem | null;
     coverImage: string | null;
-    coverMediaType: "movie" | "episode" | "tv" | null;
+    coverMediaType: WatchlistItem["mediaType"] | null;
   };
-}
+} & Watchlist;
 
-interface WatchlistCardProps {
-  watchlist: EnrichedWatchlist;
-}
+const getImageUrl = (path: string | null) => {
+  if (!path) return "";
+  return path.startsWith("http") ? path : `https://image.tmdb.org/t/p/w500${path}`;
+};
 
-export function WatchlistCard({ watchlist }: WatchlistCardProps) {
+const CoverImage = ({ watchlist }: { watchlist: EnrichedWatchlist }) => {
+  const stats = watchlist.stats;
+  if (!stats.coverImage) {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/20">
+        {/* Could add an icon here */}
+      </div>
+    );
+  }
+
+  const coverImageUrl = getImageUrl(stats.coverImage);
+  const isEpisodeCover = stats.coverMediaType === "episode";
+
+  return (
+    <>
+      {isEpisodeCover ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 overflow-hidden">
+          <img
+            src={coverImageUrl}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover blur-2xl scale-150 opacity-80"
+          />
+          <div className="relative z-10 w-full aspect-video shadow-2xl">
+            <img
+              src={coverImageUrl}
+              alt={watchlist.name}
+              className="w-full h-full object-cover rounded-sm shadow-black/50"
+            />
+          </div>
+        </div>
+      ) : (
+        <img
+          src={coverImageUrl}
+          alt={watchlist.name}
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      )}
+    </>
+  );
+};
+
+const WatchlistInfo = ({ watchlist }: { watchlist: EnrichedWatchlist }) => {
+  const stats = watchlist.stats;
+
+  return (
+    <div className="px-1">
+      <h3 className="font-bold text-lg text-foreground leading-tight truncate">{watchlist.name}</h3>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 mb-1">
+        <span>{stats.totalItems} items</span>
+        <span>•</span>
+        <span className={cn(stats.progress === 100 ? "text-green-500" : "text-primary")}>
+          {stats.progress}%
+        </span>
+      </div>
+
+      <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
+        <div
+          className={cn(
+            "h-full rounded-full transition-all duration-500",
+            stats.progress === 100 ? "bg-green-500" : "bg-primary",
+          )}
+          style={{ width: `${stats.progress}%` }}
+        />
+      </div>
+    </div>
+  );
+};
+
+export function WatchlistCard({ watchlist }: { watchlist: EnrichedWatchlist }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
 
-  // Fallback gradient if no cover image
   const fallbackGradient = "bg-gradient-to-br from-zinc-800 to-zinc-900";
 
   const handleDelete = async () => {
@@ -57,7 +112,6 @@ export function WatchlistCard({ watchlist }: WatchlistCardProps) {
 
   const { stats } = watchlist;
   const hasUnwatched = !!stats.nextUnwatched;
-  const isEpisodeCover = stats.coverMediaType === "episode";
 
   return (
     <div className="flex flex-col gap-2 group relative">
@@ -72,45 +126,9 @@ export function WatchlistCard({ watchlist }: WatchlistCardProps) {
             !stats.coverImage && fallbackGradient,
           )}
         >
-          {stats.coverImage ? (
-            <>
-              {isEpisodeCover ? (
-                // Episode Layout: Blurred Background + Centered Landscape Image
-                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 overflow-hidden">
-                  {/* Blurred Background */}
-                  <img
-                    src={`https://image.tmdb.org/t/p/w500${stats.coverImage}`}
-                    alt=""
-                    className="absolute inset-0 w-full h-full object-cover blur-2xl scale-150 opacity-80"
-                  />
-                  {/* Main Image */}
-                  <div className="relative z-10 w-full aspect-video shadow-2xl">
-                    <img
-                      src={`https://image.tmdb.org/t/p/w500${stats.coverImage}`}
-                      alt={watchlist.name}
-                      className="w-full h-full object-cover rounded-sm shadow-black/50"
-                    />
-                  </div>
-                </div>
-              ) : (
-                // Movie/Default Layout: Full Cover
-                <img
-                  src={`https://image.tmdb.org/t/p/w500${stats.coverImage}`}
-                  alt={watchlist.name}
-                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-              )}
-            </>
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/20">
-              {/* Could add an icon here */}
-            </div>
-          )}
-
-          {/* Dark Overlay for text legibility if needed, or just refined shadows */}
+          <CoverImage watchlist={watchlist} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
 
-          {/* "Up Next" Badge - Only if there is something specifically next */}
           {hasUnwatched && (
             <div className="absolute top-3 left-3 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-1 rounded-md shadow-lg z-20">
               UP NEXT
@@ -119,68 +137,13 @@ export function WatchlistCard({ watchlist }: WatchlistCardProps) {
         </div>
       </Link>
 
-      {/* Delete Button (Hidden till hover) */}
-      <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button
-            variant="destructive"
-            size="icon"
-            className="absolute top-2 right-2 w-8 h-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-lg"
-            onClick={(e: MouseEvent) => {
-              e.stopPropagation();
-            }}
-            disabled={deleting}
-          >
-            <X className="w-4 h-4" />
-          </Button>
-        </AlertDialogTrigger>
-        <AlertDialogContent onClick={(e: MouseEvent) => e.stopPropagation()}>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Watchlist</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{watchlist.name}"? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={(e: MouseEvent) => e.stopPropagation()}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={(e: MouseEvent) => {
-                e.stopPropagation();
-                handleDelete();
-              }}
-            >
-              {deleting ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteWatchlistButton
+        watchlist={watchlist}
+        deleting={deleting}
+        handleDelete={handleDelete}
+      />
 
-      {/* Info Section */}
-      <div className="px-1">
-        <h3 className="font-bold text-lg text-foreground leading-tight truncate">
-          {watchlist.name}
-        </h3>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 mb-1">
-          <span>{stats.totalItems} items</span>
-          <span>•</span>
-          <span className={cn(stats.progress === 100 ? "text-green-500" : "text-primary")}>
-            {stats.progress}%
-          </span>
-        </div>
-        {/* Progress Bar */}
-        <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
-          <div
-            className={cn(
-              "h-full rounded-full transition-all duration-500",
-              stats.progress === 100 ? "bg-green-500" : "bg-primary",
-            )}
-            style={{ width: `${stats.progress}%` }}
-          />
-        </div>
-      </div>
+      <WatchlistInfo watchlist={watchlist} />
     </div>
   );
 }
