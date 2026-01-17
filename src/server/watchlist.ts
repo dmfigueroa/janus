@@ -7,6 +7,8 @@ import { watchlistItems } from "../db/schema";
 import { eq, and } from "drizzle-orm";
 import { getTVDetails, getSeasonDetails, getMovieDetails } from "./tmdb";
 import { getComicIssues } from "./comicvine";
+import { getBookDetails } from "./google-books";
+import { getGameDetails } from "./rawg";
 
 export type { Watchlist, WatchlistItem } from "../db/schema";
 
@@ -21,6 +23,7 @@ const addToWatchlistSchema = z.object({
     title: z.string(),
     poster: z.string().nullable(),
     year: z.string().optional(),
+    releaseDate: z.string().optional(),
     rating: z.number().optional(),
     overview: z.string().optional(),
   }),
@@ -71,6 +74,18 @@ export const addToWatchlist = createServerFn({ method: "POST" })
       return await addComicToWatchList(watchlistId, media.id, media, cvApiKey);
     }
 
+    if (media.source === "google_books" && media.mediaType === "book") {
+      const details = await getBookDetails(media.id);
+      return await addGenericItemToWatchlist(watchlistId, details);
+    }
+
+    if (media.source === "rawg" && media.mediaType === "game") {
+      const rawgApiKey = process.env.RAWG_API_KEY;
+      if (!rawgApiKey) throw new Error("RAWG_API_KEY is not configured");
+      const details = await getGameDetails(media.id, rawgApiKey);
+      return await addGenericItemToWatchlist(watchlistId, details);
+    }
+
     // TypeScript now knows media.mediaType is not "tv", so it matches GenericMedia
     return await addGenericItemToWatchlist(watchlistId, media as GenericMedia);
   });
@@ -99,7 +114,7 @@ const addGenericItemToWatchlist = async (watchlistId: number, media: GenericMedi
     mediaType: media.mediaType,
     title: media.title,
     posterPath: media.poster,
-    releaseDate: media.year,
+    releaseDate: media.releaseDate || media.year,
     voteAverage: media.rating,
     runtime: 0,
   });

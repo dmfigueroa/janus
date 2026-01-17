@@ -43,6 +43,7 @@ export async function searchGames(
       title: game.name,
       poster: game.background_image || null,
       year: game.released?.split("-")[0],
+      releaseDate: game.released || undefined,
       rating: game.rating ? game.rating * 2 : undefined,
       overview: undefined,
     }));
@@ -54,5 +55,31 @@ export async function searchGames(
   } catch (e) {
     console.error("RAWG API Error", e);
     return { results: [], totalResults: 0 };
+  }
+}
+
+export async function getGameDetails(id: string, apiKey: string) {
+  try {
+    const url = `https://api.rawg.io/api/games/${id}?key=${apiKey}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Failed to fetch game details");
+
+    const item = await res.json();
+    const data = RawgGameSchema.parse(item);
+
+    return {
+      id: data.id.toString(),
+      mediaType: "game" as const,
+      source: "rawg" as const,
+      title: data.name,
+      poster: data.background_image || null,
+      year: data.released?.split("-")[0],
+      releaseDate: data.released || undefined,
+      rating: data.rating ? data.rating * 2 : undefined,
+      overview: undefined,
+    };
+  } catch (e) {
+    console.error("RAWG Details Error", e);
+    throw e;
   }
 }

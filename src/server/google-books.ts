@@ -45,6 +45,7 @@ export async function searchBooks(
       title: item.volumeInfo.title || "Unknown Title",
       poster: item.volumeInfo.imageLinks?.thumbnail?.replace("http:", "https:") || null,
       year: item.volumeInfo.publishedDate?.split("-")[0],
+      releaseDate: item.volumeInfo.publishedDate,
       rating: item.volumeInfo.averageRating ? item.volumeInfo.averageRating * 2 : undefined,
       overview: item.volumeInfo.description,
     }));
@@ -56,5 +57,31 @@ export async function searchBooks(
   } catch (e) {
     console.error("Google Books API Error", e);
     return { results: [], totalResults: 0 };
+  }
+}
+
+export async function getBookDetails(id: string) {
+  try {
+    const url = `https://www.googleapis.com/books/v1/volumes/${id}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Failed to fetch book details");
+
+    const item = await res.json();
+    const data = GoogleBookItemSchema.parse(item);
+
+    return {
+      id: data.id,
+      mediaType: "book" as const,
+      source: "google_books" as const,
+      title: data.volumeInfo.title || "Unknown Title",
+      poster: data.volumeInfo.imageLinks?.thumbnail?.replace("http:", "https:") || null,
+      year: data.volumeInfo.publishedDate?.split("-")[0],
+      releaseDate: data.volumeInfo.publishedDate,
+      rating: data.volumeInfo.averageRating ? data.volumeInfo.averageRating * 2 : undefined,
+      overview: data.volumeInfo.description,
+    };
+  } catch (e) {
+    console.error("Google Books Details Error", e);
+    throw e;
   }
 }

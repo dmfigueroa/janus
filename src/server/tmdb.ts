@@ -98,6 +98,7 @@ export const searchMultimedia = createServerFn({ method: "GET" })
           ? `https://image.tmdb.org/t/p/w1280${item.backdrop_path}`
           : null,
         year: (item.release_date || item.first_air_date)?.split("-")[0],
+        releaseDate: item.release_date || item.first_air_date,
         rating: item.vote_average,
         overview: item.overview,
       }));
