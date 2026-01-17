@@ -1,11 +1,11 @@
-import { TMDBMedia } from "../server/tmdb";
+import { UnifiedMedia } from "../server/media";
 import { MediaCard } from "./MediaCard";
 import { useIntersectionObserver } from "../hooks/useIntersectionObserver";
 import { useState } from "react";
 import { MediaDetailSheet } from "./MediaDetailSheet";
 
 interface SearchResultsProps {
-  results: TMDBMedia[];
+  results: UnifiedMedia[];
   fetchNextPage: () => void;
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
@@ -17,7 +17,7 @@ export function SearchResults({
   hasNextPage,
   isFetchingNextPage,
 }: SearchResultsProps) {
-  const [selectedMedia, setSelectedMedia] = useState<TMDBMedia | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<UnifiedMedia | null>(null);
 
   const { ref } = useIntersectionObserver({
     onIntersect: fetchNextPage,
@@ -48,6 +48,7 @@ export function SearchResults({
       )}
 
       <MediaDetailSheet
+        key={selectedMedia?.id}
         media={selectedMedia}
         isOpen={!!selectedMedia}
         onClose={() => setSelectedMedia(null)}

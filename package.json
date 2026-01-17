@@ -10,7 +10,8 @@
     "test": "vitest run",
     "lint": "oxlint .",
     "format": "oxfmt . --write",
-    "prepare": "simple-git-hooks"
+    "prepare": "simple-git-hooks",
+    "migrate": "npx -y tsx --env-file=.env src/db/migrate.ts"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.15",

@@ -108,7 +108,6 @@ The project is designed to be containerized. Ensure your `Dockerfile` (pending c
 
 ## 📝 Roadmap & Todo
 
-- [ ] **Add Dockerfile**: Create a Dockerfile to containerize the application.
 - [ ] **Delete items**: Add functionality to delete movies and shows from the watchlist.
 - [ ] **Infinite Scroll Polish**: Optimize the search results pagination and infinite loading experience.
 - [ ] **Watchlist visual polish**: Enhance the "Up Next" cover art logic and progress bars in the card view.

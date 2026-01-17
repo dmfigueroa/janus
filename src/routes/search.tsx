@@ -1,6 +1,6 @@
 import { SearchInput } from "../components/SearchInput";
 import { SearchResults } from "../components/SearchResults";
-import { searchMultimedia } from "../server/tmdb";
+import { searchUnified } from "../server/search";
 import { useCallback } from "react";
 import { createFileRoute, useNavigate, useSearch, useRouterState } from "@tanstack/react-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
@@ -10,8 +10,10 @@ import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
 const searchSchema = z.object({
   query: z.string().optional().default(""),
   page: z.coerce.number().optional().default(1),
-  type: z.enum(["movie", "tv"]).optional().default("movie"),
+  type: z.enum(["movie", "tv", "game", "book", "comic"]).optional().default("movie"),
 });
+
+type SearchType = z.infer<typeof searchSchema>["type"];
 
 export const Route = createFileRoute("/search")({
   validateSearch: searchSchema,
@@ -21,7 +23,7 @@ export const Route = createFileRoute("/search")({
       return { results: [], page: 1, total_pages: 0, total_results: 0 };
     }
 
-    return searchMultimedia({ data: { query, page: 1, type } });
+    return searchUnified({ data: { query, page: 1, type } });
   },
   component: Search,
 });
@@ -35,7 +37,7 @@ function Search() {
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["search", query, type],
-    queryFn: ({ pageParam }) => searchMultimedia({ data: { query, page: pageParam, type } }),
+    queryFn: ({ pageParam }) => searchUnified({ data: { query, page: pageParam, type } }),
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
       lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined,
@@ -62,7 +64,7 @@ function Search() {
       navigate({
         search: {
           query,
-          type: newType as "movie" | "tv",
+          type: newType as SearchType,
         },
       });
     },
@@ -74,10 +76,10 @@ function Search() {
       <div className="mb-8 flex flex-col items-center gap-6">
         <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-5xl">
           <span className="text-primary">Discover</span>{" "}
-          <span className="text-muted-foreground">Movies & TV</span>
+          <span className="text-muted-foreground">Everything</span>
         </h1>
         <p className="max-w-md text-center text-muted-foreground">
-          Find where to stream new, popular & upcoming entertainment.
+          Find movies, shows, games, books and comics.
         </p>
 
         <SearchInput onSearch={handleSearch} defaultValue={query} isLoading={isLoadingRoute} />
@@ -86,11 +88,14 @@ function Search() {
           defaultValue={type}
           value={type}
           onValueChange={handleTabChange}
-          className="w-full max-w-sm"
+          className="w-full max-w-2xl"
         >
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="movie">Movies</TabsTrigger>
-            <TabsTrigger value="tv">TV Shows</TabsTrigger>
+            <TabsTrigger value="tv">TV</TabsTrigger>
+            <TabsTrigger value="game">Games</TabsTrigger>
+            <TabsTrigger value="book">Books</TabsTrigger>
+            <TabsTrigger value="comic">Comics</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>

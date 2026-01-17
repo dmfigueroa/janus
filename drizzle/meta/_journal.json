@@ -15,6 +15,20 @@
       "when": 1768610663267,
       "tag": "0001_powerful_purifiers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1768631554453,
+      "tag": "0002_glossy_glorian",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1768671577412,
+      "tag": "0003_nice_silver_surfer",
+      "breakpoints": true
     }
   ]
 }
