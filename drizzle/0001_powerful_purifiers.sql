@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `unique_watchlist_item` ON `watchlist_items` (`watchlist_id`,`tmdb_id`);

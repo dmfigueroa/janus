@@ -4,12 +4,13 @@ import { Star } from "lucide-react";
 
 interface MediaCardProps {
   media: TMDBMedia;
+  onClick?: () => void;
 }
 
-export function MediaCard({ media }: MediaCardProps) {
+export function MediaCard({ media, onClick }: MediaCardProps) {
   const title = media.title || media.name || "Unknown Title";
   const date = media.release_date || media.first_air_date;
-  const year = date ? new Date(date).getFullYear() : "TBA";
+  const year = date ? date.split("-")[0] : "TBA";
   const posterUrl = media.poster_path
     ? `https://image.tmdb.org/t/p/w500${media.poster_path}`
     : "https://placehold.co/500x750/1a1a1a/666?text=No+Poster"; // Fallback
@@ -17,13 +18,8 @@ export function MediaCard({ media }: MediaCardProps) {
   const rating = media.vote_average ? media.vote_average.toFixed(1) : null;
   const isHighRating = media.vote_average >= 7.5;
 
-  return (
-    <Link
-      to="."
-      // Note: Actual linking to details page will be implemented later or we can assume a route exists.
-      // For now linking to current page or a placeholder.
-      className="group relative flex flex-col gap-2 transition-all duration-300 hover:scale-[1.02]"
-    >
+  const CardContent = (
+    <>
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-secondary/30 shadow-sm border border-white/5 transition-all group-hover:border-primary/30 group-hover:shadow-lg group-hover:shadow-primary/5">
         <img
           src={posterUrl}
@@ -52,6 +48,26 @@ export function MediaCard({ media }: MediaCardProps) {
         </h3>
         <p className="text-xs text-muted-foreground">{year}</p>
       </div>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <div
+        onClick={onClick}
+        className="group relative flex flex-col gap-2 transition-all duration-300 hover:scale-[1.02] cursor-pointer"
+      >
+        {CardContent}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      to="."
+      className="group relative flex flex-col gap-2 transition-all duration-300 hover:scale-[1.02]"
+    >
+      {CardContent}
     </Link>
   );
 }

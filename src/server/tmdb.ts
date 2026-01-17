@@ -49,7 +49,15 @@ async function fetchFromTMDB(
     throw new Error("Failed to fetch data from TMDB");
   }
 
-  return (await response.json()) as TMDBSearchResponse;
+  const data = (await response.json()) as TMDBSearchResponse;
+
+  // TMDB specific search endpoints don't always return media_type, so we inject it.
+  data.results = data.results.map((item) => ({
+    ...item,
+    media_type: item.media_type || type,
+  }));
+
+  return data;
 }
 
 export const searchMultimedia = createServerFn({ method: "GET" })
@@ -72,3 +80,36 @@ export const searchMultimedia = createServerFn({ method: "GET" })
 
     return fetchFromTMDB(query, page, type, apiKey);
   });
+
+export async function getTVDetails(id: number, apiKey: string) {
+  const url = new URL(`${TMDB_BASE_URL}/tv/${id}`);
+  url.searchParams.set("api_key", apiKey);
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error("Failed to fetch TV details");
+  }
+  return response.json();
+}
+
+export async function getSeasonDetails(id: number, seasonNumber: number, apiKey: string) {
+  const url = new URL(`${TMDB_BASE_URL}/tv/${id}/season/${seasonNumber}`);
+  url.searchParams.set("api_key", apiKey);
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error("Failed to fetch season details");
+  }
+  return response.json();
+}
+
+export async function getMovieDetails(id: number, apiKey: string) {
+  const url = new URL(`${TMDB_BASE_URL}/movie/${id}`);
+  url.searchParams.set("api_key", apiKey);
+
+  const response = await fetch(url.toString());
+  if (!response.ok) {
+    throw new Error("Failed to fetch movie details");
+  }
+  return response.json();
+}

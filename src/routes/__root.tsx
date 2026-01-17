@@ -8,6 +8,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BottomNav } from "@/components/BottomNav";
 
 import appCss from "../styles.css?url";
 
@@ -65,6 +66,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
                 },
               ]}
             />
+            <BottomNav />
           </QueryClientProvider>
         </ThemeProvider>
         <Scripts />

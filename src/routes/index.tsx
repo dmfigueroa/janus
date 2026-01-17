@@ -3,7 +3,6 @@ import { getWatchlists } from "@/server/watchlists";
 import { WatchlistCard } from "@/components/WatchlistCard";
 import { CreateWatchlistCard } from "@/components/CreateWatchlistCard";
 import { CreateWatchlistDialog } from "@/components/CreateWatchlistDialog";
-import { BottomNav } from "@/components/BottomNav";
 import { SearchBar } from "@/components/SearchBar";
 import { Settings } from "lucide-react";
 import { useLoaderData } from "@tanstack/react-router";
@@ -51,9 +50,6 @@ function Index() {
 
         {/* Floating Action Button (Mobile) */}
         <CreateWatchlistDialog />
-
-        {/* B ottom Navigation */}
-        <BottomNav />
       </div>
     </div>
   );

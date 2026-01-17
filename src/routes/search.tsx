@@ -1,6 +1,5 @@
 import { SearchInput } from "../components/SearchInput";
 import { SearchResults } from "../components/SearchResults";
-import { BottomNav } from "../components/BottomNav";
 import { searchMultimedia } from "../server/tmdb";
 import { useCallback } from "react";
 import { createFileRoute, useNavigate, useSearch, useRouterState } from "@tanstack/react-router";
@@ -104,7 +103,6 @@ function Search() {
           isFetchingNextPage={isFetchingNextPage}
         />
       </div>
-      <BottomNav />
     </div>
   );
 }
