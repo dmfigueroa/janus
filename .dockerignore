@@ -1,0 +1,10 @@
+node_modules
+.git
+.output
+.tanstack
+sqlite.db
+.env
+.DS_Store
+dist
+coverage
+test-results
