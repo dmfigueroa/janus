@@ -14,6 +14,13 @@ const addToWatchlistSchema = z.object({
   media: z.object({
     id: z.number(),
     media_type: z.enum(["movie", "tv"]).optional(),
+    title: z.string().optional(),
+    name: z.string().optional(),
+    poster_path: z.string().nullable(),
+    release_date: z.string().optional(),
+    first_air_date: z.string().optional(),
+    vote_average: z.number(),
+    overview: z.string(),
   }),
 });
 

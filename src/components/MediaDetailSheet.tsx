@@ -117,7 +117,7 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
                 <span className="flex items-center gap-1">
                   <Star className="size-3.5 text-yellow-500 fill-yellow-500" /> {rating}
                 </span>
-                <span className="capitalize border px-1.5 py-0.5 rounded textxs">
+                <span className="capitalize border px-1.5 py-0.5 rounded text-xs">
                   {media.media_type === "tv" ? "TV Series" : "Movie"}
                 </span>
               </div>
