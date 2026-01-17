@@ -3,31 +3,48 @@ import { createFileRoute } from "@tanstack/react-router";
 import { WatchlistHeader } from "@/components/watchlist/WatchlistHeader";
 import { WatchlistTimeline } from "@/components/watchlist/WatchlistTimeline";
 import { useState } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/watchlists/$watchlistId")({
   loader: async ({ params: { watchlistId } }) => {
-    const { watchlist, items } = await getWatchlistById({
-      data: { id: parseInt(watchlistId) },
+    return await getWatchlistById({
+      data: { id: parseInt(watchlistId), page: 1, limit: 50 },
     });
-
-    return { watchlist, items };
   },
   component: WatchlistDetail,
 });
 
 function WatchlistDetail() {
-  const { watchlist, items } = Route.useLoaderData();
-  const [showUnwatchedOnly, setShowUnwatchedOnly] = useState(false);
+  const initialData = Route.useLoaderData();
+  const watchlistId = initialData.watchlist.id;
+  const [showUnwatchedOnly, setShowUnwatchedOnly] = useState(true);
 
-  const totalItems = items.length;
-  const watchedItems = items.filter((i) => i.isWatched).length;
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ["watchlist", watchlistId, "items"],
+    queryFn: async ({ pageParam }) => {
+      return getWatchlistById({ data: { id: watchlistId, page: pageParam, limit: 50 } });
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    initialData: {
+      pages: [initialData],
+      pageParams: [1],
+    },
+  });
 
-  const displayedItems = showUnwatchedOnly ? items.filter((i) => !i.isWatched) : items;
+  const allItems = data?.pages.flatMap((page) => page.items) || [];
+  // Use stats from the latest fetched page as they are recalculated on every request
+  const latestWatchlist = data?.pages[data.pages.length - 1]?.watchlist || initialData.watchlist;
+
+  const totalItems = latestWatchlist.stats.totalItems;
+  const watchedItems = latestWatchlist.stats.watchedItems;
+
+  const displayedItems = showUnwatchedOnly ? allItems.filter((i) => !i.isWatched) : allItems;
 
   return (
     <div className="container mx-auto min-h-screen max-w-3xl px-4 py-6 md:px-8 pb-32">
       <WatchlistHeader
-        watchlist={watchlist}
+        watchlist={latestWatchlist}
         totalItems={totalItems}
         watchedItems={watchedItems}
         showUnwatchedOnly={showUnwatchedOnly}
@@ -35,7 +52,12 @@ function WatchlistDetail() {
       />
 
       <div className="mt-8">
-        <WatchlistTimeline items={displayedItems} />
+        <WatchlistTimeline
+          items={displayedItems}
+          hasMore={hasNextPage}
+          isLoadingMore={isFetchingNextPage}
+          onLoadMore={fetchNextPage}
+        />
       </div>
     </div>
   );

@@ -3,13 +3,22 @@
 import { WatchlistItem } from "@/server/watchlist";
 import { TimelineItem } from "./TimelineItem";
 import { useMemo } from "react";
-import { Flag } from "lucide-react";
+import { Flag, Loader2 } from "lucide-react";
+import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 
 interface WatchlistTimelineProps {
   items: WatchlistItem[];
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
-export function WatchlistTimeline({ items }: WatchlistTimelineProps) {
+export function WatchlistTimeline({
+  items,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
+}: WatchlistTimelineProps) {
   // Group items by year
   const groups = useMemo(() => {
     const grouped: { year: string; items: WatchlistItem[] }[] = [];
@@ -37,6 +46,12 @@ export function WatchlistTimeline({ items }: WatchlistTimelineProps) {
 
     return grouped;
   }, [items]);
+
+  const { ref } = useIntersectionObserver({
+    onIntersect: onLoadMore,
+    enabled: hasMore && !isLoadingMore,
+    rootMargin: "100px",
+  });
 
   if (items.length === 0) {
     return (
@@ -72,13 +87,20 @@ export function WatchlistTimeline({ items }: WatchlistTimelineProps) {
         ))}
       </div>
 
-      {/* End of Timeline Marker */}
-      <div className="relative mt-12 pb-12">
+      {/* End of Timeline Marker / Loading Trigger */}
+      <div className="relative mt-12 pb-12" ref={ref}>
         <div className="flex items-center md:top-48">
-          <div className="relative z-10 flex h-8 items-center gap-2 rounded-full bg-background px-4 text-xs font-medium text-muted-foreground ring-1 ring-border md:ml-4">
-            <Flag className="size-3" />
-            <span>End of Watchlist</span>
-          </div>
+          {hasMore ? (
+            <div className="relative z-10 flex h-8 items-center gap-2 rounded-full bg-background px-4 text-xs font-medium text-muted-foreground ring-1 ring-border md:ml-4">
+              <Loader2 className="size-3 animate-spin" />
+              <span>Loading more...</span>
+            </div>
+          ) : (
+            <div className="relative z-10 flex h-8 items-center gap-2 rounded-full bg-background px-4 text-xs font-medium text-muted-foreground ring-1 ring-border md:ml-4">
+              <Flag className="size-3" />
+              <span>End of Watchlist</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

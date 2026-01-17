@@ -3,7 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { db } from "../db";
 import { watchlists, watchlistItems } from "../db/schema";
-import { eq, desc, inArray, asc } from "drizzle-orm";
+import { eq, desc, inArray, asc, sql, and } from "drizzle-orm";
 import { z } from "zod";
 
 const watchlistSchema = z.object({
@@ -28,7 +28,10 @@ export const getWatchlists = createServerFn().handler(async () => {
     .select()
     .from(watchlistItems)
     .where(inArray(watchlistItems.watchlistId, listIds))
-    .orderBy(asc(watchlistItems.releaseDate));
+    .orderBy(
+      sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
+      asc(watchlistItems.releaseDate),
+    );
 
   // Group items by watchlistId
   const itemsByWatchlist = items.reduce(
@@ -70,24 +73,80 @@ export const getWatchlists = createServerFn().handler(async () => {
 });
 
 export const getWatchlistById = createServerFn()
-  .inputValidator((data) => z.object({ id: z.coerce.number() }).parse(data))
+  .inputValidator((data) =>
+    z
+      .object({
+        id: z.coerce.number(),
+        page: z.number().optional().default(1),
+        limit: z.number().optional().default(20),
+      })
+      .parse(data),
+  )
   .handler(async ({ data }) => {
-    const [list] = await db.select().from(watchlists).where(eq(watchlists.id, data.id));
+    const { id, page, limit } = data;
+    const offset = (page - 1) * limit;
+
+    const [list] = await db.select().from(watchlists).where(eq(watchlists.id, id));
 
     if (!list) {
       throw new Error("Watchlist not found");
     }
 
-    const items = await db
-      .select()
-      .from(watchlistItems)
-      .where(eq(watchlistItems.watchlistId, data.id))
-      .orderBy(asc(watchlistItems.releaseDate));
+    // Parallelize stats queries
+    const [totalRes, watchedRes, nextUnwatchedRes, firstItemRes, items] = await Promise.all([
+      // Total Items
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, id)),
 
-    const totalItems = items.length;
-    const watchedItems = items.filter((i) => i.isWatched).length;
-    const nextUnwatched = items.find((i) => !i.isWatched) || null;
-    const coverItem = nextUnwatched || items[0] || null;
+      // Watched Items
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(watchlistItems)
+        .where(and(eq(watchlistItems.watchlistId, id), eq(watchlistItems.isWatched, true))),
+
+      // Next Unwatched (for cover & stats)
+      db
+        .select()
+        .from(watchlistItems)
+        .where(and(eq(watchlistItems.watchlistId, id), eq(watchlistItems.isWatched, false)))
+        .orderBy(
+          sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
+          asc(watchlistItems.releaseDate),
+        )
+        .limit(1),
+
+      // First Item (fallback for cover if all watched)
+      db
+        .select()
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, id))
+        .orderBy(
+          sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
+          asc(watchlistItems.releaseDate),
+        )
+        .limit(1),
+
+      // Paginated Items
+      db
+        .select()
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, id))
+        .orderBy(
+          sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
+          asc(watchlistItems.releaseDate),
+        )
+        .limit(limit)
+        .offset(offset),
+    ]);
+
+    const totalItems = totalRes[0]?.count || 0;
+    const watchedItems = watchedRes[0]?.count || 0;
+    const nextUnwatched = nextUnwatchedRes[0] || null;
+    const firstItem = firstItemRes[0] || null;
+
+    const coverItem = nextUnwatched || firstItem || null;
     const coverImage = coverItem?.posterPath || null;
     const coverMediaType = coverItem?.mediaType || null;
 
@@ -104,6 +163,7 @@ export const getWatchlistById = createServerFn()
         },
       },
       items,
+      nextCursor: items.length === limit ? page + 1 : undefined,
     };
   });
 
