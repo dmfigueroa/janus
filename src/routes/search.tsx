@@ -13,6 +13,8 @@ const searchSchema = z.object({
   type: z.enum(["movie", "tv", "game", "book", "comic"]).optional().default("movie"),
 });
 
+type SearchType = z.infer<typeof searchSchema>["type"];
+
 export const Route = createFileRoute("/search")({
   validateSearch: searchSchema,
   loaderDeps: ({ search: { query, type } }) => ({ query, type }),
@@ -62,7 +64,7 @@ function Search() {
       navigate({
         search: {
           query,
-          type: newType as any,
+          type: newType as SearchType,
         },
       });
     },

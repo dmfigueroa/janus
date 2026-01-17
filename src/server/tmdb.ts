@@ -2,7 +2,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { type UnifiedMedia } from "./external-apis";
+import { type UnifiedMedia } from "./media";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 

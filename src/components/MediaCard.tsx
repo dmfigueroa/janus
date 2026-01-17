@@ -1,4 +1,4 @@
-import { UnifiedMedia } from "../server/external-apis";
+import { UnifiedMedia } from "../server/media";
 import { Star } from "lucide-react";
 
 interface MediaCardProps {

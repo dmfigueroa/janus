@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UnifiedMedia } from "@/server/external-apis";
+import { UnifiedMedia } from "@/server/media";
 import {
   Sheet,
   SheetContent,

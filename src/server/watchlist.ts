@@ -6,9 +6,11 @@ import { db } from "../db";
 import { watchlistItems } from "../db/schema";
 import { eq, and } from "drizzle-orm";
 import { getTVDetails, getSeasonDetails, getMovieDetails } from "./tmdb";
-import { getComicIssues } from "./external-apis";
+import { getComicIssues } from "./comicvine";
 
 export type { Watchlist, WatchlistItem } from "../db/schema";
+
+const DB_INSERT_CHUNK_SIZE = 50;
 
 const addToWatchlistSchema = z.object({
   watchlistId: z.number(),
@@ -23,6 +25,11 @@ const addToWatchlistSchema = z.object({
     overview: z.string().optional(),
   }),
 });
+
+type WatchlistMedia = z.infer<typeof addToWatchlistSchema>["media"];
+type GenericMedia = Omit<WatchlistMedia, "mediaType"> & {
+  mediaType: Exclude<WatchlistMedia["mediaType"], "tv">;
+};
 
 export const toggleWatched = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({ itemId: z.number(), isWatched: z.boolean() }).parse(data))
@@ -40,14 +47,21 @@ export const addToWatchlist = createServerFn({ method: "POST" })
     const { watchlistId, media } = data;
     const apiKey = process.env.TMDB_API_KEY;
 
+    if (media.mediaType === "tv") {
+      if (media.source === "tmdb") {
+        if (!apiKey) throw new Error("TMDB_API_KEY is not configured");
+        const tmdbId = parseInt(media.id);
+        return await addTVShowToWatchList(watchlistId, tmdbId, media, apiKey);
+      }
+      throw new Error("TV shows from non-TMDB sources are not supported as generic items");
+    }
+
     if (media.source === "tmdb") {
       if (!apiKey) throw new Error("TMDB_API_KEY is not configured");
       const tmdbId = parseInt(media.id);
 
       if (media.mediaType === "movie") {
         return await addMovieToWatchList(watchlistId, tmdbId, apiKey);
-      } else if (media.mediaType === "tv") {
-        return await addTVShowToWatchList(watchlistId, tmdbId, media, apiKey);
       }
     }
 
@@ -57,10 +71,11 @@ export const addToWatchlist = createServerFn({ method: "POST" })
       return await addComicToWatchList(watchlistId, media.id, media, cvApiKey);
     }
 
-    return await addGenericItemToWatchlist(watchlistId, media);
+    // TypeScript now knows media.mediaType is not "tv", so it matches GenericMedia
+    return await addGenericItemToWatchlist(watchlistId, media as GenericMedia);
   });
 
-const addGenericItemToWatchlist = async (watchlistId: number, media: any) => {
+const addGenericItemToWatchlist = async (watchlistId: number, media: GenericMedia) => {
   const existing = await db
     .select()
     .from(watchlistItems)
@@ -129,7 +144,7 @@ const addMovieToWatchList = async (watchlistId: number, tmdbId: number, apiKey: 
 const addTVShowToWatchList = async (
   watchlistId: number,
   tmdbId: number,
-  media: any,
+  media: z.infer<typeof addToWatchlistSchema>["media"],
   apiKey: string,
 ) => {
   const showDetails = await getTVDetails(tmdbId, apiKey);
@@ -161,9 +176,8 @@ const addTVShowToWatchList = async (
   );
 
   if (allEpisodes.length > 0) {
-    const chunkSize = 50;
-    for (let i = 0; i < allEpisodes.length; i += chunkSize) {
-      const chunk = allEpisodes.slice(i, i + chunkSize);
+    for (let i = 0; i < allEpisodes.length; i += DB_INSERT_CHUNK_SIZE) {
+      const chunk = allEpisodes.slice(i, i + DB_INSERT_CHUNK_SIZE);
       await db.insert(watchlistItems).values(chunk).onConflictDoNothing();
     }
   }
@@ -174,7 +188,7 @@ const addTVShowToWatchList = async (
 const addComicToWatchList = async (
   watchlistId: number,
   volumeId: string,
-  media: any,
+  media: z.infer<typeof addToWatchlistSchema>["media"],
   apiKey: string,
 ) => {
   const issues = await getComicIssues(volumeId, apiKey);
@@ -199,9 +213,8 @@ const addComicToWatchList = async (
     runtime: 0,
   }));
 
-  const chunkSize = 50;
-  for (let i = 0; i < watchlistItemsData.length; i += chunkSize) {
-    const chunk = watchlistItemsData.slice(i, i + chunkSize);
+  for (let i = 0; i < watchlistItemsData.length; i += DB_INSERT_CHUNK_SIZE) {
+    const chunk = watchlistItemsData.slice(i, i + DB_INSERT_CHUNK_SIZE);
     await db.insert(watchlistItems).values(chunk).onConflictDoNothing();
   }
 
