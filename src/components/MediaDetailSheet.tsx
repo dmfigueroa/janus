@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { UnifiedMedia } from "@/server/media";
+import DOMPurify from "dompurify";
 import {
   Sheet,
   SheetContent,
@@ -124,8 +125,12 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
               </div>
             </div>
           </div>
-          <SheetDescription className="text-base leading-relaxed text-foreground/90">
-            {overview || "No description available."}
+          <SheetDescription className="text-base leading-relaxed text-foreground/90" asChild>
+            <div
+              dangerouslySetInnerHTML={{
+                __html: DOMPurify.sanitize(overview || "No description available."),
+              }}
+            />
           </SheetDescription>
         </SheetHeader>
 
