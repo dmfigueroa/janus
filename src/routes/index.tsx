@@ -18,7 +18,7 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans pb-24">
-      <div className="max-w-md mx-auto min-h-screen relative">
+      <div className="container mx-auto min-h-screen relative">
         {/* Header */}
         <header className="px-6 pt-8 pb-4 flex justify-between items-center">
           <h1 className="text-3xl font-extrabold tracking-tight text-foreground">My Lists</h1>
@@ -38,13 +38,17 @@ function Index() {
 
         {/* Watchlists Grid */}
         <section className="px-6">
-          <div className="grid grid-cols-2 gap-x-4 gap-y-8">
+          <div className="grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:gap-6 sm:justify-start">
             {watchlists.map((list) => (
-              <WatchlistCard key={list.id} watchlist={list} />
+              <div key={list.id} className="w-full sm:w-[220px]">
+                <WatchlistCard watchlist={list} />
+              </div>
             ))}
 
             {/* Always show the create card at the end */}
-            <CreateWatchlistCard />
+            <div className="w-full sm:w-[220px]">
+              <CreateWatchlistCard />
+            </div>
           </div>
         </section>
 
