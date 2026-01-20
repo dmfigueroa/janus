@@ -13,7 +13,7 @@ experience with a modern aesthetic.
 - **Deployment**: Docker
 - **UI Styling**: Tailwind CSS v4
 - **Component Library**: shadcn/ui
-- **Runtime/Package Manager**: Bun
+- **Runtime/Package Manager**: Node.js (via npm)
 
 ## 3. Core Principles
 
@@ -40,7 +40,7 @@ experience with a modern aesthetic.
 
 ## 5. Development Workflow
 
-- **Package Management**: Always use `bun` for installing packages and running
+- **Package Management**: Always use `npm` for installing packages and running
   scripts.
 - **Database**:
   - Use Drizzle Kit for migrations.

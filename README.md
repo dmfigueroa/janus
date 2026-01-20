@@ -20,14 +20,14 @@
 - **Framework**: [TanStack Start](https://tanstack.com/start) (Full-stack React framework)
 - **Database**: [SQLite](https://sqlite.org/) via [Drizzle ORM](https://orm.drizzle.team/)
 - **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) & [shadcn/ui](https://ui.shadcn.com/)
-- **Runtime**: [Bun](https://bun.sh/)
+- **Runtime**: [Node.js](https://nodejs.org/)
 - **Quality**: [Oxlint](https://oxc-project.github.io/op/oxlint) & [Vitest](https://vitest.dev/)
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) (v1.0 or later)
+- [Node.js](https://nodejs.org/) (v22 or later)
 
 ### Installation
 
@@ -41,7 +41,7 @@
 2.  Install dependencies:
 
     ```bash
-    bun install
+    npm install
     ```
 
 3.  Set up environment variables:
@@ -52,7 +52,7 @@
 Start the development server:
 
 ```bash
-bun run dev
+npm run dev
 ```
 
 Visit `http://localhost:3000` to see the app.
@@ -64,7 +64,7 @@ Janus uses Drizzle ORM with SQLite. The database file is created locally.
 - **View Database UI**:
 
   ```bash
-  bun run db:studio
+  npm run db:studio
   ```
 
   This opens Drizzle Studio, allowing you to visually manage your SQLite data.
@@ -72,13 +72,13 @@ Janus uses Drizzle ORM with SQLite. The database file is created locally.
 - **Lint & Format**:
 
   ```bash
-  bun run lint
-  bun run format
+  npm run lint
+  npm run format
   ```
 
 - **Run Tests**:
   ```bash
-  bun run test
+  npm run test
   ```
 
 ## 🚀 Deployment
@@ -86,17 +86,17 @@ Janus uses Drizzle ORM with SQLite. The database file is created locally.
 To build the application for production:
 
 ```bash
-bun run build
+npm run build
 ```
 
 This will compile the application. You can preview the production build locally using:
 
 ```bash
-bun run preview
+npm run preview
 ```
 
 **Docker**:
-The project is designed to be containerized. Ensure your `Dockerfile` (pending creation if not present) handles the build output and serves it using a Bun runtime.
+The project is designed to be containerized. Ensure your `Dockerfile` (pending creation if not present) handles the build output and serves it using a Node.js runtime.
 
 ## 📂 Project Structure
 
