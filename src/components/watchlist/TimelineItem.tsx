@@ -4,10 +4,9 @@ import { cn } from "@/utils/cn";
 import { Check, Film, Tv, Gamepad2, Book, BookOpen } from "lucide-react";
 import { WatchlistItem } from "@/server/watchlist";
 import { formatReleaseDate, formatRuntime } from "@/utils/datetime";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { toggleWatched } from "@/server/watchlist";
-import { useRouter } from "@tanstack/react-router";
 
 type TimelineItemProps = {
   item: WatchlistItem;
@@ -113,17 +112,55 @@ const Content = ({
 };
 
 export function TimelineItem({ item }: TimelineItemProps) {
-  const router = useRouter();
+  const queryClient = useQueryClient();
+  const queryKey = ["watchlist", item.watchlistId, "items"];
 
   const toggleMutation = useMutation({
     mutationFn: async () => {
       await toggleWatched({ data: { itemId: item.id, isWatched: !item.isWatched } });
     },
-    onSuccess: () => {
-      router.invalidate();
+    onMutate: async () => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({ queryKey });
+
+      // Snapshot the previous value
+      const previousData = queryClient.getQueryData(queryKey);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(queryKey, (old: any) => {
+        if (!old) return old;
+
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            watchlist: {
+              ...page.watchlist,
+              stats: {
+                ...page.watchlist.stats,
+                watchedItems: item.isWatched
+                  ? page.watchlist.stats.watchedItems - 1
+                  : page.watchlist.stats.watchedItems + 1,
+              },
+            },
+            items: page.items.map((i: WatchlistItem) =>
+              i.id === item.id ? { ...i, isWatched: !item.isWatched } : i,
+            ),
+          })),
+        };
+      });
+
+      // Return a context object with the snapshotted value
+      return { previousData };
     },
-    onError: () => {
+    onError: (err, newTodo, context) => {
+      if (context?.previousData) {
+        queryClient.setQueryData(queryKey, context.previousData);
+      }
       toast.error("Failed to update status");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey });
     },
   });
 
