@@ -9,6 +9,8 @@ export const watchlists = sqliteTable("watchlists", {
     .default(sql`(CURRENT_TIMESTAMP)`)
     .notNull(),
   updatedAt: text("updated_at").$onUpdate(() => sql`(CURRENT_TIMESTAMP)`),
+  lastWatchedAt: text("last_watched_at"),
+  lastItemAddedAt: text("last_item_added_at"),
 });
 
 export type Watchlist = typeof watchlists.$inferSelect;

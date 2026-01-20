@@ -153,7 +153,7 @@ export function TimelineItem({ item }: TimelineItemProps) {
       // Return a context object with the snapshotted value
       return { previousData };
     },
-    onError: (err, newTodo, context) => {
+    onError: (_err, _newTodo, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(queryKey, context.previousData);
       }

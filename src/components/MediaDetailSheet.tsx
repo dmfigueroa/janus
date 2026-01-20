@@ -35,7 +35,7 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
 
   const { data: watchlists } = useQuery({
     queryKey: ["watchlists"],
-    queryFn: () => getWatchlists(),
+    queryFn: () => getWatchlists({ data: { sortBy: "lastAdded" } }),
     enabled: isOpen,
   });
 

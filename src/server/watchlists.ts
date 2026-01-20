@@ -15,62 +15,88 @@ const deleteWatchlistSchema = z.object({
   id: z.number(),
 });
 
-export const getWatchlists = createServerFn().handler(async () => {
-  const lists = await db.select().from(watchlists).orderBy(desc(watchlists.createdAt));
+export const getWatchlists = createServerFn()
+  .inputValidator((data) =>
+    z
+      .object({
+        sortBy: z.enum(["createdAt", "lastWatched", "lastAdded"]).optional().default("createdAt"),
+      })
+      .parse(data || {}),
+  )
+  .handler(async ({ data }) => {
+    let orderBy;
+    switch (data.sortBy) {
+      case "lastWatched":
+        orderBy = [
+          sql`CASE WHEN ${watchlists.lastWatchedAt} IS NULL THEN 1 ELSE 0 END`,
+          desc(watchlists.lastWatchedAt),
+        ];
+        break;
+      case "lastAdded":
+        orderBy = [desc(sql`COALESCE(${watchlists.lastItemAddedAt}, ${watchlists.createdAt})`)];
+        break;
+      default:
+        orderBy = [desc(watchlists.createdAt)];
+    }
 
-  if (lists.length === 0) {
-    return [];
-  }
+    const lists = await db
+      .select()
+      .from(watchlists)
+      .orderBy(...orderBy);
 
-  const listIds = lists.map((l) => l.id);
+    if (lists.length === 0) {
+      return [];
+    }
 
-  const items = await db
-    .select()
-    .from(watchlistItems)
-    .where(inArray(watchlistItems.watchlistId, listIds))
-    .orderBy(
-      sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
-      asc(watchlistItems.releaseDate),
+    const listIds = lists.map((l) => l.id);
+
+    const items = await db
+      .select()
+      .from(watchlistItems)
+      .where(inArray(watchlistItems.watchlistId, listIds))
+      .orderBy(
+        sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
+        asc(watchlistItems.releaseDate),
+      );
+
+    // Group items by watchlistId
+    const itemsByWatchlist = items.reduce(
+      (acc, item) => {
+        if (!acc[item.watchlistId]) {
+          acc[item.watchlistId] = [];
+        }
+        acc[item.watchlistId].push(item);
+        return acc;
+      },
+      {} as Record<number, typeof items>,
     );
 
-  // Group items by watchlistId
-  const itemsByWatchlist = items.reduce(
-    (acc, item) => {
-      if (!acc[item.watchlistId]) {
-        acc[item.watchlistId] = [];
-      }
-      acc[item.watchlistId].push(item);
-      return acc;
-    },
-    {} as Record<number, typeof items>,
-  );
+    // Enrich watchlists with stats
+    return lists.map((list) => {
+      const listItems = itemsByWatchlist[list.id] || [];
+      const totalItems = listItems.length;
+      const watchedItems = listItems.filter((i) => i.isWatched).length;
 
-  // Enrich watchlists with stats
-  return lists.map((list) => {
-    const listItems = itemsByWatchlist[list.id] || [];
-    const totalItems = listItems.length;
-    const watchedItems = listItems.filter((i) => i.isWatched).length;
+      // Find next unwatched item (sorted by release date)
+      const nextUnwatched = listItems.find((i) => !i.isWatched) || null;
 
-    // Find next unwatched item (sorted by release date)
-    const nextUnwatched = listItems.find((i) => !i.isWatched) || null;
+      const coverItem = nextUnwatched || listItems[0] || null;
+      const coverImage = coverItem?.posterPath || null;
+      const coverMediaType = coverItem?.mediaType || null;
 
-    const coverItem = nextUnwatched || listItems[0] || null;
-    const coverImage = coverItem?.posterPath || null;
-    const coverMediaType = coverItem?.mediaType || null;
-
-    return {
-      ...list,
-      stats: {
-        totalItems,
-        watchedItems,
-        progress: totalItems > 0 ? Math.round((watchedItems / totalItems) * 100) : 0,
-        nextUnwatched,
-        coverImage,
-        coverMediaType,
-      },
-    };
+      return {
+        ...list,
+        stats: {
+          totalItems,
+          watchedItems,
+          progress: totalItems > 0 ? Math.round((watchedItems / totalItems) * 100) : 0,
+          nextUnwatched,
+          coverImage,
+          coverMediaType,
+        },
+      };
+    });
   });
-});
 
 export const getWatchlistById = createServerFn()
   .inputValidator((data) =>

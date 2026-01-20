@@ -3,8 +3,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { db } from "../db";
-import { watchlistItems } from "../db/schema";
-import { eq, and } from "drizzle-orm";
+import { watchlistItems, watchlists } from "../db/schema";
+import { eq, and, sql } from "drizzle-orm";
 import { getTVDetails, getSeasonDetails, getMovieDetails } from "./tmdb";
 import { getComicIssues } from "./comicvine";
 import { getBookDetails } from "./google-books";
@@ -37,10 +37,23 @@ type GenericMedia = Omit<WatchlistMedia, "mediaType"> & {
 export const toggleWatched = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({ itemId: z.number(), isWatched: z.boolean() }).parse(data))
   .handler(async ({ data }) => {
+    const [item] = await db
+      .select({ watchlistId: watchlistItems.watchlistId })
+      .from(watchlistItems)
+      .where(eq(watchlistItems.id, data.itemId));
+
     await db
       .update(watchlistItems)
       .set({ isWatched: data.isWatched })
       .where(eq(watchlistItems.id, data.itemId));
+
+    if (item && data.isWatched) {
+      await db
+        .update(watchlists)
+        .set({ lastWatchedAt: sql`CURRENT_TIMESTAMP` })
+        .where(eq(watchlists.id, item.watchlistId));
+    }
+
     return { success: true };
   });
 
@@ -119,6 +132,11 @@ const addGenericItemToWatchlist = async (watchlistId: number, media: GenericMedi
     runtime: 0,
   });
 
+  await db
+    .update(watchlists)
+    .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
+    .where(eq(watchlists.id, watchlistId));
+
   return { success: true, message: "Added to watchlist" };
 };
 
@@ -152,6 +170,11 @@ const addMovieToWatchList = async (watchlistId: number, tmdbId: number, apiKey: 
     voteAverage: details.vote_average,
     runtime: details.runtime || 0,
   });
+
+  await db
+    .update(watchlists)
+    .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
+    .where(eq(watchlists.id, watchlistId));
 
   return { success: true, message: "Added to watchlist" };
 };
@@ -197,6 +220,13 @@ const addTVShowToWatchList = async (
     }
   }
 
+  if (allEpisodes.length > 0) {
+    await db
+      .update(watchlists)
+      .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
+      .where(eq(watchlists.id, watchlistId));
+  }
+
   return { success: true, message: `Added ${allEpisodes.length} episodes to watchlist` };
 };
 
@@ -231,6 +261,11 @@ const addComicToWatchList = async (
     const chunk = watchlistItemsData.slice(i, i + DB_INSERT_CHUNK_SIZE);
     await db.insert(watchlistItems).values(chunk).onConflictDoNothing();
   }
+
+  await db
+    .update(watchlists)
+    .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
+    .where(eq(watchlists.id, watchlistId));
 
   return { success: true, message: `Added ${watchlistItemsData.length} issues to watchlist` };
 };
