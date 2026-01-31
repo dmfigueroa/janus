@@ -3,6 +3,9 @@ import { MediaCard } from "./MediaCard";
 import { useIntersectionObserver } from "../hooks/useIntersectionObserver";
 import { useState } from "react";
 import { MediaDetailSheet } from "./MediaDetailSheet";
+import { CreateCustomItemDialog } from "./search/CreateCustomItemDialog";
+import { Button } from "./ui/button";
+import { Plus } from "lucide-react";
 
 interface SearchResultsProps {
   results: UnifiedMedia[];
@@ -28,7 +31,13 @@ export function SearchResults({
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="text-lg font-medium text-muted-foreground">No results found</div>
-        <p className="text-sm text-zinc-500">Try adjusting your search terms</p>
+        <p className="text-sm text-zinc-500 mb-6">Try adjusting your search terms</p>
+        <CreateCustomItemDialog onCreated={setSelectedMedia}>
+          <Button variant="outline">
+            <Plus className="mr-2 h-4 w-4" />
+            Create Custom Item
+          </Button>
+        </CreateCustomItemDialog>
       </div>
     );
   }
@@ -44,6 +53,18 @@ export function SearchResults({
       {(hasNextPage || isFetchingNextPage) && (
         <div ref={ref} className="flex justify-center py-4">
           <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      )}
+
+      {results.length > 0 && !hasNextPage && (
+        <div className="flex flex-col items-center justify-center py-8 border-t">
+          <p className="text-sm text-muted-foreground mb-4">Can't find what you're looking for?</p>
+          <CreateCustomItemDialog onCreated={setSelectedMedia}>
+            <Button variant="outline" size="sm">
+              <Plus className="mr-2 h-4 w-4" />
+              Create Custom Item
+            </Button>
+          </CreateCustomItemDialog>
         </div>
       )}
 

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Check, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,8 @@ import {
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Watchlist } from "@/db/schema";
+import { createWatchlist } from "@/server/watchlists";
+import { useRouter } from "@tanstack/react-router";
 
 interface WatchlistSelectorProps {
   watchlists: Watchlist[] | undefined;
@@ -104,12 +106,31 @@ function WatchlistList({
   selectedWatchlistId: string;
   onSelect: (id: string) => void;
 }) {
+  const [query, setQuery] = React.useState("");
+  const router = useRouter();
+
   return (
     <Command>
-      <CommandInput placeholder="Search watchlists..." />
+      <CommandInput placeholder="Search watchlists..." onValueChange={setQuery} />
       <CommandList>
         <CommandEmpty>No watchlist found.</CommandEmpty>
-        <CommandGroup>
+        {query && (
+          <CommandGroup>
+            <CommandItem
+              key={`create-${query}`}
+              value={`Create "${query}"`}
+              onSelect={async () => {
+                const newList = await createWatchlist({ data: { name: query } });
+                await router.invalidate();
+                onSelect(newList.id.toString());
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Create "{query}"
+            </CommandItem>
+          </CommandGroup>
+        )}
+        <CommandGroup heading="Existing Watchlists">
           {watchlists?.map((list) => (
             <CommandItem
               key={list.id}

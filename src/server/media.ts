@@ -10,7 +10,7 @@ export const UnifiedMediaSchema = z.object({
   releaseDate: z.string().optional(),
   rating: z.number().optional(),
   overview: z.string().optional(),
-  source: z.enum(["tmdb", "google_books", "rawg", "comicvine"]),
+  source: z.enum(["tmdb", "google_books", "rawg", "comicvine", "custom"]),
 });
 
 export type UnifiedMedia = z.infer<typeof UnifiedMediaSchema>;

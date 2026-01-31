@@ -19,7 +19,7 @@ const addToWatchlistSchema = z.object({
   media: z.object({
     id: z.string(),
     mediaType: z.enum(["movie", "tv", "game", "book", "comic"]),
-    source: z.enum(["tmdb", "google_books", "rawg", "comicvine"]),
+    source: z.enum(["tmdb", "google_books", "rawg", "comicvine", "custom"]),
     title: z.string(),
     poster: z.string().nullable(),
     year: z.string().optional(),
@@ -69,7 +69,10 @@ export const addToWatchlist = createServerFn({ method: "POST" })
         const tmdbId = parseInt(media.id);
         return await addTVShowToWatchList(watchlistId, tmdbId, media, apiKey);
       }
-      throw new Error("TV shows from non-TMDB sources are not supported as generic items");
+      // Custom TV shows fall through to addGenericItemToWatchlist
+      if (media.source !== "custom") {
+        throw new Error("TV shows from non-TMDB sources are not supported as generic items");
+      }
     }
 
     if (media.source === "tmdb") {
