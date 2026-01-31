@@ -15,13 +15,7 @@ import { Star, Calendar, Info } from "lucide-react";
 import { addToWatchlist } from "@/server/watchlist";
 import { getWatchlists } from "@/server/watchlists";
 import { toast } from "sonner";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { WatchlistSelector } from "./watchlist/WatchlistSelector";
 import { useQuery, useMutation } from "@tanstack/react-query";
 
 interface MediaDetailSheetProps {
@@ -137,24 +131,13 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
         <div className="mt-8 space-y-4">
           <h4 className="text-sm font-medium text-muted-foreground">Add to Watchlist</h4>
           <div className="flex gap-3">
-            <Select value={selectedWatchlistId} onValueChange={setSelectedWatchlistId}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a watchlist" />
-              </SelectTrigger>
-              <SelectContent>
-                {watchlists && watchlists.length > 0 ? (
-                  watchlists.map((list) => (
-                    <SelectItem key={list.id} value={list.id.toString()}>
-                      {list.name}
-                    </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value="none" disabled>
-                    No watchlists found
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
+            <WatchlistSelector
+              watchlists={watchlists}
+              selectedWatchlistId={selectedWatchlistId}
+              onSelect={setSelectedWatchlistId}
+              disabled={!watchlists || watchlists.length === 0}
+              className="flex-1"
+            />
             <Button
               onClick={handleAddToWatchlist}
               disabled={!selectedWatchlistId || addToWatchlistMutation.isPending}
