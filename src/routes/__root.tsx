@@ -4,6 +4,7 @@ import {
   createRootRouteWithContext,
   useRouter,
 } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { Toaster } from "@/components/ui/sonner";
@@ -26,7 +27,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "TanStack Start Starter",
+        title: "Janus",
       },
     ],
     links: [
@@ -44,6 +45,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 function RootDocument({ children }: { children: React.ReactNode }) {
   const router = useRouter(); // Get router instance to access context
   const queryClient = router.options.context.queryClient;
+
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((registration) => {
+          console.log("SW registered:", registration);
+        })
+        .catch((error) => {
+          console.log("SW registration failed:", error);
+        });
+    }
+  }, []);
 
   return (
     <html lang="en" suppressHydrationWarning>
