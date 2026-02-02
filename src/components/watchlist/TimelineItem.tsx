@@ -40,11 +40,13 @@ const Poster = ({ mediaType, posterPath, title }: WatchlistItem) => {
     : null;
 
   return (
-    <div className="flex w-28 shrink-0 justify-center">
+    <div className="flex w-20 md:w-28 shrink-0 justify-center">
       <div
         className={cn(
           "relative shrink-0 overflow-hidden font-bold shadow-md ring-1 ring-border",
-          config.isPortrait ? "h-32 w-20 rounded-lg" : "h-16 w-full rounded-md",
+          config.isPortrait
+            ? "h-24 w-16 md:h-32 md:w-20 rounded-lg"
+            : "h-12 md:h-16 w-full rounded-md",
         )}
       >
         {posterUrl ? (
@@ -89,8 +91,8 @@ const Content = ({
           {parentTitle}
         </span>
       )}
-      <h3 className="line-clamp-1 text-lg font-semibold leading-tight text-foreground">{title}</h3>
-      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+      <h3 className="text-base font-semibold leading-tight text-foreground md:text-lg">{title}</h3>
+      <div className="flex items-center gap-2 md:gap-3 text-xs md:text-sm text-muted-foreground">
         {mediaType !== "movie" && (
           <>
             {mediaType === "comic" && episode ? (
@@ -167,7 +169,7 @@ export function TimelineItem({ item }: TimelineItemProps) {
   return (
     <div
       className={cn(
-        "relative flex items-center gap-4 py-4 pr-4 transition-opacity",
+        "relative flex items-center gap-3 md:gap-4 py-3 md:py-4 pr-2 md:pr-4 transition-opacity",
         item.isWatched && "opacity-60",
       )}
     >
