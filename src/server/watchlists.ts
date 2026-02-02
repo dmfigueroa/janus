@@ -15,6 +15,16 @@ const deleteWatchlistSchema = z.object({
   id: z.number(),
 });
 
+const mergeWatchlistSchema = z
+  .object({
+    targetWatchlistId: z.number().optional(),
+    sourceWatchlistIds: z.array(z.number()),
+    newWatchlistName: z.string().optional(),
+  })
+  .refine((data) => data.targetWatchlistId || data.newWatchlistName, {
+    message: "Either targetWatchlistId or newWatchlistName must be provided",
+  });
+
 export const getWatchlists = createServerFn()
   .inputValidator((data) =>
     z
@@ -211,4 +221,92 @@ export const deleteWatchlist = createServerFn()
   .handler(async ({ data }) => {
     await db.delete(watchlists).where(eq(watchlists.id, data.id));
     return { success: true };
+  });
+
+export const mergeWatchlists = createServerFn({ method: "POST" })
+  .inputValidator((data) => mergeWatchlistSchema.parse(data))
+  .handler(async ({ data }) => {
+    let targetId = data.targetWatchlistId;
+
+    // 1. Create new watchlist if needed
+    if (data.newWatchlistName && !targetId) {
+      const [newList] = await db
+        .insert(watchlists)
+        .values({
+          name: data.newWatchlistName,
+          description: "Merged watchlist",
+        })
+        .returning();
+      targetId = newList.id;
+    }
+
+    if (!targetId) {
+      throw new Error("Target watchlist ID resolution failed");
+    }
+
+    // 2. Fetch items from source watchlists
+    const sourceItems = await db
+      .select()
+      .from(watchlistItems)
+      .where(inArray(watchlistItems.watchlistId, data.sourceWatchlistIds));
+
+    if (sourceItems.length > 0) {
+      // 3. Prepare items for insertion into target
+      // We need to avoid duplicates.
+      // Strategy:
+      // - Iterate through source items.
+      // - Construct a list of values to insert with targetId.
+      // - Use onConflictDoUpdate to update 'isWatched' if item exists.
+
+      const itemsToInsert = sourceItems.map((item) => ({
+        watchlistId: targetId!,
+        tmdbId: item.tmdbId,
+        source: item.source,
+        mediaType: item.mediaType,
+        title: item.title,
+        parentTitle: item.parentTitle,
+        season: item.season,
+        episode: item.episode,
+        posterPath: item.posterPath,
+        releaseDate: item.releaseDate,
+        voteAverage: item.voteAverage,
+        runtime: item.runtime,
+        // If source item is watched, merged item should be watched.
+        // If target item is already watched (existing), we keep it watched.
+        isWatched: item.isWatched,
+        addedAt: item.addedAt,
+      }));
+
+      // Insert in chunks to be safe with SQLite limits
+      const CHUNK_SIZE = 50;
+      for (let i = 0; i < itemsToInsert.length; i += CHUNK_SIZE) {
+        const chunk = itemsToInsert.slice(i, i + CHUNK_SIZE);
+
+        await db
+          .insert(watchlistItems)
+          .values(chunk)
+          .onConflictDoUpdate({
+            target: [watchlistItems.watchlistId, watchlistItems.tmdbId, watchlistItems.mediaType],
+            set: {
+              // Update isWatched: if existing is true OR new is true -> true
+              isWatched: sql`CASE WHEN ${watchlistItems.isWatched} OR excluded.is_watched THEN 1 ELSE 0 END`,
+            },
+          });
+      }
+
+      // Update lastItemAddedAt for target
+      await db
+        .update(watchlists)
+        .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
+        .where(eq(watchlists.id, targetId));
+    }
+
+    // 4. Delete source watchlists (and their items via cascade)
+    // Filter out targetId if it was one of the sources (e.g. merge A+B into A)
+    const sourcesToDelete = data.sourceWatchlistIds.filter((id) => id !== targetId);
+    if (sourcesToDelete.length > 0) {
+      await db.delete(watchlists).where(inArray(watchlists.id, sourcesToDelete));
+    }
+
+    return { success: true, targetId };
   });

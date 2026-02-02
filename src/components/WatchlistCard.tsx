@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import type { Watchlist } from "@/db/schema";
 import type { WatchlistItem } from "@/db/schema";
 import { DeleteWatchlistButton } from "./DeleteWatchlistButton";
+import { Check } from "lucide-react";
 
 export type EnrichedWatchlist = {
   stats: {
@@ -91,7 +92,17 @@ const WatchlistInfo = ({ watchlist }: { watchlist: EnrichedWatchlist }) => {
   );
 };
 
-export function WatchlistCard({ watchlist }: { watchlist: EnrichedWatchlist }) {
+export function WatchlistCard({
+  watchlist,
+  selectionMode = false,
+  isSelected = false,
+  onToggle,
+}: {
+  watchlist: EnrichedWatchlist;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onToggle?: () => void;
+}) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
 
@@ -113,35 +124,66 @@ export function WatchlistCard({ watchlist }: { watchlist: EnrichedWatchlist }) {
   const { stats } = watchlist;
   const hasUnwatched = !!stats.nextUnwatched;
 
+  const CardContent = (
+    <div
+      className={cn(
+        "relative aspect-[2/3] overflow-hidden rounded-2xl border-none shadow-2xl transition-all duration-300",
+        !stats.coverImage && fallbackGradient,
+        selectionMode ? "cursor-pointer scale-[0.98]" : "group-hover:scale-[1.02]",
+        isSelected && "ring-4 ring-primary",
+      )}
+      onClick={(e) => {
+        if (selectionMode) {
+          e.preventDefault();
+          onToggle?.();
+        }
+      }}
+    >
+      <CoverImage watchlist={watchlist} />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+
+      {selectionMode && (
+        <div className="absolute top-3 right-3 z-30">
+          <div
+            className={cn(
+              "h-6 w-6 rounded-full border-2 border-white flex items-center justify-center transition-colors",
+              isSelected ? "bg-primary border-primary" : "bg-black/40",
+            )}
+          >
+            {isSelected && <Check className="w-4 h-4 text-white" />}
+          </div>
+        </div>
+      )}
+
+      {hasUnwatched && !selectionMode && (
+        <div className="absolute top-3 left-3 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-1 rounded-md shadow-lg z-20">
+          UP NEXT
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex flex-col gap-2 group relative">
-      <Link
-        to="/watchlists/$watchlistId"
-        params={{ watchlistId: watchlist.id.toString() }}
-        className="block h-full cursor-pointer transition-transform duration-300 active:scale-95"
-      >
-        <div
-          className={cn(
-            "relative aspect-[2/3] overflow-hidden rounded-2xl border-none shadow-2xl transition-all duration-300 group-hover:scale-[1.02]",
-            !stats.coverImage && fallbackGradient,
-          )}
+      {selectionMode ? (
+        CardContent
+      ) : (
+        <Link
+          to="/watchlists/$watchlistId"
+          params={{ watchlistId: watchlist.id.toString() }}
+          className="block h-full cursor-pointer transition-transform duration-300 active:scale-95"
         >
-          <CoverImage watchlist={watchlist} />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-60" />
+          {CardContent}
+        </Link>
+      )}
 
-          {hasUnwatched && (
-            <div className="absolute top-3 left-3 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-1 rounded-md shadow-lg z-20">
-              UP NEXT
-            </div>
-          )}
-        </div>
-      </Link>
-
-      <DeleteWatchlistButton
-        watchlist={watchlist}
-        deleting={deleting}
-        handleDelete={handleDelete}
-      />
+      {!selectionMode && (
+        <DeleteWatchlistButton
+          watchlist={watchlist}
+          deleting={deleting}
+          handleDelete={handleDelete}
+        />
+      )}
 
       <WatchlistInfo watchlist={watchlist} />
     </div>
