@@ -2,6 +2,7 @@
 
 import { Watchlist } from "@/server/watchlist";
 import { cn } from "@/utils/cn";
+import { Search } from "lucide-react";
 
 interface WatchlistHeaderProps {
   watchlist: Watchlist;
@@ -9,6 +10,8 @@ interface WatchlistHeaderProps {
   watchedItems: number;
   showUnwatchedOnly: boolean;
   onToggleFilter: () => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
 }
 
 export function WatchlistHeader({
@@ -17,6 +20,8 @@ export function WatchlistHeader({
   watchedItems,
   showUnwatchedOnly,
   onToggleFilter,
+  searchQuery,
+  onSearchChange,
 }: WatchlistHeaderProps) {
   const percentage = totalItems > 0 ? Math.round((watchedItems / totalItems) * 100) : 0;
 
@@ -45,34 +50,45 @@ export function WatchlistHeader({
           />
         </div>
 
-        {/* Filter Controls */}
-        <div className="flex items-center gap-2 border rounded-lg p-1 w-fit bg-secondary/30">
-          <button
-            onClick={onToggleFilter}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-              !showUnwatchedOnly
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "hover:bg-accent text-muted-foreground",
-            )}
-          >
-            All
-          </button>
-          <button
-            onClick={onToggleFilter}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-              showUnwatchedOnly
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "hover:bg-accent text-muted-foreground",
-            )}
-          >
-            Unwatched
-          </button>
+        {/* Controls: Search & Filters */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search titles..."
+              className="h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-2 border rounded-lg p-1 w-fit bg-secondary/30 self-start sm:self-auto">
+            <button
+              onClick={onToggleFilter}
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                !showUnwatchedOnly
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "hover:bg-accent text-muted-foreground",
+              )}
+            >
+              All
+            </button>
+            <button
+              onClick={onToggleFilter}
+              className={cn(
+                "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
+                showUnwatchedOnly
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "hover:bg-accent text-muted-foreground",
+              )}
+            >
+              Unwatched
+            </button>
+          </div>
         </div>
       </div>
-
-      {/* Filtering/Sort controls could go here */}
     </div>
   );
 }

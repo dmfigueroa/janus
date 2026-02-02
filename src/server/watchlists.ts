@@ -3,7 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { db } from "../db";
 import { watchlists, watchlistItems } from "../db/schema";
-import { eq, desc, inArray, asc, sql, and } from "drizzle-orm";
+import { eq, desc, inArray, asc, sql, and, or, like } from "drizzle-orm";
 import { z } from "zod";
 
 const watchlistSchema = z.object({
@@ -115,11 +115,12 @@ export const getWatchlistById = createServerFn()
         id: z.coerce.number(),
         page: z.number().optional().default(1),
         limit: z.number().optional().default(20),
+        query: z.string().optional(),
       })
       .parse(data),
   )
   .handler(async ({ data }) => {
-    const { id, page, limit } = data;
+    const { id, page, limit, query } = data;
     const offset = (page - 1) * limit;
 
     const [list] = await db.select().from(watchlists).where(eq(watchlists.id, id));
@@ -168,7 +169,17 @@ export const getWatchlistById = createServerFn()
       db
         .select()
         .from(watchlistItems)
-        .where(eq(watchlistItems.watchlistId, id))
+        .where(
+          and(
+            eq(watchlistItems.watchlistId, id),
+            query
+              ? or(
+                  like(watchlistItems.title, `%${query}%`),
+                  like(watchlistItems.parentTitle, `%${query}%`),
+                )
+              : undefined,
+          ),
+        )
         .orderBy(
           sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
           asc(watchlistItems.releaseDate),
