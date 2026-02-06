@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/command";
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Watchlist } from "@/db/schema";
 import { createWatchlist } from "@/server/watchlists";
 import { useRouter } from "@tanstack/react-router";
@@ -112,43 +113,45 @@ function WatchlistList({
   return (
     <Command className="h-auto">
       <CommandInput placeholder="Search watchlists..." onValueChange={setQuery} />
-      <CommandList className="max-h-[300px]">
-        <CommandEmpty>No watchlist found.</CommandEmpty>
-        {query && (
-          <CommandGroup>
-            <CommandItem
-              key={`create-${query}`}
-              value={`Create "${query}"`}
-              onSelect={async () => {
-                const newList = await createWatchlist({ data: { name: query } });
-                await router.invalidate();
-                onSelect(newList.id.toString());
-              }}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Create "{query}"
-            </CommandItem>
+      <CommandList className="max-h-none overflow-visible">
+        <ScrollArea className="max-h-[300px]">
+          <CommandEmpty>No watchlist found.</CommandEmpty>
+          {query && (
+            <CommandGroup>
+              <CommandItem
+                key={`create-${query}`}
+                value={`Create "${query}"`}
+                onSelect={async () => {
+                  const newList = await createWatchlist({ data: { name: query } });
+                  await router.invalidate();
+                  onSelect(newList.id.toString());
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Create "{query}"
+              </CommandItem>
+            </CommandGroup>
+          )}
+          <CommandGroup heading="Existing Watchlists">
+            {watchlists?.map((list) => (
+              <CommandItem
+                key={list.id}
+                value={list.name}
+                onSelect={() => {
+                  onSelect(list.id.toString() === selectedWatchlistId ? "" : list.id.toString());
+                }}
+              >
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    selectedWatchlistId === list.id.toString() ? "opacity-100" : "opacity-0",
+                  )}
+                />
+                {list.name}
+              </CommandItem>
+            ))}
           </CommandGroup>
-        )}
-        <CommandGroup heading="Existing Watchlists">
-          {watchlists?.map((list) => (
-            <CommandItem
-              key={list.id}
-              value={list.name}
-              onSelect={() => {
-                onSelect(list.id.toString() === selectedWatchlistId ? "" : list.id.toString());
-              }}
-            >
-              <Check
-                className={cn(
-                  "mr-2 h-4 w-4",
-                  selectedWatchlistId === list.id.toString() ? "opacity-100" : "opacity-0",
-                )}
-              />
-              {list.name}
-            </CommandItem>
-          ))}
-        </CommandGroup>
+        </ScrollArea>
       </CommandList>
     </Command>
   );
