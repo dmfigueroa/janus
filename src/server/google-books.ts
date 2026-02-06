@@ -18,11 +18,18 @@ const GoogleBooksResponseSchema = z.object({
   totalItems: z.number().optional(),
 });
 
+const getGoogleBooksApiKey = () => {
+  const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
+  if (!apiKey) throw new Error("GOOGLE_BOOKS_API_KEY is not configured");
+  return apiKey;
+};
+
 export async function searchBooks(
   query: string,
   page: number = 1,
 ): Promise<{ results: UnifiedMedia[]; totalResults: number }> {
   try {
+    const apiKey = getGoogleBooksApiKey();
     const maxResults = API_PAGE_SIZE;
     const startIndex = (page - 1) * maxResults;
     const url = new URL("https://www.googleapis.com/books/v1/volumes");
@@ -30,6 +37,7 @@ export async function searchBooks(
       q: query,
       startIndex: startIndex.toString(),
       maxResults: maxResults.toString(),
+      key: apiKey,
     }).toString();
 
     const res = await fetch(url.toString());
@@ -62,8 +70,13 @@ export async function searchBooks(
 
 export async function getBookDetails(id: string) {
   try {
-    const url = `https://www.googleapis.com/books/v1/volumes/${id}`;
-    const res = await fetch(url);
+    const apiKey = getGoogleBooksApiKey();
+    const url = new URL(`https://www.googleapis.com/books/v1/volumes/${id}`);
+    url.search = new URLSearchParams({
+      key: apiKey,
+    }).toString();
+
+    const res = await fetch(url.toString());
     if (!res.ok) throw new Error("Failed to fetch book details");
 
     const item = await res.json();
