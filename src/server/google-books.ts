@@ -51,7 +51,11 @@ export async function searchBooks(
       mediaType: "book" as const,
       source: "google_books" as const,
       title: item.volumeInfo.title || "Unknown Title",
-      poster: item.volumeInfo.imageLinks?.thumbnail?.replace("http:", "https:") || null,
+      poster:
+        item.volumeInfo.imageLinks?.thumbnail
+          ?.replace("http:", "https:")
+          .replace("&zoom=1", "&zoom=0")
+          .replace("&edge=curl", "") || null,
       year: item.volumeInfo.publishedDate?.split("-")[0],
       releaseDate: item.volumeInfo.publishedDate,
       rating: item.volumeInfo.averageRating ? item.volumeInfo.averageRating * 2 : undefined,
@@ -87,7 +91,11 @@ export async function getBookDetails(id: string) {
       mediaType: "book" as const,
       source: "google_books" as const,
       title: data.volumeInfo.title || "Unknown Title",
-      poster: data.volumeInfo.imageLinks?.thumbnail?.replace("http:", "https:") || null,
+      poster:
+        data.volumeInfo.imageLinks?.thumbnail
+          ?.replace("http:", "https:")
+          .replace("&zoom=1", "&zoom=0")
+          .replace("&edge=curl", "") || null,
       year: data.volumeInfo.publishedDate?.split("-")[0],
       releaseDate: data.volumeInfo.publishedDate,
       rating: data.volumeInfo.averageRating ? data.volumeInfo.averageRating * 2 : undefined,
