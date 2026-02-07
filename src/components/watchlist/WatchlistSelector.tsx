@@ -110,7 +110,7 @@ function WatchlistList({
   const router = useRouter();
 
   return (
-    <Command className="h-auto">
+    <Command>
       <CommandInput placeholder="Search watchlists..." onValueChange={setQuery} />
       <CommandList>
         <CommandEmpty>No watchlist found.</CommandEmpty>
