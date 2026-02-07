@@ -9,6 +9,7 @@ import { getTVDetails, getSeasonDetails, getMovieDetails } from "./tmdb";
 import { getComicIssues } from "./comicvine";
 import { getBookDetails } from "./google-books";
 import { getGameDetails } from "./rawg";
+import pLimit from "p-limit";
 
 export type { Watchlist, WatchlistItem } from "../db/schema";
 
@@ -191,12 +192,16 @@ const addTVShowToWatchList = async (
   const showDetails = await getTVDetails(tmdbId, apiKey);
   const seasons = showDetails.seasons || [];
 
+  const limit = pLimit(10);
+
   const allEpisodes = await Promise.all(
     seasons
       .filter((s: any) => s.season_number !== 0)
       .map((season: any) =>
-        getSeasonDetails(tmdbId, season.season_number, apiKey).then(
-          (seasonDetails) => seasonDetails.episodes,
+        limit(() =>
+          getSeasonDetails(tmdbId, season.season_number, apiKey).then(
+            (seasonDetails) => seasonDetails.episodes,
+          ),
         ),
       ),
   ).then((seasonDetails) =>
