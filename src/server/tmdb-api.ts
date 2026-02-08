@@ -20,6 +20,40 @@ export interface TMDBSearchResponse {
   total_results: number;
 }
 
+export interface TMDBErrorResponse {
+  status_code: number;
+  status_message: string;
+  success: boolean;
+}
+
+async function fetchWithAuth(url: string, apiKey: string) {
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    try {
+      const errorData = (await response.json()) as TMDBErrorResponse;
+      if (errorData.status_code && errorData.status_message) {
+        console.error(
+          `TMDB API Error: ${response.status} (Code: ${errorData.status_code}) - ${errorData.status_message}`
+        );
+      } else {
+        console.error(`TMDB API Error: ${response.status} ${response.statusText}`);
+      }
+    } catch {
+      // Fallback if response is not JSON
+      console.error(`TMDB API Error: ${response.status} ${response.statusText}`);
+    }
+    throw new Error(`Failed to fetch data from TMDB: ${response.status}`);
+  }
+
+  return response.json();
+}
+
 export async function fetchFromTMDB(
   query: string,
   page: number,
@@ -29,25 +63,12 @@ export async function fetchFromTMDB(
   const endpoint = type === "movie" ? "search/movie" : "search/tv";
   const url = new URL(`${TMDB_BASE_URL}/${endpoint}`);
 
-  // Use Bearer Token auth via Authorization header
   url.searchParams.set("query", query);
   url.searchParams.set("page", page.toString());
   url.searchParams.set("include_adult", "false");
   url.searchParams.set("language", "en-US");
 
-  const response = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      accept: "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    console.error(`TMDB API Error: ${response.status} ${response.statusText}`);
-    throw new Error("Failed to fetch data from TMDB");
-  }
-
-  const data = (await response.json()) as TMDBSearchResponse;
+  const data = (await fetchWithAuth(url.toString(), apiKey)) as TMDBSearchResponse;
 
   data.results = data.results.map((item) => ({
     ...item,
@@ -59,48 +80,15 @@ export async function fetchFromTMDB(
 
 export async function getTVDetails(id: number, apiKey: string) {
   const url = new URL(`${TMDB_BASE_URL}/tv/${id}`);
-
-  const response = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      accept: "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch TV details");
-  }
-  return response.json();
+  return fetchWithAuth(url.toString(), apiKey);
 }
 
 export async function getSeasonDetails(id: number, seasonNumber: number, apiKey: string) {
   const url = new URL(`${TMDB_BASE_URL}/tv/${id}/season/${seasonNumber}`);
-
-  const response = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      accept: "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch season details");
-  }
-  return response.json();
+  return fetchWithAuth(url.toString(), apiKey);
 }
 
 export async function getMovieDetails(id: number, apiKey: string) {
   const url = new URL(`${TMDB_BASE_URL}/movie/${id}`);
-
-  const response = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      accept: "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch movie details");
-  }
-  return response.json();
+  return fetchWithAuth(url.toString(), apiKey);
 }
