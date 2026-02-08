@@ -3,7 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { type UnifiedMedia } from "./media";
-import { fetchFromTMDB } from "./tmdb-api";
+import { fetchFromTMDB, getTVDetails, getSeasonDetails, getMovieDetails } from "./tmdb-api";
 
 export {
   type TMDBMedia,
@@ -34,7 +34,7 @@ export const searchMultimedia = createServerFn({ method: "GET" })
     }> => {
       const { query, page, type } = data;
 
-      const tmdbData = await fetchFromTMDB(query, page, type);
+      const tmdbData = await fetchFromTMDB({ data: { query, page, type } });
 
       const results: UnifiedMedia[] = tmdbData.results.map((item) => ({
         id: item.id.toString(),

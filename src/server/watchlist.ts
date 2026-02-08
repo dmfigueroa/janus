@@ -157,7 +157,7 @@ const addMovieToWatchList = async (watchlistId: number, tmdbId: number) => {
     return { success: true, message: "Already in watchlist" };
   }
 
-  const details = await getMovieDetails(tmdbId);
+  const details = await getMovieDetails({ data: { id: tmdbId } });
 
   await db.insert(watchlistItems).values({
     watchlistId,
@@ -184,14 +184,14 @@ const addTVShowToWatchList = async (
   tmdbId: number,
   media: z.infer<typeof addToWatchlistSchema>["media"],
 ) => {
-  const showDetails = await getTVDetails(tmdbId);
+  const showDetails = await getTVDetails({ data: { id: tmdbId } });
   const seasons = showDetails.seasons || [];
 
   const allEpisodes = await Promise.all(
     seasons
       .filter((s: any) => s.season_number !== 0)
       .map((season: any) =>
-        getSeasonDetails(tmdbId, season.season_number).then(
+        getSeasonDetails({ data: { id: tmdbId, seasonNumber: season.season_number } }).then(
           (seasonDetails) => seasonDetails.episodes,
         ),
       ),

@@ -1,3 +1,6 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
 export interface TMDBMedia {
@@ -59,40 +62,57 @@ async function fetchWithAuth(url: string) {
   return response.json();
 }
 
-export async function fetchFromTMDB(
-  query: string,
-  page: number,
-  type: "movie" | "tv",
-): Promise<TMDBSearchResponse> {
-  const endpoint = type === "movie" ? "search/movie" : "search/tv";
-  const url = new URL(`${TMDB_BASE_URL}/${endpoint}`);
+export const fetchFromTMDB = createServerFn({ method: "GET" })
+  .inputValidator((data) =>
+    z
+      .object({
+        query: z.string(),
+        page: z.number(),
+        type: z.enum(["movie", "tv"]),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { query, page, type } = data;
+    const endpoint = type === "movie" ? "search/movie" : "search/tv";
+    const url = new URL(`${TMDB_BASE_URL}/${endpoint}`);
 
-  url.searchParams.set("query", query);
-  url.searchParams.set("page", page.toString());
-  url.searchParams.set("include_adult", "false");
-  url.searchParams.set("language", "en-US");
+    url.searchParams.set("query", query);
+    url.searchParams.set("page", page.toString());
+    url.searchParams.set("include_adult", "false");
+    url.searchParams.set("language", "en-US");
 
-  const data = (await fetchWithAuth(url.toString())) as TMDBSearchResponse;
+    const response = (await fetchWithAuth(url.toString())) as TMDBSearchResponse;
 
-  data.results = data.results.map((item) => ({
-    ...item,
-    media_type: item.media_type || type,
-  }));
+    response.results = response.results.map((item) => ({
+      ...item,
+      media_type: item.media_type || type,
+    }));
 
-  return data;
-}
+    return response;
+  });
 
-export async function getTVDetails(id: number) {
-  const url = new URL(`${TMDB_BASE_URL}/tv/${id}`);
-  return fetchWithAuth(url.toString());
-}
+export const getTVDetails = createServerFn({ method: "GET" })
+  .inputValidator((data) => z.object({ id: z.number() }).parse(data))
+  .handler(async ({ data }) => {
+    const url = new URL(`${TMDB_BASE_URL}/tv/${data.id}`);
+    return fetchWithAuth(url.toString());
+  });
 
-export async function getSeasonDetails(id: number, seasonNumber: number) {
-  const url = new URL(`${TMDB_BASE_URL}/tv/${id}/season/${seasonNumber}`);
-  return fetchWithAuth(url.toString());
-}
+export const getSeasonDetails = createServerFn({ method: "GET" })
+  .inputValidator((data) =>
+    z.object({ id: z.number(), seasonNumber: z.number() }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const url = new URL(
+      `${TMDB_BASE_URL}/tv/${data.id}/season/${data.seasonNumber}`,
+    );
+    return fetchWithAuth(url.toString());
+  });
 
-export async function getMovieDetails(id: number) {
-  const url = new URL(`${TMDB_BASE_URL}/movie/${id}`);
-  return fetchWithAuth(url.toString());
-}
+export const getMovieDetails = createServerFn({ method: "GET" })
+  .inputValidator((data) => z.object({ id: z.number() }).parse(data))
+  .handler(async ({ data }) => {
+    const url = new URL(`${TMDB_BASE_URL}/movie/${data.id}`);
+    return fetchWithAuth(url.toString());
+  });
