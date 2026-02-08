@@ -61,13 +61,12 @@ export const addToWatchlist = createServerFn({ method: "POST" })
   .inputValidator((data) => addToWatchlistSchema.parse(data))
   .handler(async ({ data }) => {
     const { watchlistId, media } = data;
-    const apiKey = process.env.TMDB_API_KEY;
+    // TMDB API key is now handled internally in tmdb-api.ts, so we don't need to retrieve it here for TMDB calls
 
     if (media.mediaType === "tv") {
       if (media.source === "tmdb") {
-        if (!apiKey) throw new Error("TMDB_API_KEY is not configured");
         const tmdbId = parseInt(media.id);
-        return await addTVShowToWatchList(watchlistId, tmdbId, media, apiKey);
+        return await addTVShowToWatchList(watchlistId, tmdbId, media);
       }
       // Custom TV shows fall through to addGenericItemToWatchlist
       if (media.source !== "custom") {
@@ -76,11 +75,10 @@ export const addToWatchlist = createServerFn({ method: "POST" })
     }
 
     if (media.source === "tmdb") {
-      if (!apiKey) throw new Error("TMDB_API_KEY is not configured");
       const tmdbId = parseInt(media.id);
 
       if (media.mediaType === "movie") {
-        return await addMovieToWatchList(watchlistId, tmdbId, apiKey);
+        return await addMovieToWatchList(watchlistId, tmdbId);
       }
     }
 
@@ -143,7 +141,7 @@ const addGenericItemToWatchlist = async (watchlistId: number, media: GenericMedi
   return { success: true, message: "Added to watchlist" };
 };
 
-const addMovieToWatchList = async (watchlistId: number, tmdbId: number, apiKey: string) => {
+const addMovieToWatchList = async (watchlistId: number, tmdbId: number) => {
   const existing = await db
     .select()
     .from(watchlistItems)
@@ -160,7 +158,7 @@ const addMovieToWatchList = async (watchlistId: number, tmdbId: number, apiKey: 
     return { success: true, message: "Already in watchlist" };
   }
 
-  const details = await getMovieDetails(tmdbId, apiKey);
+  const details = await getMovieDetails(tmdbId);
 
   await db.insert(watchlistItems).values({
     watchlistId,
@@ -186,16 +184,15 @@ const addTVShowToWatchList = async (
   watchlistId: number,
   tmdbId: number,
   media: z.infer<typeof addToWatchlistSchema>["media"],
-  apiKey: string,
 ) => {
-  const showDetails = await getTVDetails(tmdbId, apiKey);
+  const showDetails = await getTVDetails(tmdbId);
   const seasons = showDetails.seasons || [];
 
   const allEpisodes = await Promise.all(
     seasons
       .filter((s: any) => s.season_number !== 0)
       .map((season: any) =>
-        getSeasonDetails(tmdbId, season.season_number, apiKey).then(
+        getSeasonDetails(tmdbId, season.season_number).then(
           (seasonDetails) => seasonDetails.episodes,
         ),
       ),
