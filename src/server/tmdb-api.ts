@@ -29,13 +29,18 @@ export async function fetchFromTMDB(
   const endpoint = type === "movie" ? "search/movie" : "search/tv";
   const url = new URL(`${TMDB_BASE_URL}/${endpoint}`);
 
-  url.searchParams.set("api_key", apiKey);
+  // Use Bearer Token auth via Authorization header
   url.searchParams.set("query", query);
   url.searchParams.set("page", page.toString());
   url.searchParams.set("include_adult", "false");
   url.searchParams.set("language", "en-US");
 
-  const response = await fetch(url.toString());
+  const response = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      accept: "application/json",
+    },
+  });
 
   if (!response.ok) {
     console.error(`TMDB API Error: ${response.status} ${response.statusText}`);
@@ -54,9 +59,14 @@ export async function fetchFromTMDB(
 
 export async function getTVDetails(id: number, apiKey: string) {
   const url = new URL(`${TMDB_BASE_URL}/tv/${id}`);
-  url.searchParams.set("api_key", apiKey);
 
-  const response = await fetch(url.toString());
+  const response = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      accept: "application/json",
+    },
+  });
+
   if (!response.ok) {
     throw new Error("Failed to fetch TV details");
   }
@@ -65,9 +75,14 @@ export async function getTVDetails(id: number, apiKey: string) {
 
 export async function getSeasonDetails(id: number, seasonNumber: number, apiKey: string) {
   const url = new URL(`${TMDB_BASE_URL}/tv/${id}/season/${seasonNumber}`);
-  url.searchParams.set("api_key", apiKey);
 
-  const response = await fetch(url.toString());
+  const response = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      accept: "application/json",
+    },
+  });
+
   if (!response.ok) {
     throw new Error("Failed to fetch season details");
   }
@@ -76,9 +91,14 @@ export async function getSeasonDetails(id: number, seasonNumber: number, apiKey:
 
 export async function getMovieDetails(id: number, apiKey: string) {
   const url = new URL(`${TMDB_BASE_URL}/movie/${id}`);
-  url.searchParams.set("api_key", apiKey);
 
-  const response = await fetch(url.toString());
+  const response = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      accept: "application/json",
+    },
+  });
+
   if (!response.ok) {
     throw new Error("Failed to fetch movie details");
   }
