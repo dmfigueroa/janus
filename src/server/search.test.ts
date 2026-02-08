@@ -25,9 +25,6 @@ vi.mock("../utils/search", () => ({
 // Import searchUnifiedHandler AFTER mocking
 import { searchUnifiedHandler } from "./search-api";
 import { searchMultimedia } from "./tmdb";
-import { searchBooks } from "./google-books";
-import { searchGames } from "./rawg";
-import { searchComics } from "./comicvine";
 
 // Mock the external API search functions
 vi.mock("./tmdb", () => ({
