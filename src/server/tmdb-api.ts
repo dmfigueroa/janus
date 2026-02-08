@@ -26,7 +26,12 @@ export interface TMDBErrorResponse {
   success: boolean;
 }
 
-async function fetchWithAuth(url: string, apiKey: string) {
+async function fetchWithAuth(url: string) {
+  const apiKey = process.env.TMDB_API_KEY;
+  if (!apiKey) {
+    throw new Error("TMDB_API_KEY is not configured");
+  }
+
   const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -58,7 +63,6 @@ export async function fetchFromTMDB(
   query: string,
   page: number,
   type: "movie" | "tv",
-  apiKey: string,
 ): Promise<TMDBSearchResponse> {
   const endpoint = type === "movie" ? "search/movie" : "search/tv";
   const url = new URL(`${TMDB_BASE_URL}/${endpoint}`);
@@ -68,7 +72,7 @@ export async function fetchFromTMDB(
   url.searchParams.set("include_adult", "false");
   url.searchParams.set("language", "en-US");
 
-  const data = (await fetchWithAuth(url.toString(), apiKey)) as TMDBSearchResponse;
+  const data = (await fetchWithAuth(url.toString())) as TMDBSearchResponse;
 
   data.results = data.results.map((item) => ({
     ...item,
@@ -78,17 +82,17 @@ export async function fetchFromTMDB(
   return data;
 }
 
-export async function getTVDetails(id: number, apiKey: string) {
+export async function getTVDetails(id: number) {
   const url = new URL(`${TMDB_BASE_URL}/tv/${id}`);
-  return fetchWithAuth(url.toString(), apiKey);
+  return fetchWithAuth(url.toString());
 }
 
-export async function getSeasonDetails(id: number, seasonNumber: number, apiKey: string) {
+export async function getSeasonDetails(id: number, seasonNumber: number) {
   const url = new URL(`${TMDB_BASE_URL}/tv/${id}/season/${seasonNumber}`);
-  return fetchWithAuth(url.toString(), apiKey);
+  return fetchWithAuth(url.toString());
 }
 
-export async function getMovieDetails(id: number, apiKey: string) {
+export async function getMovieDetails(id: number) {
   const url = new URL(`${TMDB_BASE_URL}/movie/${id}`);
-  return fetchWithAuth(url.toString(), apiKey);
+  return fetchWithAuth(url.toString());
 }

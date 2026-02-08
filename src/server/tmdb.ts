@@ -33,13 +33,9 @@ export const searchMultimedia = createServerFn({ method: "GET" })
       total_results: number;
     }> => {
       const { query, page, type } = data;
-      const apiKey = process.env.TMDB_API_KEY;
 
-      if (!apiKey) {
-        throw new Error("TMDB_API_KEY is not configured");
-      }
-
-      const tmdbData = await fetchFromTMDB(query, page, type, apiKey);
+      // Removed apiKey retrieval and passing as it is now handled internally by fetchFromTMDB
+      const tmdbData = await fetchFromTMDB(query, page, type);
 
       const results: UnifiedMedia[] = tmdbData.results.map((item) => ({
         id: item.id.toString(),
