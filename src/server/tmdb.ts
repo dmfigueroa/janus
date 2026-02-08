@@ -3,7 +3,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { type UnifiedMedia } from "./media";
-import { fetchFromTMDB, getTVDetails, getSeasonDetails, getMovieDetails } from "./tmdb-api";
+import { fetchFromTMDB } from "./tmdb-api";
 
 export {
   type TMDBMedia,
