@@ -2,6 +2,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import pLimit from "p-limit";
 import { db } from "../db";
 import { watchlistItems, watchlists } from "../db/schema";
 import { eq, and, sql } from "drizzle-orm";
@@ -9,10 +10,10 @@ import { getTVDetails, getSeasonDetails, getMovieDetails } from "./tmdb";
 import { getComicIssues } from "./comicvine";
 import { getBookDetails } from "./google-books";
 import { getGameDetails } from "./rawg";
-import pLimit from "p-limit";
 
 export type { Watchlist, WatchlistItem } from "../db/schema";
 
+const limit = pLimit(5);
 const DB_INSERT_CHUNK_SIZE = 50;
 
 const addToWatchlistSchema = z.object({

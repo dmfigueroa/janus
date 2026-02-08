@@ -1,10 +1,9 @@
 "use server";
 
-import { escapeLikeString } from "../utils/search";
 import { createServerFn } from "@tanstack/react-start";
 import { db } from "../db";
 import { watchlists, watchlistItems } from "../db/schema";
-import { eq, desc, inArray, asc, sql, and, or } from "drizzle-orm";
+import { eq, desc, inArray, asc, sql, and, or, like } from "drizzle-orm";
 import { z } from "zod";
 
 const watchlistSchema = z.object({
@@ -175,8 +174,8 @@ export const getWatchlistById = createServerFn()
             eq(watchlistItems.watchlistId, id),
             query
               ? or(
-                  sql`${watchlistItems.title} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\'`,
-                  sql`${watchlistItems.parentTitle} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\'`,
+                  like(watchlistItems.title, `%${query}%`),
+                  like(watchlistItems.parentTitle, `%${query}%`),
                 )
               : undefined,
           ),
