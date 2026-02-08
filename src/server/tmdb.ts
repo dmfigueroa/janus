@@ -34,7 +34,6 @@ export const searchMultimedia = createServerFn({ method: "GET" })
     }> => {
       const { query, page, type } = data;
 
-      // Removed apiKey retrieval and passing as it is now handled internally by fetchFromTMDB
       const tmdbData = await fetchFromTMDB(query, page, type);
 
       const results: UnifiedMedia[] = tmdbData.results.map((item) => ({

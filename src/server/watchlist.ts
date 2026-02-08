@@ -9,7 +9,6 @@ import { getTVDetails, getSeasonDetails, getMovieDetails } from "./tmdb";
 import { getComicIssues } from "./comicvine";
 import { getBookDetails } from "./google-books";
 import { getGameDetails } from "./rawg";
-import pLimit from "p-limit";
 
 export type { Watchlist, WatchlistItem } from "../db/schema";
 
@@ -62,7 +61,6 @@ export const addToWatchlist = createServerFn({ method: "POST" })
   .inputValidator((data) => addToWatchlistSchema.parse(data))
   .handler(async ({ data }) => {
     const { watchlistId, media } = data;
-    // TMDB API key is now handled internally in tmdb-api.ts, so we don't need to retrieve it here for TMDB calls
 
     if (media.mediaType === "tv") {
       if (media.source === "tmdb") {
@@ -188,8 +186,6 @@ const addTVShowToWatchList = async (
 ) => {
   const showDetails = await getTVDetails(tmdbId);
   const seasons = showDetails.seasons || [];
-
-  const limit = pLimit(10);
 
   const allEpisodes = await Promise.all(
     seasons
