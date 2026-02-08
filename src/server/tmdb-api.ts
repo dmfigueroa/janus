@@ -28,14 +28,12 @@ export async function fetchFromTMDB(
 ): Promise<TMDBSearchResponse> {
   const endpoint = type === "movie" ? "search/movie" : "search/tv";
   const url = new URL(`${TMDB_BASE_URL}/${endpoint}`);
-  const params = new URLSearchParams({
-    api_key: apiKey,
-    query: query,
-    page: page.toString(),
-    include_adult: "false",
-    language: "en-US",
-  });
-  url.search = params.toString();
+
+  url.searchParams.set("api_key", apiKey);
+  url.searchParams.set("query", query);
+  url.searchParams.set("page", page.toString());
+  url.searchParams.set("include_adult", "false");
+  url.searchParams.set("language", "en-US");
 
   const response = await fetch(url.toString());
 
