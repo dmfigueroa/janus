@@ -7,7 +7,7 @@ import { type UnifiedMedia } from "./media";
 import { API_PAGE_SIZE } from "./constants";
 import { db } from "../db";
 import { watchlistItems } from "../db/schema";
-import { eq, and, like } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { escapeLikeString } from "../utils/search";
 
 export const searchInputSchema = z.object({
@@ -36,7 +36,7 @@ export const searchCustomItems = async (
       and(
         eq(watchlistItems.source, "custom"),
         eq(watchlistItems.mediaType, type),
-        like(watchlistItems.title, `%${escapeLikeString(query)}%`),
+        sql`${watchlistItems.title} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\'`
       ),
     )
     .groupBy(watchlistItems.tmdbId);
