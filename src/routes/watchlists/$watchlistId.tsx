@@ -30,7 +30,7 @@ function WatchlistDetail() {
   }, [searchQuery]);
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ["watchlist", watchlistId, "items", debouncedSearchQuery],
+    queryKey: ["watchlist", watchlistId, "items", debouncedSearchQuery, showUnwatchedOnly],
     queryFn: async ({ pageParam }) => {
       return getWatchlistById({
         data: {
@@ -38,14 +38,16 @@ function WatchlistDetail() {
           page: pageParam,
           limit: 50,
           query: debouncedSearchQuery || undefined,
+          isWatched: showUnwatchedOnly ? false : undefined,
         },
       });
     },
     initialPageParam: 1,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialData:
-      // Only use initialData if there is no search query, otherwise we want to fetch fresh results
-      debouncedSearchQuery === ""
+      // Only use initialData if there is no search query AND we are not filtering by unwatched only
+      // (because initialData is unfiltered)
+      debouncedSearchQuery === "" && !showUnwatchedOnly
         ? {
             pages: [initialData],
             pageParams: [1],
@@ -60,7 +62,7 @@ function WatchlistDetail() {
   const totalItems = latestWatchlist.stats.totalItems;
   const watchedItems = latestWatchlist.stats.watchedItems;
 
-  const displayedItems = showUnwatchedOnly ? allItems.filter((item) => !item.isWatched) : allItems;
+  const displayedItems = allItems;
 
   return (
     <div className="container mx-auto min-h-screen max-w-3xl px-4 py-6 md:px-8 pb-32">

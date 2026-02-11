@@ -117,11 +117,12 @@ export const getWatchlistById = createServerFn()
         page: z.number().optional().default(1),
         limit: z.number().optional().default(20),
         query: z.string().optional(),
+        isWatched: z.boolean().optional(),
       })
       .parse(data),
   )
   .handler(async ({ data }) => {
-    const { id, page, limit, query } = data;
+    const { id, page, limit, query, isWatched } = data;
     const offset = (page - 1) * limit;
 
     const [list] = await db.select().from(watchlists).where(eq(watchlists.id, id));
@@ -173,6 +174,7 @@ export const getWatchlistById = createServerFn()
         .where(
           and(
             eq(watchlistItems.watchlistId, id),
+            isWatched !== undefined ? eq(watchlistItems.isWatched, isWatched) : undefined,
             query
               ? or(
                   sql`${watchlistItems.title} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\'`,
