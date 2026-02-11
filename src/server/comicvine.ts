@@ -55,11 +55,26 @@ const ComicIssueResponseSchema = z.object({
   number_of_total_results: z.number().default(0),
 });
 
+interface SearchCacheEntry {
+  data: { results: UnifiedMedia[]; totalResults: number };
+  timestamp: number;
+}
+
+const CACHE_TTL = 1000 * 60 * 10; // 10 minutes
+const searchCache = new Map<string, SearchCacheEntry>();
+
 export async function searchComics(
   query: string,
   apiKey: string,
   page: number = 1,
 ): Promise<{ results: UnifiedMedia[]; totalResults: number }> {
+  const cacheKey = `search:${apiKey}:${query}:${page}`;
+  const cached = searchCache.get(cacheKey);
+
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+
   try {
     const limit = API_PAGE_SIZE;
     const url = new URL("https://comicvine.gamespot.com/api/search/");
@@ -94,10 +109,18 @@ export async function searchComics(
       overview: item.deck || item.description || undefined,
     }));
 
-    return {
+    const result = {
       results,
       totalResults: data.number_of_total_results || 0,
     };
+
+    if (searchCache.size > 100) {
+      const firstKey = searchCache.keys().next().value;
+      if (firstKey) searchCache.delete(firstKey);
+    }
+    searchCache.set(cacheKey, { data: result, timestamp: Date.now() });
+
+    return result;
   } catch (e) {
     console.error("ComicVine API Error", e);
     return { results: [], totalResults: 0 };

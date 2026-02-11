@@ -47,7 +47,7 @@ async function fetchWithAuth(url: string) {
       const errorData = (await response.json()) as TMDBErrorResponse;
       if (errorData.status_code && errorData.status_message) {
         console.error(
-          `TMDB API Error: ${response.status} (Code: ${errorData.status_code}) - ${errorData.status_message}`
+          `TMDB API Error: ${response.status} (Code: ${errorData.status_code}) - ${errorData.status_message}`,
         );
       } else {
         console.error(`TMDB API Error: ${response.status} ${response.statusText}`);
@@ -100,13 +100,9 @@ export const getTVDetails = createServerFn({ method: "GET" })
   });
 
 export const getSeasonDetails = createServerFn({ method: "GET" })
-  .inputValidator((data) =>
-    z.object({ id: z.number(), seasonNumber: z.number() }).parse(data),
-  )
+  .inputValidator((data) => z.object({ id: z.number(), seasonNumber: z.number() }).parse(data))
   .handler(async ({ data }) => {
-    const url = new URL(
-      `${TMDB_BASE_URL}/tv/${data.id}/season/${data.seasonNumber}`,
-    );
+    const url = new URL(`${TMDB_BASE_URL}/tv/${data.id}/season/${data.seasonNumber}`);
     return fetchWithAuth(url.toString());
   });
 
