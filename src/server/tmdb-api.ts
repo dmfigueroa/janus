@@ -3,6 +3,51 @@ import { z } from "zod";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
+// Simple LRU Cache Implementation
+const TMDB_CACHE_SIZE = 100;
+const TMDB_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+interface CacheEntry {
+  data: TMDBSearchResponse;
+  timestamp: number;
+}
+
+const tmdbCache = new Map<string, CacheEntry>();
+
+function getCacheKey(query: string, page: number, type: string): string {
+  return `${type}:${query}:${page}`;
+}
+
+function getFromCache(key: string): TMDBSearchResponse | null {
+  const entry = tmdbCache.get(key);
+  if (!entry) return null;
+
+  if (Date.now() - entry.timestamp > TMDB_CACHE_TTL) {
+    tmdbCache.delete(key);
+    return null;
+  }
+
+  // Refresh LRU (mark as recently used)
+  tmdbCache.delete(key);
+  tmdbCache.set(key, entry);
+  return entry.data;
+}
+
+function addToCache(key: string, data: TMDBSearchResponse) {
+  if (tmdbCache.has(key)) {
+    tmdbCache.delete(key);
+  } else if (tmdbCache.size >= TMDB_CACHE_SIZE) {
+    // Evict oldest entry
+    const oldestKey = tmdbCache.keys().next().value;
+    if (oldestKey) tmdbCache.delete(oldestKey);
+  }
+
+  tmdbCache.set(key, {
+    data,
+    timestamp: Date.now(),
+  });
+}
+
 export interface TMDBMedia {
   id: number;
   media_type?: "movie" | "tv";
@@ -62,6 +107,36 @@ async function fetchWithAuth(url: string) {
   return response.json();
 }
 
+export async function fetchFromTMDBHandler(data: { query: string; page: number; type: "movie" | "tv" }) {
+  const { query, page, type } = data;
+
+  const cacheKey = getCacheKey(query, page, type);
+  const cachedData = getFromCache(cacheKey);
+
+  if (cachedData) {
+    return cachedData;
+  }
+
+  const endpoint = type === "movie" ? "search/movie" : "search/tv";
+  const url = new URL(`${TMDB_BASE_URL}/${endpoint}`);
+
+  url.searchParams.set("query", query);
+  url.searchParams.set("page", page.toString());
+  url.searchParams.set("include_adult", "false");
+  url.searchParams.set("language", "en-US");
+
+  const response = (await fetchWithAuth(url.toString())) as TMDBSearchResponse;
+
+  response.results = response.results.map((item) => ({
+    ...item,
+    media_type: item.media_type || type,
+  }));
+
+  addToCache(cacheKey, response);
+
+  return response;
+}
+
 export const fetchFromTMDB = createServerFn({ method: "GET" })
   .inputValidator((data) =>
     z
@@ -73,23 +148,7 @@ export const fetchFromTMDB = createServerFn({ method: "GET" })
       .parse(data),
   )
   .handler(async ({ data }) => {
-    const { query, page, type } = data;
-    const endpoint = type === "movie" ? "search/movie" : "search/tv";
-    const url = new URL(`${TMDB_BASE_URL}/${endpoint}`);
-
-    url.searchParams.set("query", query);
-    url.searchParams.set("page", page.toString());
-    url.searchParams.set("include_adult", "false");
-    url.searchParams.set("language", "en-US");
-
-    const response = (await fetchWithAuth(url.toString())) as TMDBSearchResponse;
-
-    response.results = response.results.map((item) => ({
-      ...item,
-      media_type: item.media_type || type,
-    }));
-
-    return response;
+    return fetchFromTMDBHandler(data);
   });
 
 export const getTVDetails = createServerFn({ method: "GET" })
