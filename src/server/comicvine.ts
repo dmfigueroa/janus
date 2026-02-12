@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { API_PAGE_SIZE } from "./constants";
 import { type UnifiedMedia } from "./media";
+import { withCache } from "@/utils/cache";
 
 export const ComicIssueSchema = z.object({
   id: z.string(),
@@ -104,64 +105,70 @@ export async function searchComics(
   }
 }
 
-export async function getComicIssues(volumeId: string, apiKey: string): Promise<ComicIssue[]> {
-  const allIssues: z.infer<typeof ComicIssueItemSchema>[] = [];
-  let offset = 0;
-  let totalResults = 1;
-  const limit = 100;
+export async function getComicIssues(
+  volumeId: string,
+  apiKey: string,
+  forceRefresh: boolean = false,
+): Promise<ComicIssue[]> {
+  return withCache(
+    `comicvine:volume:${volumeId}:issues`,
+    async () => {
+      const allIssues: z.infer<typeof ComicIssueItemSchema>[] = [];
+      let offset = 0;
+      let totalResults = 1;
+      const limit = 100;
 
-  try {
-    while (offset < totalResults) {
-      const url = new URL("https://comicvine.gamespot.com/api/issues/");
-      url.search = new URLSearchParams({
-        api_key: apiKey,
-        filter: `volume:${volumeId}`,
-        sort: "issue_number:asc",
-        format: "json",
-        limit: limit.toString(),
-        offset: offset.toString(),
-      }).toString();
+      while (offset < totalResults) {
+        const url = new URL("https://comicvine.gamespot.com/api/issues/");
+        url.search = new URLSearchParams({
+          api_key: apiKey,
+          filter: `volume:${volumeId}`,
+          sort: "issue_number:asc",
+          format: "json",
+          limit: limit.toString(),
+          offset: offset.toString(),
+        }).toString();
 
-      const res = await fetch(url, {
-        headers: {
-          "User-Agent": "JanusApp/1.0",
-        },
-      });
+        const res = await fetch(url, {
+          headers: {
+            "User-Agent": "JanusApp/1.0",
+          },
+        });
 
-      if (!res.ok) {
-        console.error(`ComicVine API Error (Status ${res.status}): ${res.statusText}`);
-        break;
+        if (!res.ok) {
+          console.error(`ComicVine API Error (Status ${res.status}): ${res.statusText}`);
+          break;
+        }
+
+        const rawData = await res.json();
+        const data = ComicIssueResponseSchema.parse(rawData);
+
+        if (data.error !== "OK") {
+          console.error(`ComicVine API Error (Response): ${data.error}`);
+          break;
+        }
+
+        const results = data.results;
+        allIssues.push(...results);
+
+        totalResults = data.number_of_total_results;
+        offset += results.length;
+
+        if (results.length === 0) break;
       }
 
-      const rawData = await res.json();
-      const data = ComicIssueResponseSchema.parse(rawData);
-
-      if (data.error !== "OK") {
-        console.error(`ComicVine API Error (Response): ${data.error}`);
-        break;
-      }
-
-      const results = data.results;
-      allIssues.push(...results);
-
-      totalResults = data.number_of_total_results;
-      offset += results.length;
-
-      if (results.length === 0) break;
-    }
-
-    return allIssues.map((issue) => ({
-      id: issue.id.toString(),
-      mediaType: "comic",
-      source: "comicvine",
-      title: issue.name || `Issue #${issue.issue_number}`,
-      poster: issue.image?.medium_url || issue.image?.small_url || null,
-      coverDate: issue.cover_date || null,
-      issueNumber: issue.issue_number || null,
-      description: issue.description || issue.deck || null,
-    }));
-  } catch (e) {
-    console.error("ComicVine Issues API Search Error", e);
-    return [];
-  }
+      return allIssues.map((issue) => ({
+        id: issue.id.toString(),
+        mediaType: "comic",
+        source: "comicvine",
+        title: issue.name || `Issue #${issue.issue_number}`,
+        poster: issue.image?.medium_url || issue.image?.small_url || null,
+        coverDate: issue.cover_date || null,
+        issueNumber: issue.issue_number || null,
+        description: issue.description || issue.deck || null,
+      }));
+    },
+    undefined,
+    forceRefresh,
+  );
 }

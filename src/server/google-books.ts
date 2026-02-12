@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { API_PAGE_SIZE } from "./constants";
 import { type UnifiedMedia } from "./media";
+import { withCache } from "@/utils/cache";
 
 const GoogleBookItemSchema = z.object({
   id: z.string(),
@@ -72,37 +73,39 @@ export async function searchBooks(
   }
 }
 
-export async function getBookDetails(id: string) {
-  try {
-    const apiKey = getGoogleBooksApiKey();
-    const url = new URL(`https://www.googleapis.com/books/v1/volumes/${id}`);
-    url.search = new URLSearchParams({
-      key: apiKey,
-    }).toString();
+export async function getBookDetails(id: string, forceRefresh: boolean = false) {
+  return withCache(
+    `google_books:book:${id}`,
+    async () => {
+      const apiKey = getGoogleBooksApiKey();
+      const url = new URL(`https://www.googleapis.com/books/v1/volumes/${id}`);
+      url.search = new URLSearchParams({
+        key: apiKey,
+      }).toString();
 
-    const res = await fetch(url.toString());
-    if (!res.ok) throw new Error("Failed to fetch book details");
+      const res = await fetch(url.toString());
+      if (!res.ok) throw new Error("Failed to fetch book details");
 
-    const item = await res.json();
-    const data = GoogleBookItemSchema.parse(item);
+      const item = await res.json();
+      const data = GoogleBookItemSchema.parse(item);
 
-    return {
-      id: data.id,
-      mediaType: "book" as const,
-      source: "google_books" as const,
-      title: data.volumeInfo.title || "Unknown Title",
-      poster:
-        data.volumeInfo.imageLinks?.thumbnail
-          ?.replace("http:", "https:")
-          .replace("&zoom=1", "&zoom=0")
-          .replace("&edge=curl", "") || null,
-      year: data.volumeInfo.publishedDate?.split("-")[0],
-      releaseDate: data.volumeInfo.publishedDate,
-      rating: data.volumeInfo.averageRating ? data.volumeInfo.averageRating * 2 : undefined,
-      overview: data.volumeInfo.description,
-    };
-  } catch (e) {
-    console.error("Google Books Details Error", e);
-    throw e;
-  }
+      return {
+        id: data.id,
+        mediaType: "book" as const,
+        source: "google_books" as const,
+        title: data.volumeInfo.title || "Unknown Title",
+        poster:
+          data.volumeInfo.imageLinks?.thumbnail
+            ?.replace("http:", "https:")
+            .replace("&zoom=1", "&zoom=0")
+            .replace("&edge=curl", "") || null,
+        year: data.volumeInfo.publishedDate?.split("-")[0],
+        releaseDate: data.volumeInfo.publishedDate,
+        rating: data.volumeInfo.averageRating ? data.volumeInfo.averageRating * 2 : undefined,
+        overview: data.volumeInfo.description,
+      };
+    },
+    undefined,
+    forceRefresh,
+  );
 }

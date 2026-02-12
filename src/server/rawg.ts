@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { API_PAGE_SIZE } from "./constants";
 import { type UnifiedMedia } from "./media";
+import { withCache } from "@/utils/cache";
 
 const RawgGameSchema = z.object({
   id: z.number(),
@@ -58,28 +59,30 @@ export async function searchGames(
   }
 }
 
-export async function getGameDetails(id: string, apiKey: string) {
-  try {
-    const url = `https://api.rawg.io/api/games/${id}?key=${apiKey}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("Failed to fetch game details");
+export async function getGameDetails(id: string, apiKey: string, forceRefresh: boolean = false) {
+  return withCache(
+    `rawg:game:${id}`,
+    async () => {
+      const url = `https://api.rawg.io/api/games/${id}?key=${apiKey}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch game details");
 
-    const item = await res.json();
-    const data = RawgGameSchema.parse(item);
+      const item = await res.json();
+      const data = RawgGameSchema.parse(item);
 
-    return {
-      id: data.id.toString(),
-      mediaType: "game" as const,
-      source: "rawg" as const,
-      title: data.name,
-      poster: data.background_image || null,
-      year: data.released?.split("-")[0],
-      releaseDate: data.released || undefined,
-      rating: data.rating ? data.rating * 2 : undefined,
-      overview: undefined,
-    };
-  } catch (e) {
-    console.error("RAWG Details Error", e);
-    throw e;
-  }
+      return {
+        id: data.id.toString(),
+        mediaType: "game" as const,
+        source: "rawg" as const,
+        title: data.name,
+        poster: data.background_image || null,
+        year: data.released?.split("-")[0],
+        releaseDate: data.released || undefined,
+        rating: data.rating ? data.rating * 2 : undefined,
+        overview: undefined,
+      };
+    },
+    undefined,
+    forceRefresh,
+  );
 }

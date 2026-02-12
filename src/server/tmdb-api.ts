@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { withCache } from "@/utils/cache";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
@@ -47,7 +48,7 @@ async function fetchWithAuth(url: string) {
       const errorData = (await response.json()) as TMDBErrorResponse;
       if (errorData.status_code && errorData.status_message) {
         console.error(
-          `TMDB API Error: ${response.status} (Code: ${errorData.status_code}) - ${errorData.status_message}`
+          `TMDB API Error: ${response.status} (Code: ${errorData.status_code}) - ${errorData.status_message}`,
         );
       } else {
         console.error(`TMDB API Error: ${response.status} ${response.statusText}`);
@@ -93,26 +94,51 @@ export const fetchFromTMDB = createServerFn({ method: "GET" })
   });
 
 export const getTVDetails = createServerFn({ method: "GET" })
-  .inputValidator((data) => z.object({ id: z.number() }).parse(data))
+  .inputValidator((data) =>
+    z.object({ id: z.number(), forceRefresh: z.boolean().optional() }).parse(data),
+  )
   .handler(async ({ data }) => {
-    const url = new URL(`${TMDB_BASE_URL}/tv/${data.id}`);
-    return fetchWithAuth(url.toString());
+    return withCache(
+      `tmdb:tv:${data.id}`,
+      async () => {
+        const url = new URL(`${TMDB_BASE_URL}/tv/${data.id}`);
+        return fetchWithAuth(url.toString());
+      },
+      undefined,
+      data.forceRefresh,
+    );
   });
 
 export const getSeasonDetails = createServerFn({ method: "GET" })
   .inputValidator((data) =>
-    z.object({ id: z.number(), seasonNumber: z.number() }).parse(data),
+    z
+      .object({ id: z.number(), seasonNumber: z.number(), forceRefresh: z.boolean().optional() })
+      .parse(data),
   )
   .handler(async ({ data }) => {
-    const url = new URL(
-      `${TMDB_BASE_URL}/tv/${data.id}/season/${data.seasonNumber}`,
+    return withCache(
+      `tmdb:tv:${data.id}:season:${data.seasonNumber}`,
+      async () => {
+        const url = new URL(`${TMDB_BASE_URL}/tv/${data.id}/season/${data.seasonNumber}`);
+        return fetchWithAuth(url.toString());
+      },
+      undefined,
+      data.forceRefresh,
     );
-    return fetchWithAuth(url.toString());
   });
 
 export const getMovieDetails = createServerFn({ method: "GET" })
-  .inputValidator((data) => z.object({ id: z.number() }).parse(data))
+  .inputValidator((data) =>
+    z.object({ id: z.number(), forceRefresh: z.boolean().optional() }).parse(data),
+  )
   .handler(async ({ data }) => {
-    const url = new URL(`${TMDB_BASE_URL}/movie/${data.id}`);
-    return fetchWithAuth(url.toString());
+    return withCache(
+      `tmdb:movie:${data.id}`,
+      async () => {
+        const url = new URL(`${TMDB_BASE_URL}/movie/${data.id}`);
+        return fetchWithAuth(url.toString());
+      },
+      undefined,
+      data.forceRefresh,
+    );
   });
