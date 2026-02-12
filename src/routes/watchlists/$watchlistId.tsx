@@ -62,8 +62,6 @@ function WatchlistDetail() {
   const totalItems = latestWatchlist.stats.totalItems;
   const watchedItems = latestWatchlist.stats.watchedItems;
 
-  const displayedItems = allItems;
-
   return (
     <div className="container mx-auto min-h-screen max-w-3xl px-4 py-6 md:px-8 pb-32">
       <WatchlistHeader
@@ -78,7 +76,7 @@ function WatchlistDetail() {
 
       <div className="mt-8">
         <WatchlistTimeline
-          items={displayedItems}
+          items={allItems}
           hasMore={hasNextPage}
           isLoadingMore={isFetchingNextPage}
           onLoadMore={fetchNextPage}
