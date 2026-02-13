@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { apiCache } from "@/db/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { z } from "zod";
+import { consola } from "consola";
 
 const DEFAULT_TTL = 7 * 24 * 60 * 60; // 7 days in seconds
 
@@ -19,20 +20,20 @@ export class CacheService {
         .get();
 
       if (!result) {
-        console.log(`[Cache] MISS: ${key}`);
+        consola.info(`[Cache] MISS: ${key}`);
         return null;
       }
 
       const parsed = schema.safeParse(result.data);
       if (!parsed.success) {
-        console.warn(`[Cache] INVALIDATION: ${key} due to schema mismatch`);
+        consola.warn(`[Cache] INVALIDATION: ${key} due to schema mismatch`);
         return null;
       }
 
-      console.log(`[Cache] HIT: ${key}`);
+      consola.success(`[Cache] HIT: ${key}`);
       return parsed.data;
     } catch (error) {
-      console.error(`[Cache] ERROR reading ${key}:`, error);
+      consola.error(`[Cache] ERROR reading ${key}:`, error);
       return null;
     }
   }
@@ -50,7 +51,7 @@ export class CacheService {
       const now = new Date();
       const expiresAt = new Date(now.getTime() + ttlSeconds * 1000).toISOString();
 
-      console.log(`[Cache] SET: ${key} (Provider: ${provider}, TTL: ${ttlSeconds}s)`);
+      consola.info(`[Cache] SET: ${key} (Provider: ${provider}, TTL: ${ttlSeconds}s)`);
 
       await db
         .insert(apiCache)
@@ -70,7 +71,7 @@ export class CacheService {
           },
         });
     } catch (error) {
-      console.error(`[Cache] ERROR writing ${key}:`, error);
+      consola.error(`[Cache] ERROR writing ${key}:`, error);
     }
   }
 

@@ -2,6 +2,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { consola } from "consola";
 import { API_PAGE_SIZE } from "./constants";
 import { type UnifiedMedia, UnifiedMediaSchema } from "./media";
 import { CacheService } from "@/utils/cache";
@@ -122,7 +123,7 @@ export async function searchComicsInternal(data: {
           totalResults: parsedData.number_of_total_results || 0,
         };
       } catch (e) {
-        console.error("ComicVine API Error", e);
+        consola.error("ComicVine API Error", e);
         return { results: [], totalResults: 0 };
       }
     },
@@ -181,7 +182,7 @@ export async function getComicIssuesInternal(data: {
           });
 
           if (!res.ok) {
-            console.error(`ComicVine API Error (Status ${res.status}): ${res.statusText}`);
+              consola.error(`ComicVine API Error (Status ${res.status}): ${res.statusText}`);
             break;
           }
 
@@ -189,7 +190,7 @@ export async function getComicIssuesInternal(data: {
           const parsedData = ComicIssueResponseSchema.parse(rawData);
 
           if (parsedData.error !== "OK") {
-            console.error(`ComicVine API Error (Response): ${parsedData.error}`);
+              consola.error(`ComicVine API Error (Response): ${parsedData.error}`);
             break;
           }
 
@@ -213,7 +214,7 @@ export async function getComicIssuesInternal(data: {
           description: issue.description || issue.deck || null,
         }));
       } catch (e) {
-        console.error("ComicVine Issues API Search Error", e);
+          consola.error("ComicVine Issues API Search Error", e);
         return [];
       }
     },

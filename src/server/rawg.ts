@@ -2,6 +2,7 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { consola } from "consola";
 import { API_PAGE_SIZE } from "./constants";
 import { type UnifiedMedia, UnifiedMediaSchema } from "./media";
 import { CacheService } from "@/utils/cache";
@@ -76,7 +77,7 @@ export async function searchGamesInternal(data: {
           totalResults: parsedData.count || 0,
         };
       } catch (e) {
-        console.error("RAWG API Error", e);
+        consola.error("RAWG API Error", e);
         return { results: [], totalResults: 0 };
       }
     },
@@ -132,7 +133,7 @@ export async function getGameDetailsInternal(data: {
         };
         return result;
       } catch (e) {
-        console.error("RAWG Details Error", e);
+        consola.error("RAWG Details Error", e);
         throw e;
       }
     },
