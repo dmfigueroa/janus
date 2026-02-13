@@ -108,7 +108,7 @@ export async function searchComics(
 export async function getComicIssues(
   volumeId: string,
   apiKey: string,
-  forceRefresh: boolean = false,
+  forceRefresh?: boolean,
 ): Promise<ComicIssue[]> {
   return withCache(
     `comicvine:volume:${volumeId}:issues`,
