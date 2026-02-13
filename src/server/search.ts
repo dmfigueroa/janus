@@ -3,9 +3,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { searchMultimedia } from "./tmdb";
-import { searchBooks } from "./google-books";
-import { searchGames } from "./rawg";
-import { searchComics } from "./comicvine";
+import { searchBooksInternal } from "./google-books";
+import { searchGamesInternal } from "./rawg";
+import { searchComicsInternal } from "./comicvine";
 import { type UnifiedMedia } from "./media";
 import { API_PAGE_SIZE } from "./constants";
 
@@ -29,19 +29,15 @@ export const searchUnified = createServerFn({ method: "GET" })
     const limit = API_PAGE_SIZE;
 
     if (type === "book") {
-      const resp = await searchBooks(query, page);
+      const resp = await searchBooksInternal({ query, page });
       results = resp.results;
       totalResults = resp.totalResults;
     } else if (type === "game") {
-      const apiKey = process.env.RAWG_API_KEY;
-      if (!apiKey) throw new Error("RAWG_API_KEY is not configured");
-      const resp = await searchGames(query, apiKey, page);
+      const resp = await searchGamesInternal({ query, page });
       results = resp.results;
       totalResults = resp.totalResults;
     } else if (type === "comic") {
-      const apiKey = process.env.COMICVINE_API_KEY;
-      if (!apiKey) throw new Error("COMICVINE_API_KEY is not configured");
-      const resp = await searchComics(query, apiKey, page);
+      const resp = await searchComicsInternal({ query, page });
       results = resp.results;
       totalResults = resp.totalResults;
     }

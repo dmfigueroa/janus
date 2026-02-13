@@ -7,9 +7,9 @@ import { db } from "../db";
 import { watchlistItems, watchlists } from "../db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { getTVDetails, getSeasonDetails, getMovieDetails } from "./tmdb";
-import { getComicIssues } from "./comicvine";
-import { getBookDetails } from "./google-books";
-import { getGameDetails } from "./rawg";
+import { getComicIssuesInternal } from "./comicvine";
+import { getBookDetailsInternal } from "./google-books";
+import { getGameDetailsInternal } from "./rawg";
 
 export type { Watchlist, WatchlistItem } from "../db/schema";
 
@@ -84,21 +84,17 @@ export const addToWatchlist = createServerFn({ method: "POST" })
     }
 
     if (media.source === "comicvine" && media.mediaType === "comic") {
-      const cvApiKey = process.env.COMICVINE_API_KEY;
-      if (!cvApiKey) throw new Error("COMICVINE_API_KEY is not configured");
-      return await addComicToWatchList(watchlistId, media.id, media, cvApiKey);
+      return await addComicToWatchList(watchlistId, media.id, media);
     }
 
     if (media.source === "google_books" && media.mediaType === "book") {
-      const details = await getBookDetails(media.id);
-      return await addGenericItemToWatchlist(watchlistId, details);
+      const details = await getBookDetailsInternal({ id: media.id });
+      return await addGenericItemToWatchlist(watchlistId, details as GenericMedia);
     }
 
     if (media.source === "rawg" && media.mediaType === "game") {
-      const rawgApiKey = process.env.RAWG_API_KEY;
-      if (!rawgApiKey) throw new Error("RAWG_API_KEY is not configured");
-      const details = await getGameDetails(media.id, rawgApiKey);
-      return await addGenericItemToWatchlist(watchlistId, details);
+      const details = await getGameDetailsInternal({ id: media.id });
+      return await addGenericItemToWatchlist(watchlistId, details as GenericMedia);
     }
 
     // TypeScript now knows media.mediaType is not "tv", so it matches GenericMedia
@@ -237,9 +233,8 @@ const addComicToWatchList = async (
   watchlistId: number,
   volumeId: string,
   media: z.infer<typeof addToWatchlistSchema>["media"],
-  apiKey: string,
 ) => {
-  const issues = await getComicIssues(volumeId, apiKey);
+  const issues = await getComicIssuesInternal({ volumeId });
 
   if (issues.length === 0) {
     return { success: false, message: "No issues found for this volume" };
