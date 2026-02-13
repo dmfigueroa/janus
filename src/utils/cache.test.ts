@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { CacheService } from "./cache";
 import { z } from "zod";
-import { cacheDb } from "@/db/cache";
-import { apiCache } from "@/db/cache-schema";
+import { db } from "@/db";
+import { apiCache } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 describe("CacheService", () => {
@@ -13,7 +13,7 @@ describe("CacheService", () => {
 
   beforeEach(async () => {
     // Clean up test data
-    await cacheDb.delete(apiCache).where(eq(apiCache.key, testKey));
+    await db.delete(apiCache).where(eq(apiCache.key, testKey));
   });
 
   it("should set and get values from cache", async () => {

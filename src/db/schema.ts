@@ -52,3 +52,16 @@ export const watchlistItems = sqliteTable(
 
 export type WatchlistItem = typeof watchlistItems.$inferSelect;
 export type InsertWatchlistItem = typeof watchlistItems.$inferInsert;
+
+export const apiCache = sqliteTable("api_cache", {
+  key: text("key").primaryKey(),
+  provider: text("provider").notNull(),
+  data: text("data", { mode: "json" }).notNull(),
+  createdAt: text("created_at")
+    .default(sql`(CURRENT_TIMESTAMP)`)
+    .notNull(),
+  expiresAt: text("expires_at").notNull(),
+});
+
+export type ApiCache = typeof apiCache.$inferSelect;
+export type InsertApiCache = typeof apiCache.$inferInsert;

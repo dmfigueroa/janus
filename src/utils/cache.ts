@@ -1,5 +1,5 @@
-import { cacheDb } from "@/db/cache";
-import { apiCache } from "@/db/cache-schema";
+import { db } from "@/db";
+import { apiCache } from "@/db/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { z } from "zod";
 
@@ -12,7 +12,7 @@ export class CacheService {
   static async get<T>(key: string, schema: z.ZodSchema<T>): Promise<T | null> {
     try {
       const now = new Date().toISOString();
-      const result = await cacheDb
+      const result = await db
         .select()
         .from(apiCache)
         .where(and(eq(apiCache.key, key), gt(apiCache.expiresAt, now)))
@@ -46,7 +46,7 @@ export class CacheService {
       const now = new Date();
       const expiresAt = new Date(now.getTime() + ttlSeconds * 1000).toISOString();
 
-      await cacheDb
+      await db
         .insert(apiCache)
         .values({
           key,

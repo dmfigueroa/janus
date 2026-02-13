@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { searchBooksInternal } from "./google-books";
-import { cacheDb } from "@/db/cache";
-import { apiCache } from "@/db/cache-schema";
+import { db } from "@/db";
+import { apiCache } from "@/db/schema";
 import { like } from "drizzle-orm";
 
 describe("Google Books Internal Logic", () => {
@@ -9,7 +9,7 @@ describe("Google Books Internal Logic", () => {
 
   beforeEach(async () => {
     // Clean up cache for this test
-    await cacheDb.delete(apiCache).where(like(apiCache.key, `google-books-search-${query}-%`));
+    await db.delete(apiCache).where(like(apiCache.key, `google-books-search-${query}-%`));
 
     // Mock environment variable
     vi.stubEnv("GOOGLE_BOOKS_API_KEY", "test-api-key");
