@@ -18,17 +18,21 @@ export class CacheService {
         .where(and(eq(apiCache.key, key), gt(apiCache.expiresAt, now)))
         .get();
 
-      if (!result) return null;
-
-      const parsed = schema.safeParse(result.data);
-      if (!parsed.success) {
-        console.warn(`Cache invalidation for key ${key} due to schema mismatch`);
+      if (!result) {
+        console.log(`[Cache] MISS: ${key}`);
         return null;
       }
 
+      const parsed = schema.safeParse(result.data);
+      if (!parsed.success) {
+        console.warn(`[Cache] INVALIDATION: ${key} due to schema mismatch`);
+        return null;
+      }
+
+      console.log(`[Cache] HIT: ${key}`);
       return parsed.data;
     } catch (error) {
-      console.error(`Error reading from cache for key ${key}:`, error);
+      console.error(`[Cache] ERROR reading ${key}:`, error);
       return null;
     }
   }
@@ -45,6 +49,8 @@ export class CacheService {
     try {
       const now = new Date();
       const expiresAt = new Date(now.getTime() + ttlSeconds * 1000).toISOString();
+
+      console.log(`[Cache] SET: ${key} (Provider: ${provider}, TTL: ${ttlSeconds}s)`);
 
       await db
         .insert(apiCache)
@@ -64,7 +70,7 @@ export class CacheService {
           },
         });
     } catch (error) {
-      console.error(`Error writing to cache for key ${key}:`, error);
+      console.error(`[Cache] ERROR writing ${key}:`, error);
     }
   }
 
