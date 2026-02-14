@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, uniqueIndex, index } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 export const watchlists = sqliteTable("watchlists", {
@@ -46,6 +46,10 @@ export const watchlistItems = sqliteTable(
       table.watchlistId,
       table.tmdbId,
       table.mediaType,
+    ),
+    byWatchlistReleaseDate: index("by_watchlist_release_date").on(
+      table.watchlistId,
+      table.releaseDate,
     ),
   }),
 );
