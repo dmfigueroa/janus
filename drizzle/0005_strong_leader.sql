@@ -1,0 +1,1 @@
+CREATE INDEX `by_watchlist_release_date` ON `watchlist_items` (`watchlist_id`,`release_date`);
