@@ -10,7 +10,7 @@ describe("google-books getBookDetails", () => {
   });
 
   it("should construct the correct URL for a valid ID (Positive Test)", async () => {
-    (fetch as any).mockResolvedValue({
+    vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({
         id: "zyTCAlFPjgYC",
@@ -18,7 +18,7 @@ describe("google-books getBookDetails", () => {
           title: "Test Book",
         },
       }),
-    });
+    } as Response);
 
     await getBookDetails("zyTCAlFPjgYC");
 
@@ -28,19 +28,19 @@ describe("google-books getBookDetails", () => {
   });
 
   it("should encode malicious ID to prevent path traversal/injection (Negative Test/Security)", async () => {
-    (fetch as any).mockResolvedValue({
+    vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({
         id: "id",
         volumeInfo: {},
       }),
-    });
+    } as Response);
 
     const maliciousId = "../volumes/other-endpoint";
     await getBookDetails(maliciousId);
 
-    const calledUrl = (fetch as any).mock.calls[0][0];
-    const urlObj = new URL(calledUrl);
+    const calledUrl = vi.mocked(fetch).mock.calls[0][0];
+    const urlObj = new URL(calledUrl as string);
 
     // If encoded, the .. and / should be escaped
     // The path should be /books/v1/volumes/..%2Fvolumes%2Fother-endpoint
