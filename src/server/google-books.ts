@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { API_PAGE_SIZE } from "./constants";
 import { type UnifiedMedia } from "./media";
+import { getErrorMessage } from "./utils";
 
 const GoogleBookItemSchema = z.object({
   id: z.string(),
@@ -67,8 +68,9 @@ export async function searchBooks(
       totalResults: data.totalItems || 0,
     };
   } catch (e) {
-    console.error("Google Books API Error", e);
-    return { results: [], totalResults: 0 };
+    const errorMessage = getErrorMessage(e);
+    console.error("Google Books API Error:", errorMessage);
+    throw new Error(`Google Books API Error: ${errorMessage}`);
   }
 }
 
@@ -102,7 +104,8 @@ export async function getBookDetails(id: string) {
       overview: data.volumeInfo.description,
     };
   } catch (e) {
-    console.error("Google Books Details Error", e);
-    throw e;
+    const errorMessage = getErrorMessage(e);
+    console.error("Google Books Details Error:", errorMessage);
+    throw new Error(`Google Books Details Error: ${errorMessage}`);
   }
 }

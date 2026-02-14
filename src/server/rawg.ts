@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { API_PAGE_SIZE } from "./constants";
 import { type UnifiedMedia } from "./media";
+import { getErrorMessage } from "./utils";
 
 const RawgGameSchema = z.object({
   id: z.number(),
@@ -53,8 +54,9 @@ export async function searchGames(
       totalResults: data.count || 0,
     };
   } catch (e) {
-    console.error("RAWG API Error", e);
-    return { results: [], totalResults: 0 };
+    const errorMessage = getErrorMessage(e);
+    console.error("RAWG API Error:", errorMessage);
+    throw new Error(`RAWG API Error: ${errorMessage}`);
   }
 }
 
@@ -79,7 +81,8 @@ export async function getGameDetails(id: string, apiKey: string) {
       overview: undefined,
     };
   } catch (e) {
-    console.error("RAWG Details Error", e);
-    throw e;
+    const errorMessage = getErrorMessage(e);
+    console.error("RAWG Details Error:", errorMessage);
+    throw new Error(`RAWG Details Error: ${errorMessage}`);
   }
 }

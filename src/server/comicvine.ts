@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { API_PAGE_SIZE } from "./constants";
 import { type UnifiedMedia } from "./media";
+import { getErrorMessage } from "./utils";
 
 export const ComicIssueSchema = z.object({
   id: z.string(),
@@ -99,8 +100,9 @@ export async function searchComics(
       totalResults: data.number_of_total_results || 0,
     };
   } catch (e) {
-    console.error("ComicVine API Error", e);
-    return { results: [], totalResults: 0 };
+    const errorMessage = getErrorMessage(e);
+    console.error("ComicVine API Error:", errorMessage);
+    throw new Error(`ComicVine API Error: ${errorMessage}`);
   }
 }
 
@@ -161,7 +163,8 @@ export async function getComicIssues(volumeId: string, apiKey: string): Promise<
       description: issue.description || issue.deck || null,
     }));
   } catch (e) {
-    console.error("ComicVine Issues API Search Error", e);
-    return [];
+    const errorMessage = getErrorMessage(e);
+    console.error("ComicVine Issues API Search Error:", errorMessage);
+    throw new Error(`ComicVine Issues API Search Error: ${errorMessage}`);
   }
 }
