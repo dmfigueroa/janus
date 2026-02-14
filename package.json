@@ -73,7 +73,7 @@
     "web-vitals": "^5.1.0"
   },
   "simple-git-hooks": {
-    "pre-commit": "bun lint-staged"
+    "pre-commit": "npx lint-staged"
   },
   "lint-staged": {
     "*.{js,ts,jsx,tsx,mjs,cjs}": [

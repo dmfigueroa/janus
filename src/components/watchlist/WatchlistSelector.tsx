@@ -12,9 +12,9 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandDialog,
 } from "@/components/ui/command";
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Watchlist } from "@/db/schema";
 import { createWatchlist } from "@/server/watchlists";
 import { useRouter } from "@tanstack/react-router";
@@ -40,20 +40,19 @@ export function WatchlistSelector({
 
   if (isDesktop) {
     return (
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className={cn("w-full justify-between", className)}
-            disabled={disabled}
-          >
-            {selectedWatchlist ? selectedWatchlist.name : "Select a watchlist..."}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+      <>
+        <Button
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className={cn("w-full justify-between", className)}
+          disabled={disabled}
+          onClick={() => setOpen(true)}
+        >
+          {selectedWatchlist ? selectedWatchlist.name : "Select a watchlist..."}
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+        <CommandDialog open={open} onOpenChange={setOpen}>
           <WatchlistList
             watchlists={watchlists}
             selectedWatchlistId={selectedWatchlistId}
@@ -62,8 +61,8 @@ export function WatchlistSelector({
               setOpen(false);
             }}
           />
-        </PopoverContent>
-      </Popover>
+        </CommandDialog>
+      </>
     );
   }
 
@@ -83,14 +82,16 @@ export function WatchlistSelector({
       </DrawerTrigger>
       <DrawerContent>
         <div className="mt-4 border-t">
-          <WatchlistList
-            watchlists={watchlists}
-            selectedWatchlistId={selectedWatchlistId}
-            onSelect={(id) => {
-              onSelect(id);
-              setOpen(false);
-            }}
-          />
+          <Command>
+            <WatchlistList
+              watchlists={watchlists}
+              selectedWatchlistId={selectedWatchlistId}
+              onSelect={(id) => {
+                onSelect(id);
+                setOpen(false);
+              }}
+            />
+          </Command>
         </div>
       </DrawerContent>
     </Drawer>
@@ -110,7 +111,7 @@ function WatchlistList({
   const router = useRouter();
 
   return (
-    <Command>
+    <>
       <CommandInput placeholder="Search watchlists..." onValueChange={setQuery} />
       <CommandList>
         <CommandEmpty>No watchlist found.</CommandEmpty>
@@ -150,6 +151,6 @@ function WatchlistList({
           ))}
         </CommandGroup>
       </CommandList>
-    </Command>
+    </>
   );
 }
