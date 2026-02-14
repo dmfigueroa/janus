@@ -2,7 +2,6 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { consola } from "consola";
 import { API_PAGE_SIZE } from "./constants";
 import { type UnifiedMedia, UnifiedMediaSchema } from "./media";
 import { CacheService } from "@/utils/cache";
@@ -85,7 +84,7 @@ export async function searchBooksInternal(data: {
           totalResults: parsedData.totalItems || 0,
         };
       } catch (e) {
-        consola.error("Google Books API Error", e);
+        console.error("Google Books API Error", e);
         return { results: [], totalResults: 0 };
       }
     },
@@ -151,7 +150,7 @@ export async function getBookDetailsInternal(data: {
         };
         return result;
       } catch (e) {
-        consola.error("Google Books Details Error", e);
+        console.error("Google Books Details Error", e);
         throw e;
       }
     },

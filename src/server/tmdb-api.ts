@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { consola } from "consola";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
@@ -47,15 +46,15 @@ async function fetchWithAuth(url: string) {
     try {
       const errorData = (await response.json()) as TMDBErrorResponse;
       if (errorData.status_code && errorData.status_message) {
-        consola.error(
+        console.error(
           `TMDB API Error: ${response.status} (Code: ${errorData.status_code}) - ${errorData.status_message}`
         );
       } else {
-        consola.error(`TMDB API Error: ${response.status} ${response.statusText}`);
+        console.error(`TMDB API Error: ${response.status} ${response.statusText}`);
       }
     } catch {
       // Fallback if response is not JSON
-      consola.error(`TMDB API Error: ${response.status} ${response.statusText}`);
+      console.error(`TMDB API Error: ${response.status} ${response.statusText}`);
     }
     throw new Error(`Failed to fetch data from TMDB: ${response.status}`);
   }
