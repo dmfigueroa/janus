@@ -16,7 +16,7 @@ const config = defineConfig({
   plugins: [
     devtools(),
     nitro({
-      logLevel: 4,
+      logLevel: 1000,
     }),
     // this is the plugin that enables path aliases
     viteTsConfigPaths({
