@@ -119,19 +119,12 @@
       "indexes": {
         "unique_watchlist_item": {
           "name": "unique_watchlist_item",
-          "columns": [
-            "watchlist_id",
-            "tmdb_id",
-            "media_type"
-          ],
+          "columns": ["watchlist_id", "tmdb_id", "media_type"],
           "isUnique": true
         },
         "by_watchlist_release_date": {
           "name": "by_watchlist_release_date",
-          "columns": [
-            "watchlist_id",
-            "release_date"
-          ],
+          "columns": ["watchlist_id", "release_date"],
           "isUnique": false
         }
       },
@@ -140,12 +133,8 @@
           "name": "watchlist_items_watchlist_id_watchlists_id_fk",
           "tableFrom": "watchlist_items",
           "tableTo": "watchlists",
-          "columnsFrom": [
-            "watchlist_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["watchlist_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
