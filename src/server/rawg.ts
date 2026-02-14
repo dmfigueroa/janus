@@ -60,7 +60,8 @@ export async function searchGames(
 
 export async function getGameDetails(id: string, apiKey: string) {
   try {
-    const url = `https://api.rawg.io/api/games/${id}?key=${apiKey}`;
+    const encodedId = encodeURIComponent(id);
+    const url = `https://api.rawg.io/api/games/${encodedId}?key=${apiKey}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error("Failed to fetch game details");
 

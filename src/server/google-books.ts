@@ -75,7 +75,8 @@ export async function searchBooks(
 export async function getBookDetails(id: string) {
   try {
     const apiKey = getGoogleBooksApiKey();
-    const url = new URL(`https://www.googleapis.com/books/v1/volumes/${id}`);
+    const encodedId = encodeURIComponent(id);
+    const url = new URL(`https://www.googleapis.com/books/v1/volumes/${encodedId}`);
     url.search = new URLSearchParams({
       key: apiKey,
     }).toString();
