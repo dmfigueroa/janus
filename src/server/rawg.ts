@@ -53,7 +53,8 @@ export async function searchGames(
       totalResults: data.count || 0,
     };
   } catch (e) {
-    console.error("RAWG API Error", e);
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    console.error("RAWG API Error:", errorMessage);
     return { results: [], totalResults: 0 };
   }
 }
@@ -79,7 +80,8 @@ export async function getGameDetails(id: string, apiKey: string) {
       overview: undefined,
     };
   } catch (e) {
-    console.error("RAWG Details Error", e);
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    console.error("RAWG Details Error:", errorMessage);
     throw e;
   }
 }

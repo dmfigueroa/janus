@@ -99,7 +99,8 @@ export async function searchComics(
       totalResults: data.number_of_total_results || 0,
     };
   } catch (e) {
-    console.error("ComicVine API Error", e);
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    console.error("ComicVine API Error:", errorMessage);
     return { results: [], totalResults: 0 };
   }
 }
@@ -161,7 +162,8 @@ export async function getComicIssues(volumeId: string, apiKey: string): Promise<
       description: issue.description || issue.deck || null,
     }));
   } catch (e) {
-    console.error("ComicVine Issues API Search Error", e);
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    console.error("ComicVine Issues API Search Error:", errorMessage);
     return [];
   }
 }

@@ -67,7 +67,8 @@ export async function searchBooks(
       totalResults: data.totalItems || 0,
     };
   } catch (e) {
-    console.error("Google Books API Error", e);
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    console.error("Google Books API Error:", errorMessage);
     return { results: [], totalResults: 0 };
   }
 }
@@ -102,7 +103,8 @@ export async function getBookDetails(id: string) {
       overview: data.volumeInfo.description,
     };
   } catch (e) {
-    console.error("Google Books Details Error", e);
+    const errorMessage = e instanceof Error ? e.message : String(e);
+    console.error("Google Books Details Error:", errorMessage);
     throw e;
   }
 }
