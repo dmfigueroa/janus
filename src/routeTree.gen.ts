@@ -8,80 +8,80 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root'
-import { Route as SearchRouteImport } from './routes/search'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as WatchlistsWatchlistIdRouteImport } from './routes/watchlists/$watchlistId'
+import { Route as rootRouteImport } from "./routes/__root";
+import { Route as SearchRouteImport } from "./routes/search";
+import { Route as IndexRouteImport } from "./routes/index";
+import { Route as WatchlistsWatchlistIdRouteImport } from "./routes/watchlists/$watchlistId";
 
 const SearchRoute = SearchRouteImport.update({
-  id: '/search',
-  path: '/search',
+  id: "/search",
+  path: "/search",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+  id: "/",
+  path: "/",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 const WatchlistsWatchlistIdRoute = WatchlistsWatchlistIdRouteImport.update({
-  id: '/watchlists/$watchlistId',
-  path: '/watchlists/$watchlistId',
+  id: "/watchlists/$watchlistId",
+  path: "/watchlists/$watchlistId",
   getParentRoute: () => rootRouteImport,
-} as any)
+} as any);
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/search': typeof SearchRoute
-  '/watchlists/$watchlistId': typeof WatchlistsWatchlistIdRoute
+  "/": typeof IndexRoute;
+  "/search": typeof SearchRoute;
+  "/watchlists/$watchlistId": typeof WatchlistsWatchlistIdRoute;
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/search': typeof SearchRoute
-  '/watchlists/$watchlistId': typeof WatchlistsWatchlistIdRoute
+  "/": typeof IndexRoute;
+  "/search": typeof SearchRoute;
+  "/watchlists/$watchlistId": typeof WatchlistsWatchlistIdRoute;
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/search': typeof SearchRoute
-  '/watchlists/$watchlistId': typeof WatchlistsWatchlistIdRoute
+  __root__: typeof rootRouteImport;
+  "/": typeof IndexRoute;
+  "/search": typeof SearchRoute;
+  "/watchlists/$watchlistId": typeof WatchlistsWatchlistIdRoute;
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/search' | '/watchlists/$watchlistId'
-  fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/search' | '/watchlists/$watchlistId'
-  id: '__root__' | '/' | '/search' | '/watchlists/$watchlistId'
-  fileRoutesById: FileRoutesById
+  fileRoutesByFullPath: FileRoutesByFullPath;
+  fullPaths: "/" | "/search" | "/watchlists/$watchlistId";
+  fileRoutesByTo: FileRoutesByTo;
+  to: "/" | "/search" | "/watchlists/$watchlistId";
+  id: "__root__" | "/" | "/search" | "/watchlists/$watchlistId";
+  fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  SearchRoute: typeof SearchRoute
-  WatchlistsWatchlistIdRoute: typeof WatchlistsWatchlistIdRoute
+  IndexRoute: typeof IndexRoute;
+  SearchRoute: typeof SearchRoute;
+  WatchlistsWatchlistIdRoute: typeof WatchlistsWatchlistIdRoute;
 }
 
-declare module '@tanstack/react-router' {
+declare module "@tanstack/react-router" {
   interface FileRoutesByPath {
-    '/search': {
-      id: '/search'
-      path: '/search'
-      fullPath: '/search'
-      preLoaderRoute: typeof SearchRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/watchlists/$watchlistId': {
-      id: '/watchlists/$watchlistId'
-      path: '/watchlists/$watchlistId'
-      fullPath: '/watchlists/$watchlistId'
-      preLoaderRoute: typeof WatchlistsWatchlistIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
+    "/search": {
+      id: "/search";
+      path: "/search";
+      fullPath: "/search";
+      preLoaderRoute: typeof SearchRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/": {
+      id: "/";
+      path: "/";
+      fullPath: "/";
+      preLoaderRoute: typeof IndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    "/watchlists/$watchlistId": {
+      id: "/watchlists/$watchlistId";
+      path: "/watchlists/$watchlistId";
+      fullPath: "/watchlists/$watchlistId";
+      preLoaderRoute: typeof WatchlistsWatchlistIdRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
   }
 }
 
@@ -89,16 +89,16 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SearchRoute: SearchRoute,
   WatchlistsWatchlistIdRoute: WatchlistsWatchlistIdRoute,
-}
+};
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>()
+  ._addFileTypes<FileRouteTypes>();
 
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
+import type { getRouter } from "./router.tsx";
+import type { createStart } from "@tanstack/react-start";
+declare module "@tanstack/react-start" {
   interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
+    ssr: true;
+    router: Awaited<ReturnType<typeof getRouter>>;
   }
 }
