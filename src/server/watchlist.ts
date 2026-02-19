@@ -10,6 +10,7 @@ import { getTVDetails, getSeasonDetails, getMovieDetails } from "./tmdb";
 import { getComicIssues } from "./comicvine";
 import { getBookDetails } from "./google-books";
 import { getGameDetails } from "./rawg";
+import { getAnilistDetails } from "./anilist";
 
 export type { Watchlist, WatchlistItem } from "../db/schema";
 
@@ -20,8 +21,8 @@ const addToWatchlistSchema = z.object({
   watchlistId: z.number(),
   media: z.object({
     id: z.string(),
-    mediaType: z.enum(["movie", "tv", "game", "book", "comic"]),
-    source: z.enum(["tmdb", "google_books", "rawg", "comicvine", "custom"]),
+    mediaType: z.enum(["movie", "tv", "game", "book", "comic", "anime", "manga"]),
+    source: z.enum(["tmdb", "google_books", "rawg", "comicvine", "anilist", "custom"]),
     title: z.string(),
     poster: z.string().nullable(),
     year: z.string().optional(),
@@ -99,6 +100,15 @@ export const addToWatchlist = createServerFn({ method: "POST" })
       if (!rawgApiKey) throw new Error("RAWG_API_KEY is not configured");
       const details = await getGameDetails(media.id, rawgApiKey);
       return await addGenericItemToWatchlist(watchlistId, details);
+    }
+
+    if (media.source === "anilist") {
+      if (media.mediaType === "anime") {
+        return await addAnimeToWatchlist(watchlistId, media.id, media);
+      }
+      if (media.mediaType === "manga") {
+        return await addMangaToWatchlist(watchlistId, media.id, media);
+      }
     }
 
     // TypeScript now knows media.mediaType is not "tv", so it matches GenericMedia
@@ -271,4 +281,92 @@ const addComicToWatchList = async (
     .where(eq(watchlists.id, watchlistId));
 
   return { success: true, message: `Added ${watchlistItemsData.length} issues to watchlist` };
+};
+
+const addAnimeToWatchlist = async (
+  watchlistId: number,
+  aniListId: string,
+  media: z.infer<typeof addToWatchlistSchema>["media"],
+) => {
+  const details = await getAnilistDetails(aniListId);
+
+  if (details.episodes && details.episodes > 0) {
+    const episodesCount = details.episodes;
+    const allEpisodes = Array.from({ length: episodesCount }, (_, i) => ({
+      watchlistId,
+      tmdbId: `${aniListId}-ep${i + 1}`,
+      source: "anilist" as const,
+      mediaType: "episode" as const,
+      title: `Episode ${i + 1}`,
+      parentTitle: media.title,
+      season: 1,
+      episode: (i + 1).toString(),
+      posterPath: details.poster,
+      releaseDate: details.releaseDate,
+      voteAverage: details.rating || 0,
+      runtime: 0,
+    }));
+
+    for (let i = 0; i < allEpisodes.length; i += DB_INSERT_CHUNK_SIZE) {
+      const chunk = allEpisodes.slice(i, i + DB_INSERT_CHUNK_SIZE);
+      await db.insert(watchlistItems).values(chunk).onConflictDoNothing();
+    }
+
+    await db
+      .update(watchlists)
+      .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
+      .where(eq(watchlists.id, watchlistId));
+
+    return { success: true, message: `Added ${allEpisodes.length} episodes to watchlist` };
+  }
+
+  return await addGenericItemToWatchlist(watchlistId, {
+    ...details,
+    mediaType: "anime",
+  } as unknown as GenericMedia);
+};
+
+const addMangaToWatchlist = async (
+  watchlistId: number,
+  aniListId: string,
+  media: z.infer<typeof addToWatchlistSchema>["media"],
+) => {
+  const details = await getAnilistDetails(aniListId);
+
+  const count = details.volumes || details.chapters || 0;
+  const label = details.volumes ? "Volume" : "Chapter";
+
+  if (count > 0) {
+    const items = Array.from({ length: count }, (_, i) => ({
+      watchlistId,
+      tmdbId: `${aniListId}-${label.toLowerCase()}${i + 1}`,
+      source: "anilist" as const,
+      mediaType: "manga" as const,
+      title: `${label} ${i + 1}`,
+      parentTitle: media.title,
+      season: null,
+      episode: (i + 1).toString(),
+      posterPath: details.poster,
+      releaseDate: details.releaseDate,
+      voteAverage: details.rating || 0,
+      runtime: 0,
+    }));
+
+    for (let i = 0; i < items.length; i += DB_INSERT_CHUNK_SIZE) {
+      const chunk = items.slice(i, i + DB_INSERT_CHUNK_SIZE);
+      await db.insert(watchlistItems).values(chunk).onConflictDoNothing();
+    }
+
+    await db
+      .update(watchlists)
+      .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
+      .where(eq(watchlists.id, watchlistId));
+
+    return { success: true, message: `Added ${items.length} ${label.toLowerCase()}s to watchlist` };
+  }
+
+  return await addGenericItemToWatchlist(watchlistId, {
+    ...details,
+    mediaType: "manga",
+  } as unknown as GenericMedia);
 };
