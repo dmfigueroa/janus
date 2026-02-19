@@ -31,23 +31,30 @@ export const getWatchlists = createServerFn()
     z
       .object({
         sortBy: z.enum(["createdAt", "lastWatched", "lastAdded"]).optional().default("createdAt"),
+        sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
       })
       .parse(data || {}),
   )
   .handler(async ({ data }) => {
+    const { sortBy, sortOrder } = data;
+    const isDesc = sortOrder === "desc";
+    const orderFn = isDesc ? desc : asc;
+
     let orderBy;
-    switch (data.sortBy) {
+    switch (sortBy) {
       case "lastWatched":
         orderBy = [
-          sql`CASE WHEN ${watchlists.lastWatchedAt} IS NULL THEN 1 ELSE 0 END`,
-          desc(watchlists.lastWatchedAt),
+          isDesc
+            ? sql`CASE WHEN ${watchlists.lastWatchedAt} IS NULL THEN 1 ELSE 0 END`
+            : sql`CASE WHEN ${watchlists.lastWatchedAt} IS NULL THEN 0 ELSE 1 END`,
+          orderFn(watchlists.lastWatchedAt),
         ];
         break;
       case "lastAdded":
-        orderBy = [desc(sql`COALESCE(${watchlists.lastItemAddedAt}, ${watchlists.createdAt})`)];
+        orderBy = [orderFn(sql`COALESCE(${watchlists.lastItemAddedAt}, ${watchlists.createdAt})`)];
         break;
       default:
-        orderBy = [desc(watchlists.createdAt)];
+        orderBy = [orderFn(watchlists.createdAt)];
     }
 
     const lists = await db
