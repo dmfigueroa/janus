@@ -10,7 +10,10 @@ import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
 const searchSchema = z.object({
   query: z.string().optional().default(""),
   page: z.coerce.number().optional().default(1),
-  type: z.enum(["movie", "tv", "game", "book", "comic", "anime", "manga"]).optional().default("movie"),
+  type: z
+    .enum(["movie", "tv", "game", "book", "comic", "anime", "manga"])
+    .optional()
+    .default("movie"),
 });
 
 type SearchType = z.infer<typeof searchSchema>["type"];

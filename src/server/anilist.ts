@@ -14,16 +14,20 @@ const AniListMediaSchema = z.object({
   format: z.string().nullable().optional(),
   status: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
-  startDate: z.object({
-    year: z.number().nullable().optional(),
-    month: z.number().nullable().optional(),
-    day: z.number().nullable().optional(),
-  }).optional(),
+  startDate: z
+    .object({
+      year: z.number().nullable().optional(),
+      month: z.number().nullable().optional(),
+      day: z.number().nullable().optional(),
+    })
+    .optional(),
   averageScore: z.number().nullable().optional(),
-  coverImage: z.object({
-    large: z.string().nullable().optional(),
-    extraLarge: z.string().nullable().optional(),
-  }).optional(),
+  coverImage: z
+    .object({
+      large: z.string().nullable().optional(),
+      extraLarge: z.string().nullable().optional(),
+    })
+    .optional(),
   bannerImage: z.string().nullable().optional(),
   episodes: z.number().nullable().optional(),
   chapters: z.number().nullable().optional(),
