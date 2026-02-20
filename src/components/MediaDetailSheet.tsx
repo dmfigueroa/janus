@@ -146,12 +146,27 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
               {addToWatchlistMutation.isPending ? "Adding..." : "Add"}
             </Button>
           </div>
-          {mediaType === "tv" && (
+          {(mediaType === "tv" ||
+            mediaType === "anime" ||
+            mediaType === "comic" ||
+            mediaType === "manga") && (
             <div className="flex items-start gap-2 text-xs text-muted-foreground bg-secondary/50 p-3 rounded-md">
               <Info className="size-4 shrink-0 mt-0.5" />
               <p>
-                Adding a TV show will automatically add <strong>all available episodes</strong> to
-                your watchlist. This allows you to track your progress episode by episode.
+                Adding{" "}
+                {mediaType === "tv"
+                  ? "a TV show"
+                  : mediaType === "anime"
+                    ? "an anime"
+                    : mediaType === "comic"
+                      ? "a comic"
+                      : "a manga"}{" "}
+                will automatically add{" "}
+                <strong>
+                  all available{" "}
+                  {mediaType === "tv" || mediaType === "anime" ? "episodes" : "issues/volumes"}
+                </strong>{" "}
+                to your watchlist. This allows you to track your progress step by step.
               </p>
             </div>
           )}

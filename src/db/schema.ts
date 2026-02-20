@@ -26,7 +26,7 @@ export const watchlistItems = sqliteTable(
     tmdbId: text("tmdb_id").notNull(), // Stores external ID (TMDB, ISBN, etc.)
     source: text("source").notNull().default("tmdb"),
     mediaType: text("media_type", {
-      enum: ["movie", "episode", "game", "book", "comic"], // Expanded enum
+      enum: ["movie", "episode", "game", "book", "comic", "anime", "manga"], // Expanded enum
     }).notNull(),
     title: text("title").notNull(),
     parentTitle: text("parent_title"), // For TV Show name

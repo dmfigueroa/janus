@@ -6,13 +6,14 @@ import { searchMultimedia } from "./tmdb";
 import { searchBooks } from "./google-books";
 import { searchGames } from "./rawg";
 import { searchComics } from "./comicvine";
+import { searchAnilist } from "./anilist";
 import { type UnifiedMedia } from "./media";
 import { API_PAGE_SIZE } from "./constants";
 
 const searchInputSchema = z.object({
   query: z.string().min(1),
   page: z.coerce.number().default(1),
-  type: z.enum(["movie", "tv", "game", "book", "comic"]).default("movie"),
+  type: z.enum(["movie", "tv", "game", "book", "comic", "anime", "manga"]).default("movie"),
 });
 
 export const searchUnified = createServerFn({ method: "GET" })
@@ -42,6 +43,14 @@ export const searchUnified = createServerFn({ method: "GET" })
       const apiKey = process.env.COMICVINE_API_KEY;
       if (!apiKey) throw new Error("COMICVINE_API_KEY is not configured");
       const resp = await searchComics(query, apiKey, page);
+      results = resp.results;
+      totalResults = resp.totalResults;
+    } else if (type === "anime") {
+      const resp = await searchAnilist(query, "ANIME", page);
+      results = resp.results;
+      totalResults = resp.totalResults;
+    } else if (type === "manga") {
+      const resp = await searchAnilist(query, "MANGA", page);
       results = resp.results;
       totalResults = resp.totalResults;
     }

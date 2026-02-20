@@ -10,7 +10,10 @@ import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
 const searchSchema = z.object({
   query: z.string().optional().default(""),
   page: z.coerce.number().optional().default(1),
-  type: z.enum(["movie", "tv", "game", "book", "comic"]).optional().default("movie"),
+  type: z
+    .enum(["movie", "tv", "game", "book", "comic", "anime", "manga"])
+    .optional()
+    .default("movie"),
 });
 
 type SearchType = z.infer<typeof searchSchema>["type"];
@@ -79,18 +82,20 @@ function Search() {
           <span className="text-muted-foreground">Everything</span>
         </h1>
         <p className="max-w-md text-center text-muted-foreground">
-          Find movies, shows, games, books and comics.
+          Find movies, shows, games, books, comics, anime and manga.
         </p>
 
         <SearchInput onSearch={handleSearch} defaultValue={query} isLoading={isLoadingRoute} />
 
-        <Tabs value={type} onValueChange={handleTabChange} className="w-full max-w-2xl">
-          <TabsList className="grid w-full grid-cols-5">
+        <Tabs value={type} onValueChange={handleTabChange} className="w-full max-w-3xl">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="movie">Movies</TabsTrigger>
             <TabsTrigger value="tv">TV</TabsTrigger>
             <TabsTrigger value="game">Games</TabsTrigger>
             <TabsTrigger value="book">Books</TabsTrigger>
             <TabsTrigger value="comic">Comics</TabsTrigger>
+            <TabsTrigger value="anime">Anime</TabsTrigger>
+            <TabsTrigger value="manga">Manga</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
