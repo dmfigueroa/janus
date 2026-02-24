@@ -57,9 +57,7 @@ export function WatchlistDetail({ initialData }: WatchlistDetailProps) {
     initialPageParam: 1,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialData:
-      // Only use initialData if there is no search query AND we are not filtering by unwatched only
-      // (because initialData is unfiltered)
-      debouncedSearchQuery === "" && !showUnwatchedOnly
+      debouncedSearchQuery === "" && showUnwatchedOnly
         ? {
             pages: [initialData],
             pageParams: [1],
