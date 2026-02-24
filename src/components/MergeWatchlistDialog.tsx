@@ -72,7 +72,7 @@ export function MergeWatchlistDialog({
       }
 
       toast.success("Watchlists merged successfully");
-      await router.invalidate();
+      await router.invalidate?.();
       onSuccess?.();
       onOpenChange(false);
       // Reset state

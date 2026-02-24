@@ -112,7 +112,7 @@ export function WatchlistCard({
     setDeleting(true);
     try {
       await deleteWatchlist({ data: { id: watchlist.id } });
-      await router.invalidate();
+      await router.invalidate?.();
       toast.success("Watchlist deleted successfully");
     } catch (error) {
       console.error("Failed to delete", error);
