@@ -171,6 +171,7 @@ export function WatchlistCard({
         <Link
           to="/watchlists/$watchlistId"
           params={{ watchlistId: watchlist.id.toString() }}
+          preload="viewport"
           className="block h-full cursor-pointer transition-transform duration-300 active:scale-95"
         >
           {CardContent}

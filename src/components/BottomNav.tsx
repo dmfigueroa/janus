@@ -15,6 +15,7 @@ export function BottomNav() {
           <Link
             key={item.label}
             to={item.to}
+            preload="intent"
             activeOptions={{ exact: item.to === "/" }}
             className="flex flex-col items-center justify-center gap-1 w-20 py-2 rounded-xl transition-all duration-300"
             activeProps={{
