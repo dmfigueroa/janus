@@ -14,6 +14,9 @@ const config = defineConfig({
     },
     dedupe: ["react", "react-dom"],
   },
+  build: {
+    sourcemap: true,
+  },
   plugins: [
     devtools(),
     nitro(),
