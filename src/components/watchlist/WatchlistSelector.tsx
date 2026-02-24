@@ -122,7 +122,7 @@ function WatchlistList({
               value={`Create "${query}"`}
               onSelect={async () => {
                 const newList = await createWatchlist({ data: { name: query } });
-                await router.invalidate();
+                await router.invalidate?.();
                 onSelect(newList.id.toString());
               }}
             >

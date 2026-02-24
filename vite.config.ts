@@ -12,6 +12,10 @@ const config = defineConfig({
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
+    dedupe: ["react", "react-dom"],
+  },
+  build: {
+    sourcemap: true,
   },
   plugins: [
     devtools(),

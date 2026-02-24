@@ -36,7 +36,7 @@ export function CreateWatchlistDialog({ asCard }: CreateWatchlistDialogProps) {
     try {
       await createWatchlist({ data: { name, description } });
       setOpen(false);
-      router.invalidate();
+      await router.invalidate?.();
       toast.success("Watchlist created successfully");
     } catch (error) {
       console.error("Failed to create watchlist", error);

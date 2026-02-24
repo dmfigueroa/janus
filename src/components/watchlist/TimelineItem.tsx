@@ -2,7 +2,7 @@
 
 import { cn } from "@/utils/cn";
 import { Check, Film, Tv, Gamepad2, Book, BookOpen } from "lucide-react";
-import { WatchlistItem } from "@/server/watchlist";
+import type { WatchlistItem } from "@/db/schema";
 import { formatReleaseDate, formatRuntime } from "@/utils/datetime";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";

@@ -3,7 +3,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import pLimit from "p-limit";
-import { db } from "../db";
 import { watchlistItems, watchlists } from "../db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { getTVDetails, getSeasonDetails, getMovieDetails } from "./tmdb";
@@ -11,6 +10,7 @@ import { getComicIssues } from "./comicvine";
 import { getBookDetails } from "./google-books";
 import { getGameDetails } from "./rawg";
 import { getAnilistDetails } from "./anilist";
+import { getDb } from "../db/server.server";
 
 export type { Watchlist, WatchlistItem } from "../db/schema";
 
@@ -40,6 +40,7 @@ type GenericMedia = Omit<WatchlistMedia, "mediaType"> & {
 export const toggleWatched = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({ itemId: z.number(), isWatched: z.boolean() }).parse(data))
   .handler(async ({ data }) => {
+    const db = getDb();
     const [item] = await db
       .select({ watchlistId: watchlistItems.watchlistId })
       .from(watchlistItems)
@@ -116,6 +117,7 @@ export const addToWatchlist = createServerFn({ method: "POST" })
   });
 
 const addGenericItemToWatchlist = async (watchlistId: number, media: GenericMedia) => {
+  const db = getDb();
   const existing = await db
     .select()
     .from(watchlistItems)
@@ -153,6 +155,7 @@ const addGenericItemToWatchlist = async (watchlistId: number, media: GenericMedi
 };
 
 const addMovieToWatchList = async (watchlistId: number, tmdbId: number) => {
+  const db = getDb();
   const existing = await db
     .select()
     .from(watchlistItems)
@@ -196,6 +199,7 @@ const addTVShowToWatchList = async (
   tmdbId: number,
   media: z.infer<typeof addToWatchlistSchema>["media"],
 ) => {
+  const db = getDb();
   const showDetails = await getTVDetails({ data: { id: tmdbId } });
   const seasons = showDetails.seasons || [];
 
@@ -249,6 +253,7 @@ const addComicToWatchList = async (
   media: z.infer<typeof addToWatchlistSchema>["media"],
   apiKey: string,
 ) => {
+  const db = getDb();
   const issues = await getComicIssues(volumeId, apiKey);
 
   if (issues.length === 0) {
@@ -288,6 +293,7 @@ const addAnimeToWatchlist = async (
   aniListId: string,
   media: z.infer<typeof addToWatchlistSchema>["media"],
 ) => {
+  const db = getDb();
   const details = await getAnilistDetails(aniListId);
 
   if (details.episodes && details.episodes > 0) {
@@ -331,6 +337,7 @@ const addMangaToWatchlist = async (
   aniListId: string,
   media: z.infer<typeof addToWatchlistSchema>["media"],
 ) => {
+  const db = getDb();
   const details = await getAnilistDetails(aniListId);
 
   const count = details.volumes || details.chapters || 0;

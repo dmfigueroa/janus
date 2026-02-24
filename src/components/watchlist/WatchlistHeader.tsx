@@ -1,6 +1,6 @@
 "use client";
 
-import { Watchlist } from "@/server/watchlist";
+import type { Watchlist } from "@/db/schema";
 import { cn } from "@/utils/cn";
 import { Search } from "lucide-react";
 
@@ -9,7 +9,7 @@ interface WatchlistHeaderProps {
   totalItems: number;
   watchedItems: number;
   showUnwatchedOnly: boolean;
-  onToggleFilter: () => void;
+  onFilterChange: (showUnwatchedOnly: boolean) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
 }
@@ -19,7 +19,7 @@ export function WatchlistHeader({
   totalItems,
   watchedItems,
   showUnwatchedOnly,
-  onToggleFilter,
+  onFilterChange,
   searchQuery,
   onSearchChange,
 }: WatchlistHeaderProps) {
@@ -65,7 +65,7 @@ export function WatchlistHeader({
 
           <div className="flex items-center gap-2 border rounded-lg p-1 w-fit bg-secondary/30 self-start sm:self-auto">
             <button
-              onClick={onToggleFilter}
+              onClick={() => onFilterChange(false)}
               className={cn(
                 "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
                 !showUnwatchedOnly
@@ -76,7 +76,7 @@ export function WatchlistHeader({
               All
             </button>
             <button
-              onClick={onToggleFilter}
+              onClick={() => onFilterChange(true)}
               className={cn(
                 "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
                 showUnwatchedOnly
