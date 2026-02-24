@@ -81,7 +81,7 @@ export function WatchlistDetail({ initialData }: WatchlistDetailProps) {
         totalItems={totalItems}
         watchedItems={watchedItems}
         showUnwatchedOnly={showUnwatchedOnly}
-        onToggleFilter={() => setShowUnwatchedOnly((prev) => !prev)}
+        onFilterChange={setShowUnwatchedOnly}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
       />
