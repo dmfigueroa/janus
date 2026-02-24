@@ -3,8 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { WatchlistDetail as WatchlistDetailView } from "@/components/watchlist/WatchlistDetail";
 
 export const Route = createFileRoute("/watchlists/$watchlistId")({
-  loader: async ({ params: { watchlistId } }) => {
-    return await getWatchlistById({
+  loader: ({ params: { watchlistId } }) => {
+    return getWatchlistById({
       data: { id: parseInt(watchlistId, 10), page: 1, limit: 50, isWatched: false },
     });
   },
