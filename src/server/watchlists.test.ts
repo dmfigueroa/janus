@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import path from "path";
 
-let db: typeof import("../db").db;
+let db: ReturnType<typeof import("../db").getDb>;
 let watchlists: typeof import("../db/schema").watchlists;
 let watchlistItems: typeof import("../db/schema").watchlistItems;
 let getWatchlistByIdInternal: typeof import("./watchlists").getWatchlistByIdInternal;
@@ -13,7 +13,7 @@ beforeAll(async () => {
   const schemaModule = await import("../db/schema");
   const watchlistsModule = await import("./watchlists");
 
-  db = dbModule.db;
+  db = dbModule.getDb();
   watchlists = schemaModule.watchlists;
   watchlistItems = schemaModule.watchlistItems;
   getWatchlistByIdInternal = watchlistsModule.getWatchlistByIdInternal;

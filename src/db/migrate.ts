@@ -1,5 +1,5 @@
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { db } from "./index";
+import { getDb } from "./index";
 import path from "path";
 import fs from "fs";
 
@@ -15,7 +15,7 @@ async function main() {
     }
 
     // This will run migrations on the database, skipping the ones already applied
-    await migrate(db, { migrationsFolder });
+    await migrate(getDb(), { migrationsFolder });
     console.log("Migrations complete");
     process.exit(0);
   } catch (error) {
