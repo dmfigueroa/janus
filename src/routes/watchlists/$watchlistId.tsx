@@ -14,7 +14,7 @@ export const Route = createFileRoute("/watchlists/$watchlistId")({
   component: WatchlistDetail,
 });
 
-function WatchlistDetail() {
+export function WatchlistDetail() {
   const initialData = Route.useLoaderData();
   const watchlistId = initialData.watchlist.id;
   const [showUnwatchedOnly, setShowUnwatchedOnly] = useState(true);

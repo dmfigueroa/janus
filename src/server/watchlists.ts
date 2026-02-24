@@ -183,10 +183,14 @@ export const getWatchlistById = createServerFn()
             eq(watchlistItems.watchlistId, id),
             isWatched !== undefined ? eq(watchlistItems.isWatched, isWatched) : undefined,
             query
-              ? or(
-                  sql`${watchlistItems.title} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\'`,
-                  sql`${watchlistItems.parentTitle} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\'`,
-                )
+              ? (() => {
+                  const likeQuery = `%${escapeLikeString(query)}%`;
+                  return or(
+                    sql`${watchlistItems.title} LIKE ${likeQuery} ESCAPE '\\'`,
+                    sql`${watchlistItems.parentTitle} LIKE ${likeQuery} ESCAPE '\\'`,
+                    sql`${watchlistItems.episode} LIKE ${likeQuery} ESCAPE '\\'`,
+                  );
+                })()
               : undefined,
           ),
         )
