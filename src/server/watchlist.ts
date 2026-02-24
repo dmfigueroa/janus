@@ -3,7 +3,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import pLimit from "p-limit";
-import { getDb } from "../db";
 import { watchlistItems, watchlists } from "../db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { getTVDetails, getSeasonDetails, getMovieDetails } from "./tmdb";
@@ -40,6 +39,7 @@ type GenericMedia = Omit<WatchlistMedia, "mediaType"> & {
 export const toggleWatched = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({ itemId: z.number(), isWatched: z.boolean() }).parse(data))
   .handler(async ({ data }) => {
+    const { getDb } = await import("../db/server");
     const db = getDb();
     const [item] = await db
       .select({ watchlistId: watchlistItems.watchlistId })
@@ -117,6 +117,7 @@ export const addToWatchlist = createServerFn({ method: "POST" })
   });
 
 const addGenericItemToWatchlist = async (watchlistId: number, media: GenericMedia) => {
+  const { getDb } = await import("../db/server");
   const db = getDb();
   const existing = await db
     .select()
@@ -155,6 +156,7 @@ const addGenericItemToWatchlist = async (watchlistId: number, media: GenericMedi
 };
 
 const addMovieToWatchList = async (watchlistId: number, tmdbId: number) => {
+  const { getDb } = await import("../db/server");
   const db = getDb();
   const existing = await db
     .select()
@@ -199,6 +201,7 @@ const addTVShowToWatchList = async (
   tmdbId: number,
   media: z.infer<typeof addToWatchlistSchema>["media"],
 ) => {
+  const { getDb } = await import("../db/server");
   const db = getDb();
   const showDetails = await getTVDetails({ data: { id: tmdbId } });
   const seasons = showDetails.seasons || [];
@@ -253,6 +256,7 @@ const addComicToWatchList = async (
   media: z.infer<typeof addToWatchlistSchema>["media"],
   apiKey: string,
 ) => {
+  const { getDb } = await import("../db/server");
   const db = getDb();
   const issues = await getComicIssues(volumeId, apiKey);
 
@@ -293,6 +297,7 @@ const addAnimeToWatchlist = async (
   aniListId: string,
   media: z.infer<typeof addToWatchlistSchema>["media"],
 ) => {
+  const { getDb } = await import("../db/server");
   const db = getDb();
   const details = await getAnilistDetails(aniListId);
 
@@ -337,6 +342,7 @@ const addMangaToWatchlist = async (
   aniListId: string,
   media: z.infer<typeof addToWatchlistSchema>["media"],
 ) => {
+  const { getDb } = await import("../db/server");
   const db = getDb();
   const details = await getAnilistDetails(aniListId);
 

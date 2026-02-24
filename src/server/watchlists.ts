@@ -2,7 +2,6 @@
 
 import { escapeLikeString } from "../utils/search";
 import { createServerFn } from "@tanstack/react-start";
-import { getDb } from "../db";
 import { watchlists, watchlistItems } from "../db/schema";
 import { eq, desc, inArray, asc, sql, and, or } from "drizzle-orm";
 import { z } from "zod";
@@ -57,6 +56,7 @@ export const getWatchlists = createServerFn()
         orderBy = [orderFn(watchlists.createdAt)];
     }
 
+    const { getDb } = await import("../db/server");
     const db = getDb();
     const lists = await db
       .select()
@@ -127,6 +127,7 @@ export const getWatchlistByIdInternal = async (data: {
   const { id, page, limit, query, isWatched } = data;
   const offset = (page - 1) * limit;
 
+  const { getDb } = await import("../db/server");
   const db = getDb();
   const [list] = await db.select().from(watchlists).where(eq(watchlists.id, id));
 
@@ -243,6 +244,7 @@ export const getWatchlistById = createServerFn()
 export const createWatchlist = createServerFn()
   .inputValidator((data) => watchlistSchema.parse(data))
   .handler(async ({ data }) => {
+    const { getDb } = await import("../db/server");
     const db = getDb();
     const [newItem] = await db
       .insert(watchlists)
@@ -257,6 +259,7 @@ export const createWatchlist = createServerFn()
 export const deleteWatchlist = createServerFn()
   .inputValidator((data) => deleteWatchlistSchema.parse(data))
   .handler(async ({ data }) => {
+    const { getDb } = await import("../db/server");
     const db = getDb();
     await db.delete(watchlists).where(eq(watchlists.id, data.id));
     return { success: true };
@@ -265,6 +268,7 @@ export const deleteWatchlist = createServerFn()
 export const mergeWatchlists = createServerFn({ method: "POST" })
   .inputValidator((data) => mergeWatchlistSchema.parse(data))
   .handler(async ({ data }) => {
+    const { getDb } = await import("../db/server");
     const db = getDb();
     let targetId = data.targetWatchlistId;
 

@@ -1,5 +1,5 @@
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { getDb } from "./index";
+import { getDb } from "./server";
 import path from "path";
 import fs from "fs";
 
