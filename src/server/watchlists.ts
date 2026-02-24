@@ -180,15 +180,11 @@ export const getWatchlistByIdInternal = createServerOnlyFn(
             eq(watchlistItems.watchlistId, id),
             isWatched !== undefined ? eq(watchlistItems.isWatched, isWatched) : undefined,
             query
-              ? (() => {
-                  const normalizedQuery = query.toLowerCase();
-                  const likeQuery = `%${escapeLikeString(normalizedQuery)}%`;
-                  return or(
-                    sql`LOWER(${watchlistItems.title}) LIKE ${likeQuery} ESCAPE '\\'`,
-                    sql`LOWER(${watchlistItems.parentTitle}) LIKE ${likeQuery} ESCAPE '\\'`,
-                    sql`LOWER(${watchlistItems.episode}) LIKE ${likeQuery} ESCAPE '\\'`,
-                  );
-                })()
+              ? or(
+                  sql`${watchlistItems.title} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\\' COLLATE NOCASE`,
+                  sql`${watchlistItems.parentTitle} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\\' COLLATE NOCASE`,
+                  sql`${watchlistItems.episode} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\\' COLLATE NOCASE`,
+                )
               : undefined,
           ),
         )
