@@ -1,7 +1,7 @@
 "use server";
 
 import { escapeLikeString } from "../utils/search";
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { watchlists, watchlistItems } from "../db/schema";
 import { eq, desc, inArray, asc, sql, and, or } from "drizzle-orm";
 import { z } from "zod";
@@ -117,113 +117,115 @@ export const getWatchlists = createServerFn()
     });
   });
 
-export const getWatchlistByIdInternal = async (data: {
-  id: number;
-  page: number;
-  limit: number;
-  query?: string;
-  isWatched?: boolean;
-}) => {
-  const { id, page, limit, query, isWatched } = data;
-  const offset = (page - 1) * limit;
+export const getWatchlistByIdInternal = createServerOnlyFn(
+  async (data: {
+    id: number;
+    page: number;
+    limit: number;
+    query?: string;
+    isWatched?: boolean;
+  }) => {
+    const { id, page, limit, query, isWatched } = data;
+    const offset = (page - 1) * limit;
 
-  const db = getDb();
-  const [list] = await db.select().from(watchlists).where(eq(watchlists.id, id));
+    const db = getDb();
+    const [list] = await db.select().from(watchlists).where(eq(watchlists.id, id));
 
-  if (!list) {
-    throw new Error("Watchlist not found");
-  }
+    if (!list) {
+      throw new Error("Watchlist not found");
+    }
 
-  // Parallelize stats queries
-  const [totalRes, watchedRes, nextUnwatchedRes, firstItemRes, items] = await Promise.all([
-    // Total Items
-    db
-      .select({ count: sql<number>`count(*)` })
-      .from(watchlistItems)
-      .where(eq(watchlistItems.watchlistId, id)),
+    // Parallelize stats queries
+    const [totalRes, watchedRes, nextUnwatchedRes, firstItemRes, items] = await Promise.all([
+      // Total Items
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, id)),
 
-    // Watched Items
-    db
-      .select({ count: sql<number>`count(*)` })
-      .from(watchlistItems)
-      .where(and(eq(watchlistItems.watchlistId, id), eq(watchlistItems.isWatched, true))),
+      // Watched Items
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(watchlistItems)
+        .where(and(eq(watchlistItems.watchlistId, id), eq(watchlistItems.isWatched, true))),
 
-    // Next Unwatched (for cover & stats)
-    db
-      .select()
-      .from(watchlistItems)
-      .where(and(eq(watchlistItems.watchlistId, id), eq(watchlistItems.isWatched, false)))
-      .orderBy(
-        sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
-        asc(watchlistItems.releaseDate),
-      )
-      .limit(1),
+      // Next Unwatched (for cover & stats)
+      db
+        .select()
+        .from(watchlistItems)
+        .where(and(eq(watchlistItems.watchlistId, id), eq(watchlistItems.isWatched, false)))
+        .orderBy(
+          sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
+          asc(watchlistItems.releaseDate),
+        )
+        .limit(1),
 
-    // First Item (fallback for cover if all watched)
-    db
-      .select()
-      .from(watchlistItems)
-      .where(eq(watchlistItems.watchlistId, id))
-      .orderBy(
-        sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
-        asc(watchlistItems.releaseDate),
-      )
-      .limit(1),
+      // First Item (fallback for cover if all watched)
+      db
+        .select()
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, id))
+        .orderBy(
+          sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
+          asc(watchlistItems.releaseDate),
+        )
+        .limit(1),
 
-    // Paginated Items
-    db
-      .select()
-      .from(watchlistItems)
-      .where(
-        and(
-          eq(watchlistItems.watchlistId, id),
-          isWatched !== undefined ? eq(watchlistItems.isWatched, isWatched) : undefined,
-          query
-            ? (() => {
-                const normalizedQuery = query.toLowerCase();
-                const likeQuery = `%${escapeLikeString(normalizedQuery)}%`;
-                return or(
-                  sql`LOWER(${watchlistItems.title}) LIKE ${likeQuery} ESCAPE '\\'`,
-                  sql`LOWER(${watchlistItems.parentTitle}) LIKE ${likeQuery} ESCAPE '\\'`,
-                  sql`LOWER(${watchlistItems.episode}) LIKE ${likeQuery} ESCAPE '\\'`,
-                );
-              })()
-            : undefined,
-        ),
-      )
-      .orderBy(
-        sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
-        asc(watchlistItems.releaseDate),
-      )
-      .limit(limit)
-      .offset(offset),
-  ]);
+      // Paginated Items
+      db
+        .select()
+        .from(watchlistItems)
+        .where(
+          and(
+            eq(watchlistItems.watchlistId, id),
+            isWatched !== undefined ? eq(watchlistItems.isWatched, isWatched) : undefined,
+            query
+              ? (() => {
+                  const normalizedQuery = query.toLowerCase();
+                  const likeQuery = `%${escapeLikeString(normalizedQuery)}%`;
+                  return or(
+                    sql`LOWER(${watchlistItems.title}) LIKE ${likeQuery} ESCAPE '\\'`,
+                    sql`LOWER(${watchlistItems.parentTitle}) LIKE ${likeQuery} ESCAPE '\\'`,
+                    sql`LOWER(${watchlistItems.episode}) LIKE ${likeQuery} ESCAPE '\\'`,
+                  );
+                })()
+              : undefined,
+          ),
+        )
+        .orderBy(
+          sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
+          asc(watchlistItems.releaseDate),
+        )
+        .limit(limit)
+        .offset(offset),
+    ]);
 
-  const totalItems = totalRes[0]?.count || 0;
-  const watchedItems = watchedRes[0]?.count || 0;
-  const nextUnwatched = nextUnwatchedRes[0] || null;
-  const firstItem = firstItemRes[0] || null;
+    const totalItems = totalRes[0]?.count || 0;
+    const watchedItems = watchedRes[0]?.count || 0;
+    const nextUnwatched = nextUnwatchedRes[0] || null;
+    const firstItem = firstItemRes[0] || null;
 
-  const coverItem = nextUnwatched || firstItem || null;
-  const coverImage = coverItem?.posterPath || null;
-  const coverMediaType = coverItem?.mediaType || null;
+    const coverItem = nextUnwatched || firstItem || null;
+    const coverImage = coverItem?.posterPath || null;
+    const coverMediaType = coverItem?.mediaType || null;
 
-  return {
-    watchlist: {
-      ...list,
-      stats: {
-        totalItems,
-        watchedItems,
-        progress: totalItems > 0 ? Math.round((watchedItems / totalItems) * 100) : 0,
-        nextUnwatched,
-        coverImage,
-        coverMediaType,
+    return {
+      watchlist: {
+        ...list,
+        stats: {
+          totalItems,
+          watchedItems,
+          progress: totalItems > 0 ? Math.round((watchedItems / totalItems) * 100) : 0,
+          nextUnwatched,
+          coverImage,
+          coverMediaType,
+        },
       },
-    },
-    items,
-    nextCursor: items.length === limit ? page + 1 : undefined,
-  };
-};
+      items,
+      nextCursor: items.length === limit ? page + 1 : undefined,
+    };
+  },
+);
 
 export type GetWatchlistByIdResult = Awaited<ReturnType<typeof getWatchlistByIdInternal>>;
 
