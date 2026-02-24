@@ -179,14 +179,11 @@ export const getWatchlistByIdInternal = async (data: {
           eq(watchlistItems.watchlistId, id),
           isWatched !== undefined ? eq(watchlistItems.isWatched, isWatched) : undefined,
           query
-            ? (() => {
-                const likeQuery = `%${escapeLikeString(query)}%`;
-                return or(
-                  sql`${watchlistItems.title} LIKE ${likeQuery} ESCAPE '\\'`,
-                  sql`${watchlistItems.parentTitle} LIKE ${likeQuery} ESCAPE '\\'`,
-                  sql`${watchlistItems.episode} LIKE ${likeQuery} ESCAPE '\\'`,
-                );
-              })()
+            ? or(
+                sql`${watchlistItems.title} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\\'`,
+                sql`${watchlistItems.parentTitle} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\\'`,
+                sql`${watchlistItems.episode} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\\'`,
+              )
             : undefined,
         ),
       )
