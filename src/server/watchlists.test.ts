@@ -91,6 +91,15 @@ describe("watchlist search", () => {
     expect(bySeries.items).toHaveLength(1);
     expect(bySeries.items[0].parentTitle).toBe("Saga");
 
+    const bySeriesLower = await getWatchlistByIdInternal({
+      id: list.id,
+      page: 1,
+      limit: 50,
+      query: "saga",
+    });
+    expect(bySeriesLower.items).toHaveLength(1);
+    expect(bySeriesLower.items[0].parentTitle).toBe("Saga");
+
     const byItemTitle = await getWatchlistByIdInternal({
       id: list.id,
       page: 1,
