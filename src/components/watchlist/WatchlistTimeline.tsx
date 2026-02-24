@@ -1,6 +1,6 @@
 "use client";
 
-import { WatchlistItem } from "@/server/watchlist";
+import type { WatchlistItem } from "@/db/schema";
 import { TimelineItem } from "./TimelineItem";
 import { useMemo } from "react";
 import { Flag, Loader2 } from "lucide-react";

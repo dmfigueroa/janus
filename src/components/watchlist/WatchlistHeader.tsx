@@ -1,6 +1,6 @@
 "use client";
 
-import { Watchlist } from "@/server/watchlist";
+import type { Watchlist } from "@/db/schema";
 import { cn } from "@/utils/cn";
 import { Search } from "lucide-react";
 
