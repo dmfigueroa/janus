@@ -5,7 +5,7 @@ import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { watchlists, watchlistItems } from "../db/schema";
 import { eq, desc, inArray, asc, sql, and, or } from "drizzle-orm";
 import { z } from "zod";
-import { getDb } from "../db/server.server";
+import { getDb } from "../db/db.server";
 
 const watchlistSchema = z.object({
   name: z.string().min(1, "Name is required"),

@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { API_PAGE_SIZE } from "./constants";
-import { type UnifiedMedia } from "./media";
-import { getErrorMessage } from "./utils";
+import { API_PAGE_SIZE } from "../constants";
+import { type UnifiedMedia } from "../media";
+import { getErrorMessage } from "../utils";
 
 const GoogleBookItemSchema = z.object({
   id: z.string(),

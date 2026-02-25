@@ -5,12 +5,12 @@ import { z } from "zod";
 import pLimit from "p-limit";
 import { watchlistItems, watchlists } from "../db/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { getTVDetails, getSeasonDetails, getMovieDetails } from "./tmdb";
-import { getComicIssues } from "./comicvine";
-import { getBookDetails } from "./google-books";
-import { getGameDetails } from "./rawg";
-import { getAnilistDetails } from "./anilist";
-import { getDb } from "../db/server.server";
+import { getTVDetails, getSeasonDetails, getMovieDetails } from "./providers/tmdb.server";
+import { getComicIssues } from "./providers/comicvine.server";
+import { getBookDetails } from "./providers/google-books.server";
+import { getGameDetails } from "./providers/rawg.server";
+import { getAnilistDetails } from "./providers/anilist.server";
+import { getDb } from "../db/db.server";
 import { isDeprecatedMediaType, DEPRECATED_MEDIA_MESSAGE } from "./media";
 
 export type { Watchlist, WatchlistItem } from "../db/schema";

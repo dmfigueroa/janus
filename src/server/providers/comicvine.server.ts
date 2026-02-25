@@ -1,8 +1,8 @@
 import { z } from "zod";
 import pLimit from "p-limit";
-import { API_PAGE_SIZE } from "./constants";
-import { type UnifiedMedia } from "./media";
-import { getErrorMessage } from "./utils";
+import { API_PAGE_SIZE } from "../constants";
+import { type UnifiedMedia } from "../media";
+import { getErrorMessage } from "../utils";
 
 export const ComicIssueSchema = z.object({
   id: z.string(),

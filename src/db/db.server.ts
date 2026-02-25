@@ -5,5 +5,15 @@ import * as schema from "./schema";
 
 const sqlite = new Database(process.env.DATABASE_URL || "sqlite.db");
 const db = drizzle(sqlite, { schema });
+let isSqliteClosed = false;
 
 export const getDb = createServerOnlyFn(() => db);
+
+export function closeDb() {
+  if (isSqliteClosed) {
+    return;
+  }
+
+  sqlite.close();
+  isSqliteClosed = true;
+}

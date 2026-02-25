@@ -2,11 +2,11 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { searchMultimedia } from "./tmdb";
-import { searchBooks } from "./google-books";
-import { searchGames } from "./rawg";
-import { searchComics } from "./comicvine";
-import { searchAnilist } from "./anilist";
+import { searchMultimedia } from "./providers/tmdb.server";
+import { searchBooks } from "./providers/google-books.server";
+import { searchGames } from "./providers/rawg.server";
+import { searchComics } from "./providers/comicvine.server";
+import { searchAnilist } from "./providers/anilist.server";
 import { type UnifiedMedia, isDeprecatedMediaType, DEPRECATED_MEDIA_MESSAGE } from "./media";
 import { API_PAGE_SIZE } from "./constants";
 
