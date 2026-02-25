@@ -254,10 +254,28 @@ const addComicToWatchList = async (
   apiKey: string,
 ) => {
   const db = getDb();
-  const issues = await getComicIssues(volumeId, apiKey);
+  const existingComicRows = await db
+    .select({ tmdbId: watchlistItems.tmdbId })
+    .from(watchlistItems)
+    .where(
+      and(
+        eq(watchlistItems.watchlistId, watchlistId),
+        eq(watchlistItems.mediaType, "comic"),
+        eq(watchlistItems.source, "comicvine"),
+      ),
+    );
+
+  const existingIssueIds = new Set(existingComicRows.map((row) => row.tmdbId));
+  const issues = await getComicIssues(volumeId, apiKey, { knownIssueIds: existingIssueIds });
 
   if (issues.length === 0) {
-    return { success: false, message: "No issues found for this volume" };
+    return {
+      success: true,
+      message:
+        existingIssueIds.size > 0
+          ? "No new issues found for this volume"
+          : "No issues found for this volume",
+    };
   }
 
   const watchlistItemsData = issues.map((issue) => ({
@@ -285,7 +303,13 @@ const addComicToWatchList = async (
     .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
     .where(eq(watchlists.id, watchlistId));
 
-  return { success: true, message: `Added ${watchlistItemsData.length} issues to watchlist` };
+  const newIssueCount = watchlistItemsData.length;
+  const message =
+    existingIssueIds.size > 0
+      ? `Added ${newIssueCount} new issues to watchlist`
+      : `Added ${newIssueCount} issues to watchlist`;
+
+  return { success: true, message };
 };
 
 const addAnimeToWatchlist = async (
