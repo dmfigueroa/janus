@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect } from "effect";
 import { z } from "zod";
 import { API_PAGE_SIZE } from "../-constants";
 import { type UnifiedMedia } from "../-media";
@@ -139,25 +139,20 @@ function fetchIssuePageWithRetryEffect(
   direction: ComicIssueSortDirection,
   retries = COMICVINE_RETRIES,
 ): Effect.Effect<ComicIssueResponse, Error> {
-  return Effect.gen(function* () {
-    for (let attempt = 0; attempt <= retries; attempt += 1) {
-      const result = yield* fetchIssuePageEffect(volumeId, apiKey, offset, direction).pipe(
-        Effect.either,
-      );
+  const runAttempt = (attempt: number): Effect.Effect<ComicIssueResponse, Error> =>
+    fetchIssuePageEffect(volumeId, apiKey, offset, direction).pipe(
+      Effect.catchAll((error) => {
+        if (attempt >= retries) {
+          return Effect.fail(error);
+        }
 
-      if (Either.isRight(result)) {
-        return result.right;
-      }
+        return Effect.sleep(COMICVINE_RETRY_BASE_DELAY_MS * (attempt + 1)).pipe(
+          Effect.flatMap(() => runAttempt(attempt + 1)),
+        );
+      }),
+    );
 
-      if (attempt >= retries) {
-        return yield* Effect.fail(result.left);
-      }
-
-      yield* Effect.sleep(COMICVINE_RETRY_BASE_DELAY_MS * (attempt + 1));
-    }
-
-    return yield* Effect.fail(new Error("Failed to fetch issues page"));
-  });
+  return runAttempt(0);
 }
 
 function collectAllVolumeIssuesEffect(
@@ -174,14 +169,13 @@ function collectAllVolumeIssuesEffect(
       return allIssues;
     }
 
-    const offsets: number[] = [];
-    for (
-      let offset = firstPage.results.length;
-      offset < totalResults;
-      offset += COMICVINE_ISSUE_PAGE_LIMIT
-    ) {
-      offsets.push(offset);
-    }
+    const remainingPageCount = Math.ceil(
+      (totalResults - firstPage.results.length) / COMICVINE_ISSUE_PAGE_LIMIT,
+    );
+    const offsets = Array.from(
+      { length: remainingPageCount },
+      (_, index) => firstPage.results.length + index * COMICVINE_ISSUE_PAGE_LIMIT,
+    );
 
     // Use Effect's concurrency mechanisms
     const remainingPages = yield* Effect.forEach(
@@ -208,39 +202,34 @@ function collectNewVolumeIssuesEffect(
   apiKey: string,
   knownIssueIds: Set<string>,
 ): Effect.Effect<ComicIssueItem[], Error> {
-  return Effect.gen(function* () {
-    const newIssues: ComicIssueItem[] = [];
-    let offset = 0;
-    let totalResults = 1;
-
-    while (offset < totalResults) {
-      const data = yield* fetchIssuePageWithRetryEffect(volumeId, apiKey, offset, "desc");
-      totalResults = data.number_of_total_results;
-
-      if (data.results.length === 0) {
-        break;
-      }
-
-      let newIssuesInPage = 0;
-
-      for (const issue of data.results) {
-        const issueId = issue.id.toString();
-        if (knownIssueIds.has(issueId)) {
-          continue;
-        }
-        newIssues.push(issue);
-        newIssuesInPage += 1;
-      }
-
-      if (newIssuesInPage === 0) {
-        break;
-      }
-
-      offset += data.results.length;
+  const collectFromOffset = (
+    offset: number,
+    totalResults: number,
+    collected: ComicIssueItem[],
+  ): Effect.Effect<ComicIssueItem[], Error> => {
+    if (offset >= totalResults) {
+      return Effect.succeed(collected);
     }
 
-    return newIssues;
-  });
+    return Effect.gen(function* () {
+      const data = yield* fetchIssuePageWithRetryEffect(volumeId, apiKey, offset, "desc");
+      if (data.results.length === 0) {
+        return collected;
+      }
+
+      const pageNewIssues = data.results.filter((issue) => !knownIssueIds.has(issue.id.toString()));
+      if (pageNewIssues.length === 0) {
+        return collected;
+      }
+
+      return yield* collectFromOffset(offset + data.results.length, data.number_of_total_results, [
+        ...collected,
+        ...pageNewIssues,
+      ]);
+    });
+  };
+
+  return collectFromOffset(0, Number.POSITIVE_INFINITY, []);
 }
 
 function mapIssueToComicIssue(issue: ComicIssueItem): ComicIssue {

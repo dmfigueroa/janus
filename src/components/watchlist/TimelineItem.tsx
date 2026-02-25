@@ -6,7 +6,7 @@ import type { WatchlistItem } from "@/db/schema";
 import { formatReleaseDate, formatRuntime } from "@/utils/datetime";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { toggleWatched } from "@/routes/watchlists/-watchlist-items.server";
+import { toggleWatched } from "@/routes/watchlists/watchlist/-items.server";
 
 type TimelineItemProps = {
   item: WatchlistItem;

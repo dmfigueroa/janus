@@ -1,24 +1,30 @@
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import path from "path";
 
 let db: ReturnType<typeof import("@/db/server.server").getDb>;
 let watchlists: typeof import("@/db/schema").watchlists;
 let watchlistItems: typeof import("@/db/schema").watchlistItems;
-let queryWatchlistDetailsById: typeof import("./-watchlist-details-query.server").queryWatchlistDetailsById;
+let queryWatchlistDetailsById: typeof import("./watchlist/-details-query.server").queryWatchlistDetailsById;
+let closeDb: typeof import("@/db/server.server").closeDb;
 
 beforeAll(async () => {
   process.env.DATABASE_URL = ":memory:";
   const dbModule = await import("@/db/server.server");
   const schemaModule = await import("@/db/schema");
-  const watchlistsModule = await import("./-watchlist-details-query.server");
+  const watchlistsModule = await import("./watchlist/-details-query.server");
 
   db = dbModule.getDb();
+  closeDb = dbModule.closeDb;
   watchlists = schemaModule.watchlists;
   watchlistItems = schemaModule.watchlistItems;
   queryWatchlistDetailsById = watchlistsModule.queryWatchlistDetailsById;
 
   await migrate(db, { migrationsFolder: path.resolve(process.cwd(), "drizzle") });
+});
+
+afterAll(() => {
+  closeDb?.();
 });
 
 beforeEach(async () => {

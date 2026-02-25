@@ -6,7 +6,18 @@ import { watchlists, watchlistItems } from "@/db/schema";
 import { eq, desc, inArray, asc, sql } from "drizzle-orm";
 import { z } from "zod";
 import { runServerHandler } from "@/routes/_shared/-effect";
+import { getDatabase } from "@/db/server.server";
+import {
+  DatabaseError,
+  WatchlistNotFoundError,
+  MergeWatchlistError,
+  ConfigurationError,
+  type WatchlistError,
+} from "./watchlist/-errors";
 
+type DbError = DatabaseError | ConfigurationError;
+
+// Zod schemas for input validation
 const watchlistSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
@@ -29,6 +40,7 @@ const mergeWatchlistSchema = z
 type SortBy = "createdAt" | "lastWatched" | "lastAdded";
 type SortOrder = "asc" | "desc";
 
+// Sorting helpers
 function buildOrderBy(sortBy: SortBy, sortOrder: SortOrder) {
   const isDesc = sortOrder === "desc";
   const orderFn = isDesc ? desc : asc;
@@ -48,16 +60,206 @@ function buildOrderBy(sortBy: SortBy, sortOrder: SortOrder) {
   }
 }
 
-function getDbEffect() {
-  return Effect.tryPromise({
-    try: async () => {
-      const { getDb: resolveDb } = await import("@/db/server.server");
-      return resolveDb();
-    },
-    catch: (error) => new Error(`Failed to get database: ${String(error)}`),
+function splitIntoBatches<T>(items: ReadonlyArray<T>, batchSize: number): T[][] {
+  return Array.from({ length: Math.ceil(items.length / batchSize) }, (_, index) =>
+    items.slice(index * batchSize, (index + 1) * batchSize),
+  );
+}
+
+// Database operations with typed errors
+function fetchAllWatchlists(
+  sortBy: SortBy,
+  sortOrder: SortOrder,
+): Effect.Effect<(typeof watchlists.$inferSelect)[], DbError> {
+  return Effect.gen(function* () {
+    const db = yield* getDatabase();
+    const orderBy = buildOrderBy(sortBy, sortOrder);
+
+    return yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select()
+          .from(watchlists)
+          .orderBy(...orderBy),
+      catch: (error) =>
+        new DatabaseError({
+          message: "Failed to fetch watchlists",
+          cause: error,
+        }),
+    });
   });
 }
 
+function fetchWatchlistItemsByIds(
+  listIds: readonly number[],
+): Effect.Effect<(typeof watchlistItems.$inferSelect)[], DbError> {
+  return Effect.gen(function* () {
+    const db = yield* getDatabase();
+
+    return yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select()
+          .from(watchlistItems)
+          .where(inArray(watchlistItems.watchlistId, listIds))
+          .orderBy(
+            sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
+            asc(watchlistItems.releaseDate),
+          ),
+      catch: (error) =>
+        new DatabaseError({
+          message: "Failed to fetch watchlist items",
+          cause: error,
+        }),
+    });
+  });
+}
+
+function insertWatchlist(
+  name: string,
+  description: string | null,
+): Effect.Effect<typeof watchlists.$inferSelect, DbError> {
+  return Effect.gen(function* () {
+    const db = yield* getDatabase();
+
+    const [newItem] = yield* Effect.tryPromise({
+      try: () => db.insert(watchlists).values({ name, description }).returning(),
+      catch: (error) =>
+        new DatabaseError({
+          message: "Failed to create watchlist",
+          cause: error,
+        }),
+    });
+
+    return newItem;
+  });
+}
+
+function deleteWatchlistById(id: number): Effect.Effect<void, WatchlistNotFoundError | DbError> {
+  return Effect.gen(function* () {
+    const db = yield* getDatabase();
+
+    // First check if watchlist exists
+    const existing = yield* Effect.tryPromise({
+      try: () =>
+        db.select({ id: watchlists.id }).from(watchlists).where(eq(watchlists.id, id)).limit(1),
+      catch: (error) =>
+        new DatabaseError({
+          message: "Failed to check watchlist existence",
+          cause: error,
+        }),
+    });
+
+    if (existing.length === 0) {
+      return yield* Effect.fail(new WatchlistNotFoundError({ id }));
+    }
+
+    yield* Effect.tryPromise({
+      try: () => db.delete(watchlists).where(eq(watchlists.id, id)),
+      catch: (error) =>
+        new DatabaseError({
+          message: "Failed to delete watchlist",
+          cause: error,
+        }),
+    });
+  });
+}
+
+function fetchWatchlistItemsByWatchlistIds(
+  sourceWatchlistIds: readonly number[],
+): Effect.Effect<(typeof watchlistItems.$inferSelect)[], DbError> {
+  return Effect.gen(function* () {
+    const db = yield* getDatabase();
+
+    return yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select()
+          .from(watchlistItems)
+          .where(inArray(watchlistItems.watchlistId, sourceWatchlistIds)),
+      catch: (error) =>
+        new DatabaseError({
+          message: "Failed to fetch source watchlist items",
+          cause: error,
+        }),
+    });
+  });
+}
+
+function insertMergedItemsInBatches(
+  itemsToInsert: Array<typeof watchlistItems.$inferInsert>,
+): Effect.Effect<void, DbError> {
+  return Effect.gen(function* () {
+    const db = yield* getDatabase();
+    const CHUNK_SIZE = 50;
+    const batches = splitIntoBatches(itemsToInsert, CHUNK_SIZE);
+
+    yield* Effect.forEach(
+      batches,
+      (batch) =>
+        Effect.tryPromise({
+          try: () => {
+            const records = batch.map((item) => ({ ...item }));
+            return db
+              .insert(watchlistItems)
+              .values(records)
+              .onConflictDoUpdate({
+                target: [
+                  watchlistItems.watchlistId,
+                  watchlistItems.tmdbId,
+                  watchlistItems.mediaType,
+                ],
+                set: {
+                  isWatched: sql`CASE WHEN ${watchlistItems.isWatched} OR excluded.is_watched THEN 1 ELSE 0 END`,
+                },
+              });
+          },
+          catch: (error) =>
+            new DatabaseError({
+              message: "Failed to insert watchlist items",
+              cause: error,
+            }),
+        }),
+      { discard: true },
+    );
+  });
+}
+
+function updateWatchlistLastItemAddedAt(watchlistId: number): Effect.Effect<void, DbError> {
+  return Effect.gen(function* () {
+    const db = yield* getDatabase();
+
+    yield* Effect.tryPromise({
+      try: () =>
+        db
+          .update(watchlists)
+          .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
+          .where(eq(watchlists.id, watchlistId)),
+      catch: (error) =>
+        new DatabaseError({
+          message: "Failed to update watchlist lastItemAddedAt",
+          cause: error,
+        }),
+    });
+  });
+}
+
+function deleteWatchlistsByIds(ids: readonly number[]): Effect.Effect<void, DbError> {
+  return Effect.gen(function* () {
+    const db = yield* getDatabase();
+
+    yield* Effect.tryPromise({
+      try: () => db.delete(watchlists).where(inArray(watchlists.id, ids)),
+      catch: (error) =>
+        new DatabaseError({
+          message: "Failed to delete source watchlists",
+          cause: error,
+        }),
+    });
+  });
+}
+
+// Business logic programs
 function getWatchlistsProgram(
   sortBy: SortBy,
   sortOrder: SortOrder,
@@ -74,39 +276,17 @@ function getWatchlistsProgram(
       };
     } & typeof watchlists.$inferSelect
   >,
-  Error
+  WatchlistError
 > {
   return Effect.gen(function* () {
-    const db = yield* getDbEffect();
-    const orderBy = buildOrderBy(sortBy, sortOrder);
-
-    const lists = yield* Effect.tryPromise({
-      try: () =>
-        db
-          .select()
-          .from(watchlists)
-          .orderBy(...orderBy),
-      catch: (error) => new Error(`Failed to fetch watchlists: ${String(error)}`),
-    });
+    const lists = yield* fetchAllWatchlists(sortBy, sortOrder);
 
     if (lists.length === 0) {
       return [];
     }
 
     const listIds = lists.map((l) => l.id);
-
-    const items = yield* Effect.tryPromise({
-      try: () =>
-        db
-          .select()
-          .from(watchlistItems)
-          .where(inArray(watchlistItems.watchlistId, listIds))
-          .orderBy(
-            sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
-            asc(watchlistItems.releaseDate),
-          ),
-      catch: (error) => new Error(`Failed to fetch watchlist items: ${String(error)}`),
-    });
+    const items = yield* fetchWatchlistItemsByIds(listIds);
 
     const itemsByWatchlist = items.reduce<Record<number, typeof items>>((acc, item) => {
       if (!acc[item.watchlistId]) {
@@ -140,73 +320,42 @@ function getWatchlistsProgram(
 
 function createWatchlistProgram(
   data: z.infer<typeof watchlistSchema>,
-): Effect.Effect<typeof watchlists.$inferSelect, Error> {
-  return Effect.gen(function* () {
-    const db = yield* getDbEffect();
-
-    const values: { name: string; description: string | null } = {
-      name: data.name,
-      description: data.description ?? null,
-    };
-
-    const [newItem] = yield* Effect.tryPromise({
-      try: () => db.insert(watchlists).values(values).returning(),
-      catch: (error) => new Error(`Failed to create watchlist: ${String(error)}`),
-    });
-
-    return newItem;
-  });
+): Effect.Effect<typeof watchlists.$inferSelect, DbError> {
+  return insertWatchlist(data.name, data.description ?? null);
 }
 
-function deleteWatchlistProgram(id: number): Effect.Effect<{ success: true }, Error> {
+function deleteWatchlistProgram(id: number): Effect.Effect<{ success: true }, WatchlistError> {
   return Effect.gen(function* () {
-    const db = yield* getDbEffect();
-
-    yield* Effect.tryPromise({
-      try: () => db.delete(watchlists).where(eq(watchlists.id, id)),
-      catch: (error) => new Error(`Failed to delete watchlist: ${String(error)}`),
-    });
-
+    yield* deleteWatchlistById(id);
     return { success: true };
   });
 }
 
 function mergeWatchlistsProgram(
   data: z.infer<typeof mergeWatchlistSchema>,
-): Effect.Effect<{ success: true; targetId: number }, Error> {
+): Effect.Effect<{ success: true; targetId: number }, WatchlistError> {
   return Effect.gen(function* () {
-    const db = yield* getDbEffect();
     let targetId = data.targetWatchlistId;
 
+    // Create new watchlist if name provided
     if (data.newWatchlistName && !targetId) {
-      const newWatchlistName = data.newWatchlistName;
-      const values: { name: string; description: string | null } = {
-        name: newWatchlistName,
-        description: "Merged watchlist",
-      };
-
-      const [newList] = yield* Effect.tryPromise({
-        try: () => db.insert(watchlists).values(values).returning(),
-        catch: (error) => new Error(`Failed to create target watchlist: ${String(error)}`),
-      });
+      const newList = yield* insertWatchlist(data.newWatchlistName, "Merged watchlist");
       targetId = newList.id;
     }
 
     if (!targetId) {
-      return yield* Effect.fail(new Error("Target watchlist ID resolution failed"));
+      return yield* Effect.fail(
+        new MergeWatchlistError({
+          message: "Target watchlist ID resolution failed",
+        }),
+      );
     }
 
-    const sourceItems = yield* Effect.tryPromise({
-      try: () =>
-        db
-          .select()
-          .from(watchlistItems)
-          .where(inArray(watchlistItems.watchlistId, data.sourceWatchlistIds)),
-      catch: (error) => new Error(`Failed to fetch source watchlist items: ${String(error)}`),
-    });
+    // Fetch and migrate items
+    const sourceItems = yield* fetchWatchlistItemsByWatchlistIds(data.sourceWatchlistIds);
 
     if (sourceItems.length > 0) {
-      const itemsToInsert = sourceItems.map((item) => ({
+      const itemsToInsert: (typeof watchlistItems.$inferInsert)[] = sourceItems.map((item) => ({
         watchlistId: targetId!,
         tmdbId: item.tmdbId,
         source: item.source,
@@ -223,51 +372,21 @@ function mergeWatchlistsProgram(
         addedAt: item.addedAt,
       }));
 
-      const CHUNK_SIZE = 50;
-      for (let i = 0; i < itemsToInsert.length; i += CHUNK_SIZE) {
-        const chunk = itemsToInsert.slice(i, i + CHUNK_SIZE);
-
-        yield* Effect.tryPromise({
-          try: () =>
-            db
-              .insert(watchlistItems)
-              .values(chunk)
-              .onConflictDoUpdate({
-                target: [
-                  watchlistItems.watchlistId,
-                  watchlistItems.tmdbId,
-                  watchlistItems.mediaType,
-                ],
-                set: {
-                  isWatched: sql`CASE WHEN ${watchlistItems.isWatched} OR excluded.is_watched THEN 1 ELSE 0 END`,
-                },
-              }),
-          catch: (error) => new Error(`Failed to insert watchlist items: ${String(error)}`),
-        });
-      }
-
-      yield* Effect.tryPromise({
-        try: () =>
-          db
-            .update(watchlists)
-            .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
-            .where(eq(watchlists.id, targetId)),
-        catch: (error) => new Error(`Failed to update watchlist: ${String(error)}`),
-      });
+      yield* insertMergedItemsInBatches(itemsToInsert);
+      yield* updateWatchlistLastItemAddedAt(targetId);
     }
 
+    // Delete source watchlists (excluding target)
     const sourcesToDelete = data.sourceWatchlistIds.filter((id) => id !== targetId);
     if (sourcesToDelete.length > 0) {
-      yield* Effect.tryPromise({
-        try: () => db.delete(watchlists).where(inArray(watchlists.id, sourcesToDelete)),
-        catch: (error) => new Error(`Failed to delete source watchlists: ${String(error)}`),
-      });
+      yield* deleteWatchlistsByIds(sourcesToDelete);
     }
 
     return { success: true, targetId };
   });
 }
 
+// Server function exports
 export const getWatchlists = createServerFn()
   .inputValidator((data) =>
     z
@@ -297,7 +416,7 @@ export const getWatchlistById = createServerFn()
     runServerHandler(
       Effect.gen(function* () {
         const { queryWatchlistDetailsById } = yield* Effect.tryPromise(
-          () => import("./-watchlist-details-query.server"),
+          () => import("./watchlist/-details-query.server"),
         );
         return queryWatchlistDetailsById(data);
       }),
