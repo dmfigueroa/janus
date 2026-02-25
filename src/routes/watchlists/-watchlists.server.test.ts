@@ -5,18 +5,18 @@ import path from "path";
 let db: ReturnType<typeof import("@/db/server.server").getDb>;
 let watchlists: typeof import("@/db/schema").watchlists;
 let watchlistItems: typeof import("@/db/schema").watchlistItems;
-let getWatchlistByIdInternal: typeof import("./-watchlists.server").getWatchlistByIdInternal;
+let queryWatchlistDetailsById: typeof import("./-watchlist-details-query.server").queryWatchlistDetailsById;
 
 beforeAll(async () => {
   process.env.DATABASE_URL = ":memory:";
   const dbModule = await import("@/db/server.server");
   const schemaModule = await import("@/db/schema");
-  const watchlistsModule = await import("./-watchlists.server");
+  const watchlistsModule = await import("./-watchlist-details-query.server");
 
   db = dbModule.getDb();
   watchlists = schemaModule.watchlists;
   watchlistItems = schemaModule.watchlistItems;
-  getWatchlistByIdInternal = watchlistsModule.getWatchlistByIdInternal;
+  queryWatchlistDetailsById = watchlistsModule.queryWatchlistDetailsById;
 
   await migrate(db, { migrationsFolder: path.resolve(process.cwd(), "drizzle") });
 });
@@ -82,7 +82,7 @@ describe("watchlist search", () => {
       },
     ]);
 
-    const bySeries = await getWatchlistByIdInternal({
+    const bySeries = await queryWatchlistDetailsById({
       id: list.id,
       page: 1,
       limit: 50,
@@ -91,7 +91,7 @@ describe("watchlist search", () => {
     expect(bySeries.items).toHaveLength(1);
     expect(bySeries.items[0].parentTitle).toBe("Saga");
 
-    const bySeriesLower = await getWatchlistByIdInternal({
+    const bySeriesLower = await queryWatchlistDetailsById({
       id: list.id,
       page: 1,
       limit: 50,
@@ -100,7 +100,7 @@ describe("watchlist search", () => {
     expect(bySeriesLower.items).toHaveLength(1);
     expect(bySeriesLower.items[0].parentTitle).toBe("Saga");
 
-    const byItemTitle = await getWatchlistByIdInternal({
+    const byItemTitle = await queryWatchlistDetailsById({
       id: list.id,
       page: 1,
       limit: 50,
@@ -109,7 +109,7 @@ describe("watchlist search", () => {
     expect(byItemTitle.items).toHaveLength(1);
     expect(byItemTitle.items[0].title).toBe("Dune");
 
-    const byEpisode = await getWatchlistByIdInternal({
+    const byEpisode = await queryWatchlistDetailsById({
       id: list.id,
       page: 1,
       limit: 50,

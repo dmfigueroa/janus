@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import {
-  getWatchlistById,
-  type GetWatchlistByIdResult,
-} from "@/routes/watchlists/-watchlists.server";
+import { getWatchlistById } from "@/routes/watchlists/-watchlists.server";
 import { WatchlistHeader } from "@/components/watchlist/WatchlistHeader";
 import { WatchlistTimeline } from "@/components/watchlist/WatchlistTimeline";
+
+type GetWatchlistByIdResult = Awaited<ReturnType<typeof getWatchlistById>>;
 
 interface WatchlistDetailProps {
   initialData: GetWatchlistByIdResult;
