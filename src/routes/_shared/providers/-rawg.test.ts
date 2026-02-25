@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getGameDetails, searchGames } from "./-rawg";
+import { Effect } from "effect";
+import { getGameDetails, searchGames } from "./-rawg.server";
 
 vi.stubGlobal("fetch", vi.fn());
 
@@ -25,7 +26,7 @@ describe("rawg provider", () => {
       }),
     } as Response);
 
-    const result = await searchGames("Test", "rawg-key", 1);
+    const result = await Effect.runPromise(searchGames("Test", "rawg-key", 1));
 
     expect(result.totalResults).toBe(1);
     expect(result.results).toHaveLength(1);
@@ -42,7 +43,7 @@ describe("rawg provider", () => {
       }),
     } as Response);
 
-    await getGameDetails("../games/other-endpoint", "rawg-key");
+    await Effect.runPromise(getGameDetails("../games/other-endpoint", "rawg-key"));
 
     expect(fetch).toHaveBeenCalledWith(
       "https://api.rawg.io/api/games/..%2Fgames%2Fother-endpoint?key=rawg-key",

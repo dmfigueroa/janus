@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import { z } from "zod";
 import { API_PAGE_SIZE } from "../-constants";
 import { type UnifiedMedia } from "../-media";
-import { fetchJson, parseWithSchema, requireEnvVar, runServerEffect } from "../-effect";
+import { fetchJson, parseWithSchema, requireEnvVar } from "../-effect";
 
 const GoogleBookItemSchema = z.object({
   id: z.string(),
@@ -69,11 +69,11 @@ const toUnifiedBook = (item: GoogleBookItem): UnifiedMedia => ({
   overview: item.volumeInfo.description ?? undefined,
 });
 
-export async function searchBooks(
+export function searchBooks(
   query: string,
   page: number = 1,
-): Promise<{ results: UnifiedMedia[]; totalResults: number }> {
-  const program = Effect.gen(function* () {
+): Effect.Effect<{ results: UnifiedMedia[]; totalResults: number }, Error> {
+  return Effect.gen(function* () {
     const apiKey = yield* requireEnvVar("GOOGLE_BOOKS_API_KEY");
     const url = buildGoogleBooksSearchUrl(query, page, apiKey);
 
@@ -88,12 +88,10 @@ export async function searchBooks(
       totalResults: data.totalItems ?? 0,
     };
   });
-
-  return runServerEffect(program);
 }
 
-export async function getBookDetails(id: string): Promise<UnifiedMedia> {
-  const program = Effect.gen(function* () {
+export function getBookDetails(id: string): Effect.Effect<UnifiedMedia, Error> {
+  return Effect.gen(function* () {
     const apiKey = yield* requireEnvVar("GOOGLE_BOOKS_API_KEY");
     const url = buildGoogleBooksDetailsUrl(id, apiKey);
 
@@ -105,6 +103,4 @@ export async function getBookDetails(id: string): Promise<UnifiedMedia> {
 
     return toUnifiedBook(data);
   });
-
-  return runServerEffect(program);
 }

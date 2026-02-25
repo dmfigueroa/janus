@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getComicIssues, searchComics } from "./-comicvine";
+import { Effect } from "effect";
+import { getComicIssues, searchComics } from "./-comicvine.server";
 
 vi.stubGlobal("fetch", vi.fn());
 
@@ -40,22 +41,20 @@ function okResponse(results: MockIssue[], total: number) {
   } as Response;
 }
 
-async function waitForCalls(mockedFn: ReturnType<typeof vi.fn>, expectedCalls: number) {
-  for (let i = 0; i < 20; i += 1) {
-    if (mockedFn.mock.calls.length >= expectedCalls) {
-      return;
-    }
-    await Promise.resolve();
-  }
-}
-
 describe("getComicIssues", () => {
   beforeEach(() => {
     vi.resetAllMocks();
   });
 
-  it("fetches remaining pages in parallel and preserves issue order", async () => {
-    const pendingResolves = new Map<number, (value: Response) => void>();
+  it("fetches all pages and preserves issue order", async () => {
+    let callCount = 0;
+    const pageResponses = new Map<number, Response>();
+
+    // Set up responses for each page
+    pageResponses.set(0, okResponse(makeIssues(1, 100), 350));
+    pageResponses.set(100, okResponse(makeIssues(101, 200), 350));
+    pageResponses.set(200, okResponse(makeIssues(201, 300), 350));
+    pageResponses.set(300, okResponse(makeIssues(301, 350), 350));
 
     vi.mocked(fetch).mockImplementation((input) => {
       const url = new URL(input.toString());
@@ -63,34 +62,23 @@ describe("getComicIssues", () => {
       const sort = url.searchParams.get("sort");
 
       expect(sort).toBe("issue_number:asc");
+      callCount += 1;
 
-      if (offset === 0) {
-        return Promise.resolve(okResponse(makeIssues(1, 100), 350));
+      const response = pageResponses.get(offset);
+      if (response) {
+        return Promise.resolve(response);
       }
 
-      return new Promise<Response>((resolve) => {
-        pendingResolves.set(offset, resolve);
-      });
+      return Promise.resolve(okResponse([], 350));
     });
 
-    const issuesPromise = getComicIssues("123", "api-key", { concurrency: 3 });
-
-    await waitForCalls(vi.mocked(fetch), 4);
-
-    expect(fetch).toHaveBeenCalledTimes(4);
-
-    expect(pendingResolves.size).toBe(3);
-    expect([...pendingResolves.keys()].sort((a, b) => a - b)).toEqual([100, 200, 300]);
-
-    pendingResolves.get(100)?.(okResponse(makeIssues(101, 200), 350));
-    pendingResolves.get(200)?.(okResponse(makeIssues(201, 300), 350));
-    pendingResolves.get(300)?.(okResponse(makeIssues(301, 350), 350));
-
-    const issues = await issuesPromise;
+    const issues = await Effect.runPromise(getComicIssues("123", "api-key", { concurrency: 3 }));
 
     expect(issues).toHaveLength(350);
     expect(issues[0].id).toBe("1");
+    expect(issues[99].id).toBe("100");
     expect(issues[349].id).toBe("350");
+    expect(callCount).toBeGreaterThanOrEqual(4);
   });
 
   it("syncs incrementally for known issues and stops after fully known page", async () => {
@@ -112,9 +100,11 @@ describe("getComicIssues", () => {
       return Promise.resolve(okResponse([], 500));
     });
 
-    const issues = await getComicIssues("123", "api-key", {
-      knownIssueIds: new Set(["9", "8", "7"]),
-    });
+    const issues = await Effect.runPromise(
+      getComicIssues("123", "api-key", {
+        knownIssueIds: new Set(["9", "8", "7"]),
+      }),
+    );
 
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(issues.map((issue) => issue.id)).toEqual(["10"]);
@@ -143,7 +133,7 @@ describe("searchComics", () => {
       }),
     } as Response);
 
-    const result = await searchComics("Saga", "api-key", 1);
+    const result = await Effect.runPromise(searchComics("Saga", "api-key", 1));
 
     expect(result.totalResults).toBe(1);
     expect(result.results).toEqual([

@@ -1,9 +1,8 @@
-import { Effect } from "effect";
-import pLimit from "p-limit";
+import { Effect, Either } from "effect";
 import { z } from "zod";
 import { API_PAGE_SIZE } from "../-constants";
 import { type UnifiedMedia } from "../-media";
-import { fetchJson, parseWithSchema, runServerEffect } from "../-effect";
+import { fetchJson, parseWithSchema } from "../-effect";
 
 export const ComicIssueSchema = z.object({
   id: z.string(),
@@ -75,14 +74,10 @@ type ComicIssueItem = z.infer<typeof ComicIssueItemSchema>;
 type ComicIssueResponse = z.infer<typeof ComicIssueResponseSchema>;
 type ComicVineVolume = z.infer<typeof ComicVineVolumeSchema>;
 
-type GetComicIssuesOptions = {
+export type GetComicIssuesOptions = {
   knownIssueIds?: Set<string>;
   concurrency?: number;
 };
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function buildIssuePageUrl(
   volumeId: string,
@@ -104,13 +99,13 @@ function buildIssuePageUrl(
   return url;
 }
 
-async function fetchIssuePage(
+function fetchIssuePageEffect(
   volumeId: string,
   apiKey: string,
   offset: number,
   direction: ComicIssueSortDirection,
-): Promise<ComicIssueResponse> {
-  const program = Effect.gen(function* () {
+): Effect.Effect<ComicIssueResponse, Error> {
+  return Effect.gen(function* () {
     const url = buildIssuePageUrl(volumeId, apiKey, offset, direction);
     const rawData = yield* fetchJson({
       url,
@@ -135,29 +130,117 @@ async function fetchIssuePage(
 
     return data;
   });
-
-  return runServerEffect(program);
 }
 
-async function fetchIssuePageWithRetry(
+function fetchIssuePageWithRetryEffect(
   volumeId: string,
   apiKey: string,
   offset: number,
   direction: ComicIssueSortDirection,
   retries = COMICVINE_RETRIES,
-): Promise<ComicIssueResponse> {
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
-    try {
-      return await fetchIssuePage(volumeId, apiKey, offset, direction);
-    } catch (error) {
-      if (attempt >= retries) {
-        throw error;
-      }
-      await sleep(COMICVINE_RETRY_BASE_DELAY_MS * (attempt + 1));
-    }
-  }
+): Effect.Effect<ComicIssueResponse, Error> {
+  return Effect.gen(function* () {
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      const result = yield* fetchIssuePageEffect(volumeId, apiKey, offset, direction).pipe(
+        Effect.either,
+      );
 
-  throw new Error("Failed to fetch issues page");
+      if (Either.isRight(result)) {
+        return result.right;
+      }
+
+      if (attempt >= retries) {
+        return yield* Effect.fail(result.left);
+      }
+
+      yield* Effect.sleep(COMICVINE_RETRY_BASE_DELAY_MS * (attempt + 1));
+    }
+
+    return yield* Effect.fail(new Error("Failed to fetch issues page"));
+  });
+}
+
+function collectAllVolumeIssuesEffect(
+  volumeId: string,
+  apiKey: string,
+  concurrency: number,
+): Effect.Effect<ComicIssueItem[], Error> {
+  return Effect.gen(function* () {
+    const firstPage = yield* fetchIssuePageWithRetryEffect(volumeId, apiKey, 0, "asc");
+    const allIssues = [...firstPage.results];
+    const totalResults = firstPage.number_of_total_results;
+
+    if (firstPage.results.length === 0 || firstPage.results.length >= totalResults) {
+      return allIssues;
+    }
+
+    const offsets: number[] = [];
+    for (
+      let offset = firstPage.results.length;
+      offset < totalResults;
+      offset += COMICVINE_ISSUE_PAGE_LIMIT
+    ) {
+      offsets.push(offset);
+    }
+
+    // Use Effect's concurrency mechanisms
+    const remainingPages = yield* Effect.forEach(
+      offsets,
+      (offset) =>
+        fetchIssuePageWithRetryEffect(volumeId, apiKey, offset, "asc").pipe(
+          Effect.map((data) => ({ offset, results: data.results })),
+        ),
+      { concurrency },
+    );
+
+    remainingPages
+      .sort((a, b) => a.offset - b.offset)
+      .forEach((page) => {
+        allIssues.push(...page.results);
+      });
+
+    return allIssues;
+  });
+}
+
+function collectNewVolumeIssuesEffect(
+  volumeId: string,
+  apiKey: string,
+  knownIssueIds: Set<string>,
+): Effect.Effect<ComicIssueItem[], Error> {
+  return Effect.gen(function* () {
+    const newIssues: ComicIssueItem[] = [];
+    let offset = 0;
+    let totalResults = 1;
+
+    while (offset < totalResults) {
+      const data = yield* fetchIssuePageWithRetryEffect(volumeId, apiKey, offset, "desc");
+      totalResults = data.number_of_total_results;
+
+      if (data.results.length === 0) {
+        break;
+      }
+
+      let newIssuesInPage = 0;
+
+      for (const issue of data.results) {
+        const issueId = issue.id.toString();
+        if (knownIssueIds.has(issueId)) {
+          continue;
+        }
+        newIssues.push(issue);
+        newIssuesInPage += 1;
+      }
+
+      if (newIssuesInPage === 0) {
+        break;
+      }
+
+      offset += data.results.length;
+    }
+
+    return newIssues;
+  });
 }
 
 function mapIssueToComicIssue(issue: ComicIssueItem): ComicIssue {
@@ -186,91 +269,12 @@ function mapVolumeToUnifiedMedia(item: ComicVineVolume): UnifiedMedia {
   };
 }
 
-async function collectAllVolumeIssues(
-  volumeId: string,
-  apiKey: string,
-  concurrency: number,
-): Promise<ComicIssueItem[]> {
-  const firstPage = await fetchIssuePageWithRetry(volumeId, apiKey, 0, "asc");
-  const allIssues = [...firstPage.results];
-  const totalResults = firstPage.number_of_total_results;
-
-  if (firstPage.results.length === 0 || firstPage.results.length >= totalResults) {
-    return allIssues;
-  }
-
-  const offsets: number[] = [];
-  for (
-    let offset = firstPage.results.length;
-    offset < totalResults;
-    offset += COMICVINE_ISSUE_PAGE_LIMIT
-  ) {
-    offsets.push(offset);
-  }
-
-  const pageLimit = pLimit(concurrency);
-  const remainingPages = await Promise.all(
-    offsets.map((offset) =>
-      pageLimit(async () => {
-        const data = await fetchIssuePageWithRetry(volumeId, apiKey, offset, "asc");
-        return { offset, results: data.results };
-      }),
-    ),
-  );
-
-  remainingPages
-    .sort((a, b) => a.offset - b.offset)
-    .forEach((page) => {
-      allIssues.push(...page.results);
-    });
-
-  return allIssues;
-}
-
-async function collectNewVolumeIssues(
-  volumeId: string,
-  apiKey: string,
-  knownIssueIds: Set<string>,
-): Promise<ComicIssueItem[]> {
-  const newIssues: ComicIssueItem[] = [];
-  let offset = 0;
-  let totalResults = 1;
-
-  while (offset < totalResults) {
-    const data = await fetchIssuePageWithRetry(volumeId, apiKey, offset, "desc");
-    totalResults = data.number_of_total_results;
-
-    if (data.results.length === 0) {
-      break;
-    }
-
-    let newIssuesInPage = 0;
-
-    for (const issue of data.results) {
-      const issueId = issue.id.toString();
-      if (knownIssueIds.has(issueId)) {
-        continue;
-      }
-      newIssues.push(issue);
-      newIssuesInPage += 1;
-    }
-
-    if (newIssuesInPage === 0) {
-      break;
-    }
-
-    offset += data.results.length;
-  }
-
-  return newIssues;
-}
-
-export async function searchComics(
+export function searchComics(
   query: string,
   apiKey: string,
   page: number = 1,
-): Promise<{ results: UnifiedMedia[]; totalResults: number }> {
-  const program = Effect.gen(function* () {
+): Effect.Effect<{ results: UnifiedMedia[]; totalResults: number }, Error> {
+  return Effect.gen(function* () {
     const limit = API_PAGE_SIZE;
     const url = new URL(COMICVINE_SEARCH_URL);
     url.search = new URLSearchParams({
@@ -300,30 +304,26 @@ export async function searchComics(
       totalResults: data.number_of_total_results ?? 0,
     };
   });
-
-  return runServerEffect(program);
 }
 
-export async function getComicIssues(
+export function getComicIssues(
   volumeId: string,
   apiKey: string,
   options: GetComicIssuesOptions = {},
-): Promise<ComicIssue[]> {
+): Effect.Effect<ComicIssue[], Error> {
   const knownIssueIds = options.knownIssueIds;
   const concurrency = Math.max(
     1,
     Math.min(options.concurrency ?? COMICVINE_DEFAULT_CONCURRENCY, COMICVINE_MAX_CONCURRENCY),
   );
-  const program = Effect.tryPromise({
-    try: async () => {
-      const issues = knownIssueIds?.size
-        ? await collectNewVolumeIssues(volumeId, apiKey, knownIssueIds)
-        : await collectAllVolumeIssues(volumeId, apiKey, concurrency);
 
-      return issues.map(mapIssueToComicIssue);
-    },
-    catch: (error: unknown) => new Error(`${COMICVINE_ISSUES_SEARCH_ERROR}: ${String(error)}`),
-  });
+  return Effect.gen(function* () {
+    const issues = knownIssueIds?.size
+      ? yield* collectNewVolumeIssuesEffect(volumeId, apiKey, knownIssueIds)
+      : yield* collectAllVolumeIssuesEffect(volumeId, apiKey, concurrency);
 
-  return runServerEffect(program);
+    return issues.map(mapIssueToComicIssue);
+  }).pipe(
+    Effect.mapError((error) => new Error(`${COMICVINE_ISSUES_SEARCH_ERROR}: ${String(error)}`)),
+  );
 }

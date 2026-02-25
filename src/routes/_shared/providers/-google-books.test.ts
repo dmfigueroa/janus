@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getBookDetails } from "./-google-books";
+import { Effect } from "effect";
+import { getBookDetails } from "./-google-books.server";
 
 vi.stubGlobal("fetch", vi.fn());
 
@@ -20,7 +21,7 @@ describe("google-books getBookDetails", () => {
       }),
     } as Response);
 
-    await getBookDetails("zyTCAlFPjgYC");
+    await Effect.runPromise(getBookDetails("zyTCAlFPjgYC"));
 
     expect(fetch).toHaveBeenCalledWith(
       "https://www.googleapis.com/books/v1/volumes/zyTCAlFPjgYC?key=test-api-key",
@@ -37,7 +38,7 @@ describe("google-books getBookDetails", () => {
     } as Response);
 
     const maliciousId = "../volumes/other-endpoint";
-    await getBookDetails(maliciousId);
+    await Effect.runPromise(getBookDetails(maliciousId));
 
     const calledUrl = vi.mocked(fetch).mock.calls[0][0];
     const urlObj = new URL(calledUrl as string);
@@ -66,7 +67,7 @@ describe("google-books getBookDetails", () => {
       }),
     } as Response);
 
-    const result = await getBookDetails("book-1");
+    const result = await Effect.runPromise(getBookDetails("book-1"));
 
     expect(result.rating).toBe(0);
   });

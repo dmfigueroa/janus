@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import { z } from "zod";
 import { API_PAGE_SIZE } from "../-constants";
 import { type UnifiedMedia } from "../-media";
-import { fetchJson, parseWithSchema, runServerEffect } from "../-effect";
+import { fetchJson, parseWithSchema } from "../-effect";
 
 const RawgGameSchema = z.object({
   id: z.number(),
@@ -53,12 +53,12 @@ const toUnifiedGame = (game: RawgGame): UnifiedMedia => ({
   overview: undefined,
 });
 
-export async function searchGames(
+export function searchGames(
   query: string,
   apiKey: string,
   page: number = 1,
-): Promise<{ results: UnifiedMedia[]; totalResults: number }> {
-  const program = Effect.gen(function* () {
+): Effect.Effect<{ results: UnifiedMedia[]; totalResults: number }, Error> {
+  return Effect.gen(function* () {
     const url = buildRawgSearchUrl(query, apiKey, page);
 
     const rawData = yield* fetchJson({
@@ -72,12 +72,10 @@ export async function searchGames(
       totalResults: data.count ?? 0,
     };
   });
-
-  return runServerEffect(program);
 }
 
-export async function getGameDetails(id: string, apiKey: string): Promise<UnifiedMedia> {
-  const program = Effect.gen(function* () {
+export function getGameDetails(id: string, apiKey: string): Effect.Effect<UnifiedMedia, Error> {
+  return Effect.gen(function* () {
     const url = buildRawgDetailsUrl(id, apiKey);
     const item = yield* fetchJson({
       url,
@@ -87,6 +85,4 @@ export async function getGameDetails(id: string, apiKey: string): Promise<Unifie
 
     return toUnifiedGame(data);
   });
-
-  return runServerEffect(program);
 }

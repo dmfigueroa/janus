@@ -1,2 +1,3 @@
 - File and directory names should have meaning and follow SRP. Do not use generic names like `utils`, `server`, `internal` or anything alike.
 - Use either `.server.ts` or `createServerOnlyFn` for code that should only live on the server to avoid leaking backend code and secrets onto the client
+- All backend code should use Effect, the only place where we run the effect code is on the handlers that the routes will consume

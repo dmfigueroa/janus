@@ -1,13 +1,11 @@
-"use server";
-
 import { createServerFn } from "@tanstack/react-start";
 import { Effect } from "effect";
 import { z } from "zod";
-import { searchMultimedia } from "@/routes/_shared/providers/-tmdb";
-import { searchBooks } from "@/routes/_shared/providers/-google-books";
-import { searchGames } from "@/routes/_shared/providers/-rawg";
-import { searchComics } from "@/routes/_shared/providers/-comicvine";
-import { searchAnilist } from "@/routes/_shared/providers/-anilist";
+import { searchMultimedia } from "@/routes/_shared/providers/-tmdb.server";
+import { searchBooks } from "@/routes/_shared/providers/-google-books.server";
+import { searchGames } from "@/routes/_shared/providers/-rawg.server";
+import { searchComics } from "@/routes/_shared/providers/-comicvine.server";
+import { searchAnilist } from "@/routes/_shared/providers/-anilist.server";
 import { type UnifiedMedia } from "@/routes/_shared/-media";
 import { API_PAGE_SIZE } from "@/routes/_shared/-constants";
 import { requireEnvVar, runServerHandler } from "@/routes/_shared/-effect";
@@ -27,24 +25,24 @@ function searchNonTmdbMedia(params: {
 }): Effect.Effect<ProviderSearchResult, Error> {
   const { query, page, type } = params;
 
-  return Effect.gen(function* () {
-    switch (type) {
-      case "book":
-        return yield* Effect.tryPromise(() => searchBooks(query, page));
-      case "game": {
+  switch (type) {
+    case "book":
+      return searchBooks(query, page);
+    case "game":
+      return Effect.gen(function* () {
         const apiKey = yield* requireEnvVar("RAWG_API_KEY");
-        return yield* Effect.tryPromise(() => searchGames(query, apiKey, page));
-      }
-      case "comic": {
+        return yield* searchGames(query, apiKey, page);
+      });
+    case "comic":
+      return Effect.gen(function* () {
         const apiKey = yield* requireEnvVar("COMICVINE_API_KEY");
-        return yield* Effect.tryPromise(() => searchComics(query, apiKey, page));
-      }
-      case "anime":
-        return yield* Effect.tryPromise(() => searchAnilist(query, "ANIME", page));
-      case "manga":
-        return yield* Effect.tryPromise(() => searchAnilist(query, "MANGA", page));
-    }
-  });
+        return yield* searchComics(query, apiKey, page);
+      });
+    case "anime":
+      return searchAnilist(query, "ANIME", page);
+    case "manga":
+      return searchAnilist(query, "MANGA", page);
+  }
 }
 
 export const searchUnified = createServerFn({ method: "GET" })
@@ -55,7 +53,7 @@ export const searchUnified = createServerFn({ method: "GET" })
     return runServerHandler(
       Effect.gen(function* () {
         if (type === "movie" || type === "tv") {
-          return yield* Effect.tryPromise(() => searchMultimedia({ data: { query, page, type } }));
+          return yield* searchMultimedia(query, page, type);
         }
 
         const { results, totalResults } = yield* searchNonTmdbMedia({ query, page, type });

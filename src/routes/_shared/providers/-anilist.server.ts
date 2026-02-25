@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import { z } from "zod";
 import { API_PAGE_SIZE } from "../-constants";
 import { type UnifiedMedia } from "../-media";
-import { fetchJson, parseWithSchema, runServerEffect } from "../-effect";
+import { fetchJson, parseWithSchema } from "../-effect";
 
 const AniListMediaSchema = z.object({
   id: z.number(),
@@ -176,12 +176,12 @@ const toUnifiedAniListDetail = (item: AniListMedia): AniListDetail => ({
   volumes: item.volumes,
 });
 
-export async function searchAnilist(
+export function searchAnilist(
   query: string,
   type: "ANIME" | "MANGA",
   page: number = 1,
-): Promise<{ results: UnifiedMedia[]; totalResults: number }> {
-  const program = fetchAniList(SEARCH_QUERY, {
+): Effect.Effect<{ results: UnifiedMedia[]; totalResults: number }, Error> {
+  return fetchAniList(SEARCH_QUERY, {
     search: query,
     type,
     page,
@@ -195,13 +195,11 @@ export async function searchAnilist(
       totalResults: data.data.Page.pageInfo.total ?? 0,
     })),
   );
-
-  return runServerEffect(program);
 }
 
-export async function getAnilistDetails(id: string): Promise<AniListDetail> {
+export function getAnilistDetails(id: string): Effect.Effect<AniListDetail, Error> {
   const parsedId = Number.parseInt(id, 10);
-  const program = (
+  return (
     Number.isNaN(parsedId)
       ? Effect.fail(new Error(`${ANI_LIST_DETAILS_ERROR}: invalid id '${id}'`))
       : fetchAniList(DETAILS_QUERY, { id: parsedId })
@@ -211,6 +209,4 @@ export async function getAnilistDetails(id: string): Promise<AniListDetail> {
     ),
     Effect.map((data) => toUnifiedAniListDetail(data.data.Media)),
   );
-
-  return runServerEffect(program);
 }

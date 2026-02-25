@@ -6,12 +6,15 @@ import { z } from "zod";
 import pLimit from "p-limit";
 import { watchlistItems, watchlists } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { getTVDetails, getSeasonDetails, getMovieDetails } from "@/routes/_shared/providers/-tmdb";
-import { getComicIssues } from "@/routes/_shared/providers/-comicvine";
-import { getBookDetails } from "@/routes/_shared/providers/-google-books";
-import { getGameDetails } from "@/routes/_shared/providers/-rawg";
-import { getAnilistDetails } from "@/routes/_shared/providers/-anilist";
-import { getDb } from "@/db/server.server";
+import {
+  getTVDetails,
+  getSeasonDetails,
+  getMovieDetails,
+} from "@/routes/_shared/providers/-tmdb.server";
+import { getComicIssues } from "@/routes/_shared/providers/-comicvine.server";
+import { getBookDetails } from "@/routes/_shared/providers/-google-books.server";
+import { getGameDetails } from "@/routes/_shared/providers/-rawg.server";
+import { getAnilistDetails } from "@/routes/_shared/providers/-anilist.server";
 import { requireEnvVar, runServerHandler } from "@/routes/_shared/-effect";
 
 export type { Watchlist, WatchlistItem } from "@/db/schema";
@@ -44,7 +47,17 @@ function isGenericMedia(media: WatchlistMedia): media is GenericMedia {
   return media.mediaType !== "tv";
 }
 
-function addTmdbTvMedia(
+function getDbEffect() {
+  return Effect.tryPromise({
+    try: async () => {
+      const { getDb: resolveDb } = await import("@/db/server.server");
+      return resolveDb();
+    },
+    catch: (error) => new Error(`Failed to get database: ${String(error)}`),
+  });
+}
+
+function addTmdbTvMediaEffect(
   watchlistId: number,
   media: WatchlistMedia,
 ): Effect.Effect<AddToWatchlistResult | null, Error> {
@@ -61,12 +74,10 @@ function addTmdbTvMedia(
     return Effect.succeed(null);
   }
 
-  return Effect.tryPromise(() =>
-    addTVShowToWatchList(watchlistId, Number.parseInt(media.id, 10), media),
-  );
+  return addTVShowToWatchListEffect(watchlistId, Number.parseInt(media.id, 10), media);
 }
 
-function addTmdbMovieMedia(
+function addTmdbMovieMediaEffect(
   watchlistId: number,
   media: WatchlistMedia,
 ): Effect.Effect<AddToWatchlistResult | null, Error> {
@@ -74,10 +85,10 @@ function addTmdbMovieMedia(
     return Effect.succeed(null);
   }
 
-  return Effect.tryPromise(() => addMovieToWatchList(watchlistId, Number.parseInt(media.id, 10)));
+  return addMovieToWatchListEffect(watchlistId, Number.parseInt(media.id, 10));
 }
 
-function addComicMedia(
+function addComicMediaEffect(
   watchlistId: number,
   media: WatchlistMedia,
 ): Effect.Effect<AddToWatchlistResult | null, Error> {
@@ -87,14 +98,11 @@ function addComicMedia(
 
   return Effect.gen(function* () {
     const apiKey = yield* requireEnvVar("COMICVINE_API_KEY");
-    const result = yield* Effect.tryPromise(() =>
-      addComicToWatchList(watchlistId, media.id, media, apiKey),
-    );
-    return result;
+    return yield* addComicToWatchListEffect(watchlistId, media.id, media, apiKey);
   });
 }
 
-function addBookMedia(
+function addBookMediaEffect(
   watchlistId: number,
   media: WatchlistMedia,
 ): Effect.Effect<AddToWatchlistResult | null, Error> {
@@ -103,14 +111,12 @@ function addBookMedia(
   }
 
   return Effect.gen(function* () {
-    const details = yield* Effect.tryPromise(() => getBookDetails(media.id));
-    return yield* Effect.tryPromise(() =>
-      addGenericItemToWatchlist(watchlistId, details as GenericMedia),
-    );
+    const details = yield* getBookDetails(media.id);
+    return yield* addGenericItemToWatchlistEffect(watchlistId, details as GenericMedia);
   });
 }
 
-function addGameMedia(
+function addGameMediaEffect(
   watchlistId: number,
   media: WatchlistMedia,
 ): Effect.Effect<AddToWatchlistResult | null, Error> {
@@ -120,14 +126,12 @@ function addGameMedia(
 
   return Effect.gen(function* () {
     const apiKey = yield* requireEnvVar("RAWG_API_KEY");
-    const details = yield* Effect.tryPromise(() => getGameDetails(media.id, apiKey));
-    return yield* Effect.tryPromise(() =>
-      addGenericItemToWatchlist(watchlistId, details as GenericMedia),
-    );
+    const details = yield* getGameDetails(media.id, apiKey);
+    return yield* addGenericItemToWatchlistEffect(watchlistId, details as GenericMedia);
   });
 }
 
-function addAniListMedia(
+function addAniListMediaEffect(
   watchlistId: number,
   media: WatchlistMedia,
 ): Effect.Effect<AddToWatchlistResult | null, Error> {
@@ -136,11 +140,11 @@ function addAniListMedia(
   }
 
   if (media.mediaType === "anime") {
-    return Effect.tryPromise(() => addAnimeToWatchlist(watchlistId, media.id, media));
+    return addAnimeToWatchlistEffect(watchlistId, media.id, media);
   }
 
   if (media.mediaType === "manga") {
-    return Effect.tryPromise(() => addMangaToWatchlist(watchlistId, media.id, media));
+    return addMangaToWatchlistEffect(watchlistId, media.id, media);
   }
 
   return Effect.succeed(null);
@@ -149,23 +153,36 @@ function addAniListMedia(
 export const toggleWatched = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({ itemId: z.number(), isWatched: z.boolean() }).parse(data))
   .handler(({ data }) => {
-    const program = Effect.tryPromise(async () => {
-      const db = getDb();
-      const [item] = await db
-        .select({ watchlistId: watchlistItems.watchlistId })
-        .from(watchlistItems)
-        .where(eq(watchlistItems.id, data.itemId));
+    const program = Effect.gen(function* () {
+      const db = yield* getDbEffect();
 
-      await db
-        .update(watchlistItems)
-        .set({ isWatched: data.isWatched })
-        .where(eq(watchlistItems.id, data.itemId));
+      const [item] = yield* Effect.tryPromise({
+        try: () =>
+          db
+            .select({ watchlistId: watchlistItems.watchlistId })
+            .from(watchlistItems)
+            .where(eq(watchlistItems.id, data.itemId)),
+        catch: (error) => new Error(`Failed to fetch watchlist item: ${String(error)}`),
+      });
+
+      yield* Effect.tryPromise({
+        try: () =>
+          db
+            .update(watchlistItems)
+            .set({ isWatched: data.isWatched })
+            .where(eq(watchlistItems.id, data.itemId)),
+        catch: (error) => new Error(`Failed to update watchlist item: ${String(error)}`),
+      });
 
       if (item && data.isWatched) {
-        await db
-          .update(watchlists)
-          .set({ lastWatchedAt: sql`CURRENT_TIMESTAMP` })
-          .where(eq(watchlists.id, item.watchlistId));
+        yield* Effect.tryPromise({
+          try: () =>
+            db
+              .update(watchlists)
+              .set({ lastWatchedAt: sql`CURRENT_TIMESTAMP` })
+              .where(eq(watchlists.id, item.watchlistId)),
+          catch: (error) => new Error(`Failed to update watchlist: ${String(error)}`),
+        });
       }
 
       return { success: true };
@@ -180,12 +197,12 @@ export const addToWatchlist = createServerFn({ method: "POST" })
     const { watchlistId, media } = data;
 
     const handlers = [
-      addTmdbTvMedia,
-      addTmdbMovieMedia,
-      addComicMedia,
-      addBookMedia,
-      addGameMedia,
-      addAniListMedia,
+      addTmdbTvMediaEffect,
+      addTmdbMovieMediaEffect,
+      addComicMediaEffect,
+      addBookMediaEffect,
+      addGameMediaEffect,
+      addAniListMediaEffect,
     ] as const;
 
     const program = Effect.gen(function* () {
@@ -202,294 +219,385 @@ export const addToWatchlist = createServerFn({ method: "POST" })
         );
       }
 
-      return yield* Effect.tryPromise(() => addGenericItemToWatchlist(watchlistId, media));
+      return yield* addGenericItemToWatchlistEffect(watchlistId, media);
     });
 
     return runServerHandler(program, "Add to watchlist failed");
   });
 
-const addGenericItemToWatchlist = async (watchlistId: number, media: GenericMedia) => {
-  const db = getDb();
-  const existing = await db
-    .select()
-    .from(watchlistItems)
-    .where(
-      and(
-        eq(watchlistItems.watchlistId, watchlistId),
-        eq(watchlistItems.tmdbId, media.id),
-        eq(watchlistItems.mediaType, media.mediaType),
-      ),
-    )
-    .limit(1);
+function addGenericItemToWatchlistEffect(
+  watchlistId: number,
+  media: GenericMedia,
+): Effect.Effect<AddToWatchlistResult, Error> {
+  return Effect.gen(function* () {
+    const db = yield* getDbEffect();
 
-  if (existing.length > 0) {
-    return { success: true, message: "Already in watchlist" };
-  }
+    const existing = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select()
+          .from(watchlistItems)
+          .where(
+            and(
+              eq(watchlistItems.watchlistId, watchlistId),
+              eq(watchlistItems.tmdbId, media.id),
+              eq(watchlistItems.mediaType, media.mediaType),
+            ),
+          )
+          .limit(1),
+      catch: (error) => new Error(`Failed to check existing item: ${String(error)}`),
+    });
 
-  await db.insert(watchlistItems).values({
-    watchlistId,
-    tmdbId: media.id,
-    source: media.source,
-    mediaType: media.mediaType,
-    title: media.title,
-    posterPath: media.poster,
-    releaseDate: media.releaseDate || media.year,
-    voteAverage: media.rating,
-    runtime: 0,
+    if (existing.length > 0) {
+      return { success: true, message: "Already in watchlist" };
+    }
+
+    yield* Effect.tryPromise({
+      try: () =>
+        db.insert(watchlistItems).values({
+          watchlistId,
+          tmdbId: media.id,
+          source: media.source,
+          mediaType: media.mediaType,
+          title: media.title,
+          posterPath: media.poster,
+          releaseDate: media.releaseDate || media.year || null,
+          voteAverage: media.rating ?? null,
+          runtime: 0,
+        }),
+      catch: (error) => new Error(`Failed to insert watchlist item: ${String(error)}`),
+    });
+
+    yield* Effect.tryPromise({
+      try: () =>
+        db
+          .update(watchlists)
+          .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
+          .where(eq(watchlists.id, watchlistId)),
+      catch: (error) => new Error(`Failed to update watchlist: ${String(error)}`),
+    });
+
+    return { success: true, message: "Added to watchlist" };
   });
+}
 
-  await db
-    .update(watchlists)
-    .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
-    .where(eq(watchlists.id, watchlistId));
+function addMovieToWatchListEffect(
+  watchlistId: number,
+  tmdbId: number,
+): Effect.Effect<AddToWatchlistResult, Error> {
+  return Effect.gen(function* () {
+    const db = yield* getDbEffect();
 
-  return { success: true, message: "Added to watchlist" };
-};
+    const existing = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select()
+          .from(watchlistItems)
+          .where(
+            and(
+              eq(watchlistItems.watchlistId, watchlistId),
+              eq(watchlistItems.tmdbId, tmdbId.toString()),
+              eq(watchlistItems.mediaType, "movie"),
+            ),
+          )
+          .limit(1),
+      catch: (error) => new Error(`Failed to check existing movie: ${String(error)}`),
+    });
 
-const addMovieToWatchList = async (watchlistId: number, tmdbId: number) => {
-  const db = getDb();
-  const existing = await db
-    .select()
-    .from(watchlistItems)
-    .where(
-      and(
-        eq(watchlistItems.watchlistId, watchlistId),
-        eq(watchlistItems.tmdbId, tmdbId.toString()),
-        eq(watchlistItems.mediaType, "movie"),
-      ),
-    )
-    .limit(1);
+    if (existing.length > 0) {
+      return { success: true, message: "Already in watchlist" };
+    }
 
-  if (existing.length > 0) {
-    return { success: true, message: "Already in watchlist" };
-  }
+    const details = yield* getMovieDetails(tmdbId);
 
-  const details = await getMovieDetails({ data: { id: tmdbId } });
+    yield* Effect.tryPromise({
+      try: () =>
+        db.insert(watchlistItems).values({
+          watchlistId,
+          tmdbId: tmdbId.toString(),
+          source: "tmdb",
+          mediaType: "movie",
+          title:
+            (details as { title?: string; name?: string }).title ||
+            (details as { title?: string; name?: string }).name ||
+            "Unknown",
+          posterPath: (details as { poster_path: string | null }).poster_path,
+          releaseDate: (details as { release_date?: string }).release_date ?? null,
+          voteAverage: (details as { vote_average?: number }).vote_average ?? null,
+          runtime: (details as { runtime?: number }).runtime ?? 0,
+        }),
+      catch: (error) => new Error(`Failed to insert movie: ${String(error)}`),
+    });
 
-  await db.insert(watchlistItems).values({
-    watchlistId,
-    tmdbId: tmdbId.toString(),
-    source: "tmdb",
-    mediaType: "movie",
-    title: details.title || details.name || "Unknown",
-    posterPath: details.poster_path,
-    releaseDate: details.release_date,
-    voteAverage: details.vote_average,
-    runtime: details.runtime || 0,
+    yield* Effect.tryPromise({
+      try: () =>
+        db
+          .update(watchlists)
+          .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
+          .where(eq(watchlists.id, watchlistId)),
+      catch: (error) => new Error(`Failed to update watchlist: ${String(error)}`),
+    });
+
+    return { success: true, message: "Added to watchlist" };
   });
+}
 
-  await db
-    .update(watchlists)
-    .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
-    .where(eq(watchlists.id, watchlistId));
-
-  return { success: true, message: "Added to watchlist" };
-};
-
-const addTVShowToWatchList = async (
+function addTVShowToWatchListEffect(
   watchlistId: number,
   tmdbId: number,
   media: z.infer<typeof addToWatchlistSchema>["media"],
-) => {
-  const db = getDb();
-  const showDetails = await getTVDetails({ data: { id: tmdbId } });
-  const seasons = showDetails.seasons || [];
+): Effect.Effect<AddToWatchlistResult, Error> {
+  return Effect.gen(function* () {
+    const db = yield* getDbEffect();
+    const showDetails = yield* getTVDetails(tmdbId);
+    const seasons = (showDetails as { seasons?: Array<{ season_number: number }> }).seasons || [];
 
-  const allEpisodes = await Promise.all(
-    seasons
-      .filter((s: any) => s.season_number !== 0)
-      .map((season: any) =>
-        limit(() =>
-          getSeasonDetails({ data: { id: tmdbId, seasonNumber: season.season_number } }).then(
-            (seasonDetails) => seasonDetails.episodes,
-          ),
-        ),
-      ),
-  ).then((seasonDetails) =>
-    seasonDetails.flat().map((ep: any) => ({
+    const allEpisodes = yield* Effect.tryPromise({
+      try: async () => {
+        return await Promise.all(
+          seasons
+            .filter((s) => s.season_number !== 0)
+            .map((season) =>
+              limit(() =>
+                Effect.runPromise(getSeasonDetails(tmdbId, season.season_number)).then(
+                  (seasonDetails) => (seasonDetails as { episodes: unknown[] }).episodes,
+                ),
+              ),
+            ),
+        );
+      },
+      catch: (error) => new Error(`Failed to fetch TV show seasons: ${String(error)}`),
+    });
+
+    const episodes = allEpisodes.flat().map((ep: unknown) => ({
       watchlistId,
-      tmdbId: ep.id.toString(),
-      source: "tmdb",
+      tmdbId: (ep as { id: number }).id.toString(),
+      source: "tmdb" as const,
       mediaType: "episode" as const,
-      title: ep.name,
+      title: (ep as { name: string }).name,
       parentTitle: media.title,
-      season: ep.season_number,
-      episode: ep.episode_number.toString(),
-      posterPath: ep.still_path || showDetails.poster_path,
-      releaseDate: ep.air_date,
-      voteAverage: ep.vote_average,
-      runtime: ep.runtime || 0,
-    })),
-  );
+      season: (ep as { season_number: number }).season_number,
+      episode: (ep as { episode_number: number }).episode_number.toString(),
+      posterPath:
+        (ep as { still_path?: string }).still_path ||
+        (showDetails as { poster_path?: string }).poster_path ||
+        null,
+      releaseDate: (ep as { air_date?: string }).air_date ?? null,
+      voteAverage: (ep as { vote_average?: number }).vote_average ?? null,
+      runtime: (ep as { runtime?: number }).runtime ?? 0,
+    }));
 
-  if (allEpisodes.length > 0) {
-    for (let i = 0; i < allEpisodes.length; i += DB_INSERT_CHUNK_SIZE) {
-      const chunk = allEpisodes.slice(i, i + DB_INSERT_CHUNK_SIZE);
-      await db.insert(watchlistItems).values(chunk).onConflictDoNothing();
+    if (episodes.length > 0) {
+      for (let i = 0; i < episodes.length; i += DB_INSERT_CHUNK_SIZE) {
+        const chunk = episodes.slice(i, i + DB_INSERT_CHUNK_SIZE);
+        yield* Effect.tryPromise({
+          try: () => db.insert(watchlistItems).values(chunk).onConflictDoNothing(),
+          catch: (error) => new Error(`Failed to insert episodes: ${String(error)}`),
+        });
+      }
     }
-  }
 
-  if (allEpisodes.length > 0) {
-    await db
-      .update(watchlists)
-      .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
-      .where(eq(watchlists.id, watchlistId));
-  }
+    if (episodes.length > 0) {
+      yield* Effect.tryPromise({
+        try: () =>
+          db
+            .update(watchlists)
+            .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
+            .where(eq(watchlists.id, watchlistId)),
+        catch: (error) => new Error(`Failed to update watchlist: ${String(error)}`),
+      });
+    }
 
-  return { success: true, message: `Added ${allEpisodes.length} episodes to watchlist` };
-};
+    return { success: true, message: `Added ${episodes.length} episodes to watchlist` };
+  });
+}
 
-const addComicToWatchList = async (
+function addComicToWatchListEffect(
   watchlistId: number,
   volumeId: string,
   media: z.infer<typeof addToWatchlistSchema>["media"],
   apiKey: string,
-) => {
-  const db = getDb();
-  const existingComicRows = await db
-    .select({ tmdbId: watchlistItems.tmdbId })
-    .from(watchlistItems)
-    .where(
-      and(
-        eq(watchlistItems.watchlistId, watchlistId),
-        eq(watchlistItems.mediaType, "comic"),
-        eq(watchlistItems.source, "comicvine"),
-      ),
-    );
+): Effect.Effect<AddToWatchlistResult, Error> {
+  return Effect.gen(function* () {
+    const db = yield* getDbEffect();
 
-  const existingIssueIds = new Set(existingComicRows.map((row) => row.tmdbId));
-  const issues = await getComicIssues(volumeId, apiKey, { knownIssueIds: existingIssueIds });
+    const existingComicRows = yield* Effect.tryPromise({
+      try: () =>
+        db
+          .select({ tmdbId: watchlistItems.tmdbId })
+          .from(watchlistItems)
+          .where(
+            and(
+              eq(watchlistItems.watchlistId, watchlistId),
+              eq(watchlistItems.mediaType, "comic"),
+              eq(watchlistItems.source, "comicvine"),
+            ),
+          ),
+      catch: (error) => new Error(`Failed to check existing comics: ${String(error)}`),
+    });
 
-  if (issues.length === 0) {
-    return {
-      success: true,
-      message:
-        existingIssueIds.size > 0
-          ? "No new issues found for this volume"
-          : "No issues found for this volume",
-    };
-  }
+    const existingIssueIds = new Set(existingComicRows.map((row) => row.tmdbId));
+    const issues = yield* getComicIssues(volumeId, apiKey, { knownIssueIds: existingIssueIds });
 
-  const watchlistItemsData = issues.map((issue) => ({
-    watchlistId,
-    tmdbId: issue.id,
-    source: "comicvine",
-    mediaType: "comic" as const,
-    title: issue.title,
-    parentTitle: media.title,
-    season: null,
-    episode: issue.issueNumber,
-    posterPath: issue.poster,
-    releaseDate: issue.coverDate,
-    voteAverage: 0,
-    runtime: 0,
-  }));
-
-  for (let i = 0; i < watchlistItemsData.length; i += DB_INSERT_CHUNK_SIZE) {
-    const chunk = watchlistItemsData.slice(i, i + DB_INSERT_CHUNK_SIZE);
-    await db.insert(watchlistItems).values(chunk).onConflictDoNothing();
-  }
-
-  await db
-    .update(watchlists)
-    .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
-    .where(eq(watchlists.id, watchlistId));
-
-  const newIssueCount = watchlistItemsData.length;
-  const message =
-    existingIssueIds.size > 0
-      ? `Added ${newIssueCount} new issues to watchlist`
-      : `Added ${newIssueCount} issues to watchlist`;
-
-  return { success: true, message };
-};
-
-const addAnimeToWatchlist = async (
-  watchlistId: number,
-  aniListId: string,
-  media: z.infer<typeof addToWatchlistSchema>["media"],
-) => {
-  const db = getDb();
-  const details = await getAnilistDetails(aniListId);
-
-  if (details.episodes && details.episodes > 0) {
-    const episodesCount = details.episodes;
-    const allEpisodes = Array.from({ length: episodesCount }, (_, i) => ({
-      watchlistId,
-      tmdbId: `${aniListId}-ep${i + 1}`,
-      source: "anilist" as const,
-      mediaType: "episode" as const,
-      title: `Episode ${i + 1}`,
-      parentTitle: media.title,
-      season: 1,
-      episode: (i + 1).toString(),
-      posterPath: details.poster,
-      releaseDate: details.releaseDate,
-      voteAverage: details.rating || 0,
-      runtime: 0,
-    }));
-
-    for (let i = 0; i < allEpisodes.length; i += DB_INSERT_CHUNK_SIZE) {
-      const chunk = allEpisodes.slice(i, i + DB_INSERT_CHUNK_SIZE);
-      await db.insert(watchlistItems).values(chunk).onConflictDoNothing();
+    if (issues.length === 0) {
+      return {
+        success: true,
+        message:
+          existingIssueIds.size > 0
+            ? "No new issues found for this volume"
+            : "No issues found for this volume",
+      };
     }
 
-    await db
-      .update(watchlists)
-      .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
-      .where(eq(watchlists.id, watchlistId));
-
-    return { success: true, message: `Added ${allEpisodes.length} episodes to watchlist` };
-  }
-
-  return await addGenericItemToWatchlist(watchlistId, {
-    ...details,
-    mediaType: "anime",
-  } as unknown as GenericMedia);
-};
-
-const addMangaToWatchlist = async (
-  watchlistId: number,
-  aniListId: string,
-  media: z.infer<typeof addToWatchlistSchema>["media"],
-) => {
-  const db = getDb();
-  const details = await getAnilistDetails(aniListId);
-
-  const count = details.volumes || details.chapters || 0;
-  const label = details.volumes ? "Volume" : "Chapter";
-
-  if (count > 0) {
-    const items = Array.from({ length: count }, (_, i) => ({
+    const watchlistItemsData = issues.map((issue) => ({
       watchlistId,
-      tmdbId: `${aniListId}-${label.toLowerCase()}${i + 1}`,
-      source: "anilist" as const,
-      mediaType: "manga" as const,
-      title: `${label} ${i + 1}`,
+      tmdbId: issue.id,
+      source: "comicvine" as const,
+      mediaType: "comic" as const,
+      title: issue.title,
       parentTitle: media.title,
       season: null,
-      episode: (i + 1).toString(),
-      posterPath: details.poster,
-      releaseDate: details.releaseDate,
-      voteAverage: details.rating || 0,
+      episode: issue.issueNumber,
+      posterPath: issue.poster,
+      releaseDate: issue.coverDate,
+      voteAverage: 0,
       runtime: 0,
     }));
 
-    for (let i = 0; i < items.length; i += DB_INSERT_CHUNK_SIZE) {
-      const chunk = items.slice(i, i + DB_INSERT_CHUNK_SIZE);
-      await db.insert(watchlistItems).values(chunk).onConflictDoNothing();
+    for (let i = 0; i < watchlistItemsData.length; i += DB_INSERT_CHUNK_SIZE) {
+      const chunk = watchlistItemsData.slice(i, i + DB_INSERT_CHUNK_SIZE);
+      yield* Effect.tryPromise({
+        try: () => db.insert(watchlistItems).values(chunk).onConflictDoNothing(),
+        catch: (error) => new Error(`Failed to insert comic issues: ${String(error)}`),
+      });
     }
 
-    await db
-      .update(watchlists)
-      .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
-      .where(eq(watchlists.id, watchlistId));
+    yield* Effect.tryPromise({
+      try: () =>
+        db
+          .update(watchlists)
+          .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
+          .where(eq(watchlists.id, watchlistId)),
+      catch: (error) => new Error(`Failed to update watchlist: ${String(error)}`),
+    });
 
-    return { success: true, message: `Added ${items.length} ${label.toLowerCase()}s to watchlist` };
-  }
+    const newIssueCount = watchlistItemsData.length;
+    const message =
+      existingIssueIds.size > 0
+        ? `Added ${newIssueCount} new issues to watchlist`
+        : `Added ${newIssueCount} issues to watchlist`;
 
-  return await addGenericItemToWatchlist(watchlistId, {
-    ...details,
-    mediaType: "manga",
-  } as unknown as GenericMedia);
-};
+    return { success: true, message };
+  });
+}
+
+function addAnimeToWatchlistEffect(
+  watchlistId: number,
+  aniListId: string,
+  media: z.infer<typeof addToWatchlistSchema>["media"],
+): Effect.Effect<AddToWatchlistResult, Error> {
+  return Effect.gen(function* () {
+    const db = yield* getDbEffect();
+    const details = yield* getAnilistDetails(aniListId);
+
+    if (details.episodes && details.episodes > 0) {
+      const episodesCount = details.episodes;
+      const allEpisodes = Array.from({ length: episodesCount }, (_, i) => ({
+        watchlistId,
+        tmdbId: `${aniListId}-ep${i + 1}`,
+        source: "anilist" as const,
+        mediaType: "episode" as const,
+        title: `Episode ${i + 1}`,
+        parentTitle: media.title,
+        season: 1,
+        episode: (i + 1).toString(),
+        posterPath: details.poster,
+        releaseDate: details.releaseDate ?? null,
+        voteAverage: details.rating ?? 0,
+        runtime: 0,
+      }));
+
+      for (let i = 0; i < allEpisodes.length; i += DB_INSERT_CHUNK_SIZE) {
+        const chunk = allEpisodes.slice(i, i + DB_INSERT_CHUNK_SIZE);
+        yield* Effect.tryPromise({
+          try: () => db.insert(watchlistItems).values(chunk).onConflictDoNothing(),
+          catch: (error) => new Error(`Failed to insert anime episodes: ${String(error)}`),
+        });
+      }
+
+      yield* Effect.tryPromise({
+        try: () =>
+          db
+            .update(watchlists)
+            .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
+            .where(eq(watchlists.id, watchlistId)),
+        catch: (error) => new Error(`Failed to update watchlist: ${String(error)}`),
+      });
+
+      return { success: true, message: `Added ${allEpisodes.length} episodes to watchlist` };
+    }
+
+    return yield* addGenericItemToWatchlistEffect(watchlistId, {
+      ...details,
+      mediaType: "anime",
+    } as unknown as GenericMedia);
+  });
+}
+
+function addMangaToWatchlistEffect(
+  watchlistId: number,
+  aniListId: string,
+  media: z.infer<typeof addToWatchlistSchema>["media"],
+): Effect.Effect<AddToWatchlistResult, Error> {
+  return Effect.gen(function* () {
+    const db = yield* getDbEffect();
+    const details = yield* getAnilistDetails(aniListId);
+
+    const count = details.volumes || details.chapters || 0;
+    const label = details.volumes ? "Volume" : "Chapter";
+
+    if (count > 0) {
+      const items = Array.from({ length: count }, (_, i) => ({
+        watchlistId,
+        tmdbId: `${aniListId}-${label.toLowerCase()}${i + 1}`,
+        source: "anilist" as const,
+        mediaType: "manga" as const,
+        title: `${label} ${i + 1}`,
+        parentTitle: media.title,
+        season: null,
+        episode: (i + 1).toString(),
+        posterPath: details.poster,
+        releaseDate: details.releaseDate ?? null,
+        voteAverage: details.rating ?? 0,
+        runtime: 0,
+      }));
+
+      for (let i = 0; i < items.length; i += DB_INSERT_CHUNK_SIZE) {
+        const chunk = items.slice(i, i + DB_INSERT_CHUNK_SIZE);
+        yield* Effect.tryPromise({
+          try: () => db.insert(watchlistItems).values(chunk).onConflictDoNothing(),
+          catch: (error) => new Error(`Failed to insert manga items: ${String(error)}`),
+        });
+      }
+
+      yield* Effect.tryPromise({
+        try: () =>
+          db
+            .update(watchlists)
+            .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
+            .where(eq(watchlists.id, watchlistId)),
+        catch: (error) => new Error(`Failed to update watchlist: ${String(error)}`),
+      });
+
+      return {
+        success: true,
+        message: `Added ${items.length} ${label.toLowerCase()}s to watchlist`,
+      };
+    }
+
+    return yield* addGenericItemToWatchlistEffect(watchlistId, {
+      ...details,
+      mediaType: "manga",
+    } as unknown as GenericMedia);
+  });
+}
