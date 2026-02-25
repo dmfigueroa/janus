@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { Effect } from "effect";
+import { z } from "zod";
 import { API_PAGE_SIZE } from "../-constants";
 import { type UnifiedMedia } from "../-media";
 import { fetchJson, parseWithSchema, requireEnvVar, runServerEffect } from "../-effect";
@@ -20,20 +20,53 @@ const GoogleBooksResponseSchema = z.object({
   totalItems: z.number().optional(),
 });
 
-const toUnifiedBook = (item: z.infer<typeof GoogleBookItemSchema>): UnifiedMedia => ({
+const GOOGLE_BOOKS_BASE_URL = "https://www.googleapis.com/books/v1/volumes";
+const GOOGLE_BOOKS_API_ERROR = "Google Books API Error";
+const GOOGLE_BOOKS_DETAILS_ERROR = "Google Books Details Error";
+
+type GoogleBookItem = z.infer<typeof GoogleBookItemSchema>;
+
+function normalizeBookThumbnail(thumbnail?: string): string | null {
+  if (!thumbnail) {
+    return null;
+  }
+
+  return thumbnail
+    .replace("http:", "https:")
+    .replace("&zoom=1", "&zoom=0")
+    .replace("&edge=curl", "");
+}
+
+function buildGoogleBooksSearchUrl(query: string, page: number, apiKey: string): URL {
+  const maxResults = API_PAGE_SIZE;
+  const startIndex = (page - 1) * maxResults;
+  const url = new URL(GOOGLE_BOOKS_BASE_URL);
+  url.search = new URLSearchParams({
+    q: query,
+    startIndex: startIndex.toString(),
+    maxResults: maxResults.toString(),
+    key: apiKey,
+  }).toString();
+  return url;
+}
+
+function buildGoogleBooksDetailsUrl(id: string, apiKey: string): URL {
+  const encodedId = encodeURIComponent(id);
+  const url = new URL(`${GOOGLE_BOOKS_BASE_URL}/${encodedId}`);
+  url.search = new URLSearchParams({ key: apiKey }).toString();
+  return url;
+}
+
+const toUnifiedBook = (item: GoogleBookItem): UnifiedMedia => ({
   id: item.id,
   mediaType: "book",
   source: "google_books",
-  title: item.volumeInfo.title || "Unknown Title",
-  poster:
-    item.volumeInfo.imageLinks?.thumbnail
-      ?.replace("http:", "https:")
-      .replace("&zoom=1", "&zoom=0")
-      .replace("&edge=curl", "") || null,
+  title: item.volumeInfo.title ?? "Unknown Title",
+  poster: normalizeBookThumbnail(item.volumeInfo.imageLinks?.thumbnail),
   year: item.volumeInfo.publishedDate?.split("-")[0],
   releaseDate: item.volumeInfo.publishedDate,
-  rating: item.volumeInfo.averageRating ? item.volumeInfo.averageRating * 2 : undefined,
-  overview: item.volumeInfo.description,
+  rating: item.volumeInfo.averageRating != null ? item.volumeInfo.averageRating * 2 : undefined,
+  overview: item.volumeInfo.description ?? undefined,
 });
 
 export async function searchBooks(
@@ -42,49 +75,33 @@ export async function searchBooks(
 ): Promise<{ results: UnifiedMedia[]; totalResults: number }> {
   const program = Effect.gen(function* () {
     const apiKey = yield* requireEnvVar("GOOGLE_BOOKS_API_KEY");
-    const maxResults = API_PAGE_SIZE;
-    const startIndex = (page - 1) * maxResults;
-    const url = new URL("https://www.googleapis.com/books/v1/volumes");
-    url.search = new URLSearchParams({
-      q: query,
-      startIndex: startIndex.toString(),
-      maxResults: maxResults.toString(),
-      key: apiKey,
-    }).toString();
+    const url = buildGoogleBooksSearchUrl(query, page, apiKey);
 
     const rawData = yield* fetchJson({
       url,
-      context: "Google Books API Error",
+      context: GOOGLE_BOOKS_API_ERROR,
     }).pipe(Effect.catchAll(() => Effect.succeed({ items: [], totalItems: 0 })));
-    const data = yield* parseWithSchema(
-      GoogleBooksResponseSchema,
-      rawData,
-      "Google Books API Error",
-    );
+    const data = yield* parseWithSchema(GoogleBooksResponseSchema, rawData, GOOGLE_BOOKS_API_ERROR);
 
     return {
-      results: (data.items || []).map(toUnifiedBook),
-      totalResults: data.totalItems || 0,
+      results: (data.items ?? []).map(toUnifiedBook),
+      totalResults: data.totalItems ?? 0,
     };
   });
 
   return runServerEffect(program);
 }
 
-export async function getBookDetails(id: string) {
+export async function getBookDetails(id: string): Promise<UnifiedMedia> {
   const program = Effect.gen(function* () {
     const apiKey = yield* requireEnvVar("GOOGLE_BOOKS_API_KEY");
-    const encodedId = encodeURIComponent(id);
-    const url = new URL(`https://www.googleapis.com/books/v1/volumes/${encodedId}`);
-    url.search = new URLSearchParams({
-      key: apiKey,
-    }).toString();
+    const url = buildGoogleBooksDetailsUrl(id, apiKey);
 
     const item = yield* fetchJson({
       url,
-      context: "Google Books Details Error",
+      context: GOOGLE_BOOKS_DETAILS_ERROR,
     });
-    const data = yield* parseWithSchema(GoogleBookItemSchema, item, "Google Books Details Error");
+    const data = yield* parseWithSchema(GoogleBookItemSchema, item, GOOGLE_BOOKS_DETAILS_ERROR);
 
     return toUnifiedBook(data);
   });

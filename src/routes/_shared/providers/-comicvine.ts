@@ -1,6 +1,6 @@
-import { z } from "zod";
-import pLimit from "p-limit";
 import { Effect } from "effect";
+import pLimit from "p-limit";
+import { z } from "zod";
 import { API_PAGE_SIZE } from "../-constants";
 import { type UnifiedMedia } from "../-media";
 import { fetchJson, parseWithSchema, runServerEffect } from "../-effect";
@@ -59,12 +59,16 @@ const ComicIssueResponseSchema = z.object({
 });
 
 const COMICVINE_ISSUES_URL = "https://comicvine.gamespot.com/api/issues/";
+const COMICVINE_SEARCH_URL = "https://comicvine.gamespot.com/api/search/";
 const COMICVINE_ISSUE_FIELDS = "id,name,issue_number,image,cover_date,description,deck";
 const COMICVINE_ISSUE_PAGE_LIMIT = 100;
 const COMICVINE_MAX_CONCURRENCY = 5;
 const COMICVINE_DEFAULT_CONCURRENCY = 3;
 const COMICVINE_RETRIES = 2;
 const COMICVINE_RETRY_BASE_DELAY_MS = 250;
+const COMICVINE_API_ERROR = "ComicVine API Error";
+const COMICVINE_ISSUES_API_ERROR = "ComicVine Issues API Error";
+const COMICVINE_ISSUES_SEARCH_ERROR = "ComicVine Issues API Search Error";
 
 type ComicIssueSortDirection = "asc" | "desc";
 type ComicIssueItem = z.infer<typeof ComicIssueItemSchema>;
@@ -115,16 +119,18 @@ async function fetchIssuePage(
           "User-Agent": "JanusApp/1.0",
         },
       },
-      context: "ComicVine Issues API Error",
+      context: COMICVINE_ISSUES_API_ERROR,
     });
     const data = yield* parseWithSchema(
       ComicIssueResponseSchema,
       rawData,
-      "ComicVine Issues API Error",
+      COMICVINE_ISSUES_API_ERROR,
     );
 
     if (data.error !== "OK") {
-      return yield* Effect.fail(new Error(`ComicVine Issues API Error: Response: ${data.error}`));
+      return yield* Effect.fail(
+        new Error(`${COMICVINE_ISSUES_API_ERROR}: Response: ${data.error}`),
+      );
     }
 
     return data;
@@ -160,10 +166,10 @@ function mapIssueToComicIssue(issue: ComicIssueItem): ComicIssue {
     mediaType: "comic",
     source: "comicvine",
     title: issue.name || `Issue #${issue.issue_number}`,
-    poster: issue.image?.medium_url || issue.image?.small_url || null,
-    coverDate: issue.cover_date || null,
-    issueNumber: issue.issue_number || null,
-    description: issue.description || issue.deck || null,
+    poster: issue.image?.medium_url ?? issue.image?.small_url ?? null,
+    coverDate: issue.cover_date ?? null,
+    issueNumber: issue.issue_number ?? null,
+    description: issue.description ?? issue.deck ?? null,
   };
 }
 
@@ -173,10 +179,10 @@ function mapVolumeToUnifiedMedia(item: ComicVineVolume): UnifiedMedia {
     mediaType: "comic",
     source: "comicvine",
     title: item.name || "Unknown Title",
-    poster: item.image?.medium_url || item.image?.small_url || null,
-    year: item.start_year || undefined,
+    poster: item.image?.medium_url ?? item.image?.small_url ?? null,
+    year: item.start_year ?? undefined,
     rating: undefined,
-    overview: item.deck || item.description || undefined,
+    overview: item.deck ?? item.description ?? undefined,
   };
 }
 
@@ -266,12 +272,12 @@ export async function searchComics(
 ): Promise<{ results: UnifiedMedia[]; totalResults: number }> {
   const program = Effect.gen(function* () {
     const limit = API_PAGE_SIZE;
-    const url = new URL("https://comicvine.gamespot.com/api/search/");
+    const url = new URL(COMICVINE_SEARCH_URL);
     url.search = new URLSearchParams({
       api_key: apiKey,
       format: "json",
       resources: "volume",
-      query: query,
+      query,
       page: page.toString(),
       limit: limit.toString(),
     }).toString();
@@ -283,15 +289,15 @@ export async function searchComics(
           "User-Agent": "JanusApp/1.0",
         },
       },
-      context: "ComicVine API Error",
+      context: COMICVINE_API_ERROR,
     }).pipe(Effect.catchAll(() => Effect.succeed({ results: [], number_of_total_results: 0 })));
-    const data = yield* parseWithSchema(ComicVineResponseSchema, rawData, "ComicVine API Error");
+    const data = yield* parseWithSchema(ComicVineResponseSchema, rawData, COMICVINE_API_ERROR);
 
-    const results = (data.results || []).map(mapVolumeToUnifiedMedia);
+    const results = (data.results ?? []).map(mapVolumeToUnifiedMedia);
 
     return {
       results,
-      totalResults: data.number_of_total_results || 0,
+      totalResults: data.number_of_total_results ?? 0,
     };
   });
 
@@ -316,7 +322,7 @@ export async function getComicIssues(
 
       return issues.map(mapIssueToComicIssue);
     },
-    catch: (error: unknown) => new Error(`ComicVine Issues API Search Error: ${String(error)}`),
+    catch: (error: unknown) => new Error(`${COMICVINE_ISSUES_SEARCH_ERROR}: ${String(error)}`),
   });
 
   return runServerEffect(program);

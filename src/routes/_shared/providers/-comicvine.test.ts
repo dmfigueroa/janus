@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getComicIssues } from "./-comicvine";
+import { getComicIssues, searchComics } from "./-comicvine";
 
 vi.stubGlobal("fetch", vi.fn());
 
@@ -118,5 +118,45 @@ describe("getComicIssues", () => {
 
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(issues.map((issue) => issue.id)).toEqual(["10"]);
+  });
+});
+
+describe("searchComics", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("maps ComicVine search results to unified media", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        results: [
+          {
+            id: 123,
+            name: "Saga",
+            image: { medium_url: "https://img/saga.jpg" },
+            start_year: "2012",
+            deck: "Space fantasy",
+          },
+        ],
+        number_of_total_results: 1,
+      }),
+    } as Response);
+
+    const result = await searchComics("Saga", "api-key", 1);
+
+    expect(result.totalResults).toBe(1);
+    expect(result.results).toEqual([
+      {
+        id: "123",
+        mediaType: "comic",
+        source: "comicvine",
+        title: "Saga",
+        poster: "https://img/saga.jpg",
+        year: "2012",
+        rating: undefined,
+        overview: "Space fantasy",
+      },
+    ]);
   });
 });

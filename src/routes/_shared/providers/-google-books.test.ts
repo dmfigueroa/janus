@@ -53,4 +53,21 @@ describe("google-books getBookDetails", () => {
       "https://www.googleapis.com/books/v1/volumes/..%2Fvolumes%2Fother-endpoint?key=test-api-key",
     );
   });
+
+  it("keeps zero average rating as zero", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: "book-1",
+        volumeInfo: {
+          title: "Unrated Book",
+          averageRating: 0,
+        },
+      }),
+    } as Response);
+
+    const result = await getBookDetails("book-1");
+
+    expect(result.rating).toBe(0);
+  });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { searchAnilistInternal, getAnilistDetailsInternal } from "./-anilist";
+import { searchAnilist, getAnilistDetails } from "./-anilist";
 
 vi.stubGlobal("fetch", vi.fn());
 
@@ -32,7 +32,7 @@ describe("anilist integration", () => {
       }),
     } as Response);
 
-    const result = await searchAnilistInternal("Cowboy Bebop", "ANIME", 1);
+    const result = await searchAnilist("Cowboy Bebop", "ANIME", 1);
 
     expect(result.results[0].title).toBe("Cowboy Bebop");
     expect(result.results[0].mediaType).toBe("anime");
@@ -65,7 +65,7 @@ describe("anilist integration", () => {
       }),
     } as Response);
 
-    const result = await getAnilistDetailsInternal("1");
+    const result = await getAnilistDetails("1");
 
     expect(result.title).toBe("Cowboy Bebop");
     expect(result.episodes).toBe(26);

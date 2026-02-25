@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { Effect } from "effect";
+import { z } from "zod";
 import { API_PAGE_SIZE } from "../-constants";
 import { type UnifiedMedia } from "../-media";
 import { fetchJson, parseWithSchema, runServerEffect } from "../-effect";
@@ -17,15 +17,39 @@ const RawgResponseSchema = z.object({
   count: z.number().optional(),
 });
 
-const toUnifiedGame = (game: z.infer<typeof RawgGameSchema>): UnifiedMedia => ({
+const RAWG_GAMES_URL = "https://api.rawg.io/api/games";
+const RAWG_API_ERROR = "RAWG API Error";
+const RAWG_DETAILS_ERROR = "RAWG Details Error";
+
+type RawgGame = z.infer<typeof RawgGameSchema>;
+
+function buildRawgSearchUrl(query: string, apiKey: string, page: number): URL {
+  const url = new URL(RAWG_GAMES_URL);
+  url.search = new URLSearchParams({
+    key: apiKey,
+    search: query,
+    page: page.toString(),
+    page_size: API_PAGE_SIZE.toString(),
+  }).toString();
+  return url;
+}
+
+function buildRawgDetailsUrl(id: string, apiKey: string): URL {
+  const encodedId = encodeURIComponent(id);
+  const url = new URL(`${RAWG_GAMES_URL}/${encodedId}`);
+  url.search = new URLSearchParams({ key: apiKey }).toString();
+  return url;
+}
+
+const toUnifiedGame = (game: RawgGame): UnifiedMedia => ({
   id: game.id.toString(),
   mediaType: "game",
   source: "rawg",
   title: game.name,
-  poster: game.background_image || null,
+  poster: game.background_image ?? null,
   year: game.released?.split("-")[0],
-  releaseDate: game.released || undefined,
-  rating: game.rating ? game.rating * 2 : undefined,
+  releaseDate: game.released ?? undefined,
+  rating: game.rating != null ? game.rating * 2 : undefined,
   overview: undefined,
 });
 
@@ -35,38 +59,31 @@ export async function searchGames(
   page: number = 1,
 ): Promise<{ results: UnifiedMedia[]; totalResults: number }> {
   const program = Effect.gen(function* () {
-    const pageSize = API_PAGE_SIZE;
-    const url = new URL("https://api.rawg.io/api/games");
-    url.search = new URLSearchParams({
-      key: apiKey,
-      search: query,
-      page: page.toString(),
-      page_size: pageSize.toString(),
-    }).toString();
+    const url = buildRawgSearchUrl(query, apiKey, page);
 
     const rawData = yield* fetchJson({
       url,
-      context: "RAWG API Error",
+      context: RAWG_API_ERROR,
     }).pipe(Effect.catchAll(() => Effect.succeed({ results: [], count: 0 })));
-    const data = yield* parseWithSchema(RawgResponseSchema, rawData, "RAWG API Error");
+    const data = yield* parseWithSchema(RawgResponseSchema, rawData, RAWG_API_ERROR);
 
     return {
-      results: (data.results || []).map(toUnifiedGame),
-      totalResults: data.count || 0,
+      results: (data.results ?? []).map(toUnifiedGame),
+      totalResults: data.count ?? 0,
     };
   });
 
   return runServerEffect(program);
 }
 
-export async function getGameDetails(id: string, apiKey: string) {
+export async function getGameDetails(id: string, apiKey: string): Promise<UnifiedMedia> {
   const program = Effect.gen(function* () {
-    const url = `https://api.rawg.io/api/games/${id}?key=${apiKey}`;
+    const url = buildRawgDetailsUrl(id, apiKey);
     const item = yield* fetchJson({
       url,
-      context: "RAWG Details Error",
+      context: RAWG_DETAILS_ERROR,
     });
-    const data = yield* parseWithSchema(RawgGameSchema, item, "RAWG Details Error");
+    const data = yield* parseWithSchema(RawgGameSchema, item, RAWG_DETAILS_ERROR);
 
     return toUnifiedGame(data);
   });

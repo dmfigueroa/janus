@@ -4,6 +4,19 @@ import { z } from "zod";
 import { fetchJson, requireEnvVar, runServerEffect } from "../-effect";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
+const TMDB_API_ERROR = "TMDB API Error";
+
+function buildTmdbSearchUrl(query: string, page: number, type: "movie" | "tv"): URL {
+  const endpoint = type === "movie" ? "search/movie" : "search/tv";
+  const url = new URL(`${TMDB_BASE_URL}/${endpoint}`);
+
+  url.searchParams.set("query", query);
+  url.searchParams.set("page", page.toString());
+  url.searchParams.set("include_adult", "false");
+  url.searchParams.set("language", "en-US");
+
+  return url;
+}
 
 export interface TMDBMedia {
   id: number;
@@ -28,7 +41,7 @@ export interface TMDBSearchResponse {
 async function fetchWithAuth(url: string): Promise<any> {
   const program = Effect.gen(function* () {
     const apiKey = yield* requireEnvVar("TMDB_API_KEY");
-    return yield* fetchJson({
+    const result = yield* fetchJson({
       url,
       init: {
         headers: {
@@ -36,8 +49,9 @@ async function fetchWithAuth(url: string): Promise<any> {
           accept: "application/json",
         },
       },
-      context: "TMDB API Error",
+      context: TMDB_API_ERROR,
     });
+    return result;
   });
 
   return runServerEffect(program);
@@ -55,22 +69,15 @@ export const fetchFromTMDB = createServerFn({ method: "GET" })
   )
   .handler(async ({ data }) => {
     const { query, page, type } = data;
-    const endpoint = type === "movie" ? "search/movie" : "search/tv";
-    const url = new URL(`${TMDB_BASE_URL}/${endpoint}`);
-
-    url.searchParams.set("query", query);
-    url.searchParams.set("page", page.toString());
-    url.searchParams.set("include_adult", "false");
-    url.searchParams.set("language", "en-US");
-
+    const url = buildTmdbSearchUrl(query, page, type);
     const response = (await fetchWithAuth(url.toString())) as unknown as TMDBSearchResponse;
-
-    response.results = response.results.map((item) => ({
-      ...item,
-      media_type: item.media_type || type,
-    }));
-
-    return response;
+    return {
+      ...response,
+      results: response.results.map((item) => ({
+        ...item,
+        media_type: item.media_type || type,
+      })),
+    };
   });
 
 export const getTVDetails = createServerFn({ method: "GET" })
