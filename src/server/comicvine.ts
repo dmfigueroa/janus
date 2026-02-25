@@ -1,4 +1,5 @@
 import { z } from "zod";
+import pLimit from "p-limit";
 import { API_PAGE_SIZE } from "./constants";
 import { type UnifiedMedia } from "./media";
 import { getErrorMessage } from "./utils";
@@ -56,6 +57,187 @@ const ComicIssueResponseSchema = z.object({
   number_of_total_results: z.number().default(0),
 });
 
+const COMICVINE_ISSUES_URL = "https://comicvine.gamespot.com/api/issues/";
+const COMICVINE_ISSUE_FIELDS = "id,name,issue_number,image,cover_date,description,deck";
+const COMICVINE_ISSUE_PAGE_LIMIT = 100;
+const COMICVINE_MAX_CONCURRENCY = 5;
+const COMICVINE_DEFAULT_CONCURRENCY = 3;
+const COMICVINE_RETRIES = 2;
+const COMICVINE_RETRY_BASE_DELAY_MS = 250;
+
+type ComicIssueSortDirection = "asc" | "desc";
+type ComicIssueItem = z.infer<typeof ComicIssueItemSchema>;
+type ComicIssueResponse = z.infer<typeof ComicIssueResponseSchema>;
+
+type GetComicIssuesOptions = {
+  knownIssueIds?: Set<string>;
+  concurrency?: number;
+};
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function buildIssuePageUrl(
+  volumeId: string,
+  apiKey: string,
+  offset: number,
+  direction: ComicIssueSortDirection,
+): URL {
+  const url = new URL(COMICVINE_ISSUES_URL);
+  url.search = new URLSearchParams({
+    api_key: apiKey,
+    filter: `volume:${volumeId}`,
+    sort: `issue_number:${direction}`,
+    field_list: COMICVINE_ISSUE_FIELDS,
+    format: "json",
+    limit: COMICVINE_ISSUE_PAGE_LIMIT.toString(),
+    offset: offset.toString(),
+  }).toString();
+
+  return url;
+}
+
+async function fetchIssuePage(
+  volumeId: string,
+  apiKey: string,
+  offset: number,
+  direction: ComicIssueSortDirection,
+): Promise<ComicIssueResponse> {
+  const url = buildIssuePageUrl(volumeId, apiKey, offset, direction);
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "JanusApp/1.0",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Status ${res.status}: ${res.statusText}`);
+  }
+
+  const rawData = await res.json();
+  const data = ComicIssueResponseSchema.parse(rawData);
+
+  if (data.error !== "OK") {
+    throw new Error(`Response: ${data.error}`);
+  }
+
+  return data;
+}
+
+async function fetchIssuePageWithRetry(
+  volumeId: string,
+  apiKey: string,
+  offset: number,
+  direction: ComicIssueSortDirection,
+  retries = COMICVINE_RETRIES,
+): Promise<ComicIssueResponse> {
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await fetchIssuePage(volumeId, apiKey, offset, direction);
+    } catch (error) {
+      if (attempt >= retries) {
+        throw error;
+      }
+      await sleep(COMICVINE_RETRY_BASE_DELAY_MS * (attempt + 1));
+    }
+  }
+
+  throw new Error("Failed to fetch issues page");
+}
+
+function mapIssueToComicIssue(issue: ComicIssueItem): ComicIssue {
+  return {
+    id: issue.id.toString(),
+    mediaType: "comic",
+    source: "comicvine",
+    title: issue.name || `Issue #${issue.issue_number}`,
+    poster: issue.image?.medium_url || issue.image?.small_url || null,
+    coverDate: issue.cover_date || null,
+    issueNumber: issue.issue_number || null,
+    description: issue.description || issue.deck || null,
+  };
+}
+
+async function collectAllVolumeIssues(
+  volumeId: string,
+  apiKey: string,
+  concurrency: number,
+): Promise<ComicIssueItem[]> {
+  const firstPage = await fetchIssuePageWithRetry(volumeId, apiKey, 0, "asc");
+  const allIssues = [...firstPage.results];
+  const totalResults = firstPage.number_of_total_results;
+
+  if (firstPage.results.length === 0 || firstPage.results.length >= totalResults) {
+    return allIssues;
+  }
+
+  const offsets: number[] = [];
+  for (
+    let offset = firstPage.results.length;
+    offset < totalResults;
+    offset += COMICVINE_ISSUE_PAGE_LIMIT
+  ) {
+    offsets.push(offset);
+  }
+
+  const pageLimit = pLimit(concurrency);
+  const remainingPages = await Promise.all(
+    offsets.map((offset) =>
+      pageLimit(async () => {
+        const data = await fetchIssuePageWithRetry(volumeId, apiKey, offset, "asc");
+        return { offset, results: data.results };
+      }),
+    ),
+  );
+
+  remainingPages
+    .sort((a, b) => a.offset - b.offset)
+    .forEach((page) => {
+      allIssues.push(...page.results);
+    });
+
+  return allIssues;
+}
+
+async function collectNewVolumeIssues(
+  volumeId: string,
+  apiKey: string,
+  knownIssueIds: Set<string>,
+): Promise<ComicIssueItem[]> {
+  const newIssues: ComicIssueItem[] = [];
+  let offset = 0;
+  let totalResults = 1;
+
+  while (offset < totalResults) {
+    const data = await fetchIssuePageWithRetry(volumeId, apiKey, offset, "desc");
+    totalResults = data.number_of_total_results;
+
+    if (data.results.length === 0) {
+      break;
+    }
+
+    let newIssuesInPage = 0;
+
+    for (const issue of data.results) {
+      const issueId = issue.id.toString();
+      if (knownIssueIds.has(issueId)) {
+        continue;
+      }
+      newIssues.push(issue);
+      newIssuesInPage += 1;
+    }
+
+    if (newIssuesInPage === 0) {
+      break;
+    }
+
+    offset += data.results.length;
+  }
+
+  return newIssues;
+}
+
 export async function searchComics(
   query: string,
   apiKey: string,
@@ -106,62 +288,22 @@ export async function searchComics(
   }
 }
 
-export async function getComicIssues(volumeId: string, apiKey: string): Promise<ComicIssue[]> {
-  const allIssues: z.infer<typeof ComicIssueItemSchema>[] = [];
-  let offset = 0;
-  let totalResults = 1;
-  const limit = 100;
-
+export async function getComicIssues(
+  volumeId: string,
+  apiKey: string,
+  options: GetComicIssuesOptions = {},
+): Promise<ComicIssue[]> {
+  const knownIssueIds = options.knownIssueIds;
+  const concurrency = Math.max(
+    1,
+    Math.min(options.concurrency ?? COMICVINE_DEFAULT_CONCURRENCY, COMICVINE_MAX_CONCURRENCY),
+  );
   try {
-    while (offset < totalResults) {
-      const url = new URL("https://comicvine.gamespot.com/api/issues/");
-      url.search = new URLSearchParams({
-        api_key: apiKey,
-        filter: `volume:${volumeId}`,
-        sort: "issue_number:asc",
-        format: "json",
-        limit: limit.toString(),
-        offset: offset.toString(),
-      }).toString();
+    const issues = knownIssueIds?.size
+      ? await collectNewVolumeIssues(volumeId, apiKey, knownIssueIds)
+      : await collectAllVolumeIssues(volumeId, apiKey, concurrency);
 
-      const res = await fetch(url, {
-        headers: {
-          "User-Agent": "JanusApp/1.0",
-        },
-      });
-
-      if (!res.ok) {
-        console.error(`ComicVine API Error (Status ${res.status}): ${res.statusText}`);
-        break;
-      }
-
-      const rawData = await res.json();
-      const data = ComicIssueResponseSchema.parse(rawData);
-
-      if (data.error !== "OK") {
-        console.error(`ComicVine API Error (Response): ${data.error}`);
-        break;
-      }
-
-      const results = data.results;
-      allIssues.push(...results);
-
-      totalResults = data.number_of_total_results;
-      offset += results.length;
-
-      if (results.length === 0) break;
-    }
-
-    return allIssues.map((issue) => ({
-      id: issue.id.toString(),
-      mediaType: "comic",
-      source: "comicvine",
-      title: issue.name || `Issue #${issue.issue_number}`,
-      poster: issue.image?.medium_url || issue.image?.small_url || null,
-      coverDate: issue.cover_date || null,
-      issueNumber: issue.issue_number || null,
-      description: issue.description || issue.deck || null,
-    }));
+    return issues.map(mapIssueToComicIssue);
   } catch (e) {
     const errorMessage = getErrorMessage(e);
     console.error("ComicVine Issues API Search Error:", errorMessage);
