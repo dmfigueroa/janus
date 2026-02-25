@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { API_PAGE_SIZE } from "./constants";
-import { type UnifiedMedia } from "./media";
-import { getErrorMessage } from "./utils";
+import { Effect } from "effect";
+import { API_PAGE_SIZE } from "../-constants";
+import { type UnifiedMedia } from "../-media";
+import { fetchJson, parseWithSchema, runServerEffect } from "../-effect";
 
 const AniListMediaSchema = z.object({
   id: z.number(),
@@ -58,27 +59,48 @@ const AniListDetailsResponseSchema = z.object({
 const ANILIST_URL = "https://graphql.anilist.co";
 
 async function fetchAniList(query: string, variables: Record<string, unknown>) {
-  const response = await fetch(ANILIST_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
+  const program = fetchJson({
+    url: ANILIST_URL,
+    init: {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        query,
+        variables,
+      }),
     },
-    body: JSON.stringify({
-      query,
-      variables,
-    }),
+    context: "AniList API Error",
   });
 
-  if (!response.ok) {
-    const errorData = (await response.json().catch(() => ({}))) as Record<string, unknown>;
-    throw new Error(
-      `AniList API Error: ${response.status} ${response.statusText} ${JSON.stringify(errorData)}`,
-    );
-  }
-
-  return response.json();
+  return runServerEffect(program);
 }
+
+type AniListMedia = z.infer<typeof AniListMediaSchema>;
+
+const toUnifiedAniListMedia = (item: AniListMedia): UnifiedMedia => ({
+  id: item.id.toString(),
+  mediaType: item.type === "ANIME" ? "anime" : "manga",
+  source: "anilist",
+  title: item.title.english || item.title.romaji || "Unknown Title",
+  poster: item.coverImage?.extraLarge || item.coverImage?.large || null,
+  backdrop: item.bannerImage || null,
+  year: item.startDate?.year?.toString(),
+  rating: item.averageScore ? item.averageScore / 10 : undefined,
+  overview: item.description || undefined,
+});
+
+const toUnifiedAniListDetail = (item: AniListMedia) => ({
+  ...toUnifiedAniListMedia(item),
+  releaseDate: item.startDate?.year
+    ? `${item.startDate.year}-${(item.startDate.month || 1).toString().padStart(2, "0")}-${(item.startDate.day || 1).toString().padStart(2, "0")}`
+    : undefined,
+  episodes: item.episodes,
+  chapters: item.chapters,
+  volumes: item.volumes,
+});
 
 export async function searchAnilistInternal(
   query: string,
@@ -114,36 +136,27 @@ export async function searchAnilistInternal(
     }
   `;
 
-  try {
-    const rawData = await fetchAniList(searchQuery, {
-      search: query,
-      type,
-      page,
-      perPage: API_PAGE_SIZE,
+  const program = Effect.gen(function* () {
+    const rawData = yield* Effect.tryPromise({
+      try: () =>
+        fetchAniList(searchQuery, {
+          search: query,
+          type,
+          page,
+          perPage: API_PAGE_SIZE,
+        }),
+      catch: (error: unknown) => new Error(`AniList Search Error: ${String(error)}`),
     });
 
-    const data = AniListResponseSchema.parse(rawData);
-    const results: UnifiedMedia[] = data.data.Page.media.map((item) => ({
-      id: item.id.toString(),
-      mediaType: item.type === "ANIME" ? ("anime" as const) : ("manga" as const),
-      source: "anilist" as const,
-      title: item.title.english || item.title.romaji || "Unknown Title",
-      poster: item.coverImage?.extraLarge || item.coverImage?.large || null,
-      backdrop: item.bannerImage || null,
-      year: item.startDate?.year?.toString(),
-      rating: item.averageScore ? item.averageScore / 10 : undefined,
-      overview: item.description || undefined,
-    }));
+    const data = yield* parseWithSchema(AniListResponseSchema, rawData, "AniList Search Error");
 
     return {
-      results,
+      results: data.data.Page.media.map(toUnifiedAniListMedia),
       totalResults: data.data.Page.pageInfo.total || 0,
     };
-  } catch (e) {
-    const errorMessage = getErrorMessage(e);
-    console.error("AniList Search Error:", errorMessage);
-    throw new Error(`AniList Search Error: ${errorMessage}`);
-  }
+  });
+
+  return runServerEffect(program);
 }
 
 export async function getAnilistDetailsInternal(id: string) {
@@ -175,33 +188,22 @@ export async function getAnilistDetailsInternal(id: string) {
     }
   `;
 
-  try {
-    const rawData = await fetchAniList(detailsQuery, { id: parseInt(id) });
-    const data = AniListDetailsResponseSchema.parse(rawData);
-    const item = data.data.Media;
+  const program = Effect.gen(function* () {
+    const rawData = yield* Effect.tryPromise({
+      try: () => fetchAniList(detailsQuery, { id: Number.parseInt(id, 10) }),
+      catch: (error: unknown) => new Error(`AniList Details Error: ${String(error)}`),
+    });
 
-    return {
-      id: item.id.toString(),
-      mediaType: item.type === "ANIME" ? ("anime" as const) : ("manga" as const),
-      source: "anilist" as const,
-      title: item.title.english || item.title.romaji || "Unknown Title",
-      poster: item.coverImage?.extraLarge || item.coverImage?.large || null,
-      backdrop: item.bannerImage || null,
-      year: item.startDate?.year?.toString(),
-      releaseDate: item.startDate?.year
-        ? `${item.startDate.year}-${(item.startDate.month || 1).toString().padStart(2, "0")}-${(item.startDate.day || 1).toString().padStart(2, "0")}`
-        : undefined,
-      rating: item.averageScore ? item.averageScore / 10 : undefined,
-      overview: item.description || undefined,
-      episodes: item.episodes,
-      chapters: item.chapters,
-      volumes: item.volumes,
-    };
-  } catch (e) {
-    const errorMessage = getErrorMessage(e);
-    console.error("AniList Details Error:", errorMessage);
-    throw new Error(`AniList Details Error: ${errorMessage}`);
-  }
+    const data = yield* parseWithSchema(
+      AniListDetailsResponseSchema,
+      rawData,
+      "AniList Details Error",
+    );
+
+    return toUnifiedAniListDetail(data.data.Media);
+  });
+
+  return runServerEffect(program);
 }
 
 export async function searchAnilist(query: string, type: "ANIME" | "MANGA", page: number = 1) {

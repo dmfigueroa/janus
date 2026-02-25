@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getComicIssues } from "./comicvine";
+import { getComicIssues } from "./-comicvine";
 
 vi.stubGlobal("fetch", vi.fn());
 

@@ -1,4 +1,4 @@
-import { UnifiedMedia } from "../server/media";
+import { UnifiedMedia } from "../routes/_shared/-media";
 import { Star } from "lucide-react";
 
 interface MediaCardProps {

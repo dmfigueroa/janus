@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UnifiedMedia } from "@/server/media";
+import { UnifiedMedia } from "@/routes/_shared/-media";
 import DOMPurify from "dompurify";
 import {
   Sheet,
@@ -12,8 +12,8 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Star, Calendar, Info } from "lucide-react";
-import { addToWatchlist } from "@/server/watchlist";
-import { getWatchlists } from "@/server/watchlists";
+import { addToWatchlist } from "@/routes/watchlists/-watchlist-items.server";
+import { getWatchlists } from "@/routes/watchlists/-watchlists.server";
 import { toast } from "sonner";
 import { WatchlistSelector } from "./watchlist/WatchlistSelector";
 import { useQuery, useMutation } from "@tanstack/react-query";

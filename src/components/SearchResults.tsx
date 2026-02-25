@@ -1,4 +1,4 @@
-import { UnifiedMedia } from "../server/media";
+import { UnifiedMedia } from "../routes/_shared/-media";
 import { MediaCard } from "./MediaCard";
 import { useIntersectionObserver } from "../hooks/useIntersectionObserver";
 import { useState } from "react";

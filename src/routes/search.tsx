@@ -1,6 +1,6 @@
 import { SearchInput } from "../components/SearchInput";
 import { SearchResults } from "../components/SearchResults";
-import { searchUnified } from "../server/search";
+import { searchUnified } from "./search/-search.server";
 import { useCallback } from "react";
 import { createFileRoute, useNavigate, useSearch, useRouterState } from "@tanstack/react-router";
 import { useInfiniteQuery } from "@tanstack/react-query";

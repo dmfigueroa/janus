@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getBookDetails } from "./google-books";
+import { getBookDetails } from "./-google-books";
 
 vi.stubGlobal("fetch", vi.fn());
 

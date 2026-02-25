@@ -1,8 +1,9 @@
 import { z } from "zod";
 import pLimit from "p-limit";
-import { API_PAGE_SIZE } from "./constants";
-import { type UnifiedMedia } from "./media";
-import { getErrorMessage } from "./utils";
+import { Effect } from "effect";
+import { API_PAGE_SIZE } from "../-constants";
+import { type UnifiedMedia } from "../-media";
+import { fetchJson, parseWithSchema, runServerEffect } from "../-effect";
 
 export const ComicIssueSchema = z.object({
   id: z.string(),
@@ -68,6 +69,7 @@ const COMICVINE_RETRY_BASE_DELAY_MS = 250;
 type ComicIssueSortDirection = "asc" | "desc";
 type ComicIssueItem = z.infer<typeof ComicIssueItemSchema>;
 type ComicIssueResponse = z.infer<typeof ComicIssueResponseSchema>;
+type ComicVineVolume = z.infer<typeof ComicVineVolumeSchema>;
 
 type GetComicIssuesOptions = {
   knownIssueIds?: Set<string>;
@@ -104,25 +106,31 @@ async function fetchIssuePage(
   offset: number,
   direction: ComicIssueSortDirection,
 ): Promise<ComicIssueResponse> {
-  const url = buildIssuePageUrl(volumeId, apiKey, offset, direction);
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": "JanusApp/1.0",
-    },
+  const program = Effect.gen(function* () {
+    const url = buildIssuePageUrl(volumeId, apiKey, offset, direction);
+    const rawData = yield* fetchJson({
+      url,
+      init: {
+        headers: {
+          "User-Agent": "JanusApp/1.0",
+        },
+      },
+      context: "ComicVine Issues API Error",
+    });
+    const data = yield* parseWithSchema(
+      ComicIssueResponseSchema,
+      rawData,
+      "ComicVine Issues API Error",
+    );
+
+    if (data.error !== "OK") {
+      return yield* Effect.fail(new Error(`ComicVine Issues API Error: Response: ${data.error}`));
+    }
+
+    return data;
   });
 
-  if (!res.ok) {
-    throw new Error(`Status ${res.status}: ${res.statusText}`);
-  }
-
-  const rawData = await res.json();
-  const data = ComicIssueResponseSchema.parse(rawData);
-
-  if (data.error !== "OK") {
-    throw new Error(`Response: ${data.error}`);
-  }
-
-  return data;
+  return runServerEffect(program);
 }
 
 async function fetchIssuePageWithRetry(
@@ -156,6 +164,19 @@ function mapIssueToComicIssue(issue: ComicIssueItem): ComicIssue {
     coverDate: issue.cover_date || null,
     issueNumber: issue.issue_number || null,
     description: issue.description || issue.deck || null,
+  };
+}
+
+function mapVolumeToUnifiedMedia(item: ComicVineVolume): UnifiedMedia {
+  return {
+    id: item.id.toString(),
+    mediaType: "comic",
+    source: "comicvine",
+    title: item.name || "Unknown Title",
+    poster: item.image?.medium_url || item.image?.small_url || null,
+    year: item.start_year || undefined,
+    rating: undefined,
+    overview: item.deck || item.description || undefined,
   };
 }
 
@@ -243,7 +264,7 @@ export async function searchComics(
   apiKey: string,
   page: number = 1,
 ): Promise<{ results: UnifiedMedia[]; totalResults: number }> {
-  try {
+  const program = Effect.gen(function* () {
     const limit = API_PAGE_SIZE;
     const url = new URL("https://comicvine.gamespot.com/api/search/");
     url.search = new URLSearchParams({
@@ -255,37 +276,26 @@ export async function searchComics(
       limit: limit.toString(),
     }).toString();
 
-    const res = await fetch(url.toString(), {
-      headers: {
-        "User-Agent": "JanusApp/1.0",
+    const rawData = yield* fetchJson({
+      url,
+      init: {
+        headers: {
+          "User-Agent": "JanusApp/1.0",
+        },
       },
-    });
+      context: "ComicVine API Error",
+    }).pipe(Effect.catchAll(() => Effect.succeed({ results: [], number_of_total_results: 0 })));
+    const data = yield* parseWithSchema(ComicVineResponseSchema, rawData, "ComicVine API Error");
 
-    if (!res.ok) return { results: [], totalResults: 0 };
-
-    const rawData = await res.json();
-    const data = ComicVineResponseSchema.parse(rawData);
-
-    const results = (data.results || []).map((item) => ({
-      id: item.id.toString(),
-      mediaType: "comic" as const,
-      source: "comicvine" as const,
-      title: item.name || "Unknown Title",
-      poster: item.image?.medium_url || item.image?.small_url || null,
-      year: item.start_year || undefined,
-      rating: undefined,
-      overview: item.deck || item.description || undefined,
-    }));
+    const results = (data.results || []).map(mapVolumeToUnifiedMedia);
 
     return {
       results,
       totalResults: data.number_of_total_results || 0,
     };
-  } catch (e) {
-    const errorMessage = getErrorMessage(e);
-    console.error("ComicVine API Error:", errorMessage);
-    throw new Error(`ComicVine API Error: ${errorMessage}`);
-  }
+  });
+
+  return runServerEffect(program);
 }
 
 export async function getComicIssues(
@@ -298,15 +308,16 @@ export async function getComicIssues(
     1,
     Math.min(options.concurrency ?? COMICVINE_DEFAULT_CONCURRENCY, COMICVINE_MAX_CONCURRENCY),
   );
-  try {
-    const issues = knownIssueIds?.size
-      ? await collectNewVolumeIssues(volumeId, apiKey, knownIssueIds)
-      : await collectAllVolumeIssues(volumeId, apiKey, concurrency);
+  const program = Effect.tryPromise({
+    try: async () => {
+      const issues = knownIssueIds?.size
+        ? await collectNewVolumeIssues(volumeId, apiKey, knownIssueIds)
+        : await collectAllVolumeIssues(volumeId, apiKey, concurrency);
 
-    return issues.map(mapIssueToComicIssue);
-  } catch (e) {
-    const errorMessage = getErrorMessage(e);
-    console.error("ComicVine Issues API Search Error:", errorMessage);
-    throw new Error(`ComicVine Issues API Search Error: ${errorMessage}`);
-  }
+      return issues.map(mapIssueToComicIssue);
+    },
+    catch: (error: unknown) => new Error(`ComicVine Issues API Search Error: ${String(error)}`),
+  });
+
+  return runServerEffect(program);
 }

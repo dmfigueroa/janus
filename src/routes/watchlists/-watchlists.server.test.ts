@@ -2,16 +2,16 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import path from "path";
 
-let db: ReturnType<typeof import("../db/server.server").getDb>;
-let watchlists: typeof import("../db/schema").watchlists;
-let watchlistItems: typeof import("../db/schema").watchlistItems;
-let getWatchlistByIdInternal: typeof import("./watchlists").getWatchlistByIdInternal;
+let db: ReturnType<typeof import("@/db/server.server").getDb>;
+let watchlists: typeof import("@/db/schema").watchlists;
+let watchlistItems: typeof import("@/db/schema").watchlistItems;
+let getWatchlistByIdInternal: typeof import("./-watchlists.server").getWatchlistByIdInternal;
 
 beforeAll(async () => {
   process.env.DATABASE_URL = ":memory:";
-  const dbModule = await import("../db/server.server");
-  const schemaModule = await import("../db/schema");
-  const watchlistsModule = await import("./watchlists");
+  const dbModule = await import("@/db/server.server");
+  const schemaModule = await import("@/db/schema");
+  const watchlistsModule = await import("./-watchlists.server");
 
   db = dbModule.getDb();
   watchlists = schemaModule.watchlists;

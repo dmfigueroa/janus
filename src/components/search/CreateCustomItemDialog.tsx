@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { UnifiedMedia } from "@/server/media";
+import { UnifiedMedia } from "@/routes/_shared/-media";
 import {
   Dialog,
   DialogContent,

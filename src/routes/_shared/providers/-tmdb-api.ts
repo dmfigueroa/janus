@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
+import { Effect } from "effect";
 import { z } from "zod";
+import { fetchJson, requireEnvVar, runServerEffect } from "../-effect";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
@@ -23,43 +25,22 @@ export interface TMDBSearchResponse {
   total_results: number;
 }
 
-export interface TMDBErrorResponse {
-  status_code: number;
-  status_message: string;
-  success: boolean;
-}
-
-async function fetchWithAuth(url: string) {
-  const apiKey = process.env.TMDB_API_KEY;
-  if (!apiKey) {
-    throw new Error("TMDB_API_KEY is not configured");
-  }
-
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      accept: "application/json",
-    },
+async function fetchWithAuth(url: string): Promise<any> {
+  const program = Effect.gen(function* () {
+    const apiKey = yield* requireEnvVar("TMDB_API_KEY");
+    return yield* fetchJson({
+      url,
+      init: {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          accept: "application/json",
+        },
+      },
+      context: "TMDB API Error",
+    });
   });
 
-  if (!response.ok) {
-    try {
-      const errorData = (await response.json()) as TMDBErrorResponse;
-      if (errorData.status_code && errorData.status_message) {
-        console.error(
-          `TMDB API Error: ${response.status} (Code: ${errorData.status_code}) - ${errorData.status_message}`,
-        );
-      } else {
-        console.error(`TMDB API Error: ${response.status} ${response.statusText}`);
-      }
-    } catch {
-      // Fallback if response is not JSON
-      console.error(`TMDB API Error: ${response.status} ${response.statusText}`);
-    }
-    throw new Error(`Failed to fetch data from TMDB: ${response.status}`);
-  }
-
-  return response.json();
+  return runServerEffect(program);
 }
 
 export const fetchFromTMDB = createServerFn({ method: "GET" })
@@ -82,7 +63,7 @@ export const fetchFromTMDB = createServerFn({ method: "GET" })
     url.searchParams.set("include_adult", "false");
     url.searchParams.set("language", "en-US");
 
-    const response = (await fetchWithAuth(url.toString())) as TMDBSearchResponse;
+    const response = (await fetchWithAuth(url.toString())) as unknown as TMDBSearchResponse;
 
     response.results = response.results.map((item) => ({
       ...item,

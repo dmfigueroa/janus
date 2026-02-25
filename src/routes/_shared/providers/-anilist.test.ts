@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { searchAnilistInternal, getAnilistDetailsInternal } from "./anilist";
+import { searchAnilistInternal, getAnilistDetailsInternal } from "./-anilist";
 
 vi.stubGlobal("fetch", vi.fn());
 

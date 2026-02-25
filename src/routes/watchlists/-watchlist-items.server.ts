@@ -1,18 +1,20 @@
 "use server";
 
 import { createServerFn } from "@tanstack/react-start";
+import { Effect } from "effect";
 import { z } from "zod";
 import pLimit from "p-limit";
-import { watchlistItems, watchlists } from "../db/schema";
+import { watchlistItems, watchlists } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
-import { getTVDetails, getSeasonDetails, getMovieDetails } from "./tmdb";
-import { getComicIssues } from "./comicvine";
-import { getBookDetails } from "./google-books";
-import { getGameDetails } from "./rawg";
-import { getAnilistDetails } from "./anilist";
-import { getDb } from "../db/server.server";
+import { getTVDetails, getSeasonDetails, getMovieDetails } from "@/routes/_shared/providers/-tmdb";
+import { getComicIssues } from "@/routes/_shared/providers/-comicvine";
+import { getBookDetails } from "@/routes/_shared/providers/-google-books";
+import { getGameDetails } from "@/routes/_shared/providers/-rawg";
+import { getAnilistDetails } from "@/routes/_shared/providers/-anilist";
+import { getDb } from "@/db/server.server";
+import { requireEnvVar, runServerHandler } from "@/routes/_shared/-effect";
 
-export type { Watchlist, WatchlistItem } from "../db/schema";
+export type { Watchlist, WatchlistItem } from "@/db/schema";
 
 const limit = pLimit(5);
 const DB_INSERT_CHUNK_SIZE = 50;
@@ -36,84 +38,174 @@ type WatchlistMedia = z.infer<typeof addToWatchlistSchema>["media"];
 type GenericMedia = Omit<WatchlistMedia, "mediaType"> & {
   mediaType: Exclude<WatchlistMedia["mediaType"], "tv">;
 };
+type AddToWatchlistResult = { success: boolean; message: string };
+
+function isGenericMedia(media: WatchlistMedia): media is GenericMedia {
+  return media.mediaType !== "tv";
+}
+
+function addTmdbTvMedia(
+  watchlistId: number,
+  media: WatchlistMedia,
+): Effect.Effect<AddToWatchlistResult | null, Error> {
+  if (media.mediaType !== "tv") {
+    return Effect.succeed(null);
+  }
+
+  if (media.source !== "tmdb") {
+    if (media.source !== "custom") {
+      return Effect.fail(
+        new Error("TV shows from non-TMDB sources are not supported as generic items"),
+      );
+    }
+    return Effect.succeed(null);
+  }
+
+  return Effect.tryPromise(() =>
+    addTVShowToWatchList(watchlistId, Number.parseInt(media.id, 10), media),
+  );
+}
+
+function addTmdbMovieMedia(
+  watchlistId: number,
+  media: WatchlistMedia,
+): Effect.Effect<AddToWatchlistResult | null, Error> {
+  if (media.source !== "tmdb" || media.mediaType !== "movie") {
+    return Effect.succeed(null);
+  }
+
+  return Effect.tryPromise(() => addMovieToWatchList(watchlistId, Number.parseInt(media.id, 10)));
+}
+
+function addComicMedia(
+  watchlistId: number,
+  media: WatchlistMedia,
+): Effect.Effect<AddToWatchlistResult | null, Error> {
+  if (media.source !== "comicvine" || media.mediaType !== "comic") {
+    return Effect.succeed(null);
+  }
+
+  return Effect.gen(function* () {
+    const apiKey = yield* requireEnvVar("COMICVINE_API_KEY");
+    const result = yield* Effect.tryPromise(() =>
+      addComicToWatchList(watchlistId, media.id, media, apiKey),
+    );
+    return result;
+  });
+}
+
+function addBookMedia(
+  watchlistId: number,
+  media: WatchlistMedia,
+): Effect.Effect<AddToWatchlistResult | null, Error> {
+  if (media.source !== "google_books" || media.mediaType !== "book") {
+    return Effect.succeed(null);
+  }
+
+  return Effect.gen(function* () {
+    const details = yield* Effect.tryPromise(() => getBookDetails(media.id));
+    return yield* Effect.tryPromise(() =>
+      addGenericItemToWatchlist(watchlistId, details as GenericMedia),
+    );
+  });
+}
+
+function addGameMedia(
+  watchlistId: number,
+  media: WatchlistMedia,
+): Effect.Effect<AddToWatchlistResult | null, Error> {
+  if (media.source !== "rawg" || media.mediaType !== "game") {
+    return Effect.succeed(null);
+  }
+
+  return Effect.gen(function* () {
+    const apiKey = yield* requireEnvVar("RAWG_API_KEY");
+    const details = yield* Effect.tryPromise(() => getGameDetails(media.id, apiKey));
+    return yield* Effect.tryPromise(() =>
+      addGenericItemToWatchlist(watchlistId, details as GenericMedia),
+    );
+  });
+}
+
+function addAniListMedia(
+  watchlistId: number,
+  media: WatchlistMedia,
+): Effect.Effect<AddToWatchlistResult | null, Error> {
+  if (media.source !== "anilist") {
+    return Effect.succeed(null);
+  }
+
+  if (media.mediaType === "anime") {
+    return Effect.tryPromise(() => addAnimeToWatchlist(watchlistId, media.id, media));
+  }
+
+  if (media.mediaType === "manga") {
+    return Effect.tryPromise(() => addMangaToWatchlist(watchlistId, media.id, media));
+  }
+
+  return Effect.succeed(null);
+}
 
 export const toggleWatched = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({ itemId: z.number(), isWatched: z.boolean() }).parse(data))
-  .handler(async ({ data }) => {
-    const db = getDb();
-    const [item] = await db
-      .select({ watchlistId: watchlistItems.watchlistId })
-      .from(watchlistItems)
-      .where(eq(watchlistItems.id, data.itemId));
+  .handler(({ data }) => {
+    const program = Effect.tryPromise(async () => {
+      const db = getDb();
+      const [item] = await db
+        .select({ watchlistId: watchlistItems.watchlistId })
+        .from(watchlistItems)
+        .where(eq(watchlistItems.id, data.itemId));
 
-    await db
-      .update(watchlistItems)
-      .set({ isWatched: data.isWatched })
-      .where(eq(watchlistItems.id, data.itemId));
-
-    if (item && data.isWatched) {
       await db
-        .update(watchlists)
-        .set({ lastWatchedAt: sql`CURRENT_TIMESTAMP` })
-        .where(eq(watchlists.id, item.watchlistId));
-    }
+        .update(watchlistItems)
+        .set({ isWatched: data.isWatched })
+        .where(eq(watchlistItems.id, data.itemId));
 
-    return { success: true };
+      if (item && data.isWatched) {
+        await db
+          .update(watchlists)
+          .set({ lastWatchedAt: sql`CURRENT_TIMESTAMP` })
+          .where(eq(watchlists.id, item.watchlistId));
+      }
+
+      return { success: true };
+    });
+
+    return runServerHandler(program, "Toggle watched failed");
   });
 
 export const addToWatchlist = createServerFn({ method: "POST" })
   .inputValidator((data) => addToWatchlistSchema.parse(data))
-  .handler(async ({ data }) => {
+  .handler(({ data }) => {
     const { watchlistId, media } = data;
 
-    if (media.mediaType === "tv") {
-      if (media.source === "tmdb") {
-        const tmdbId = parseInt(media.id);
-        return await addTVShowToWatchList(watchlistId, tmdbId, media);
+    const handlers = [
+      addTmdbTvMedia,
+      addTmdbMovieMedia,
+      addComicMedia,
+      addBookMedia,
+      addGameMedia,
+      addAniListMedia,
+    ] as const;
+
+    const program = Effect.gen(function* () {
+      for (const handler of handlers) {
+        const result = yield* handler(watchlistId, media);
+        if (result) {
+          return result;
+        }
       }
-      // Custom TV shows fall through to addGenericItemToWatchlist
-      if (media.source !== "custom") {
-        throw new Error("TV shows from non-TMDB sources are not supported as generic items");
+
+      if (!isGenericMedia(media)) {
+        return yield* Effect.fail(
+          new Error("Custom TV shows are not supported for manual item insertion"),
+        );
       }
-    }
 
-    if (media.source === "tmdb") {
-      const tmdbId = parseInt(media.id);
+      return yield* Effect.tryPromise(() => addGenericItemToWatchlist(watchlistId, media));
+    });
 
-      if (media.mediaType === "movie") {
-        return await addMovieToWatchList(watchlistId, tmdbId);
-      }
-    }
-
-    if (media.source === "comicvine" && media.mediaType === "comic") {
-      const cvApiKey = process.env.COMICVINE_API_KEY;
-      if (!cvApiKey) throw new Error("COMICVINE_API_KEY is not configured");
-      return await addComicToWatchList(watchlistId, media.id, media, cvApiKey);
-    }
-
-    if (media.source === "google_books" && media.mediaType === "book") {
-      const details = await getBookDetails(media.id);
-      return await addGenericItemToWatchlist(watchlistId, details);
-    }
-
-    if (media.source === "rawg" && media.mediaType === "game") {
-      const rawgApiKey = process.env.RAWG_API_KEY;
-      if (!rawgApiKey) throw new Error("RAWG_API_KEY is not configured");
-      const details = await getGameDetails(media.id, rawgApiKey);
-      return await addGenericItemToWatchlist(watchlistId, details);
-    }
-
-    if (media.source === "anilist") {
-      if (media.mediaType === "anime") {
-        return await addAnimeToWatchlist(watchlistId, media.id, media);
-      }
-      if (media.mediaType === "manga") {
-        return await addMangaToWatchlist(watchlistId, media.id, media);
-      }
-    }
-
-    // TypeScript now knows media.mediaType is not "tv", so it matches GenericMedia
-    return await addGenericItemToWatchlist(watchlistId, media as GenericMedia);
+    return runServerHandler(program, "Add to watchlist failed");
   });
 
 const addGenericItemToWatchlist = async (watchlistId: number, media: GenericMedia) => {
