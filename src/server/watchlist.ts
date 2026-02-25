@@ -11,6 +11,7 @@ import { getBookDetails } from "./google-books";
 import { getGameDetails } from "./rawg";
 import { getAnilistDetails } from "./anilist";
 import { getDb } from "../db/server.server";
+import { isDeprecatedMediaType, DEPRECATED_MEDIA_MESSAGE } from "./media";
 
 export type { Watchlist, WatchlistItem } from "../db/schema";
 
@@ -35,6 +36,17 @@ const addToWatchlistSchema = z.object({
 type WatchlistMedia = z.infer<typeof addToWatchlistSchema>["media"];
 type GenericMedia = Omit<WatchlistMedia, "mediaType"> & {
   mediaType: Exclude<WatchlistMedia["mediaType"], "tv">;
+};
+
+export const getDeprecatedWatchlistAddRejection = (mediaType: string) => {
+  if (!isDeprecatedMediaType(mediaType)) {
+    return null;
+  }
+
+  return {
+    success: false,
+    message: `${DEPRECATED_MEDIA_MESSAGE} New anime and manga items cannot be added to watchlists.`,
+  };
 };
 
 export const toggleWatched = createServerFn({ method: "POST" })
@@ -65,6 +77,11 @@ export const addToWatchlist = createServerFn({ method: "POST" })
   .inputValidator((data) => addToWatchlistSchema.parse(data))
   .handler(async ({ data }) => {
     const { watchlistId, media } = data;
+
+    const deprecatedRejection = getDeprecatedWatchlistAddRejection(media.mediaType);
+    if (deprecatedRejection) {
+      return deprecatedRejection;
+    }
 
     if (media.mediaType === "tv") {
       if (media.source === "tmdb") {

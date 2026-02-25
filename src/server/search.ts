@@ -7,7 +7,7 @@ import { searchBooks } from "./google-books";
 import { searchGames } from "./rawg";
 import { searchComics } from "./comicvine";
 import { searchAnilist } from "./anilist";
-import { type UnifiedMedia } from "./media";
+import { type UnifiedMedia, isDeprecatedMediaType, DEPRECATED_MEDIA_MESSAGE } from "./media";
 import { API_PAGE_SIZE } from "./constants";
 
 const searchInputSchema = z.object({
@@ -16,13 +16,37 @@ const searchInputSchema = z.object({
   type: z.enum(["movie", "tv", "game", "book", "comic", "anime", "manga"]).default("movie"),
 });
 
+export const getDeprecatedSearchResponse = (type: string, page: number) => {
+  if (!isDeprecatedMediaType(type)) {
+    return null;
+  }
+
+  return {
+    results: [],
+    page,
+    total_pages: 1,
+    total_results: 0,
+    rejected: true,
+    message: DEPRECATED_MEDIA_MESSAGE,
+  };
+};
+
 export const searchUnified = createServerFn({ method: "GET" })
   .inputValidator((data) => searchInputSchema.parse(data))
   .handler(async ({ data }) => {
     const { query, type, page } = data;
 
+    const deprecatedResponse = getDeprecatedSearchResponse(type, page);
+    if (deprecatedResponse) {
+      return deprecatedResponse;
+    }
+
     if (type === "movie" || type === "tv") {
-      return searchMultimedia({ data: { query, page, type } });
+      const result = await searchMultimedia({ data: { query, page, type } });
+      return {
+        ...result,
+        rejected: false,
+      };
     }
 
     let results: UnifiedMedia[] = [];
@@ -62,5 +86,6 @@ export const searchUnified = createServerFn({ method: "GET" })
       page,
       total_pages: totalPages || 1,
       total_results: totalResults,
+      rejected: false,
     };
   });

@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+export const DEPRECATED_MEDIA_TYPES = ["anime", "manga"] as const;
+export const DEPRECATED_MEDIA_MESSAGE =
+  "Anime and manga categories are deprecated while we revisit provider data quality.";
+
+export const isDeprecatedMediaType = (mediaType: string): boolean =>
+  DEPRECATED_MEDIA_TYPES.includes(mediaType as (typeof DEPRECATED_MEDIA_TYPES)[number]);
+
 export const UnifiedMediaSchema = z.object({
   id: z.string(),
   mediaType: z.enum(["movie", "tv", "game", "book", "comic", "anime", "manga"]),
