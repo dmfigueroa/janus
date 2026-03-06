@@ -16,6 +16,50 @@ export const watchlists = sqliteTable("watchlists", {
 export type Watchlist = typeof watchlists.$inferSelect;
 export type InsertWatchlist = typeof watchlists.$inferInsert;
 
+export const watchlistImportJobs = sqliteTable(
+  "watchlist_import_jobs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    sidequestJobId: integer("sidequest_job_id").notNull(),
+    watchlistId: integer("watchlist_id")
+      .references(() => watchlists.id, { onDelete: "cascade" })
+      .notNull(),
+    mediaType: text("media_type").notNull(),
+    source: text("source").notNull(),
+    title: text("title").notNull(),
+    status: text("status", {
+      enum: ["queued", "running", "completed", "failed"],
+    })
+      .notNull()
+      .default("queued"),
+    totalItems: integer("total_items").notNull().default(0),
+    processedItems: integer("processed_items").notNull().default(0),
+    insertedItems: integer("inserted_items").notNull().default(0),
+    message: text("message"),
+    error: text("error"),
+    startedAt: text("started_at"),
+    completedAt: text("completed_at"),
+    createdAt: text("created_at")
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+    updatedAt: text("updated_at")
+      .default(sql`(CURRENT_TIMESTAMP)`)
+      .notNull(),
+  },
+  (table) => ({
+    bySidequestJobId: uniqueIndex("watchlist_import_jobs_sidequest_job_id").on(
+      table.sidequestJobId,
+    ),
+    byWatchlistCreatedAt: index("watchlist_import_jobs_watchlist_created_at").on(
+      table.watchlistId,
+      table.createdAt,
+    ),
+  }),
+);
+
+export type WatchlistImportJob = typeof watchlistImportJobs.$inferSelect;
+export type InsertWatchlistImportJob = typeof watchlistImportJobs.$inferInsert;
+
 export const watchlistItems = sqliteTable(
   "watchlist_items",
   {

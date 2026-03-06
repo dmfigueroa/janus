@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { UnifiedMedia } from "@/server/media";
 import DOMPurify from "dompurify";
 import {
@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Star, Calendar, Info } from "lucide-react";
-import { addToWatchlist } from "@/server/watchlist";
+import { addToWatchlist, getWatchlistImportStatus } from "@/server/watchlist";
 import { getWatchlists } from "@/server/watchlists";
 import { toast } from "sonner";
 import { WatchlistSelector } from "./watchlist/WatchlistSelector";
@@ -26,6 +26,7 @@ interface MediaDetailSheetProps {
 
 export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetProps) {
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string>("");
+  const [importJobId, setImportJobId] = useState<number | null>(null);
 
   const { data: watchlists } = useQuery({
     queryKey: ["watchlists"],
@@ -44,8 +45,17 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
       });
     },
     onSuccess: (data) => {
-      if (data?.success) {
-        toast.success(data.message);
+      if (
+        data?.success &&
+        "queued" in data &&
+        data.queued &&
+        "jobId" in data &&
+        typeof data.jobId === "number"
+      ) {
+        setImportJobId(data.jobId);
+        toast.success(data.message || "Import started");
+      } else if (data?.success) {
+        toast.success(data.message || "Added to watchlist");
         onClose();
       } else {
         toast.error(data?.message || "Failed to add to watchlist");
@@ -56,6 +66,39 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
       console.error(error);
     },
   });
+
+  const { data: importStatusData } = useQuery({
+    queryKey: ["watchlist-import-status", importJobId],
+    queryFn: () => getWatchlistImportStatus({ data: { jobId: importJobId! } }),
+    enabled: importJobId !== null,
+    refetchInterval: 1000,
+  });
+
+  useEffect(() => {
+    if (!importStatusData?.success) {
+      return;
+    }
+
+    const status = importStatusData.status.status;
+
+    if (status === "completed") {
+      toast.success(importStatusData.status.message || "Import completed");
+      setImportJobId(null);
+      onClose();
+      return;
+    }
+
+    if (status === "failed") {
+      toast.error(importStatusData.status.error || "Import failed");
+      setImportJobId(null);
+    }
+  }, [importStatusData, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setImportJobId(null);
+    }
+  }, [isOpen]);
 
   if (!media) return null;
 
@@ -140,12 +183,20 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
             />
             <Button
               onClick={handleAddToWatchlist}
-              disabled={!selectedWatchlistId || addToWatchlistMutation.isPending}
+              disabled={
+                !selectedWatchlistId || addToWatchlistMutation.isPending || importJobId !== null
+              }
               className="min-w-[100px]"
             >
               {addToWatchlistMutation.isPending ? "Adding..." : "Add"}
             </Button>
           </div>
+          {importStatusData?.success ? (
+            <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-xs text-primary">
+              {importStatusData.status.message ||
+                `${importStatusData.status.insertedItems} of ${importStatusData.status.totalItems} items added`}
+            </div>
+          ) : null}
           {(mediaType === "tv" ||
             mediaType === "anime" ||
             mediaType === "comic" ||
