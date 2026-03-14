@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { UnifiedMedia } from "@/server/media";
 import DOMPurify from "dompurify";
 import {
@@ -12,11 +12,10 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Star, Calendar, Info } from "lucide-react";
-import { addToWatchlist, getWatchlistImportStatus } from "@/server/watchlist";
-import { getWatchlists } from "@/server/watchlists";
 import { toast } from "sonner";
 import { WatchlistSelector } from "./watchlist/WatchlistSelector";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useWatchlistImportWorkflow } from "@/hooks/useWatchlistImportWorkflow";
+import { useWatchlistOptions } from "@/hooks/useWatchlistOptions";
 
 interface MediaDetailSheetProps {
   media: UnifiedMedia | null;
@@ -24,81 +23,39 @@ interface MediaDetailSheetProps {
   onClose: () => void;
 }
 
+const MEDIA_TYPE_DISPLAY: Partial<
+  Record<
+    UnifiedMedia["mediaType"],
+    {
+      chipLabel?: string;
+      importHint?: {
+        itemLabel: string;
+        mediaLabel: string;
+      };
+    }
+  >
+> = {
+  anime: {
+    importHint: { mediaLabel: "an anime", itemLabel: "episodes" },
+  },
+  comic: {
+    importHint: { mediaLabel: "a comic", itemLabel: "issues/volumes" },
+  },
+  manga: {
+    importHint: { mediaLabel: "a manga", itemLabel: "issues/volumes" },
+  },
+  tv: {
+    chipLabel: "TV Series",
+    importHint: { mediaLabel: "a TV show", itemLabel: "episodes" },
+  },
+};
+
 export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetProps) {
-  const [selectedWatchlistId, setSelectedWatchlistId] = useState<string>("");
-  const [importJobId, setImportJobId] = useState<number | null>(null);
-
-  const { data: watchlists } = useQuery({
-    queryKey: ["watchlists"],
-    queryFn: () => getWatchlists({ data: { sortBy: "lastAdded" } }),
-    enabled: isOpen,
+  const [selectedWatchlistId, setSelectedWatchlistId] = useState("");
+  const { data: watchlists } = useWatchlistOptions(isOpen);
+  const { resetImportWorkflow, startImport, status } = useWatchlistImportWorkflow({
+    media,
   });
-
-  const addToWatchlistMutation = useMutation({
-    mutationFn: async () => {
-      if (!media || !selectedWatchlistId) return;
-      return addToWatchlist({
-        data: {
-          watchlistId: parseInt(selectedWatchlistId),
-          media: media,
-        },
-      });
-    },
-    onSuccess: (data) => {
-      if (
-        data?.success &&
-        "queued" in data &&
-        data.queued &&
-        "jobId" in data &&
-        typeof data.jobId === "number"
-      ) {
-        setImportJobId(data.jobId);
-        toast.success(data.message || "Import started");
-      } else if (data?.success) {
-        toast.success(data.message || "Added to watchlist");
-        onClose();
-      } else {
-        toast.error(data?.message || "Failed to add to watchlist");
-      }
-    },
-    onError: (error) => {
-      toast.error("An error occurred");
-      console.error(error);
-    },
-  });
-
-  const { data: importStatusData } = useQuery({
-    queryKey: ["watchlist-import-status", importJobId],
-    queryFn: () => getWatchlistImportStatus({ data: { jobId: importJobId! } }),
-    enabled: importJobId !== null,
-    refetchInterval: 1000,
-  });
-
-  useEffect(() => {
-    if (!importStatusData?.success) {
-      return;
-    }
-
-    const status = importStatusData.status.status;
-
-    if (status === "completed") {
-      toast.success(importStatusData.status.message || "Import completed");
-      setImportJobId(null);
-      onClose();
-      return;
-    }
-
-    if (status === "failed") {
-      toast.error(importStatusData.status.error || "Import failed");
-      setImportJobId(null);
-    }
-  }, [importStatusData, onClose]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setImportJobId(null);
-    }
-  }, [isOpen]);
 
   if (!media) return null;
 
@@ -112,19 +69,39 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
     mediaType,
   } = media;
 
-  // Rating might be undefined, handle gracefully
   const displayRating = rating ? rating.toFixed(1) : "N/A";
+  const mediaTypeDisplay = MEDIA_TYPE_DISPLAY[mediaType];
+  const mediaTypeLabel = mediaTypeDisplay?.chipLabel ?? mediaType;
+  const overviewHtml = DOMPurify.sanitize(overview || "No description available.");
+  const isSubmitDisabled =
+    !selectedWatchlistId || status.kind === "submitting" || status.kind === "importing";
 
-  const handleAddToWatchlist = () => {
+  const addSelectedWatchlist = async () => {
     if (!selectedWatchlistId) {
       toast.error("Please select a watchlist");
       return;
     }
-    addToWatchlistMutation.mutate();
+
+    const { resolution } = await startImport(Number.parseInt(selectedWatchlistId, 10));
+
+    if (resolution.kind === "completed") {
+      toast.success(resolution.message);
+      handleClose();
+      return;
+    }
+
+    if (resolution.kind === "failed") {
+      toast.error(resolution.message);
+    }
+  };
+
+  const handleClose = () => {
+    resetImportWorkflow();
+    onClose();
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Sheet open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <SheetContent className="sm:max-w-md md:max-w-lg lg:max-w-xl overflow-y-auto no-scrollbar">
         <SheetHeader className="text-left space-y-4">
           {backdropUrl && (
@@ -157,17 +134,14 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
                   <Star className="size-3.5 text-yellow-500 fill-yellow-500" /> {displayRating}
                 </span>
                 <span className="capitalize border px-1.5 py-0.5 rounded text-xs">
-                  {mediaType === "tv" ? "TV Series" : mediaType}
+                  {mediaTypeLabel}
                 </span>
               </div>
             </div>
           </div>
           <SheetDescription className="text-base leading-relaxed text-foreground/90" asChild>
-            <div
-              dangerouslySetInnerHTML={{
-                __html: DOMPurify.sanitize(overview || "No description available."),
-              }}
-            />
+            {/* Some providers return trusted-rich descriptions, so we sanitize instead of flattening them. */}
+            <div dangerouslySetInnerHTML={{ __html: overviewHtml }} />
           </SheetDescription>
         </SheetHeader>
 
@@ -182,42 +156,25 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
               className="flex-1"
             />
             <Button
-              onClick={handleAddToWatchlist}
-              disabled={
-                !selectedWatchlistId || addToWatchlistMutation.isPending || importJobId !== null
-              }
+              onClick={addSelectedWatchlist}
+              disabled={isSubmitDisabled}
               className="min-w-[100px]"
             >
-              {addToWatchlistMutation.isPending ? "Adding..." : "Add"}
+              {status.kind === "submitting" ? "Adding..." : "Add"}
             </Button>
           </div>
-          {importStatusData?.success ? (
+          {status.kind === "importing" && status.message ? (
             <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-xs text-primary">
-              {importStatusData.status.message ||
-                `${importStatusData.status.insertedItems} of ${importStatusData.status.totalItems} items added`}
+              {status.message}
             </div>
           ) : null}
-          {(mediaType === "tv" ||
-            mediaType === "anime" ||
-            mediaType === "comic" ||
-            mediaType === "manga") && (
+          {mediaTypeDisplay?.importHint && (
             <div className="flex items-start gap-2 text-xs text-muted-foreground bg-secondary/50 p-3 rounded-md">
               <Info className="size-4 shrink-0 mt-0.5" />
               <p>
-                Adding{" "}
-                {mediaType === "tv"
-                  ? "a TV show"
-                  : mediaType === "anime"
-                    ? "an anime"
-                    : mediaType === "comic"
-                      ? "a comic"
-                      : "a manga"}{" "}
-                will automatically add{" "}
-                <strong>
-                  all available{" "}
-                  {mediaType === "tv" || mediaType === "anime" ? "episodes" : "issues/volumes"}
-                </strong>{" "}
-                to your watchlist. This allows you to track your progress step by step.
+                Adding {mediaTypeDisplay.importHint.mediaLabel} will automatically add{" "}
+                <strong>all available {mediaTypeDisplay.importHint.itemLabel}</strong> to your
+                watchlist. This allows you to track your progress step by step.
               </p>
             </div>
           )}
