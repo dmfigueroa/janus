@@ -34,7 +34,7 @@ export class WatchlistImportJob extends Job {
       await markImportCompleted(this.id, result.message);
       return result;
     } catch (error) {
-      const message = logImportError(this.id, input, error);
+      const message = logWatchlistImportRunError(this.id, input, error);
       await markImportFailed(this.id, message);
       throw error;
     }
@@ -56,11 +56,19 @@ export async function enqueueImport(input: CreateImportInput): Promise<number> {
   return job.id;
 }
 
-function logImportError(jobId: number, input: CreateImportInput, error: unknown) {
+export function logWatchlistImportEnqueueError(input: CreateImportInput, error: unknown) {
+  return logWatchlistImportError("enqueue failed", input, error);
+}
+
+function logWatchlistImportRunError(jobId: number, input: CreateImportInput, error: unknown) {
+  return logWatchlistImportError(`run failed for job ${jobId}`, input, error);
+}
+
+function logWatchlistImportError(context: string, input: CreateImportInput, error: unknown) {
   const message = getErrorMessage(error);
   const suffix = error instanceof Error && error.stack ? `\n${error.stack}` : "";
 
-  console.error(`[jobs/watchlist/import] run failed for job ${jobId}: ${message}${suffix}`, {
+  console.error(`[jobs/watchlist/import] ${context}: ${message}${suffix}`, {
     watchlistId: input.watchlistId,
     media: {
       id: input.media.id,

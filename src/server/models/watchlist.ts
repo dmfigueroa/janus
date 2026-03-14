@@ -52,6 +52,13 @@ export const getDeprecatedWatchlistAddRejection = (mediaType: string) => {
   };
 };
 
+export class WatchlistNotFoundError extends Error {
+  constructor(readonly watchlistId: number) {
+    super(`Watchlist ${watchlistId} not found`);
+    this.name = "WatchlistNotFoundError";
+  }
+}
+
 export async function listWatchlists(input: z.infer<typeof getWatchlistsInputSchema>) {
   const { sortBy, sortOrder } = input;
   const isDesc = sortOrder === "desc";
@@ -135,7 +142,7 @@ export const getWatchlistByIdInternal = createServerOnlyFn(
     const [list] = await db.select().from(watchlists).where(eq(watchlists.id, id));
 
     if (!list) {
-      throw new Error("Watchlist not found");
+      throw new WatchlistNotFoundError(id);
     }
 
     const [totalRes, watchedRes, nextUnwatchedRes, firstItemRes, items] = await Promise.all([

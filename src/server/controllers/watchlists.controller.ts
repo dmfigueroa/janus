@@ -21,10 +21,10 @@ import {
   mergeWatchlistSchema,
   setWatchlistItemWatchedState,
   type GetWatchlistByIdResult,
+  WatchlistNotFoundError,
   watchlistSchema,
 } from "../models/watchlist";
-import { enqueueImport } from "../jobs/watchlist/import.job";
-import { getErrorMessage } from "../utils";
+import { enqueueImport, logWatchlistImportEnqueueError } from "../jobs/watchlist/import.job";
 
 export type { GetWatchlistByIdResult };
 
@@ -68,7 +68,17 @@ export const getWatchlists = createServerFn()
 
 export const getWatchlistById = createServerFn()
   .inputValidator((data) => getWatchlistByIdInputSchema.parse(data))
-  .handler(async ({ data }) => getWatchlistByIdInternal(data));
+  .handler(async ({ data }) => {
+    try {
+      return await getWatchlistByIdInternal(data);
+    } catch (error) {
+      if (error instanceof WatchlistNotFoundError) {
+        throw notFound();
+      }
+
+      throw error;
+    }
+  });
 
 export const createWatchlist = createServerFn()
   .inputValidator((data) => watchlistSchema.parse(data))
@@ -115,18 +125,7 @@ export const addToWatchlist = createServerFn({ method: "POST" })
         message: "Import started",
       };
     } catch (error) {
-      const message = getErrorMessage(error);
-      const suffix = error instanceof Error && error.stack ? `\n${error.stack}` : "";
-
-      console.error(`[controllers/watchlist] addToWatchlist enqueue failed: ${message}${suffix}`, {
-        watchlistId: data.watchlistId,
-        media: {
-          id: data.media.id,
-          mediaType: data.media.mediaType,
-          source: data.media.source,
-          title: data.media.title,
-        },
-      });
+      logWatchlistImportEnqueueError(data, error);
       throw error;
     }
   });
