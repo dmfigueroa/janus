@@ -4,9 +4,33 @@ import { createServerOnlyFn } from "@tanstack/react-start";
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "../../db/db.server";
-import { watchlistItems, watchlists } from "../../db/schema";
+import { watchlistItems, watchlists, type Watchlist, type WatchlistItem } from "../../db/schema";
 import { DEPRECATED_MEDIA_MESSAGE, isDeprecatedMediaType } from "../media";
 import { escapeLikeString } from "../../utils/search";
+
+type WatchlistStats = {
+  totalItems: number;
+  watchedItems: number;
+  progress: number;
+  nextUnwatched: WatchlistItem | null;
+  coverImage: string | null;
+  coverMediaType: WatchlistItem["mediaType"] | null;
+};
+
+type WatchlistSummary = Watchlist & {
+  stats: WatchlistStats;
+};
+
+type WatchlistItemFilters = {
+  watchlistId: number;
+  query?: string;
+  isWatched?: boolean;
+};
+
+type MergeWatchlistInput = z.infer<typeof mergeWatchlistSchema>;
+type ToggleWatchedInput = { itemId: number; isWatched: boolean };
+
+const WATCHLIST_ITEM_INSERT_CHUNK_SIZE = 50;
 
 export const watchlistSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -59,33 +83,225 @@ export class WatchlistNotFoundError extends Error {
   }
 }
 
-export async function listWatchlists(input: z.infer<typeof getWatchlistsInputSchema>) {
-  const { sortBy, sortOrder } = input;
-  const isDesc = sortOrder === "desc";
+function getWatchlistSortOrder(input: z.infer<typeof getWatchlistsInputSchema>) {
+  const isDesc = input.sortOrder === "desc";
   const orderFn = isDesc ? desc : asc;
 
-  let orderBy;
-  switch (sortBy) {
+  switch (input.sortBy) {
     case "lastWatched":
-      orderBy = [
+      return [
         isDesc
           ? sql`CASE WHEN ${watchlists.lastWatchedAt} IS NULL THEN 1 ELSE 0 END`
           : sql`CASE WHEN ${watchlists.lastWatchedAt} IS NULL THEN 0 ELSE 1 END`,
         orderFn(watchlists.lastWatchedAt),
-      ];
-      break;
+      ] as const;
     case "lastAdded":
-      orderBy = [orderFn(sql`COALESCE(${watchlists.lastItemAddedAt}, ${watchlists.createdAt})`)];
-      break;
+      return [
+        orderFn(sql`COALESCE(${watchlists.lastItemAddedAt}, ${watchlists.createdAt})`),
+      ] as const;
     default:
-      orderBy = [orderFn(watchlists.createdAt)];
+      return [orderFn(watchlists.createdAt)] as const;
+  }
+}
+
+function orderWatchlistItemsByReleaseDate() {
+  return [
+    sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
+    asc(watchlistItems.releaseDate),
+  ] as const;
+}
+
+function groupItemsByWatchlist(items: WatchlistItem[]) {
+  return items.reduce<Record<number, WatchlistItem[]>>((acc, item) => {
+    if (!acc[item.watchlistId]) {
+      acc[item.watchlistId] = [];
+    }
+
+    acc[item.watchlistId].push(item);
+    return acc;
+  }, {});
+}
+
+function buildWatchlistStats(input: {
+  items: WatchlistItem[];
+  totalItems?: number;
+  watchedItems?: number;
+  nextUnwatched?: WatchlistItem | null;
+  firstItem?: WatchlistItem | null;
+}): WatchlistStats {
+  const totalItems = input.totalItems ?? input.items.length;
+  const watchedItems = input.watchedItems ?? input.items.filter((item) => item.isWatched).length;
+  const nextUnwatched = input.nextUnwatched ?? input.items.find((item) => !item.isWatched) ?? null;
+  const firstItem = input.firstItem ?? input.items[0] ?? null;
+  const coverItem = nextUnwatched ?? firstItem;
+
+  return {
+    totalItems,
+    watchedItems,
+    progress: totalItems > 0 ? Math.round((watchedItems / totalItems) * 100) : 0,
+    nextUnwatched,
+    coverImage: coverItem?.posterPath ?? null,
+    coverMediaType: coverItem?.mediaType ?? null,
+  };
+}
+
+function buildWatchlistSummary(watchlist: Watchlist, stats: WatchlistStats): WatchlistSummary {
+  return {
+    ...watchlist,
+    stats,
+  };
+}
+
+/**
+ * Returns the watchlist for the given id.
+ * Throws `WatchlistNotFoundError` when no watchlist exists.
+ */
+async function getWatchlist(id: number) {
+  const db = getDb();
+  const [watchlist] = await db.select().from(watchlists).where(eq(watchlists.id, id));
+
+  if (!watchlist) {
+    throw new WatchlistNotFoundError(id);
   }
 
+  return watchlist;
+}
+
+async function resolveMergeTargetWatchlist(input: MergeWatchlistInput) {
+  if (input.targetWatchlistId) {
+    return input.targetWatchlistId;
+  }
+
+  if (!input.newWatchlistName) {
+    throw new Error("Target watchlist ID resolution failed");
+  }
+
+  const db = getDb();
+  const [watchlist] = await db
+    .insert(watchlists)
+    .values({
+      name: input.newWatchlistName,
+      description: "Merged watchlist",
+    })
+    .returning();
+
+  return watchlist.id;
+}
+
+function getWatchlistItemSearchFilter({ watchlistId, query, isWatched }: WatchlistItemFilters) {
+  return and(
+    eq(watchlistItems.watchlistId, watchlistId),
+    isWatched !== undefined ? eq(watchlistItems.isWatched, isWatched) : undefined,
+    query
+      ? or(
+          sql`${watchlistItems.title} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\\' COLLATE NOCASE`,
+          sql`${watchlistItems.parentTitle} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\\' COLLATE NOCASE`,
+          sql`${watchlistItems.episode} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\\' COLLATE NOCASE`,
+        )
+      : undefined,
+  );
+}
+
+function toMergedWatchlistItem(targetWatchlistId: number, item: WatchlistItem) {
+  return {
+    watchlistId: targetWatchlistId,
+    tmdbId: item.tmdbId,
+    source: item.source,
+    mediaType: item.mediaType,
+    title: item.title,
+    parentTitle: item.parentTitle,
+    season: item.season,
+    episode: item.episode,
+    posterPath: item.posterPath,
+    releaseDate: item.releaseDate,
+    voteAverage: item.voteAverage,
+    runtime: item.runtime,
+    isWatched: item.isWatched,
+    addedAt: item.addedAt,
+  };
+}
+
+async function copyItemsToWatchlist(targetWatchlistId: number, sourceWatchlistIds: number[]) {
+  const db = getDb();
+  const sourceItems = await db
+    .select()
+    .from(watchlistItems)
+    .where(inArray(watchlistItems.watchlistId, sourceWatchlistIds));
+
+  if (sourceItems.length === 0) {
+    return;
+  }
+
+  const itemsToInsert = sourceItems.map((item) => toMergedWatchlistItem(targetWatchlistId, item));
+
+  for (let index = 0; index < itemsToInsert.length; index += WATCHLIST_ITEM_INSERT_CHUNK_SIZE) {
+    const chunk = itemsToInsert.slice(index, index + WATCHLIST_ITEM_INSERT_CHUNK_SIZE);
+
+    await db
+      .insert(watchlistItems)
+      .values(chunk)
+      .onConflictDoUpdate({
+        target: [watchlistItems.watchlistId, watchlistItems.tmdbId, watchlistItems.mediaType],
+        set: {
+          isWatched: sql`CASE WHEN ${watchlistItems.isWatched} OR excluded.is_watched THEN 1 ELSE 0 END`,
+        },
+      });
+  }
+
+  await db
+    .update(watchlists)
+    .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
+    .where(eq(watchlists.id, targetWatchlistId));
+}
+
+async function deleteMergedSourceWatchlists(
+  targetWatchlistId: number,
+  sourceWatchlistIds: number[],
+) {
+  const sourceIdsToDelete = sourceWatchlistIds.filter((id) => id !== targetWatchlistId);
+
+  if (sourceIdsToDelete.length === 0) {
+    return;
+  }
+
+  const db = getDb();
+  await db.delete(watchlists).where(inArray(watchlists.id, sourceIdsToDelete));
+}
+
+async function getWatchlistItemTarget(itemId: number) {
+  const db = getDb();
+  const [item] = await db
+    .select({ watchlistId: watchlistItems.watchlistId })
+    .from(watchlistItems)
+    .where(eq(watchlistItems.id, itemId));
+
+  return item ?? null;
+}
+
+async function markWatchlistItemWatchedState(input: ToggleWatchedInput) {
+  const db = getDb();
+
+  await db
+    .update(watchlistItems)
+    .set({ isWatched: input.isWatched })
+    .where(eq(watchlistItems.id, input.itemId));
+}
+
+async function updateWatchlistLastWatchedAt(watchlistId: number) {
+  const db = getDb();
+
+  await db
+    .update(watchlists)
+    .set({ lastWatchedAt: sql`CURRENT_TIMESTAMP` })
+    .where(eq(watchlists.id, watchlistId));
+}
+
+export async function listWatchlists(input: z.infer<typeof getWatchlistsInputSchema>) {
   const db = getDb();
   const lists = await db
     .select()
     .from(watchlists)
-    .orderBy(...orderBy);
+    .orderBy(...getWatchlistSortOrder(input));
 
   if (lists.length === 0) {
     return [];
@@ -96,40 +312,13 @@ export async function listWatchlists(input: z.infer<typeof getWatchlistsInputSch
     .select()
     .from(watchlistItems)
     .where(inArray(watchlistItems.watchlistId, listIds))
-    .orderBy(
-      sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
-      asc(watchlistItems.releaseDate),
-    );
+    .orderBy(...orderWatchlistItemsByReleaseDate());
 
-  const itemsByWatchlist = items.reduce(
-    (acc, item) => {
-      if (!acc[item.watchlistId]) {
-        acc[item.watchlistId] = [];
-      }
-      acc[item.watchlistId].push(item);
-      return acc;
-    },
-    {} as Record<number, typeof items>,
-  );
+  const itemsByWatchlist = groupItemsByWatchlist(items);
 
   return lists.map((list) => {
-    const listItems = itemsByWatchlist[list.id] || [];
-    const totalItems = listItems.length;
-    const watchedItems = listItems.filter((item) => item.isWatched).length;
-    const nextUnwatched = listItems.find((item) => !item.isWatched) || null;
-    const coverItem = nextUnwatched || listItems[0] || null;
-
-    return {
-      ...list,
-      stats: {
-        totalItems,
-        watchedItems,
-        progress: totalItems > 0 ? Math.round((watchedItems / totalItems) * 100) : 0,
-        nextUnwatched,
-        coverImage: coverItem?.posterPath || null,
-        coverMediaType: coverItem?.mediaType || null,
-      },
-    };
+    const stats = buildWatchlistStats({ items: itemsByWatchlist[list.id] ?? [] });
+    return buildWatchlistSummary(list, stats);
   });
 }
 
@@ -139,11 +328,7 @@ export const getWatchlistByIdInternal = createServerOnlyFn(
     const offset = (page - 1) * limit;
 
     const db = getDb();
-    const [list] = await db.select().from(watchlists).where(eq(watchlists.id, id));
-
-    if (!list) {
-      throw new WatchlistNotFoundError(id);
-    }
+    const watchlist = await getWatchlist(id);
 
     const [totalRes, watchedRes, nextUnwatchedRes, firstItemRes, items] = await Promise.all([
       db
@@ -158,62 +343,33 @@ export const getWatchlistByIdInternal = createServerOnlyFn(
         .select()
         .from(watchlistItems)
         .where(and(eq(watchlistItems.watchlistId, id), eq(watchlistItems.isWatched, false)))
-        .orderBy(
-          sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
-          asc(watchlistItems.releaseDate),
-        )
+        .orderBy(...orderWatchlistItemsByReleaseDate())
         .limit(1),
       db
         .select()
         .from(watchlistItems)
         .where(eq(watchlistItems.watchlistId, id))
-        .orderBy(
-          sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
-          asc(watchlistItems.releaseDate),
-        )
+        .orderBy(...orderWatchlistItemsByReleaseDate())
         .limit(1),
       db
         .select()
         .from(watchlistItems)
-        .where(
-          and(
-            eq(watchlistItems.watchlistId, id),
-            isWatched !== undefined ? eq(watchlistItems.isWatched, isWatched) : undefined,
-            query
-              ? or(
-                  sql`${watchlistItems.title} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\\' COLLATE NOCASE`,
-                  sql`${watchlistItems.parentTitle} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\\' COLLATE NOCASE`,
-                  sql`${watchlistItems.episode} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\\' COLLATE NOCASE`,
-                )
-              : undefined,
-          ),
-        )
-        .orderBy(
-          sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
-          asc(watchlistItems.releaseDate),
-        )
+        .where(getWatchlistItemSearchFilter({ watchlistId: id, query, isWatched }))
+        .orderBy(...orderWatchlistItemsByReleaseDate())
         .limit(limit)
         .offset(offset),
     ]);
 
-    const totalItems = totalRes[0]?.count || 0;
-    const watchedItems = watchedRes[0]?.count || 0;
-    const nextUnwatched = nextUnwatchedRes[0] || null;
-    const firstItem = firstItemRes[0] || null;
-    const coverItem = nextUnwatched || firstItem || null;
+    const stats = buildWatchlistStats({
+      items,
+      totalItems: totalRes[0]?.count ?? 0,
+      watchedItems: watchedRes[0]?.count ?? 0,
+      nextUnwatched: nextUnwatchedRes[0] ?? null,
+      firstItem: firstItemRes[0] ?? null,
+    });
 
     return {
-      watchlist: {
-        ...list,
-        stats: {
-          totalItems,
-          watchedItems,
-          progress: totalItems > 0 ? Math.round((watchedItems / totalItems) * 100) : 0,
-          nextUnwatched,
-          coverImage: coverItem?.posterPath || null,
-          coverMediaType: coverItem?.mediaType || null,
-        },
-      },
+      watchlist: buildWatchlistSummary(watchlist, stats),
       items,
       nextCursor: items.length === limit ? page + 1 : undefined,
     };
@@ -242,97 +398,25 @@ export async function deleteWatchlistRecord(input: z.infer<typeof deleteWatchlis
 }
 
 export async function mergeWatchlistRecords(input: z.infer<typeof mergeWatchlistSchema>) {
-  const db = getDb();
-  let targetId = input.targetWatchlistId;
+  const targetId = await resolveMergeTargetWatchlist(input);
 
-  if (input.newWatchlistName && !targetId) {
-    const [newWatchlist] = await db
-      .insert(watchlists)
-      .values({
-        name: input.newWatchlistName,
-        description: "Merged watchlist",
-      })
-      .returning();
-    targetId = newWatchlist.id;
-  }
-
-  if (!targetId) {
-    throw new Error("Target watchlist ID resolution failed");
-  }
-
-  const sourceItems = await db
-    .select()
-    .from(watchlistItems)
-    .where(inArray(watchlistItems.watchlistId, input.sourceWatchlistIds));
-
-  if (sourceItems.length > 0) {
-    const itemsToInsert = sourceItems.map((item) => ({
-      watchlistId: targetId,
-      tmdbId: item.tmdbId,
-      source: item.source,
-      mediaType: item.mediaType,
-      title: item.title,
-      parentTitle: item.parentTitle,
-      season: item.season,
-      episode: item.episode,
-      posterPath: item.posterPath,
-      releaseDate: item.releaseDate,
-      voteAverage: item.voteAverage,
-      runtime: item.runtime,
-      isWatched: item.isWatched,
-      addedAt: item.addedAt,
-    }));
-
-    const chunkSize = 50;
-    for (let index = 0; index < itemsToInsert.length; index += chunkSize) {
-      const chunk = itemsToInsert.slice(index, index + chunkSize);
-
-      await db
-        .insert(watchlistItems)
-        .values(chunk)
-        .onConflictDoUpdate({
-          target: [watchlistItems.watchlistId, watchlistItems.tmdbId, watchlistItems.mediaType],
-          set: {
-            isWatched: sql`CASE WHEN ${watchlistItems.isWatched} OR excluded.is_watched THEN 1 ELSE 0 END`,
-          },
-        });
-    }
-
-    await db
-      .update(watchlists)
-      .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
-      .where(eq(watchlists.id, targetId));
-  }
-
-  const sourcesToDelete = input.sourceWatchlistIds.filter((id) => id !== targetId);
-  if (sourcesToDelete.length > 0) {
-    await db.delete(watchlists).where(inArray(watchlists.id, sourcesToDelete));
-  }
+  await copyItemsToWatchlist(targetId, input.sourceWatchlistIds);
+  await deleteMergedSourceWatchlists(targetId, input.sourceWatchlistIds);
 
   return { success: true, targetId };
 }
 
-export async function setWatchlistItemWatchedState(input: { itemId: number; isWatched: boolean }) {
-  const db = getDb();
-  const [item] = await db
-    .select({ watchlistId: watchlistItems.watchlistId })
-    .from(watchlistItems)
-    .where(eq(watchlistItems.id, input.itemId));
+export async function setWatchlistItemWatchedState(input: ToggleWatchedInput) {
+  const item = await getWatchlistItemTarget(input.itemId);
 
   if (!item) {
     return null;
   }
 
-  await db
-    .update(watchlistItems)
-    .set({ isWatched: input.isWatched })
-    .where(eq(watchlistItems.id, input.itemId));
+  await markWatchlistItemWatchedState(input);
 
   if (input.isWatched) {
-    await db
-      .update(watchlists)
-      .set({ lastWatchedAt: sql`CURRENT_TIMESTAMP` })
-      .where(eq(watchlists.id, item.watchlistId));
+    await updateWatchlistLastWatchedAt(item.watchlistId);
   }
 
   return {
