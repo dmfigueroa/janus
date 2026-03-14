@@ -5,7 +5,7 @@ import {
   getImportResolution,
   getImportStatusMessage,
 } from "@/hooks/watchlistImportState";
-import { getWatchlistImportStatus } from "@/server/watchlist";
+import { getWatchlistImportStatus } from "@/server/controllers/watchlists.controller";
 
 const IMPORT_POLL_INTERVAL_MS = 1000;
 

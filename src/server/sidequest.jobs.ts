@@ -1,1 +1,1 @@
-export { WatchlistImportJob } from "./watchlists/import/job";
+export { WatchlistImportJob } from "./jobs/watchlist/import.job";

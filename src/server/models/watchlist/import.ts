@@ -1,23 +1,40 @@
 "use server";
 
 import { and, desc, eq, sql } from "drizzle-orm";
-import { watchlistImportJobs, watchlistItems, watchlists } from "../../db/schema";
-import { getDb } from "../../db/db.server";
-import { getAnilistDetails } from "../providers/anilist.server";
-import { getComicIssues } from "../providers/comicvine.server";
-import { getBookDetails } from "../providers/google-books.server";
-import { getGameDetails } from "../providers/rawg.server";
+import { watchlistImportJobs, watchlistItems, watchlists } from "../../../db/schema";
+import { getDb } from "../../../db/db.server";
+import { getAnilistDetails } from "../../providers/anilist.server";
+import { getComicIssues } from "../../providers/comicvine.server";
+import { getBookDetails } from "../../providers/google-books.server";
+import { getGameDetails } from "../../providers/rawg.server";
 import {
   getMovieDetails,
   getSeasonDetails,
   getTVDetails,
   type TMDBEpisode,
   type TMDBSeason,
-} from "../providers/tmdb.server";
-import { getErrorMessage } from "../utils";
-import { type CreateImportInput, type ImportMedia } from "./import/contracts";
+} from "../../providers/tmdb.server";
+import { z } from "zod";
 
-export { createImportSchema } from "./import/contracts";
+export const importMediaSchema = z.object({
+  id: z.string(),
+  mediaType: z.enum(["movie", "tv", "game", "book", "comic", "anime", "manga"]),
+  source: z.enum(["tmdb", "google_books", "rawg", "comicvine", "anilist", "custom"]),
+  title: z.string(),
+  poster: z.string().nullable(),
+  year: z.string().optional(),
+  releaseDate: z.string().optional(),
+  rating: z.number().optional(),
+  overview: z.string().optional(),
+});
+
+export const createImportSchema = z.object({
+  watchlistId: z.number(),
+  media: importMediaSchema,
+});
+
+export type ImportMedia = z.infer<typeof importMediaSchema>;
+export type CreateImportInput = z.infer<typeof createImportSchema>;
 
 const DB_INSERT_CHUNK_SIZE = 50;
 
@@ -147,7 +164,8 @@ export async function createImport(input: {
   totalItems: number;
 }) {
   const db = getDb();
-  const [record] = await db
+
+  await db
     .insert(watchlistImportJobs)
     .values({
       sidequestJobId: input.jobId,
@@ -160,7 +178,12 @@ export async function createImport(input: {
       processedItems: 0,
       insertedItems: 0,
     })
-    .returning();
+    .onConflictDoNothing({ target: watchlistImportJobs.sidequestJobId });
+
+  const record = await getImportRecord(input.jobId);
+  if (!record) {
+    throw new Error(`Failed to create import record for job ${input.jobId}`);
+  }
 
   return record;
 }
@@ -211,13 +234,7 @@ export async function markImportFailed(jobId: number, error: string) {
 }
 
 export async function getImportByJobId(jobId: number): Promise<WatchlistImportStatus | null> {
-  const db = getDb();
-  const [record] = await db
-    .select()
-    .from(watchlistImportJobs)
-    .where(eq(watchlistImportJobs.sidequestJobId, jobId))
-    .limit(1);
-
+  const record = await getImportRecord(jobId);
   if (!record) {
     return null;
   }
@@ -247,21 +264,63 @@ export async function getLatestImportForWatchlist(watchlistId: number) {
   return record || null;
 }
 
-export async function runImport(jobId: number, input: CreateImportInput): Promise<ImportResult> {
-  await markImportRunning(jobId);
+export async function importMediaIntoWatchlist(
+  watchlistId: number,
+  media: ImportMedia,
+  onProgress?: ProgressListener,
+): Promise<ImportResult> {
+  const tracker = new ImportProgressTracker(onProgress);
+  const plan = buildImportPlan(watchlistId, media);
 
-  try {
-    const result = await importIntoWatchlist(input.watchlistId, input.media, async (progress) => {
-      await updateImportProgress(jobId, progress);
-    });
-
-    await markImportCompleted(jobId, result.message);
-    return result;
-  } catch (error) {
-    const message = logImportError(jobId, input, error);
-    await markImportFailed(jobId, message);
-    throw error;
+  switch (plan.kind) {
+    case "tmdb_tv":
+      return addTvShowToWatchlist(watchlistId, plan.tmdbId, media.title, tracker);
+    case "tmdb_movie":
+      return addMovieToWatchlist(watchlistId, plan.tmdbId, tracker);
+    case "comicvine_comic":
+      return addComicVolumeToWatchlist(
+        watchlistId,
+        plan.volumeId,
+        media.title,
+        plan.apiKey,
+        tracker,
+      );
+    case "google_books_book":
+      return addGenericMediaToWatchlist(
+        watchlistId,
+        {
+          ...(await getBookDetails(plan.bookId)),
+          mediaType: "book",
+        },
+        tracker,
+      );
+    case "rawg_game":
+      return addGenericMediaToWatchlist(
+        watchlistId,
+        {
+          ...(await getGameDetails(plan.gameId, plan.apiKey)),
+          mediaType: "game",
+        },
+        tracker,
+      );
+    case "anilist_anime":
+      return addAnimeToWatchlist(watchlistId, plan.aniListId, media.title, tracker);
+    case "anilist_manga":
+      return addMangaToWatchlist(watchlistId, plan.aniListId, media.title, tracker);
+    case "generic":
+      return addGenericMediaToWatchlist(watchlistId, plan.media, tracker);
   }
+}
+
+async function getImportRecord(jobId: number) {
+  const db = getDb();
+  const [record] = await db
+    .select()
+    .from(watchlistImportJobs)
+    .where(eq(watchlistImportJobs.sidequestJobId, jobId))
+    .limit(1);
+
+  return record || null;
 }
 
 async function updateImportState(jobId: number, transition: ImportStateTransition) {
@@ -298,23 +357,6 @@ async function updateImportState(jobId: number, transition: ImportStateTransitio
     .where(eq(watchlistImportJobs.sidequestJobId, jobId));
 }
 
-function logImportError(jobId: number, input: CreateImportInput, error: unknown) {
-  const message = getErrorMessage(error);
-  const suffix = error instanceof Error && error.stack ? `\n${error.stack}` : "";
-
-  console.error(`[watchlists/imports] run failed for job ${jobId}: ${message}${suffix}`, {
-    watchlistId: input.watchlistId,
-    media: {
-      id: input.media.id,
-      mediaType: input.media.mediaType,
-      source: input.media.source,
-      title: input.media.title,
-    },
-  });
-
-  return message;
-}
-
 function isGenericImportMedia(media: ImportMedia): media is GenericImportMedia {
   return media.mediaType !== "tv";
 }
@@ -338,7 +380,7 @@ function getRequiredProviderApiKey(
     return apiKey;
   }
 
-  console.error(`[watchlists/imports] ${envVar} is not configured`, {
+  console.error(`[watchlists/import] ${envVar} is not configured`, {
     watchlistId,
     mediaId: media.id,
     mediaType: media.mediaType,
@@ -359,7 +401,7 @@ function buildImportPlan(watchlistId: number, media: ImportMedia): ImportPlan {
     }
 
     if (media.source !== "custom") {
-      console.error("[watchlists/imports] unsupported TV source for generic import", {
+      console.error("[watchlists/import] unsupported TV source for generic import", {
         watchlistId,
         mediaId: media.id,
         source: media.source,
@@ -445,54 +487,6 @@ function importNoop(
     ...tracker.snapshot(),
     message,
   };
-}
-
-async function importIntoWatchlist(
-  watchlistId: number,
-  media: ImportMedia,
-  onProgress?: ProgressListener,
-): Promise<ImportResult> {
-  const tracker = new ImportProgressTracker(onProgress);
-  const plan = buildImportPlan(watchlistId, media);
-
-  switch (plan.kind) {
-    case "tmdb_tv":
-      return addTvShowToWatchlist(watchlistId, plan.tmdbId, media.title, tracker);
-    case "tmdb_movie":
-      return addMovieToWatchlist(watchlistId, plan.tmdbId, tracker);
-    case "comicvine_comic":
-      return addComicVolumeToWatchlist(
-        watchlistId,
-        plan.volumeId,
-        media.title,
-        plan.apiKey,
-        tracker,
-      );
-    case "google_books_book":
-      return addGenericMediaToWatchlist(
-        watchlistId,
-        {
-          ...(await getBookDetails(plan.bookId)),
-          mediaType: "book",
-        },
-        tracker,
-      );
-    case "rawg_game":
-      return addGenericMediaToWatchlist(
-        watchlistId,
-        {
-          ...(await getGameDetails(plan.gameId, plan.apiKey)),
-          mediaType: "game",
-        },
-        tracker,
-      );
-    case "anilist_anime":
-      return addAnimeToWatchlist(watchlistId, plan.aniListId, media.title, tracker);
-    case "anilist_manga":
-      return addMangaToWatchlist(watchlistId, plan.aniListId, media.title, tracker);
-    case "generic":
-      return addGenericMediaToWatchlist(watchlistId, plan.media, tracker);
-  }
 }
 
 async function addGenericMediaToWatchlist(

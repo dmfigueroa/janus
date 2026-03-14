@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { getWatchlistById, type GetWatchlistByIdResult } from "@/server/watchlists";
+import {
+  getWatchlistById,
+  type GetWatchlistByIdResult,
+} from "@/server/controllers/watchlists.controller";
 import { WatchlistHeader } from "@/components/watchlist/WatchlistHeader";
 import { WatchlistTimeline } from "@/components/watchlist/WatchlistTimeline";
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "@tanstack/react-router";
-import { createWatchlist } from "@/server/watchlists";
+import { createWatchlist } from "@/server/controllers/watchlists.controller";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

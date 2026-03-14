@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { mergeWatchlists } from "@/server/watchlists";
+import { mergeWatchlists } from "@/server/controllers/watchlists.controller";
 import { useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 import type { EnrichedWatchlist } from "./WatchlistCard";

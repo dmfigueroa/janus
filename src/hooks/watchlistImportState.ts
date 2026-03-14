@@ -1,6 +1,9 @@
 "use client";
 
-import { addToWatchlist, getWatchlistImportStatus } from "@/server/watchlist";
+import {
+  addToWatchlist,
+  getWatchlistImportStatus,
+} from "@/server/controllers/watchlists.controller";
 
 type AddToWatchlistResult = Awaited<ReturnType<typeof addToWatchlist>>;
 type ImportStatusResult = Awaited<ReturnType<typeof getWatchlistImportStatus>>;

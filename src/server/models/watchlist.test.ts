@@ -1,24 +1,24 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import path from "path";
 
-let db: ReturnType<typeof import("../db/db.server").getDb>;
-let watchlists: typeof import("../db/schema").watchlists;
-let watchlistItems: typeof import("../db/schema").watchlistItems;
-let getWatchlistByIdInternal: typeof import("./watchlists").getWatchlistByIdInternal;
-let closeDb: typeof import("../db/db.server").closeDb;
+let db: ReturnType<typeof import("../../db/db.server").getDb>;
+let watchlists: typeof import("../../db/schema").watchlists;
+let watchlistItems: typeof import("../../db/schema").watchlistItems;
+let getWatchlistByIdInternal: typeof import("./watchlist").getWatchlistByIdInternal;
+let closeDb: typeof import("../../db/db.server").closeDb;
 
 beforeAll(async () => {
   process.env.DATABASE_URL = ":memory:";
-  const dbModule = await import("../db/db.server");
-  const schemaModule = await import("../db/schema");
-  const watchlistsModule = await import("./watchlists");
+  const dbModule = await import("../../db/db.server");
+  const schemaModule = await import("../../db/schema");
+  const watchlistsModelModule = await import("./watchlist");
 
   db = dbModule.getDb();
   closeDb = dbModule.closeDb;
   watchlists = schemaModule.watchlists;
   watchlistItems = schemaModule.watchlistItems;
-  getWatchlistByIdInternal = watchlistsModule.getWatchlistByIdInternal;
+  getWatchlistByIdInternal = watchlistsModelModule.getWatchlistByIdInternal;
 
   await migrate(db, { migrationsFolder: path.resolve(process.cwd(), "drizzle") });
 });

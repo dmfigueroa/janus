@@ -2,7 +2,7 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { UnifiedMedia } from "@/server/media";
-import { addToWatchlist } from "@/server/watchlist";
+import { addToWatchlist } from "@/server/controllers/watchlists.controller";
 import { ImportResolution, getStartedImport } from "@/hooks/watchlistImportState";
 
 interface UseStartWatchlistImportOptions {

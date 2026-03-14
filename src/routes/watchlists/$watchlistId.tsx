@@ -1,4 +1,4 @@
-import { getWatchlistById } from "@/server/watchlists";
+import { getWatchlistById } from "@/server/controllers/watchlists.controller";
 import { createFileRoute } from "@tanstack/react-router";
 import { WatchlistDetail as WatchlistDetailView } from "@/components/watchlist/WatchlistDetail";
 
