@@ -16,11 +16,7 @@ export interface ImportResolution {
 }
 
 export function getStartedImport(result: AddToWatchlistResult): ImportStarted | null {
-  if (!result.success) {
-    return null;
-  }
-
-  if (!("jobId" in result) || typeof result.jobId !== "number") {
+  if (result.kind !== "queued") {
     return null;
   }
 
@@ -31,7 +27,7 @@ export function getStartedImport(result: AddToWatchlistResult): ImportStarted | 
 }
 
 export function getImportStatusMessage(result: ImportStatusResult | undefined) {
-  if (!result?.success) {
+  if (!result || result.kind !== "status") {
     return null;
   }
 
@@ -44,7 +40,7 @@ export function getImportStatusMessage(result: ImportStatusResult | undefined) {
 export function getImportResolution(
   result: ImportStatusResult | undefined,
 ): ImportResolution | null {
-  if (!result?.success) {
+  if (!result || result.kind !== "status") {
     return null;
   }
 

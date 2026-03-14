@@ -6,8 +6,13 @@ import { type UnifiedMedia } from "../media";
 import { fetchFromTMDB } from "./tmdb-api.server";
 
 export {
+  type TMDBEpisode,
   type TMDBMedia,
+  type TMDBMovieDetails,
+  type TMDBSeason,
+  type TMDBSeasonDetails,
   type TMDBSearchResponse,
+  type TMDBTVDetails,
   getTVDetails,
   getSeasonDetails,
   getMovieDetails,

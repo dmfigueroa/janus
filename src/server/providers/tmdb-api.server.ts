@@ -16,6 +16,35 @@ export interface TMDBMedia {
   overview: string;
 }
 
+export interface TMDBMovieDetails extends TMDBMedia {
+  runtime?: number | null;
+}
+
+export interface TMDBSeason {
+  season_number: number;
+  episode_count?: number | null;
+}
+
+export interface TMDBTVDetails {
+  poster_path: string | null;
+  seasons?: TMDBSeason[];
+}
+
+export interface TMDBEpisode {
+  id: number;
+  name: string;
+  season_number: number;
+  episode_number: number;
+  still_path: string | null;
+  air_date?: string;
+  vote_average: number;
+  runtime?: number | null;
+}
+
+export interface TMDBSeasonDetails {
+  episodes?: TMDBEpisode[];
+}
+
 export interface TMDBSearchResponse {
   page: number;
   results: TMDBMedia[];
@@ -94,21 +123,21 @@ export const fetchFromTMDB = createServerFn({ method: "GET" })
 
 export const getTVDetails = createServerFn({ method: "GET" })
   .inputValidator((data) => z.object({ id: z.number() }).parse(data))
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<TMDBTVDetails> => {
     const url = new URL(`${TMDB_BASE_URL}/tv/${data.id}`);
-    return fetchWithAuth(url.toString());
+    return (await fetchWithAuth(url.toString())) as TMDBTVDetails;
   });
 
 export const getSeasonDetails = createServerFn({ method: "GET" })
   .inputValidator((data) => z.object({ id: z.number(), seasonNumber: z.number() }).parse(data))
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<TMDBSeasonDetails> => {
     const url = new URL(`${TMDB_BASE_URL}/tv/${data.id}/season/${data.seasonNumber}`);
-    return fetchWithAuth(url.toString());
+    return (await fetchWithAuth(url.toString())) as TMDBSeasonDetails;
   });
 
 export const getMovieDetails = createServerFn({ method: "GET" })
   .inputValidator((data) => z.object({ id: z.number() }).parse(data))
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<TMDBMovieDetails> => {
     const url = new URL(`${TMDB_BASE_URL}/movie/${data.id}`);
-    return fetchWithAuth(url.toString());
+    return (await fetchWithAuth(url.toString())) as TMDBMovieDetails;
   });

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const watchlistImportMediaSchema = z.object({
+export const importMediaSchema = z.object({
   id: z.string(),
   mediaType: z.enum(["movie", "tv", "game", "book", "comic", "anime", "manga"]),
   source: z.enum(["tmdb", "google_books", "rawg", "comicvine", "anilist", "custom"]),
@@ -12,10 +12,10 @@ export const watchlistImportMediaSchema = z.object({
   overview: z.string().optional(),
 });
 
-export const watchlistImportRequestSchema = z.object({
+export const createImportSchema = z.object({
   watchlistId: z.number(),
-  media: watchlistImportMediaSchema,
+  media: importMediaSchema,
 });
 
-export type WatchlistImportMedia = z.infer<typeof watchlistImportMediaSchema>;
-export type WatchlistImportRequest = z.infer<typeof watchlistImportRequestSchema>;
+export type ImportMedia = z.infer<typeof importMediaSchema>;
+export type CreateImportInput = z.infer<typeof createImportSchema>;

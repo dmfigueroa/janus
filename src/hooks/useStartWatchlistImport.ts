@@ -53,7 +53,7 @@ export function useStartWatchlistImport({ media }: UseStartWatchlistImportOption
         kind: "failed",
         resolution: {
           kind: "failed",
-          message: result.message || "Failed to add to watchlist",
+          message: result.kind === "rejected" ? result.message : "Failed to add to watchlist",
         },
       };
     } catch (error) {

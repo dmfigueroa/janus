@@ -39,8 +39,10 @@ describe("deprecated media behavior", () => {
     if (!animeAdd || !mangaAdd) {
       throw new Error("Expected deprecated add rejections for anime and manga");
     }
-    expect(animeAdd.success).toBe(false);
-    expect(mangaAdd.success).toBe(false);
+    expect(animeAdd.kind).toBe("rejected");
+    expect(mangaAdd.kind).toBe("rejected");
+    expect(animeAdd.reason).toBe("deprecated_media_type");
+    expect(mangaAdd.reason).toBe("deprecated_media_type");
     expect(animeAdd.message).toContain(DEPRECATED_MEDIA_MESSAGE);
     expect(mangaAdd.message).toContain(DEPRECATED_MEDIA_MESSAGE);
   });
