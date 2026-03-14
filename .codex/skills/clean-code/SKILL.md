@@ -14,6 +14,7 @@ Bias toward findings that improve local reasoning, explicit contracts, and safe 
 Evaluate the code against these dimensions:
 
 - SRP: Does a unit have one clear reason to change, or is it mixing unrelated responsibilities?
+- Module and file boundaries: Do files, folders, and exports reflect the domain model, or are they split around generic technical layers, action prefixes, or arbitrary line-count concerns?
 - Complexity: Flag excessive branching, nesting, state transitions, or control flow. Call out likely cyclomatic complexity issues even if no exact metric is available.
 - Declarative over imperative: Always prefer declarative code over imperative code. Review whether the declarative shape still preserves readability, keeps responsibilities focused, and does not introduce avoidable complexity.
 - Readability: Naming, structure, cohesion, local reasoning, and whether the code explains itself without mental backtracking.
@@ -27,7 +28,7 @@ Evaluate the code against these dimensions:
    If the user passed a file, diff, function, or snippet, review that exact scope first.
 
 2. Load minimal context.
-   Read nearby files only when needed to infer naming, architecture, or language/framework conventions.
+   Read nearby files only when needed to infer naming, architecture, file/folder conventions, or language/framework conventions.
 
 3. Look for concrete findings.
    Prioritize bugs, maintainability risks, design drift, and readability regressions over generic advice.
@@ -55,6 +56,13 @@ Flag code when one unit:
 
 Do not force indirection when a small function is already cohesive.
 
+Apply the same reasoning above the function level:
+
+- a file should usually have one clear reason to change
+- a folder should usually represent one coherent resource, subsystem, or domain area
+- repeated filename prefixes often indicate missing directory structure rather than good organization
+- avoid splitting code into multiple files if those files do not earn distinct, nameable responsibilities
+
 ### Complexity
 
 Flag code when:
@@ -72,6 +80,12 @@ Prefer early returns, extraction of decision points, table-driven logic, and cle
 
 When the code is modeling a workflow with mutually exclusive phases, strongly prefer a discriminated union, tagged result, or other explicit state-machine shape over overlapping booleans, nullable fields, or message-based protocols.
 
+Also review structural complexity:
+
+- too many small files with vague names can be harder to reason about than one cohesive module
+- do not reward extra layers if the caller must still reconstruct the real workflow mentally
+- flag files that exist only to bounce between `service`, `manager`, `runner`, `logic`, `operations`, or similarly generic layers
+
 ### Declarative Style
 
 Prefer declarative code by default.
@@ -88,11 +102,14 @@ Do not excuse imperative code on the grounds of familiarity alone. Declarative c
 
 Do not blindly reward removing framework primitives if the replacement is a hand-rolled control loop that is harder to reason about. Judge the resulting shape, not the slogan. A no-effect rewrite that introduces a manual async state machine may still be a clean-code regression.
 
+Prefer domain-oriented modules over action-oriented layer files. A resource or subsystem module with clear exported behavior is usually cleaner than scattering that behavior across generic service-style files.
+
 ### Readability
 
 Flag:
 
 - names that hide intent
+- filenames or folder names that hide intent
 - helpers whose contracts are unclear
 - misleading levels of abstraction in the same function
 - unnecessary cleverness
@@ -106,8 +123,27 @@ Also flag abstraction layers that make the codebase harder to read overall:
 - indirection that merely passes state through without clarifying the model
 - abstractions whose names are broader or vaguer than the responsibility they actually own
 - helper APIs that force the caller to reconstruct hidden invariants or protocols
+- file or folder names that carry context through prefixes instead of structure
+- generic filenames such as `service.ts`, `manager.ts`, `runner.ts`, `logic.ts`, or `types.ts` when a more precise domain name is available
+- exported names that blur distinct concepts such as persistence, orchestration, resource lifecycle, UI state, or transport concerns
+- overloaded terms like `status`, `job`, `result`, or `data` when the surrounding code has multiple competing meanings for them
 
 Do not recommend extracting a helper or hook unless the new boundary has a clear, nameable responsibility and improves local reasoning for the caller.
+
+When reviewing organization and naming:
+
+- prefer resource- or domain-based files/folders over action-based prefixes
+- prefer a parent directory over repeating the same long prefix across many filenames
+- expect a module's public API to read like the domain it models
+- extracted subordinate modules should name real concerns, traits, or adapters, not generic implementation buckets
+- if one module can clearly express the resource API on its own, prefer that over preemptive splitting
+
+Rails-inspired concern/module guidance applies even outside Rails and even when using plain JS/TS modules:
+
+- keep the public API centered on the resource or domain concept
+- split supporting code only when it captures a real concern of that resource
+- do not create modules just to distribute line count
+- concerns should enhance readability of the main module, not replace it with indirection
 
 ### Comments
 
@@ -141,6 +177,12 @@ Infer the standard from the language and repository:
 - Rust: model invariants in types, keep ownership/error boundaries clear, avoid obscuring control flow
 
 If the repository already follows a stronger local convention than the language default, prefer the repository convention.
+
+Also infer organization conventions from the repository:
+
+- if the codebase is resource-oriented, prefer adding behavior to the resource module before creating a new layer file
+- if directories already group cohesive subsystems, prefer extending that structure instead of reintroducing prefixes
+- do not force "clean architecture" layers into a codebase that is otherwise organized around domain modules unless the payoff is clear
 
 #### React-specific review rules
 
