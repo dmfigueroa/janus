@@ -1,18 +1,25 @@
-import path from "path";
-import { WatchlistImportJob } from "./jobs/watchlist-import.job";
 import { type WatchlistImportRequest } from "./watchlist-import-types";
-import { createImportProgressRecord, getImportProgressByJobId } from "./watchlist-import-progress";
+import {
+  createImportProgressRecord,
+  getImportProgressByJobId,
+  setImportProgress,
+  setImportProgressCompleted,
+  setImportProgressFailed,
+  setImportProgressRunning,
+} from "./watchlist-import-progress";
 import { getErrorMessage } from "./utils";
+import { processWatchlistImport } from "./watchlist-import-service";
 
 const WATCHLIST_IMPORT_QUEUE_NAME = "watchlist-imports";
-const SIDEQUEST_JOBS_FILE_PATH = new URL(
-  `./sidequest.jobs${import.meta.url.endsWith(".ts") ? ".ts" : ".js"}`,
-  import.meta.url,
-).href;
 
-let sidequestStartPromise: Promise<void> | null = null;
-let sidequestInstance: (typeof import("sidequest"))["Sidequest"] | null = null;
-type SidequestJobState = "waiting" | "claimed" | "running" | "completed" | "failed" | "canceled";
+type PendingImportJob = {
+  jobId: number;
+  input: WatchlistImportRequest;
+};
+
+const pendingImportJobs: PendingImportJob[] = [];
+let queueWorkerPromise: Promise<void> | null = null;
+let lastIssuedJobId = 0;
 
 export type WatchlistImportStatus = {
   jobId: number;
@@ -27,18 +34,11 @@ export type WatchlistImportStatus = {
 };
 
 export async function enqueueWatchlistImport(input: WatchlistImportRequest): Promise<number> {
+  const jobId = createJobId();
+
   try {
-    const sidequest = await getSidequest();
-    await ensureSidequestStarted();
-
-    const job = await sidequest
-      .build(WatchlistImportJob)
-      .queue(WATCHLIST_IMPORT_QUEUE_NAME)
-      .maxAttempts(1)
-      .enqueue(input);
-
     await createImportProgressRecord({
-      sidequestJobId: job.id,
+      sidequestJobId: jobId,
       watchlistId: input.watchlistId,
       mediaType: input.media.mediaType,
       source: input.media.source,
@@ -46,10 +46,13 @@ export async function enqueueWatchlistImport(input: WatchlistImportRequest): Pro
       totalItems: 0,
     });
 
-    return job.id;
+    pendingImportJobs.push({ jobId, input });
+    ensureQueueWorkerRunning();
+    return jobId;
   } catch (error) {
     logQueueError("enqueue", error, {
       queueName: WATCHLIST_IMPORT_QUEUE_NAME,
+      jobId,
       watchlistId: input.watchlistId,
       media: {
         id: input.media.id,
@@ -87,120 +90,89 @@ export async function getWatchlistImportStatusByJobId(
     };
   }
 
-  try {
-    const sidequest = await getSidequest();
-    await ensureSidequestStarted();
+  return null;
+}
 
-    const sidequestJob = await sidequest.job.get(jobId);
+function ensureQueueWorkerRunning() {
+  if (queueWorkerPromise) {
+    return;
+  }
 
-    if (!sidequestJob) {
-      return null;
+  queueWorkerPromise = runQueueWorker()
+    .catch((error) => {
+      logQueueError("worker.loop", error, {
+        queueName: WATCHLIST_IMPORT_QUEUE_NAME,
+      });
+    })
+    .finally(() => {
+      queueWorkerPromise = null;
+      if (pendingImportJobs.length > 0) {
+        ensureQueueWorkerRunning();
+      }
+    });
+}
+
+async function runQueueWorker() {
+  while (pendingImportJobs.length > 0) {
+    const job = pendingImportJobs.shift();
+    if (!job) {
+      continue;
     }
 
-    return {
-      jobId,
-      status: mapSidequestState(sidequestJob.state as SidequestJobState),
-      totalItems: 0,
-      processedItems: 0,
-      insertedItems: 0,
-      message: null,
-      error: sidequestJob.errors?.at(-1)?.message || null,
-      startedAt: sidequestJob.attempted_at?.toISOString() || null,
-      completedAt:
-        sidequestJob.completed_at?.toISOString() ||
-        sidequestJob.failed_at?.toISOString() ||
-        sidequestJob.canceled_at?.toISOString() ||
-        null,
-    };
+    await executeImportJob(job);
+  }
+}
+
+async function executeImportJob(job: PendingImportJob) {
+  const { jobId, input } = job;
+
+  try {
+    await setImportProgressRunning(jobId);
+
+    const result = await processWatchlistImport(
+      input.watchlistId,
+      input.media,
+      async (progress) => {
+        await setImportProgress(jobId, {
+          totalItems: progress.totalItems,
+          processedItems: progress.processedItems,
+          insertedItems: progress.insertedItems,
+          message: progress.message,
+        });
+      },
+    );
+
+    await setImportProgressCompleted(jobId, result.message);
   } catch (error) {
-    logQueueError("status.sidequest_lookup", error, {
-      jobId,
+    const message = getErrorMessage(error);
+    logQueueError("worker.run", error, {
       queueName: WATCHLIST_IMPORT_QUEUE_NAME,
+      jobId,
+      watchlistId: input.watchlistId,
+      media: {
+        id: input.media.id,
+        mediaType: input.media.mediaType,
+        source: input.media.source,
+        title: input.media.title,
+      },
     });
-    throw error;
+    await setImportProgressFailed(jobId, message);
   }
 }
 
-async function ensureSidequestStarted() {
-  const sidequest = await getSidequest();
-
-  if (sidequestStartPromise) {
-    return await sidequestStartPromise;
+function createJobId() {
+  const now = Date.now();
+  if (now <= lastIssuedJobId) {
+    lastIssuedJobId += 1;
+    return lastIssuedJobId;
   }
 
-  sidequestStartPromise = sidequest
-    .start({
-      backend: {
-        driver: "@sidequest/sqlite-backend",
-        config: resolveQueueDatabasePath(),
-      },
-      dashboard: {
-        enabled: false,
-      },
-      logger: {
-        level: "warn",
-        json: false,
-      },
-      queues: [
-        {
-          name: WATCHLIST_IMPORT_QUEUE_NAME,
-          concurrency: 1,
-          priority: 100,
-          state: "active",
-        },
-      ],
-      maxConcurrentJobs: 1,
-      manualJobResolution: true,
-      jobsFilePath: SIDEQUEST_JOBS_FILE_PATH,
-    })
-    .catch((error) => {
-      logQueueError("sidequest.start", error, {
-        queueName: WATCHLIST_IMPORT_QUEUE_NAME,
-        jobsFilePath: SIDEQUEST_JOBS_FILE_PATH,
-        queueDatabasePath: resolveQueueDatabasePath(),
-      });
-      sidequestStartPromise = null;
-      throw error;
-    });
-
-  await sidequestStartPromise;
-}
-
-function mapSidequestState(state: SidequestJobState): WatchlistImportStatus["status"] {
-  if (state === "waiting") return "queued";
-  if (state === "claimed" || state === "running") return "running";
-  if (state === "completed") return "completed";
-  return "failed";
-}
-
-async function getSidequest() {
-  if (sidequestInstance) {
-    return sidequestInstance;
-  }
-
-  const module = await import("sidequest");
-  sidequestInstance = module.Sidequest;
-  return sidequestInstance;
-}
-
-function resolveQueueDatabasePath() {
-  const configuredPath = process.env.SIDEQUEST_DATABASE_URL;
-  if (configuredPath) {
-    return configuredPath;
-  }
-
-  const appDatabasePath = process.env.DATABASE_URL;
-  if (!appDatabasePath || appDatabasePath === ":memory:") {
-    return path.resolve(process.cwd(), "sidequest.sqlite");
-  }
-
-  const parsed = path.parse(appDatabasePath);
-  const extension = parsed.ext || ".sqlite";
-  return path.join(parsed.dir, `${parsed.name}.sidequest${extension}`);
+  lastIssuedJobId = now;
+  return lastIssuedJobId;
 }
 
 function logQueueError(
-  operation: "enqueue" | "status.progress_lookup" | "status.sidequest_lookup" | "sidequest.start",
+  operation: "enqueue" | "status.progress_lookup" | "worker.loop" | "worker.run",
   error: unknown,
   context: Record<string, unknown>,
 ) {
