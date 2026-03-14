@@ -31,6 +31,16 @@ export class WatchlistImportJob extends Job {
       return result;
     } catch (error) {
       const message = getErrorMessage(error);
+      const suffix = error instanceof Error && error.stack ? `\n${error.stack}` : "";
+      console.error(`[watchlist-import-job] run failed for job ${this.id}: ${message}${suffix}`, {
+        watchlistId: input.watchlistId,
+        media: {
+          id: input.media.id,
+          mediaType: input.media.mediaType,
+          source: input.media.source,
+          title: input.media.title,
+        },
+      });
       await setImportProgressFailed(this.id, message);
       throw error;
     }

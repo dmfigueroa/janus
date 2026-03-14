@@ -91,18 +91,45 @@ export async function processWatchlistImport(
       return await addTVShowImport(watchlistId, tmdbId, media, tracker);
     }
     if (media.source !== "custom") {
+      console.error("[watchlist-import-service] unsupported TV source for generic import", {
+        watchlistId,
+        mediaId: media.id,
+        source: media.source,
+        mediaType: media.mediaType,
+        title: media.title,
+      });
       throw new Error("TV shows from non-TMDB sources are not supported as generic items");
     }
   }
 
   if (media.source === "tmdb" && media.mediaType === "movie") {
+    const tmdbApiKey = process.env.TMDB_API_KEY;
+    if (!tmdbApiKey) {
+      console.error("[watchlist-import-service] TMDB_API_KEY is not configured", {
+        watchlistId,
+        mediaId: media.id,
+        mediaType: media.mediaType,
+        source: media.source,
+        title: media.title,
+      });
+      throw new Error("TMDB_API_KEY is not configured");
+    }
     const tmdbId = parseInt(media.id, 10);
     return await addMovieImport(watchlistId, tmdbId, tracker);
   }
 
   if (media.source === "comicvine" && media.mediaType === "comic") {
     const cvApiKey = process.env.COMICVINE_API_KEY;
-    if (!cvApiKey) throw new Error("COMICVINE_API_KEY is not configured");
+    if (!cvApiKey) {
+      console.error("[watchlist-import-service] COMICVINE_API_KEY is not configured", {
+        watchlistId,
+        mediaId: media.id,
+        mediaType: media.mediaType,
+        source: media.source,
+        title: media.title,
+      });
+      throw new Error("COMICVINE_API_KEY is not configured");
+    }
     return await addComicImport(watchlistId, media.id, media, cvApiKey, tracker);
   }
 
@@ -113,7 +140,16 @@ export async function processWatchlistImport(
 
   if (media.source === "rawg" && media.mediaType === "game") {
     const rawgApiKey = process.env.RAWG_API_KEY;
-    if (!rawgApiKey) throw new Error("RAWG_API_KEY is not configured");
+    if (!rawgApiKey) {
+      console.error("[watchlist-import-service] RAWG_API_KEY is not configured", {
+        watchlistId,
+        mediaId: media.id,
+        mediaType: media.mediaType,
+        source: media.source,
+        title: media.title,
+      });
+      throw new Error("RAWG_API_KEY is not configured");
+    }
     const details = await getGameDetails(media.id, rawgApiKey);
     return await addGenericImport(watchlistId, details as GenericMedia, tracker);
   }

@@ -8,6 +8,7 @@ import { getDb } from "../db/db.server";
 import { isDeprecatedMediaType, DEPRECATED_MEDIA_MESSAGE } from "./media";
 import { enqueueWatchlistImport, getWatchlistImportStatusByJobId } from "./watchlist-import-queue";
 import { watchlistImportRequestSchema } from "./watchlist-import-types";
+import { getErrorMessage } from "./utils";
 
 export type { Watchlist, WatchlistItem } from "../db/schema";
 
@@ -58,7 +59,23 @@ export const addToWatchlist = createServerFn({ method: "POST" })
       return deprecatedRejection;
     }
 
-    const jobId = await enqueueWatchlistImport(data);
+    let jobId: number;
+    try {
+      jobId = await enqueueWatchlistImport(data);
+    } catch (error) {
+      const message = getErrorMessage(error);
+      const suffix = error instanceof Error && error.stack ? `\n${error.stack}` : "";
+      console.error(`[watchlist] addToWatchlist enqueue failed: ${message}${suffix}`, {
+        watchlistId: data.watchlistId,
+        media: {
+          id: data.media.id,
+          mediaType: data.media.mediaType,
+          source: data.media.source,
+          title: data.media.title,
+        },
+      });
+      throw error;
+    }
 
     return {
       success: true,
