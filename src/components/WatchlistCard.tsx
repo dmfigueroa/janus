@@ -1,23 +1,13 @@
 import { useRouter, Link } from "@tanstack/react-router";
-import { deleteWatchlist } from "@/server/watchlists";
+import { deleteWatchlist } from "@/controllers/watchlists";
 import { useState } from "react";
 import { cn } from "@/utils/cn";
 import { toast } from "sonner";
-import type { Watchlist } from "@/db/schema";
-import type { WatchlistItem } from "@/db/schema";
+import type { WatchlistSummary } from "@/models/watchlist";
 import { DeleteWatchlistButton } from "./DeleteWatchlistButton";
 import { Check } from "lucide-react";
 
-export type EnrichedWatchlist = {
-  stats: {
-    totalItems: number;
-    watchedItems: number;
-    progress: number;
-    nextUnwatched: WatchlistItem | null;
-    coverImage: string | null;
-    coverMediaType: WatchlistItem["mediaType"] | null;
-  };
-} & Watchlist;
+export type EnrichedWatchlist = WatchlistSummary;
 
 const getImageUrl = (path: string | null) => {
   if (!path) return "";
