@@ -190,6 +190,39 @@ describe("Watchlist.getDetail", () => {
     expect(detail?.watchlist.stats.nextUnwatched?.title).toBe("Next Up");
   });
 
+  it("treats null isWatched rows as unwatched in detail views", async () => {
+    const [list] = await db.insert(watchlists).values({ name: "Legacy Detail" }).returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: list.id,
+        tmdbId: "legacy-null",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Legacy Next",
+        releaseDate: "2024-01-01",
+        isWatched: null,
+      },
+      {
+        watchlistId: list.id,
+        tmdbId: "watched",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Already Watched",
+        releaseDate: "2024-02-01",
+        isWatched: true,
+      },
+    ]);
+
+    const detail = await Watchlist.getDetail({
+      watchlistId: list.id,
+      unwatchedOnly: true,
+    });
+
+    expect(detail?.items.map((item) => item.title)).toEqual(["Legacy Next"]);
+    expect(detail?.watchlist.stats.nextUnwatched?.title).toBe("Legacy Next");
+  });
+
   it("avoids full watchlist item scans when loading a detail page", async () => {
     const [list] = await db.insert(watchlists).values({ name: "Large List" }).returning();
 
@@ -313,6 +346,44 @@ describe("Watchlist.listSummaries", () => {
       parentTitle: "Series",
       episode: "2",
     });
+  });
+
+  it("treats null isWatched rows as unwatched for summary selection", async () => {
+    const [list] = await db.insert(watchlists).values({ name: "Legacy Imports" }).returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: list.id,
+        tmdbId: "legacy-null",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Legacy Next",
+        posterPath: "/legacy.jpg",
+        releaseDate: "2024-01-01",
+        isWatched: null,
+      },
+      {
+        watchlistId: list.id,
+        tmdbId: "watched",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Watched Later",
+        posterPath: "/watched.jpg",
+        releaseDate: "2024-02-01",
+        isWatched: true,
+      },
+    ]);
+
+    const [summary] = await Watchlist.listSummaries();
+
+    expect(summary.stats).toMatchObject({
+      totalItems: 2,
+      watchedItems: 1,
+      progress: 50,
+      coverImage: "/legacy.jpg",
+      coverMediaType: "movie",
+    });
+    expect(summary.stats.nextUnwatched?.title).toBe("Legacy Next");
   });
 
   it("respects supported sort orders", async () => {

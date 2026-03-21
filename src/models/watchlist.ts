@@ -32,6 +32,9 @@ const releaseDateOrder = [
   asc(watchlistItems.releaseDate),
 ] as const;
 
+const isWatchedOrderExpression = sql<number>`CASE WHEN COALESCE(${watchlistItems.isWatched}, 0) = 1 THEN 1 ELSE 0 END`;
+const isUnwatchedExpression = sql<boolean>`COALESCE(${watchlistItems.isWatched}, 0) = 0`;
+
 type SummaryCounts = Pick<WatchlistStats, "totalItems" | "watchedItems">;
 type SummarySelection = {
   nextUnwatched: WatchlistItem | null;
@@ -51,13 +54,13 @@ const emptySummarySelection: SummarySelection = {
 const coverRankExpression = sql<number>`row_number() over (
   partition by ${watchlistItems.watchlistId}
   order by
-    CASE WHEN ${watchlistItems.isWatched} THEN 1 ELSE 0 END,
+    ${isWatchedOrderExpression},
     CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END,
     ${watchlistItems.releaseDate} asc
 )`;
 
 const unwatchedRankExpression = sql<number>`row_number() over (
-  partition by ${watchlistItems.watchlistId}, ${watchlistItems.isWatched}
+  partition by ${watchlistItems.watchlistId}, ${isWatchedOrderExpression}
   order by
     CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END,
     ${watchlistItems.releaseDate} asc
@@ -100,7 +103,10 @@ async function loadSummarySelections(db: ReturnType<typeof getDb>, listIds: numb
     .where(
       or(
         eq(rankedSummaryItems.coverRank, 1),
-        and(eq(rankedSummaryItems.isWatched, false), eq(rankedSummaryItems.unwatchedRank, 1)),
+        and(
+          sql`COALESCE(${rankedSummaryItems.isWatched}, 0) = 0`,
+          eq(rankedSummaryItems.unwatchedRank, 1),
+        ),
       ),
     );
 }
@@ -127,7 +133,7 @@ function indexSummarySelections(
       entry.coverItem = item;
     }
 
-    if (!item.isWatched && item.unwatchedRank === 1) {
+    if (item.isWatched !== true && item.unwatchedRank === 1) {
       entry.nextUnwatched = item;
     }
 
@@ -153,20 +159,17 @@ async function loadWatchlistById(db: ReturnType<typeof getDb>, watchlistId: numb
 }
 
 async function loadDetailCounts(db: ReturnType<typeof getDb>, watchlistId: number) {
-  const [totalResult, watchedResult] = await Promise.all([
-    db
-      .select({ count: count() })
-      .from(watchlistItems)
-      .where(eq(watchlistItems.watchlistId, watchlistId)),
-    db
-      .select({ count: count() })
-      .from(watchlistItems)
-      .where(and(eq(watchlistItems.watchlistId, watchlistId), eq(watchlistItems.isWatched, true))),
-  ]);
+  const [counts] = await db
+    .select({
+      totalItems: count(),
+      watchedItems: watchedItemsExpression,
+    })
+    .from(watchlistItems)
+    .where(eq(watchlistItems.watchlistId, watchlistId));
 
   return {
-    totalItems: totalResult[0]?.count ?? 0,
-    watchedItems: watchedResult[0]?.count ?? 0,
+    totalItems: counts?.totalItems ?? 0,
+    watchedItems: counts?.watchedItems ?? 0,
   } satisfies SummaryCounts;
 }
 
@@ -175,7 +178,7 @@ async function loadDetailSelection(db: ReturnType<typeof getDb>, watchlistId: nu
     db
       .select()
       .from(watchlistItems)
-      .where(and(eq(watchlistItems.watchlistId, watchlistId), eq(watchlistItems.isWatched, false)))
+      .where(and(eq(watchlistItems.watchlistId, watchlistId), isUnwatchedExpression))
       .orderBy(...releaseDateOrder)
       .limit(1),
     db
@@ -252,7 +255,7 @@ function buildDetailFilters({
 }) {
   return and(
     eq(watchlistItems.watchlistId, watchlistId),
-    unwatchedOnly ? eq(watchlistItems.isWatched, false) : undefined,
+    unwatchedOnly ? isUnwatchedExpression : undefined,
     query
       ? or(
           sql`${watchlistItems.title} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\\' COLLATE NOCASE`,
