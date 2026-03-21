@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Star, Calendar, Info } from "lucide-react";
 import { addToWatchlist } from "@/server/watchlist";
-import { getWatchlists } from "@/server/watchlists";
+import { getWatchlistSummaries } from "@/controllers/watchlists";
 import { toast } from "sonner";
 import { WatchlistSelector } from "./watchlist/WatchlistSelector";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -29,7 +29,7 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
 
   const { data: watchlists } = useQuery({
     queryKey: ["watchlists"],
-    queryFn: () => getWatchlists({ data: { sortBy: "lastAdded" } }),
+    queryFn: () => getWatchlistSummaries({ data: { orderBy: "lastAdded" } }),
     enabled: isOpen,
   });
 

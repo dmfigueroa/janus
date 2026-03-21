@@ -2,30 +2,29 @@
 
 import { useEffect, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { getWatchlistById, type GetWatchlistByIdResult } from "@/server/watchlists";
+import { getWatchlistDetail, type GetWatchlistDetailResult } from "@/controllers/watchlists";
 import { WatchlistHeader } from "@/components/watchlist/WatchlistHeader";
 import { WatchlistTimeline } from "@/components/watchlist/WatchlistTimeline";
 
+type WatchlistDetailData = Exclude<GetWatchlistDetailResult, null>;
+
 interface WatchlistDetailProps {
-  initialData: GetWatchlistByIdResult;
+  initialData: WatchlistDetailData;
 }
 
-export function buildWatchlistQueryInput(params: {
+async function fetchWatchlistDetail(input: {
   watchlistId: number;
-  page: number;
-  query: string;
-  showUnwatchedOnly: boolean;
+  cursor: number;
+  query?: string;
+  unwatchedOnly?: boolean;
 }) {
-  const { watchlistId, page, query, showUnwatchedOnly } = params;
-  return {
-    data: {
-      id: watchlistId,
-      page,
-      limit: 50,
-      query: query || undefined,
-      isWatched: showUnwatchedOnly ? false : undefined,
-    },
-  };
+  const detail = await getWatchlistDetail({ data: input });
+
+  if (!detail) {
+    throw new Error("Watchlist not found");
+  }
+
+  return detail;
 }
 
 export function WatchlistDetail({ initialData }: WatchlistDetailProps) {
@@ -45,14 +44,12 @@ export function WatchlistDetail({ initialData }: WatchlistDetailProps) {
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["watchlist", watchlistId, "items", debouncedSearchQuery, showUnwatchedOnly],
     queryFn: async ({ pageParam }) => {
-      return getWatchlistById(
-        buildWatchlistQueryInput({
-          watchlistId,
-          page: pageParam,
-          query: debouncedSearchQuery,
-          showUnwatchedOnly,
-        }),
-      );
+      return fetchWatchlistDetail({
+        watchlistId,
+        cursor: pageParam,
+        query: debouncedSearchQuery || undefined,
+        unwatchedOnly: showUnwatchedOnly,
+      });
     },
     initialPageParam: 1,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -66,7 +63,6 @@ export function WatchlistDetail({ initialData }: WatchlistDetailProps) {
   });
 
   const allItems = data?.pages.flatMap((page) => page.items) || [];
-  // Use stats from the latest fetched page as they are recalculated on every request
   const latestWatchlist = data?.pages[data.pages.length - 1]?.watchlist || initialData.watchlist;
 
   const totalItems = latestWatchlist.stats.totalItems;
