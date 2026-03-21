@@ -3,8 +3,8 @@ FROM node:24-bookworm AS base
 # Install dependencies only when needed
 FROM base AS deps
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm pkg delete scripts.prepare && npm ci
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -19,11 +19,10 @@ RUN npx esbuild src/db/migrate.ts --bundle --platform=node --format=esm --outfil
 # Production image, copy all the files and run next
 FROM base AS prod-deps
 WORKDIR /app
-COPY package.json ./
+COPY package.json package-lock.json ./
 # Install production dependencies only
 # We use the full image (base) to ensure we have build tools for better-sqlite3
-RUN npm pkg delete scripts.prepare
-RUN npm install --omit=dev
+RUN npm pkg delete scripts.prepare && npm ci --omit=dev
 
 FROM node:24-bookworm-slim AS runner
 WORKDIR /app
