@@ -15,13 +15,13 @@
 skills:
 
 - task: "TanStack Start app structure, router setup, root shell, and entries"
-  load: "/home/niika/janus/node_modules/@tanstack/react-start/skills/react-start/SKILL.md"
+  load: "node_modules/@tanstack/react-start/skills/react-start/SKILL.md"
 - task: "route loaders, staleTime, pending states, and router context wiring"
-  load: "/home/niika/janus/node_modules/@tanstack/router-core/skills/router-core/data-loading/SKILL.md"
+  load: "node_modules/@tanstack/router-core/skills/router-core/data-loading/SKILL.md"
 - task: "dynamic route params like $watchlistId and route param parsing"
-  load: "/home/niika/janus/node_modules/@tanstack/router-core/skills/router-core/path-params/SKILL.md"
+  load: "node_modules/@tanstack/router-core/skills/router-core/path-params/SKILL.md"
 - task: "notFound handling, error boundaries, and route error behavior"
-  load: "/home/niika/janus/node_modules/@tanstack/router-core/skills/router-core/not-found-and-errors/SKILL.md"
+  load: "node_modules/@tanstack/router-core/skills/router-core/not-found-and-errors/SKILL.md"
 - task: "createServerFn, server/client execution boundaries, and server-only imports"
-load: "/home/niika/janus/node_modules/@tanstack/start-client-core/skills/start-core/server-functions/SKILL.md"
+load: "node_modules/@tanstack/start-client-core/skills/start-core/server-functions/SKILL.md"
 <!-- intent-skills:end -->
