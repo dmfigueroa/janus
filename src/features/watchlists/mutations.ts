@@ -6,9 +6,13 @@ const createWatchlistSchema = z.object({
   description: z.string().optional(),
 });
 
+export type CreateWatchlistInput = z.infer<typeof createWatchlistSchema>;
+
 const deleteWatchlistSchema = z.object({
   id: z.number(),
 });
+
+export type DeleteWatchlistInput = z.infer<typeof deleteWatchlistSchema>;
 
 export const createWatchlist = createServerFn({ method: "POST" })
   .inputValidator((data) => createWatchlistSchema.parse(data))

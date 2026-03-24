@@ -1,13 +1,14 @@
 "use server";
 
 import { Watchlist } from "@/models/watchlist";
+import type { CreateWatchlistInput, DeleteWatchlistInput } from "./mutations";
 
 export const WatchlistsWrite = {
-  async create({ name, description }: { name: string; description?: string }) {
-    return Watchlist.create({ name, description });
+  async create(input: CreateWatchlistInput) {
+    return Watchlist.create(input);
   },
 
-  async delete({ id }: { id: number }) {
+  async delete({ id }: DeleteWatchlistInput) {
     await Watchlist.destroy(id);
     return { success: true };
   },
