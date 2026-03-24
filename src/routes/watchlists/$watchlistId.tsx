@@ -1,19 +1,9 @@
-import { getWatchlistDetail } from "@/controllers/watchlists";
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { WatchlistDetail as WatchlistDetailView } from "@/components/watchlist/WatchlistDetail";
+import { loadWatchlistDetailPage } from "@/features/watchlists";
 
 export const Route = createFileRoute("/watchlists/$watchlistId")({
-  loader: async ({ params: { watchlistId } }) => {
-    const detail = await getWatchlistDetail({
-      data: { watchlistId: parseInt(watchlistId, 10), unwatchedOnly: true },
-    });
-
-    if (!detail) {
-      throw notFound();
-    }
-
-    return detail;
-  },
+  loader: async ({ params: { watchlistId } }) => loadWatchlistDetailPage(watchlistId),
   component: WatchlistDetail,
 });
 
