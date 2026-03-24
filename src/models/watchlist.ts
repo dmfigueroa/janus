@@ -4,6 +4,7 @@ import type { Watchlist as WatchlistRecord, WatchlistItem } from "../db/schema";
 import { watchlists, watchlistItems } from "../db/schema";
 import { getDb } from "../db/db.server";
 import { escapeLikeString } from "../utils/search";
+import { calculateWatchlistProgress } from "@/features/watchlists/progress";
 import { and, asc, count, desc, eq, getTableColumns, inArray, or, sql } from "drizzle-orm";
 
 export type WatchlistListOrder = "createdAt" | "lastWatched" | "lastAdded";
@@ -145,8 +146,7 @@ function buildSummaryStats(counts: SummaryCounts, selection: SummarySelection): 
   return {
     totalItems: counts.totalItems,
     watchedItems: counts.watchedItems,
-    progress:
-      counts.totalItems > 0 ? Math.round((counts.watchedItems / counts.totalItems) * 100) : 0,
+    progress: calculateWatchlistProgress(counts),
     nextUnwatched: selection.nextUnwatched,
     coverImage: selection.coverItem?.posterPath ?? null,
     coverMediaType: selection.coverItem?.mediaType ?? null,

@@ -1,6 +1,7 @@
 "use client";
 
 import type { Watchlist } from "@/db/schema";
+import { calculateWatchlistProgress } from "@/features/watchlists/progress";
 import { cn } from "@/utils/cn";
 import { Search } from "lucide-react";
 
@@ -23,7 +24,7 @@ export function WatchlistHeader({
   searchQuery,
   onSearchChange,
 }: WatchlistHeaderProps) {
-  const percentage = totalItems > 0 ? Math.round((watchedItems / totalItems) * 100) : 0;
+  const percentage = calculateWatchlistProgress({ totalItems, watchedItems });
 
   return (
     <div className="sticky top-0 z-40 bg-background/95 pb-4 pt-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:pb-6">

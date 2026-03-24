@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { WatchlistItem } from "@/db/schema";
 import type { WatchlistDetailPage } from "@/models/watchlist";
+import { calculateWatchlistProgress } from "@/features/watchlists/progress";
 
 const watchlistDetailFiltersSchema = z.object({
   watchlistId: z.coerce.number(),
@@ -125,7 +126,7 @@ export function updateWatchlistDetailPagesAfterToggle({
           stats: {
             ...page.watchlist.stats,
             watchedItems,
-            progress: totalItems > 0 ? Math.round((watchedItems / totalItems) * 100) : 0,
+            progress: calculateWatchlistProgress({ totalItems, watchedItems }),
           },
         },
         items: page.items.map((item) =>
