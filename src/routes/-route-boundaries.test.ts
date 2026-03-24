@@ -15,4 +15,11 @@ describe("route module boundaries", () => {
     expect(indexRoute).not.toMatch(/from\s+["'][^"']+\.server["']/);
     expect(watchlistDetailRoute).not.toMatch(/from\s+["'][^"']+\.server["']/);
   });
+
+  it("loads the watchlist list screen through the feature-owned read surface", () => {
+    const indexRoute = readFileSync(workspaceFile("src/routes/index.tsx"), "utf8");
+
+    expect(indexRoute).toMatch(/from\s+["']@\/features\/watchlists\/queries["']/);
+    expect(indexRoute).not.toMatch(/from\s+["']@\/controllers\/watchlists["']/);
+  });
 });
