@@ -5,7 +5,7 @@ import { WatchlistDetail as WatchlistDetailView } from "@/components/watchlist/W
 export const Route = createFileRoute("/watchlists/$watchlistId")({
   loader: async ({ params: { watchlistId } }) => {
     const detail = await getWatchlistDetail({
-      data: { watchlistId: parseInt(watchlistId, 10), unwatchedOnly: true },
+      data: { watchlistId: Number.parseInt(watchlistId, 10), unwatchedOnly: true },
     });
 
     if (!detail) {
