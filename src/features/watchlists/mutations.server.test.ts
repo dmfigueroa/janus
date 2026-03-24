@@ -12,10 +12,12 @@ let WatchlistsWrite: typeof import("./write.server").WatchlistsWrite;
 beforeAll(async () => {
   process.env.DATABASE_URL = ":memory:";
 
-  const dbModule = await import("@/db/db.server");
-  const schemaModule = await import("@/db/schema");
-  const readModule = await import("./read.server");
-  const writeModule = await import("./write.server");
+  const [dbModule, schemaModule, readModule, writeModule] = await Promise.all([
+    import("@/db/db.server"),
+    import("@/db/schema"),
+    import("./read.server"),
+    import("./write.server"),
+  ]);
 
   db = dbModule.getDb();
   closeDb = dbModule.closeDb;
