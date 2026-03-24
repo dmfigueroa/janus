@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { loadWatchlistsIndex } from "@/features/watchlists/index.server";
+import { loadWatchlistsIndex } from "@/features/watchlists";
 import { WatchlistCard } from "@/components/WatchlistCard";
 import { CreateWatchlistCard } from "@/components/CreateWatchlistCard";
 import { CreateWatchlistDialog } from "@/components/CreateWatchlistDialog";
