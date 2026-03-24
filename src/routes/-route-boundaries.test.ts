@@ -29,17 +29,17 @@ describe("route module boundaries", () => {
       "utf8",
     );
 
-    expect(watchlistDetailRoute).toMatch(/from\s+["']@\/features\/watchlists\/queries["']/);
+    expect(watchlistDetailRoute).toMatch(/from\s+["']@\/features\/watchlists\/detail\/query["']/);
     expect(watchlistDetailRoute).not.toMatch(/from\s+["']@\/controllers\/watchlists["']/);
   });
 
   it("keeps the shared watchlist query surface free of server-only imports", () => {
     const watchlistQueries = readFileSync(
-      workspaceFile("src/features/watchlists/queries.ts"),
+      workspaceFile("src/features/watchlists/detail/query.ts"),
       "utf8",
     );
 
     expect(watchlistQueries).not.toMatch(/from\s+["'][^"']+\.server["']/);
-    expect(watchlistQueries).not.toMatch(/from\s+["']\.\/read\.server["']/);
+    expect(watchlistQueries).not.toMatch(/from\s+["']\.\.\/read\.server["']/);
   });
 });

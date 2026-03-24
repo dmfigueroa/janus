@@ -11,7 +11,7 @@ import {
   type WatchlistDetailQueryData,
   updateWatchlistDetailPagesAfterToggle,
   watchlistDetailQueryFamily,
-} from "@/features/watchlists/queries";
+} from "@/features/watchlists/detail/query";
 
 type TimelineItemProps = {
   item: WatchlistItem;

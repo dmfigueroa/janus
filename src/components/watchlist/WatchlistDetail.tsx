@@ -5,7 +5,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import {
   watchlistDetailInfiniteQueryOptions,
   type WatchlistDetailQueryData,
-} from "@/features/watchlists/queries";
+} from "@/features/watchlists/detail/query";
 import { WatchlistHeader } from "@/components/watchlist/WatchlistHeader";
 import { WatchlistTimeline } from "@/components/watchlist/WatchlistTimeline";
 

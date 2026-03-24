@@ -7,25 +7,24 @@ let db: ReturnType<typeof import("@/db/db.server").getDb>;
 let watchlists: typeof import("@/db/schema").watchlists;
 let watchlistItems: typeof import("@/db/schema").watchlistItems;
 let closeDb: typeof import("@/db/db.server").closeDb;
-let loadWatchlistDetailRoute: typeof import("./queries").loadWatchlistDetailRoute;
-let watchlistDetailInfiniteQueryOptions: typeof import("./queries").watchlistDetailInfiniteQueryOptions;
-let watchlistDetailQueryKey: typeof import("./queries").watchlistDetailQueryKey;
-type WatchlistDetailQueryData = import("./queries").WatchlistDetailQueryData;
+let loadWatchlistDetailRoute: typeof import("./query").loadWatchlistDetailRoute;
+let watchlistDetailInfiniteQueryOptions: typeof import("./query").watchlistDetailInfiniteQueryOptions;
+let watchlistDetailQueryKey: typeof import("./query").watchlistDetailQueryKey;
+type WatchlistDetailQueryData = import("./query").WatchlistDetailQueryData;
 
 beforeAll(async () => {
   process.env.DATABASE_URL = ":memory:";
 
   const dbModule = await import("@/db/db.server");
   const schemaModule = await import("@/db/schema");
-  const queriesModule = await import("./queries");
-
+  const queryModule = await import("./query");
   db = dbModule.getDb();
   closeDb = dbModule.closeDb;
   watchlists = schemaModule.watchlists;
   watchlistItems = schemaModule.watchlistItems;
-  loadWatchlistDetailRoute = queriesModule.loadWatchlistDetailRoute;
-  watchlistDetailInfiniteQueryOptions = queriesModule.watchlistDetailInfiniteQueryOptions;
-  watchlistDetailQueryKey = queriesModule.watchlistDetailQueryKey;
+  loadWatchlistDetailRoute = queryModule.loadWatchlistDetailRoute;
+  watchlistDetailInfiniteQueryOptions = queryModule.watchlistDetailInfiniteQueryOptions;
+  watchlistDetailQueryKey = queryModule.watchlistDetailQueryKey;
 
   await migrate(db, { migrationsFolder: path.resolve(process.cwd(), "drizzle") });
 });

@@ -1,4 +1,4 @@
-import { loadWatchlistDetailRoute } from "@/features/watchlists/queries";
+import { loadWatchlistDetailRoute } from "@/features/watchlists/detail/query";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { WatchlistDetail as WatchlistDetailView } from "@/components/watchlist/WatchlistDetail";
 
