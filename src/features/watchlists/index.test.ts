@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import path from "path";
 
-import { loadWatchlistDetailPage, loadWatchlistsIndex } from "./index";
+import { loadWatchlistDetailPage, loadWatchlistsIndex } from "./index.server";
 
 let db: ReturnType<typeof import("@/db/db.server").getDb>;
 let watchlists: typeof import("@/db/schema").watchlists;
