@@ -3,7 +3,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { WatchlistItem } from "@/db/schema";
 import type { WatchlistDetailPage } from "@/models/watchlist";
-import { WatchlistsRead } from "./read.server";
 
 const watchlistListSchema = z.object({
   orderBy: z.enum(["createdAt", "lastWatched", "lastAdded"]).optional().default("createdAt"),
@@ -56,11 +55,17 @@ export function watchlistDetailQueryKey(filters: WatchlistDetailQueryFilters) {
 
 export const getWatchlistList = createServerFn()
   .inputValidator((data) => watchlistListSchema.parse(data || {}))
-  .handler(async ({ data }) => WatchlistsRead.listScreen(data));
+  .handler(async ({ data }) => {
+    const { WatchlistsRead } = await import("./read.server");
+    return WatchlistsRead.listScreen(data);
+  });
 
 export const getWatchlistDetailPage = createServerFn()
   .inputValidator((data) => watchlistDetailPageSchema.parse(data))
-  .handler(async ({ data }) => WatchlistsRead.detailScreen(data));
+  .handler(async ({ data }) => {
+    const { WatchlistsRead } = await import("./read.server");
+    return WatchlistsRead.detailScreen(data);
+  });
 
 export async function loadWatchlistDetailRoute({
   queryClient,
@@ -70,6 +75,7 @@ export async function loadWatchlistDetailRoute({
   filters: WatchlistDetailQueryFilters;
 }) {
   const normalized = normalizeWatchlistDetailFilters(filters);
+  const { WatchlistsRead } = await import("./read.server");
   const detail = await WatchlistsRead.detailScreen(normalized);
 
   if (!detail) {
