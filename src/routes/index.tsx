@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { getWatchlistSummaries } from "@/controllers/watchlists";
+import { getWatchlistList } from "@/features/watchlists/queries";
 import { WatchlistCard } from "@/components/WatchlistCard";
 import { CreateWatchlistCard } from "@/components/CreateWatchlistCard";
 import { CreateWatchlistDialog } from "@/components/CreateWatchlistDialog";
@@ -13,8 +13,7 @@ import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
   component: Index,
-  loader: async () =>
-    await getWatchlistSummaries({ data: { orderBy: "lastWatched", order: "asc" } }),
+  loader: async () => await getWatchlistList({ data: { orderBy: "lastWatched", order: "asc" } }),
 });
 
 function Index() {
