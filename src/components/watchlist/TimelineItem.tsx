@@ -4,9 +4,14 @@ import { cn } from "@/utils/cn";
 import { Check, Film, Tv, Gamepad2, Book, BookOpen } from "lucide-react";
 import type { WatchlistItem } from "@/db/schema";
 import { formatReleaseDate, formatRuntime } from "@/utils/datetime";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { type InfiniteData, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { toggleWatched } from "@/server/watchlist";
+import {
+  type WatchlistDetailQueryData,
+  updateWatchlistDetailPagesAfterToggle,
+  watchlistDetailQueryFamily,
+} from "@/features/watchlists/detail/query";
 
 type TimelineItemProps = {
   item: WatchlistItem;
@@ -115,50 +120,35 @@ const Content = ({
 
 export function TimelineItem({ item }: TimelineItemProps) {
   const queryClient = useQueryClient();
-  const queryKey = ["watchlist", item.watchlistId, "items"];
+  const queryKey = watchlistDetailQueryFamily(item.watchlistId);
 
   const toggleMutation = useMutation({
     mutationFn: async () => {
       await toggleWatched({ data: { itemId: item.id, isWatched: !item.isWatched } });
     },
     onMutate: async () => {
-      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
       await queryClient.cancelQueries({ queryKey });
+      const previousEntries = queryClient.getQueriesData<
+        InfiniteData<WatchlistDetailQueryData, number>
+      >({ queryKey });
 
-      // Snapshot the previous value
-      const previousData = queryClient.getQueryData(queryKey);
+      queryClient.setQueriesData<InfiniteData<WatchlistDetailQueryData, number>>(
+        { queryKey },
+        (old) =>
+          updateWatchlistDetailPagesAfterToggle({
+            data: old,
+            itemId: item.id,
+            nextIsWatched: !item.isWatched,
+          }),
+      );
 
-      // Optimistically update to the new value
-      queryClient.setQueryData(queryKey, (old: any) => {
-        if (!old) return old;
-
-        return {
-          ...old,
-          pages: old.pages.map((page: any) => ({
-            ...page,
-            watchlist: {
-              ...page.watchlist,
-              stats: {
-                ...page.watchlist.stats,
-                watchedItems: item.isWatched
-                  ? page.watchlist.stats.watchedItems - 1
-                  : page.watchlist.stats.watchedItems + 1,
-              },
-            },
-            items: page.items.map((i: WatchlistItem) =>
-              i.id === item.id ? { ...i, isWatched: !item.isWatched } : i,
-            ),
-          })),
-        };
-      });
-
-      // Return a context object with the snapshotted value
-      return { previousData };
+      return { previousEntries };
     },
     onError: (_err, _newTodo, context) => {
-      if (context?.previousData) {
-        queryClient.setQueryData(queryKey, context.previousData);
+      for (const [cacheKey, previousData] of context?.previousEntries ?? []) {
+        queryClient.setQueryData(cacheKey, previousData);
       }
+
       toast.error("Failed to update status");
     },
     onSettled: () => {

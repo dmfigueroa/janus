@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { WatchlistsRead } from "./read.server";
 
 const watchlistListSchema = z.object({
   orderBy: z.enum(["createdAt", "lastWatched", "lastAdded"]).optional().default("createdAt"),
@@ -9,4 +8,7 @@ const watchlistListSchema = z.object({
 
 export const getWatchlistList = createServerFn()
   .inputValidator((data) => watchlistListSchema.parse(data || {}))
-  .handler(async ({ data }) => WatchlistsRead.listScreen(data));
+  .handler(async ({ data }) => {
+    const { WatchlistsRead } = await import("./read.server");
+    return WatchlistsRead.listScreen(data);
+  });

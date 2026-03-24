@@ -2,29 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { getWatchlistDetail, type GetWatchlistDetailResult } from "@/controllers/watchlists";
+import {
+  watchlistDetailInfiniteQueryOptions,
+  type WatchlistDetailQueryData,
+} from "@/features/watchlists/detail/query";
 import { WatchlistHeader } from "@/components/watchlist/WatchlistHeader";
 import { WatchlistTimeline } from "@/components/watchlist/WatchlistTimeline";
 
-type WatchlistDetailData = Exclude<GetWatchlistDetailResult, null>;
-
 interface WatchlistDetailProps {
-  initialData: WatchlistDetailData;
-}
-
-async function fetchWatchlistDetail(input: {
-  watchlistId: number;
-  cursor: number;
-  query?: string;
-  unwatchedOnly?: boolean;
-}) {
-  const detail = await getWatchlistDetail({ data: input });
-
-  if (!detail) {
-    throw new Error("Watchlist not found");
-  }
-
-  return detail;
+  initialData: WatchlistDetailQueryData;
 }
 
 export function WatchlistDetail({ initialData }: WatchlistDetailProps) {
@@ -41,26 +27,13 @@ export function WatchlistDetail({ initialData }: WatchlistDetailProps) {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ["watchlist", watchlistId, "items", debouncedSearchQuery, showUnwatchedOnly],
-    queryFn: async ({ pageParam }) => {
-      return fetchWatchlistDetail({
-        watchlistId,
-        cursor: pageParam,
-        query: debouncedSearchQuery || undefined,
-        unwatchedOnly: showUnwatchedOnly,
-      });
-    },
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
-    initialData:
-      debouncedSearchQuery === "" && showUnwatchedOnly
-        ? {
-            pages: [initialData],
-            pageParams: [1],
-          }
-        : undefined,
-  });
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery(
+    watchlistDetailInfiniteQueryOptions({
+      watchlistId,
+      query: debouncedSearchQuery || undefined,
+      unwatchedOnly: showUnwatchedOnly,
+    }),
+  );
 
   const allItems = data?.pages.flatMap((page) => page.items) || [];
   const latestWatchlist = data?.pages[data.pages.length - 1]?.watchlist || initialData.watchlist;
