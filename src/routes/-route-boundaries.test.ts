@@ -22,4 +22,14 @@ describe("route module boundaries", () => {
     expect(indexRoute).toMatch(/from\s+["']@\/features\/watchlists\/queries["']/);
     expect(indexRoute).not.toMatch(/from\s+["']@\/controllers\/watchlists["']/);
   });
+
+  it("loads the watchlist detail screen through the feature-owned query surface", () => {
+    const watchlistDetailRoute = readFileSync(
+      workspaceFile("src/routes/watchlists/$watchlistId.tsx"),
+      "utf8",
+    );
+
+    expect(watchlistDetailRoute).toMatch(/from\s+["']@\/features\/watchlists\/queries["']/);
+    expect(watchlistDetailRoute).not.toMatch(/from\s+["']@\/controllers\/watchlists["']/);
+  });
 });
