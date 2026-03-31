@@ -45,6 +45,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
+      {
+        rel: "manifest",
+        href: "/manifest.json",
+      },
     ],
   }),
 
@@ -57,16 +61,17 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   const queryClient = router.options.context.queryClient;
 
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("/sw.js")
-        .then((registration) => {
-          console.log("SW registered:", registration);
-        })
-        .catch((error) => {
-          console.log("SW registration failed:", error);
+    void import("virtual:pwa-register")
+      .then(({ registerSW }) => {
+        registerSW({
+          onRegisterError(error) {
+            console.error("SW registration failed:", error);
+          },
         });
-    }
+      })
+      .catch((error) => {
+        console.error("PWA registration setup failed:", error);
+      });
   }, []);
 
   return (
