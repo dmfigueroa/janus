@@ -159,7 +159,10 @@ describe("PwaUpdatePrompt", () => {
     });
 
     await waitFor(() => {
-      expect(consoleError).toHaveBeenCalledWith("SW update check failed:", expect.any(Error));
+      expect(consoleError).toHaveBeenCalledWith(
+        "PWA startup update check failed:",
+        expect.any(Error),
+      );
     });
 
     expect(screen.queryByText("Update available")).toBeNull();
@@ -176,7 +179,7 @@ describe("PwaUpdatePrompt", () => {
 
     await waitFor(() => {
       expect(consoleError).toHaveBeenCalledWith(
-        "PWA registration setup failed:",
+        "PWA registration bootstrap failed:",
         expect.any(Error),
       );
     });

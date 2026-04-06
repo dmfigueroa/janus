@@ -47,16 +47,16 @@ export function PwaUpdatePrompt() {
             }
 
             void registration.update().catch((error) => {
-              console.error("SW update check failed:", error);
+              console.error("PWA startup update check failed:", error);
             });
           },
           onRegisterError(error) {
-            console.error("SW registration failed:", error);
+            console.error("PWA worker registration failed:", error);
           },
         });
       })
       .catch((error) => {
-        console.error("PWA registration setup failed:", error);
+        console.error("PWA registration bootstrap failed:", error);
       });
 
     return () => {
