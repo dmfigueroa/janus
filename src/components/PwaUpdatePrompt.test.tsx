@@ -12,6 +12,24 @@ vi.mock("@/lib/pwa-registration", () => ({
 }));
 
 const mockedLoadPwaRegistration = vi.mocked(loadPwaRegistration);
+type PwaRegistrationModule = Awaited<ReturnType<typeof loadPwaRegistration>>;
+type RegisterSW = PwaRegistrationModule["registerSW"];
+
+function createPwaRegistrationModule(registerSW: RegisterSW): PwaRegistrationModule {
+  return {
+    default: {} as PwaRegistrationModule,
+    registerSW,
+  } as PwaRegistrationModule;
+}
+
+function createServiceWorkerRegistration(
+  overrides: Partial<ServiceWorkerRegistration>,
+): ServiceWorkerRegistration {
+  return {
+    update: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  } as unknown as ServiceWorkerRegistration;
+}
 
 function renderPrompt() {
   render(
@@ -46,20 +64,22 @@ describe("PwaUpdatePrompt", () => {
 
   it("checks for a startup update and prompts when a waiting worker already exists", async () => {
     const updateServiceWorker = vi.fn().mockResolvedValue(undefined);
-    const registration = {
+    const registration = createServiceWorkerRegistration({
       waiting: {} as ServiceWorker,
       update: vi.fn().mockResolvedValue(undefined),
-    } as ServiceWorkerRegistration;
-
-    mockedLoadPwaRegistration.mockResolvedValue({
-      registerSW: vi.fn((options) => {
-        queueMicrotask(() => {
-          options?.onRegisteredSW?.("/sw.js", registration);
-        });
-
-        return updateServiceWorker;
-      }),
     });
+
+    mockedLoadPwaRegistration.mockResolvedValue(
+      createPwaRegistrationModule(
+        vi.fn((options) => {
+          queueMicrotask(() => {
+            options?.onRegisteredSW?.("/sw.js", registration);
+          });
+
+          return updateServiceWorker;
+        }) as RegisterSW,
+      ),
+    );
 
     renderPrompt();
 
@@ -78,25 +98,25 @@ describe("PwaUpdatePrompt", () => {
 
   it("shows a single update prompt when a new version becomes waiting during startup", async () => {
     const updateServiceWorker = vi.fn().mockResolvedValue(undefined);
-    const registration = {
+    const registration = createServiceWorkerRegistration({
       update: vi.fn().mockResolvedValue(undefined),
-    } as ServiceWorkerRegistration;
-
-    let registerOptions:
-      | Parameters<Awaited<ReturnType<typeof loadPwaRegistration>>["registerSW"]>[0]
-      | undefined;
-
-    mockedLoadPwaRegistration.mockResolvedValue({
-      registerSW: vi.fn((options) => {
-        registerOptions = options;
-
-        queueMicrotask(() => {
-          options?.onRegisteredSW?.("/sw.js", registration);
-        });
-
-        return updateServiceWorker;
-      }),
     });
+
+    let registerOptions: Parameters<RegisterSW>[0] | undefined;
+
+    mockedLoadPwaRegistration.mockResolvedValue(
+      createPwaRegistrationModule(
+        vi.fn((options) => {
+          registerOptions = options;
+
+          queueMicrotask(() => {
+            options?.onRegisteredSW?.("/sw.js", registration);
+          });
+
+          return updateServiceWorker;
+        }) as RegisterSW,
+      ),
+    );
 
     renderPrompt();
 
@@ -116,19 +136,21 @@ describe("PwaUpdatePrompt", () => {
 
   it("keeps update-check failures silent for users", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    const registration = {
+    const registration = createServiceWorkerRegistration({
       update: vi.fn().mockRejectedValue(new Error("update failed")),
-    } as ServiceWorkerRegistration;
-
-    mockedLoadPwaRegistration.mockResolvedValue({
-      registerSW: vi.fn((options) => {
-        queueMicrotask(() => {
-          options?.onRegisteredSW?.("/sw.js", registration);
-        });
-
-        return vi.fn().mockResolvedValue(undefined);
-      }),
     });
+
+    mockedLoadPwaRegistration.mockResolvedValue(
+      createPwaRegistrationModule(
+        vi.fn((options) => {
+          queueMicrotask(() => {
+            options?.onRegisteredSW?.("/sw.js", registration);
+          });
+
+          return vi.fn().mockResolvedValue(undefined);
+        }) as RegisterSW,
+      ),
+    );
 
     renderPrompt();
 
