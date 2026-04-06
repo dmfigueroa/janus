@@ -7,9 +7,10 @@ let db: ReturnType<typeof import("@/db/db.server").getDb>;
 let watchlists: typeof import("@/db/schema").watchlists;
 let watchlistItems: typeof import("@/db/schema").watchlistItems;
 let closeDb: typeof import("@/db/db.server").closeDb;
-let loadWatchlistDetailRoute: typeof import("./query").loadWatchlistDetailRoute;
+let readWatchlistDetailScreen: typeof import("../read.server").WatchlistsRead.detailScreen;
 let watchlistDetailInfiniteQueryOptions: typeof import("./query").watchlistDetailInfiniteQueryOptions;
 let watchlistDetailQueryKey: typeof import("./query").watchlistDetailQueryKey;
+type WatchlistDetailQueryFilters = import("./query").WatchlistDetailQueryFilters;
 type WatchlistDetailQueryData = import("./query").WatchlistDetailQueryData;
 
 beforeAll(async () => {
@@ -18,11 +19,12 @@ beforeAll(async () => {
   const dbModule = await import("@/db/db.server");
   const schemaModule = await import("@/db/schema");
   const queryModule = await import("./query");
+  const readModule = await import("../read.server");
   db = dbModule.getDb();
   closeDb = dbModule.closeDb;
   watchlists = schemaModule.watchlists;
   watchlistItems = schemaModule.watchlistItems;
-  loadWatchlistDetailRoute = queryModule.loadWatchlistDetailRoute;
+  readWatchlistDetailScreen = readModule.WatchlistsRead.detailScreen;
   watchlistDetailInfiniteQueryOptions = queryModule.watchlistDetailInfiniteQueryOptions;
   watchlistDetailQueryKey = queryModule.watchlistDetailQueryKey;
 
@@ -37,6 +39,27 @@ beforeEach(async () => {
   await db.delete(watchlistItems);
   await db.delete(watchlists);
 });
+
+async function seedRouteLoadedDetail({
+  queryClient,
+  filters,
+}: {
+  queryClient: QueryClient;
+  filters: WatchlistDetailQueryFilters;
+}) {
+  const detail = await readWatchlistDetailScreen({ ...filters, cursor: 1 });
+
+  if (!detail) {
+    return null;
+  }
+
+  queryClient.setQueryData(watchlistDetailQueryKey(filters), {
+    pages: [detail],
+    pageParams: [1],
+  });
+
+  return detail;
+}
 
 describe("watchlist detail query contract", () => {
   it("seeds route-loaded detail data and continues pagination through the shared query contract", async () => {
@@ -75,7 +98,7 @@ describe("watchlist detail query contract", () => {
     const queryClient = new QueryClient();
     const filters = { watchlistId: watchlist.id, unwatchedOnly: true, pageSize: 1 };
 
-    const initialPage = await loadWatchlistDetailRoute({ queryClient, filters });
+    const initialPage = await seedRouteLoadedDetail({ queryClient, filters });
 
     expect(initialPage?.items.map((item) => item.title)).toEqual(["Next Up"]);
 
@@ -135,8 +158,8 @@ describe("watchlist detail query contract", () => {
     const defaultFilters = { watchlistId: watchlist.id, unwatchedOnly: true };
     const searchFilters = { watchlistId: watchlist.id, query: "Saga", unwatchedOnly: false };
 
-    await loadWatchlistDetailRoute({ queryClient, filters: defaultFilters });
-    await loadWatchlistDetailRoute({ queryClient, filters: searchFilters });
+    await seedRouteLoadedDetail({ queryClient, filters: defaultFilters });
+    await seedRouteLoadedDetail({ queryClient, filters: searchFilters });
 
     const defaultKey = watchlistDetailQueryKey(defaultFilters);
     const searchKey = watchlistDetailQueryKey(searchFilters);

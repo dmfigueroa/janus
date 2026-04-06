@@ -1,17 +1,25 @@
-import { loadWatchlistDetailRoute } from "@/features/watchlists/detail/query";
+import {
+  getWatchlistDetailPage,
+  watchlistDetailQueryKey,
+} from "@/features/watchlists/detail/query";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { WatchlistDetail as WatchlistDetailView } from "@/components/watchlist/WatchlistDetail";
 
 export const Route = createFileRoute("/watchlists/$watchlistId")({
   loader: async ({ context, params: { watchlistId } }) => {
-    const detail = await loadWatchlistDetailRoute({
-      queryClient: context.queryClient,
-      filters: { watchlistId: Number.parseInt(watchlistId, 10), unwatchedOnly: true },
+    const filters = { watchlistId: Number.parseInt(watchlistId, 10), unwatchedOnly: true };
+    const detail = await getWatchlistDetailPage({
+      data: { ...filters, cursor: 1 },
     });
 
     if (!detail) {
       throw notFound();
     }
+
+    context.queryClient.setQueryData(watchlistDetailQueryKey(filters), {
+      pages: [detail],
+      pageParams: [1],
+    });
 
     return detail;
   },

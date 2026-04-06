@@ -1,5 +1,5 @@
 import { useRouter, Link } from "@tanstack/react-router";
-import { deleteWatchlist } from "@/controllers/watchlists";
+import { deleteWatchlist } from "@/features/watchlists/mutations";
 import { useState } from "react";
 import { cn } from "@/utils/cn";
 import { toast } from "sonner";

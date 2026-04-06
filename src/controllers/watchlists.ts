@@ -4,15 +4,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { Watchlist, type WatchlistDetailPage } from "../models/watchlist";
 
-const watchlistSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  description: z.string().optional(),
-});
-
-const deleteWatchlistSchema = z.object({
-  id: z.number(),
-});
-
 const mergeWatchlistSchema = z
   .object({
     targetWatchlistId: z.number().optional(),
@@ -49,17 +40,6 @@ export const getWatchlistDetail = createServerFn()
       .parse(data),
   )
   .handler(async ({ data }) => Watchlist.getDetail(data));
-
-export const createWatchlist = createServerFn()
-  .inputValidator((data) => watchlistSchema.parse(data))
-  .handler(async ({ data }) => Watchlist.create(data));
-
-export const deleteWatchlist = createServerFn()
-  .inputValidator((data) => deleteWatchlistSchema.parse(data))
-  .handler(async ({ data }) => {
-    await Watchlist.destroy(data.id);
-    return { success: true };
-  });
 
 export const mergeWatchlists = createServerFn({ method: "POST" })
   .inputValidator((data) => mergeWatchlistSchema.parse(data))

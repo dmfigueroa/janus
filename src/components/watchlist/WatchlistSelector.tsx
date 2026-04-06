@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/command";
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 import { Watchlist } from "@/db/schema";
-import { createWatchlist } from "@/controllers/watchlists";
+import { createWatchlist } from "@/features/watchlists/mutations";
 import { useRouter } from "@tanstack/react-router";
 
 interface WatchlistSelectorProps {
