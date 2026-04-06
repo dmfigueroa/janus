@@ -1,4 +1,4 @@
-import { infiniteQueryOptions, type InfiniteData, type QueryClient } from "@tanstack/react-query";
+import { infiniteQueryOptions, type InfiniteData } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { WatchlistItem } from "@/db/schema";
@@ -46,38 +46,6 @@ export const getWatchlistDetailPage = createServerFn()
     const { WatchlistsRead } = await import("../read.server");
     return WatchlistsRead.detailScreen(data);
   });
-
-function toWatchlistDetailInfiniteData(
-  page: WatchlistDetailQueryData,
-): InfiniteData<WatchlistDetailQueryData, number> {
-  return {
-    pages: [page],
-    pageParams: [1],
-  };
-}
-
-export async function loadWatchlistDetailRoute({
-  queryClient,
-  filters,
-}: {
-  queryClient: QueryClient;
-  filters: WatchlistDetailQueryFilters;
-}) {
-  const normalized = normalizeWatchlistDetailFilters(filters);
-  const { readWatchlistDetailRoute } = await import("./query.server");
-  const detail = await readWatchlistDetailRoute(normalized);
-
-  if (!detail) {
-    return null;
-  }
-
-  queryClient.setQueryData(
-    watchlistDetailQueryKey(normalized),
-    toWatchlistDetailInfiniteData(detail),
-  );
-
-  return detail;
-}
 
 export function watchlistDetailInfiniteQueryOptions(filters: WatchlistDetailQueryFilters) {
   const normalized = normalizeWatchlistDetailFilters(filters);
