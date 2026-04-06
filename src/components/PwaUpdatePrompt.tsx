@@ -13,6 +13,18 @@ export function PwaUpdatePrompt() {
   const updateServiceWorkerRef = useRef<UpdateServiceWorker | null>(null);
 
   useEffect(() => {
+    const activateWaitingUpdate = () => {
+      const updateServiceWorker = updateServiceWorkerRef.current;
+
+      if (!updateServiceWorker) {
+        return;
+      }
+
+      void updateServiceWorker(true).catch((error) => {
+        console.error("PWA update activation failed:", error);
+      });
+    };
+
     const showUpdatePrompt = () => {
       if (hasPromptedRef.current) {
         return;
@@ -26,10 +38,7 @@ export function PwaUpdatePrompt() {
         dismissible: false,
         action: {
           label: "Update",
-          onClick: () => {
-            toast.dismiss(UPDATE_TOAST_ID);
-            void updateServiceWorkerRef.current?.(true);
-          },
+          onClick: activateWaitingUpdate,
         },
       });
     };
