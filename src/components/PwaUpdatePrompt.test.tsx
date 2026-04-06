@@ -134,6 +134,33 @@ describe("PwaUpdatePrompt", () => {
     });
   });
 
+  it("keeps the update prompt non-dismissible", async () => {
+    const registration = createServiceWorkerRegistration({
+      waiting: {} as ServiceWorker,
+      update: vi.fn().mockResolvedValue(undefined),
+    });
+
+    mockedLoadPwaRegistration.mockResolvedValue(
+      createPwaRegistrationModule(
+        vi.fn((options) => {
+          queueMicrotask(() => {
+            options?.onRegisteredSW?.("/sw.js", registration);
+          });
+
+          return vi.fn().mockResolvedValue(undefined);
+        }) as RegisterSW,
+      ),
+    );
+
+    renderPrompt();
+
+    const title = await screen.findByText("Update available");
+    const toastElement = title.closest("[data-sonner-toast]");
+
+    expect(toastElement).not.toBeNull();
+    expect(toastElement?.getAttribute("data-dismissible")).toBe("false");
+  });
+
   it("keeps update-check failures silent for users", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const registration = createServiceWorkerRegistration({

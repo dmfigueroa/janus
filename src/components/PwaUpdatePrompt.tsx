@@ -23,6 +23,7 @@ export function PwaUpdatePrompt() {
       toast("Update available", {
         id: UPDATE_TOAST_ID,
         duration: Number.POSITIVE_INFINITY,
+        dismissible: false,
         action: {
           label: "Update",
           onClick: () => {
