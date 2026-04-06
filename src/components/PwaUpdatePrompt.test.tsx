@@ -75,4 +75,92 @@ describe("PwaUpdatePrompt", () => {
       expect(updateServiceWorker).toHaveBeenCalledWith(true);
     });
   });
+
+  it("shows a single update prompt when a new version becomes waiting during startup", async () => {
+    const updateServiceWorker = vi.fn().mockResolvedValue(undefined);
+    const registration = {
+      update: vi.fn().mockResolvedValue(undefined),
+    } as ServiceWorkerRegistration;
+
+    let registerOptions:
+      | Parameters<Awaited<ReturnType<typeof loadPwaRegistration>>["registerSW"]>[0]
+      | undefined;
+
+    mockedLoadPwaRegistration.mockResolvedValue({
+      registerSW: vi.fn((options) => {
+        registerOptions = options;
+
+        queueMicrotask(() => {
+          options?.onRegisteredSW?.("/sw.js", registration);
+        });
+
+        return updateServiceWorker;
+      }),
+    });
+
+    renderPrompt();
+
+    await waitFor(() => {
+      expect(registration.update).toHaveBeenCalledTimes(1);
+    });
+
+    registerOptions?.onNeedRefresh?.();
+    registerOptions?.onNeedRefresh?.();
+
+    await screen.findByText("Update available");
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("button", { name: "Update" })).toHaveLength(1);
+    });
+  });
+
+  it("keeps update-check failures silent for users", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const registration = {
+      update: vi.fn().mockRejectedValue(new Error("update failed")),
+    } as ServiceWorkerRegistration;
+
+    mockedLoadPwaRegistration.mockResolvedValue({
+      registerSW: vi.fn((options) => {
+        queueMicrotask(() => {
+          options?.onRegisteredSW?.("/sw.js", registration);
+        });
+
+        return vi.fn().mockResolvedValue(undefined);
+      }),
+    });
+
+    renderPrompt();
+
+    await waitFor(() => {
+      expect(registration.update).toHaveBeenCalledTimes(1);
+    });
+
+    await waitFor(() => {
+      expect(consoleError).toHaveBeenCalledWith("SW update check failed:", expect.any(Error));
+    });
+
+    expect(screen.queryByText("Update available")).toBeNull();
+
+    consoleError.mockRestore();
+  });
+
+  it("keeps registration setup failures silent for users", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    mockedLoadPwaRegistration.mockRejectedValue(new Error("registration failed"));
+
+    renderPrompt();
+
+    await waitFor(() => {
+      expect(consoleError).toHaveBeenCalledWith(
+        "PWA registration setup failed:",
+        expect.any(Error),
+      );
+    });
+
+    expect(screen.queryByText("Update available")).toBeNull();
+
+    consoleError.mockRestore();
+  });
 });
