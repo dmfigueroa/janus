@@ -4,12 +4,12 @@ import {
   createRootRouteWithContext,
   useRouter,
 } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BottomNav } from "@/components/BottomNav";
+import { PwaUpdatePrompt } from "@/components/PwaUpdatePrompt";
 
 import appCss from "../styles.css?url";
 
@@ -60,20 +60,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   const router = useRouter(); // Get router instance to access context
   const queryClient = router.options.context.queryClient;
 
-  useEffect(() => {
-    void import("virtual:pwa-register")
-      .then(({ registerSW }) => {
-        registerSW({
-          onRegisterError(error) {
-            console.error("SW registration failed:", error);
-          },
-        });
-      })
-      .catch((error) => {
-        console.error("PWA registration setup failed:", error);
-      });
-  }, []);
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -82,6 +68,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <QueryClientProvider client={queryClient}>
+            <PwaUpdatePrompt />
             {children}
             <Toaster />
             <TanStackDevtools
