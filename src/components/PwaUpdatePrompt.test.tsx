@@ -96,6 +96,45 @@ describe("PwaUpdatePrompt", () => {
     });
   });
 
+  it("keeps the update action available if activating the waiting worker fails", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const updateServiceWorker = vi.fn().mockRejectedValue(new Error("activation failed"));
+    const registration = createServiceWorkerRegistration({
+      waiting: {} as ServiceWorker,
+      update: vi.fn().mockResolvedValue(undefined),
+    });
+
+    mockedLoadPwaRegistration.mockResolvedValue(
+      createPwaRegistrationModule(
+        vi.fn((options) => {
+          queueMicrotask(() => {
+            options?.onRegisteredSW?.("/sw.js", registration);
+          });
+
+          return updateServiceWorker;
+        }) as RegisterSW,
+      ),
+    );
+
+    renderPrompt();
+
+    const updateButton = await screen.findByRole("button", { name: "Update" });
+
+    fireEvent.click(updateButton);
+
+    await waitFor(() => {
+      expect(updateServiceWorker).toHaveBeenCalledWith(true);
+    });
+
+    await waitFor(() => {
+      expect(consoleError).toHaveBeenCalledWith("PWA update activation failed:", expect.any(Error));
+    });
+
+    expect(screen.getByRole("button", { name: "Update" })).toBeDefined();
+
+    consoleError.mockRestore();
+  });
+
   it("shows a single update prompt when a new version becomes waiting during startup", async () => {
     const updateServiceWorker = vi.fn().mockResolvedValue(undefined);
     const registration = createServiceWorkerRegistration({
