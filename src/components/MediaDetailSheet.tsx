@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Star, Calendar, Info } from "lucide-react";
-import { addToWatchlist } from "@/server/watchlist";
+import { addToWatchlist } from "@/features/watchlists/mutations";
 import { getWatchlistSummaries } from "@/controllers/watchlists";
 import { toast } from "sonner";
 import { WatchlistSelector } from "./watchlist/WatchlistSelector";
