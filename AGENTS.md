@@ -1,5 +1,11 @@
 # AGENTS
 
+## Git Conventions
+
+- Use conventional branch names for all new branches, such as `feat/watchlists-write-boundary`, `fix/search-pagination`, or `chore/update-deps`.
+- Use conventional commit messages for all commits in the form `type(scope): summary` when a scope adds clarity, or `type: summary` when it does not.
+- Prefer standard conventional commit types like `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, and `build`.
+
 ## Route And Feature Boundaries
 
 - Keep small route-specific loader logic in the route file. Param parsing, route defaults, redirects, and `notFound` handling usually belong in the route.
