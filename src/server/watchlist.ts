@@ -1,25 +1,11 @@
-"use server";
-
 import { createServerFn } from "@tanstack/react-start";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "../db/db.server";
 import { watchlistItems, watchlists } from "../db/schema";
-import { DEPRECATED_MEDIA_MESSAGE, isDeprecatedMediaType } from "./media";
 
 export { addToWatchlist } from "@/features/watchlists/mutations";
 export type { Watchlist, WatchlistItem } from "../db/schema";
-
-export const getDeprecatedWatchlistAddRejection = (mediaType: string) => {
-  if (!isDeprecatedMediaType(mediaType)) {
-    return null;
-  }
-
-  return {
-    success: false,
-    message: `${DEPRECATED_MEDIA_MESSAGE} New anime and manga items cannot be added to watchlists.`,
-  };
-};
 
 export const toggleWatched = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({ itemId: z.number(), isWatched: z.boolean() }).parse(data))

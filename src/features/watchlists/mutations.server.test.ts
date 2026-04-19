@@ -198,4 +198,37 @@ describe("watchlist mutation contract", () => {
       runtime: 127,
     });
   });
+
+  it("rejects custom TV items with a structured failure response", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({
+        name: "Custom TV",
+        description: "Unsupported source coverage",
+      })
+      .returning();
+
+    const result = await WatchlistsWrite.add({
+      watchlistId: watchlist.id,
+      media: {
+        id: "custom-tv-1",
+        mediaType: "tv",
+        source: "custom",
+        title: "Local Series",
+        poster: null,
+        year: "2025",
+      },
+    });
+
+    expect(result).toEqual({
+      success: false,
+      message: "TV shows must come from TMDB so Janus can expand them into episodes.",
+    });
+
+    const detail = await WatchlistsRead.detailScreen({ watchlistId: watchlist.id });
+
+    expect(detail?.items).toHaveLength(0);
+    expect(getTVDetailsMock).not.toHaveBeenCalled();
+    expect(getSeasonDetailsMock).not.toHaveBeenCalled();
+  });
 });

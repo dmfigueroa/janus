@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { DEPRECATED_MEDIA_MESSAGE, isDeprecatedMediaType } from "./media";
+import {
+  DEPRECATED_MEDIA_MESSAGE,
+  getDeprecatedWatchlistAddRejection,
+  isDeprecatedMediaType,
+} from "./media";
 import { getDeprecatedSearchResponse } from "./search";
-import { getDeprecatedWatchlistAddRejection } from "./watchlist";
 
 describe("deprecated media behavior", () => {
   it("marks anime and manga types as deprecated", () => {

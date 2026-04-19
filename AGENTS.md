@@ -15,6 +15,8 @@
 - Prefer short, domain-based filenames and folders over thin wrapper modules.
 - Do not use `"use server"` or `"use client"` directives. Prefer framework-native boundaries such as `createServerFn`, route/module boundaries, and `.server` files where appropriate.
 - Remove `"use server"` and `"use client"` directives when you encounter them unless there is a documented, current framework requirement that makes one unavoidable.
+- For `createServerFn` and other TanStack response surfaces, expected user-facing failures must return structured error objects such as `{ success: false, message }` instead of throwing. Reserve throws for framework control flow like `redirect` / `notFound` or truly unexpected defects.
+- Avoid `any`. Prefer provider result types, local interfaces, explicit narrowing, or typed helper boundaries.
 
 <!-- intent-skills:start -->
 
