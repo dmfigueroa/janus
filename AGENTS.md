@@ -1,5 +1,11 @@
 # AGENTS
 
+## Git Conventions
+
+- Use conventional branch names for all new branches, such as `feat/watchlists-write-boundary`, `fix/search-pagination`, or `chore/update-deps`.
+- Use conventional commit messages for all commits in the form `type(scope): summary` when a scope adds clarity, or `type: summary` when it does not.
+- Prefer standard conventional commit types like `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, and `build`.
+
 ## Route And Feature Boundaries
 
 - Keep small route-specific loader logic in the route file. Param parsing, route defaults, redirects, and `notFound` handling usually belong in the route.
@@ -7,6 +13,10 @@
 - Shared route modules must not import `.server` modules directly. Routes are part of the shared module graph, and direct `.server` imports can leak server-only dependencies into the client bundle.
 - Avoid `index.ts` / `index.server.ts` barrels unless they provide a clear, durable navigation benefit.
 - Prefer short, domain-based filenames and folders over thin wrapper modules.
+- Do not use `"use server"` or `"use client"` directives. Prefer framework-native boundaries such as `createServerFn`, route/module boundaries, and `.server` files where appropriate.
+- Remove `"use server"` and `"use client"` directives when you encounter them unless there is a documented, current framework requirement that makes one unavoidable.
+- For `createServerFn` and other TanStack response surfaces, expected user-facing failures must return structured error objects such as `{ success: false, message }` instead of throwing. Reserve throws for framework control flow like `redirect` / `notFound` or truly unexpected defects.
+- Avoid `any`. Prefer provider result types, local interfaces, explicit narrowing, or typed helper boundaries.
 
 <!-- intent-skills:start -->
 

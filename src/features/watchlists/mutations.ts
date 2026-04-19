@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { UnifiedMediaSchema } from "@/server/media";
 
 const createWatchlistSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -14,6 +15,13 @@ const deleteWatchlistSchema = z.object({
 
 export type DeleteWatchlistInput = z.infer<typeof deleteWatchlistSchema>;
 
+const addToWatchlistSchema = z.object({
+  watchlistId: z.number(),
+  media: UnifiedMediaSchema,
+});
+
+export type AddToWatchlistInput = z.infer<typeof addToWatchlistSchema>;
+
 export const createWatchlist = createServerFn({ method: "POST" })
   .inputValidator((data) => createWatchlistSchema.parse(data))
   .handler(async ({ data }) => {
@@ -26,4 +34,11 @@ export const deleteWatchlist = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { WatchlistsWrite } = await import("./write.server");
     return WatchlistsWrite.delete(data);
+  });
+
+export const addToWatchlist = createServerFn({ method: "POST" })
+  .inputValidator((data) => addToWatchlistSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { WatchlistsWrite } = await import("./write.server");
+    return WatchlistsWrite.add(data);
   });

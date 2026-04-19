@@ -7,6 +7,24 @@ export const DEPRECATED_MEDIA_MESSAGE =
 export const isDeprecatedMediaType = (mediaType: string): boolean =>
   DEPRECATED_MEDIA_TYPES.includes(mediaType as (typeof DEPRECATED_MEDIA_TYPES)[number]);
 
+export type WatchlistAddRejection = {
+  success: false;
+  message: string;
+};
+
+export const getDeprecatedWatchlistAddRejection = (
+  mediaType: string,
+): WatchlistAddRejection | null => {
+  if (!isDeprecatedMediaType(mediaType)) {
+    return null;
+  }
+
+  return {
+    success: false,
+    message: `${DEPRECATED_MEDIA_MESSAGE} New anime and manga items cannot be added to watchlists.`,
+  };
+};
+
 export const UnifiedMediaSchema = z.object({
   id: z.string(),
   mediaType: z.enum(["movie", "tv", "game", "book", "comic", "anime", "manga"]),
