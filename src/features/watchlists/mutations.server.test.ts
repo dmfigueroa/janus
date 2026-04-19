@@ -231,4 +231,89 @@ describe("watchlist mutation contract", () => {
     expect(getTVDetailsMock).not.toHaveBeenCalled();
     expect(getSeasonDetailsMock).not.toHaveBeenCalled();
   });
+
+  it("uses the provider show title and only reports newly added TMDB episodes", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({
+        name: "Serialized Drama",
+        description: "TV imports",
+      })
+      .returning();
+
+    await db.insert(watchlistItems).values({
+      watchlistId: watchlist.id,
+      tmdbId: "1001",
+      source: "tmdb",
+      mediaType: "episode",
+      title: "Pilot",
+      parentTitle: "Provider Show",
+      season: 1,
+      episode: "1",
+      releaseDate: "2024-01-10",
+      isWatched: false,
+    });
+
+    getTVDetailsMock.mockResolvedValue({
+      name: "Provider Show",
+      poster_path: "/provider-show.jpg",
+      seasons: [{ season_number: 0 }, { season_number: 1 }],
+    });
+    getSeasonDetailsMock.mockResolvedValue({
+      episodes: [
+        {
+          id: 1001,
+          name: "Pilot",
+          season_number: 1,
+          episode_number: 1,
+          still_path: "/pilot.jpg",
+          air_date: "2024-01-10",
+          vote_average: 7.2,
+          runtime: 42,
+        },
+        {
+          id: 1002,
+          name: "Second Wave",
+          season_number: 1,
+          episode_number: 2,
+          still_path: null,
+          air_date: "2024-01-17",
+          vote_average: 7.8,
+          runtime: 44,
+        },
+      ],
+    });
+
+    const result = await WatchlistsWrite.add({
+      watchlistId: watchlist.id,
+      media: {
+        id: "42",
+        mediaType: "tv",
+        source: "tmdb",
+        title: "Search Result Title",
+        poster: null,
+        year: "2024",
+      },
+    });
+
+    expect(result).toEqual({
+      success: true,
+      message: "Added 1 new episode to watchlist",
+    });
+
+    const detail = await WatchlistsRead.detailScreen({ watchlistId: watchlist.id });
+
+    expect(detail?.items).toHaveLength(2);
+    expect(detail?.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          tmdbId: "1002",
+          title: "Second Wave",
+          parentTitle: "Provider Show",
+          posterPath: "/provider-show.jpg",
+          releaseDate: "2024-01-17",
+        }),
+      ]),
+    );
+  });
 });

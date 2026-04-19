@@ -44,6 +44,9 @@ type TMDBEpisode = {
   runtime?: number | null;
 };
 
+const formatCount = (count: number, singular: string, plural: string) =>
+  `${count} ${count === 1 ? singular : plural}`;
+
 const rejectAdd = (message: string): WatchlistAddRejection => ({
   success: false,
   message,
@@ -164,6 +167,7 @@ async function addTVShowToWatchlist(
 
   try {
     showDetails = await getTVDetails({ data: { id: tmdbId } });
+    const showTitle = showDetails.name || media.title;
     const seasons = showDetails.seasons || [];
     const seasonEpisodeLists = await Promise.all(
       seasons
@@ -183,7 +187,7 @@ async function addTVShowToWatchlist(
       source: "tmdb" as const,
       mediaType: "episode" as const,
       title: episode.name,
-      parentTitle: media.title,
+      parentTitle: showTitle,
       season: episode.season_number,
       episode: episode.episode_number.toString(),
       posterPath: episode.still_path || showDetails.poster_path,
@@ -195,16 +199,38 @@ async function addTVShowToWatchlist(
     return rejectAdd(TMDB_TV_FETCH_FAILURE_MESSAGE);
   }
 
-  if (allEpisodes.length > 0) {
-    for (let i = 0; i < allEpisodes.length; i += DB_INSERT_CHUNK_SIZE) {
-      const chunk = allEpisodes.slice(i, i + DB_INSERT_CHUNK_SIZE);
-      await db.insert(watchlistItems).values(chunk).onConflictDoNothing();
-    }
-
-    await markLastItemAdded(watchlistId);
+  if (allEpisodes.length === 0) {
+    return { success: true, message: "No episodes found for this show" };
   }
 
-  return { success: true, message: `Added ${allEpisodes.length} episodes to watchlist` };
+  const existingEpisodeRows = await db
+    .select({ tmdbId: watchlistItems.tmdbId })
+    .from(watchlistItems)
+    .where(
+      and(
+        eq(watchlistItems.watchlistId, watchlistId),
+        eq(watchlistItems.mediaType, "episode"),
+        eq(watchlistItems.source, "tmdb"),
+      ),
+    );
+  const existingEpisodeIds = new Set(existingEpisodeRows.map((row) => row.tmdbId));
+  const newEpisodes = allEpisodes.filter((episode) => !existingEpisodeIds.has(episode.tmdbId));
+
+  if (newEpisodes.length === 0) {
+    return { success: true, message: "No new episodes found for this show" };
+  }
+
+  for (let i = 0; i < newEpisodes.length; i += DB_INSERT_CHUNK_SIZE) {
+    const chunk = newEpisodes.slice(i, i + DB_INSERT_CHUNK_SIZE);
+    await db.insert(watchlistItems).values(chunk).onConflictDoNothing();
+  }
+
+  await markLastItemAdded(watchlistId);
+
+  return {
+    success: true,
+    message: `Added ${formatCount(newEpisodes.length, "new episode", "new episodes")} to watchlist`,
+  };
 }
 
 async function addComicToWatchlist(
