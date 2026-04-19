@@ -65,33 +65,25 @@ async function addGenericItemToWatchlist(
   media: GenericMedia,
 ): Promise<WatchlistWriteResult> {
   const db = getDb();
-  const existing = await db
-    .select()
-    .from(watchlistItems)
-    .where(
-      and(
-        eq(watchlistItems.watchlistId, watchlistId),
-        eq(watchlistItems.tmdbId, media.id),
-        eq(watchlistItems.mediaType, media.mediaType),
-      ),
-    )
-    .limit(1);
+  const [inserted] = await db
+    .insert(watchlistItems)
+    .values({
+      watchlistId,
+      tmdbId: media.id,
+      source: media.source,
+      mediaType: media.mediaType,
+      title: media.title,
+      posterPath: media.poster,
+      releaseDate: media.releaseDate || media.year,
+      voteAverage: media.rating,
+      runtime: 0,
+    })
+    .onConflictDoNothing()
+    .returning({ id: watchlistItems.id });
 
-  if (existing.length > 0) {
+  if (!inserted) {
     return { success: true, message: "Already in watchlist" };
   }
-
-  await db.insert(watchlistItems).values({
-    watchlistId,
-    tmdbId: media.id,
-    source: media.source,
-    mediaType: media.mediaType,
-    title: media.title,
-    posterPath: media.poster,
-    releaseDate: media.releaseDate || media.year,
-    voteAverage: media.rating,
-    runtime: 0,
-  });
 
   await markLastItemAdded(watchlistId);
 
@@ -126,17 +118,25 @@ async function addMovieToWatchlist(
     return rejectAdd(TMDB_MOVIE_FETCH_FAILURE_MESSAGE);
   }
 
-  await db.insert(watchlistItems).values({
-    watchlistId,
-    tmdbId: tmdbId.toString(),
-    source: "tmdb",
-    mediaType: "movie",
-    title: details.title || details.name || "Unknown",
-    posterPath: details.poster_path,
-    releaseDate: details.release_date,
-    voteAverage: details.vote_average,
-    runtime: details.runtime || 0,
-  });
+  const [inserted] = await db
+    .insert(watchlistItems)
+    .values({
+      watchlistId,
+      tmdbId: tmdbId.toString(),
+      source: "tmdb",
+      mediaType: "movie",
+      title: details.title || details.name || "Unknown",
+      posterPath: details.poster_path,
+      releaseDate: details.release_date,
+      voteAverage: details.vote_average,
+      runtime: details.runtime || 0,
+    })
+    .onConflictDoNothing()
+    .returning({ id: watchlistItems.id });
+
+  if (!inserted) {
+    return { success: true, message: "Already in watchlist" };
+  }
 
   await markLastItemAdded(watchlistId);
 
