@@ -1,5 +1,3 @@
-"use server";
-
 import {
   Watchlist,
   type WatchlistDetailPage,

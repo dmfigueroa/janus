@@ -1,5 +1,3 @@
-"use client";
-
 import * as React from "react";
 import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { cn } from "@/utils/cn";
@@ -18,6 +16,7 @@ import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 import { Watchlist } from "@/db/schema";
 import { createWatchlist } from "@/features/watchlists/mutations";
 import { useRouter } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 
 interface WatchlistSelectorProps {
   watchlists: Watchlist[] | undefined;
@@ -109,6 +108,7 @@ function WatchlistList({
 }) {
   const [query, setQuery] = React.useState("");
   const router = useRouter();
+  const createWatchlistFn = useServerFn(createWatchlist);
 
   return (
     <>
@@ -121,7 +121,7 @@ function WatchlistList({
               key={`create-${query}`}
               value={`Create "${query}"`}
               onSelect={async () => {
-                const newList = await createWatchlist({ data: { name: query } });
+                const newList = await createWatchlistFn({ data: { name: query } });
                 await router.invalidate?.();
                 onSelect(newList.id.toString());
               }}

@@ -1,5 +1,3 @@
-"use client";
-
 import type { Watchlist } from "@/db/schema";
 import { calculateWatchlistProgress } from "@/features/watchlists/progress";
 import { cn } from "@/utils/cn";

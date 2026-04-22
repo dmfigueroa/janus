@@ -1,5 +1,3 @@
-"use client";
-
 import type { WatchlistItem } from "@/db/schema";
 import { TimelineItem } from "./TimelineItem";
 import { useMemo } from "react";

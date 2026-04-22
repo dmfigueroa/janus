@@ -36,6 +36,13 @@ const addToWatchlistSchema = z.object({
 
 export type AddToWatchlistInput = z.infer<typeof addToWatchlistSchema>;
 
+const toggleWatchedSchema = z.object({
+  itemId: z.number(),
+  isWatched: z.boolean(),
+});
+
+export type ToggleWatchedInput = z.infer<typeof toggleWatchedSchema>;
+
 export const createWatchlist = createServerFn({ method: "POST" })
   .inputValidator((data) => createWatchlistSchema.parse(data))
   .handler(async ({ data }) => {
@@ -62,4 +69,11 @@ export const addToWatchlist = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { WatchlistsWrite } = await import("./write.server");
     return WatchlistsWrite.add(data);
+  });
+
+export const toggleWatched = createServerFn({ method: "POST" })
+  .inputValidator((data) => toggleWatchedSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { WatchlistsWrite } = await import("./write.server");
+    return WatchlistsWrite.toggleWatched(data);
   });

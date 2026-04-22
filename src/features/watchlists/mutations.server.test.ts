@@ -98,6 +98,44 @@ describe("watchlist mutation contract", () => {
     await expect(WatchlistsRead.detailScreen({ watchlistId: watchlist.id })).resolves.toBeNull();
   });
 
+  it("toggles an item watched through the feature write boundary so detail reads reflect persisted progress", async () => {
+    const [watchlist] = await db.insert(watchlists).values({ name: "Toggle Flow" }).returning();
+
+    const [item] = await db
+      .insert(watchlistItems)
+      .values({
+        watchlistId: watchlist.id,
+        tmdbId: "toggle-me",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Toggle Me",
+        releaseDate: "2024-01-01",
+        isWatched: false,
+      })
+      .returning();
+
+    const result = await WatchlistsWrite.toggleWatched({
+      itemId: item.id,
+      isWatched: true,
+    });
+
+    const detail = await WatchlistsRead.detailScreen({
+      watchlistId: watchlist.id,
+      unwatchedOnly: false,
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(detail?.items[0]).toMatchObject({
+      id: item.id,
+      isWatched: true,
+    });
+    expect(detail?.watchlist.stats).toMatchObject({
+      totalItems: 1,
+      watchedItems: 1,
+      progress: 100,
+    });
+  });
+
   it("merges selected watchlists into an existing target through the feature mutation boundary", async () => {
     const [target, source, untouched] = await db
       .insert(watchlists)
