@@ -15,6 +15,20 @@ const deleteWatchlistSchema = z.object({
 
 export type DeleteWatchlistInput = z.infer<typeof deleteWatchlistSchema>;
 
+const mergeWatchlistsSchema = z
+  .object({
+    targetWatchlistId: z.number().optional(),
+    sourceWatchlistIds: z
+      .array(z.number())
+      .min(1, "At least one source watchlist must be selected"),
+    newWatchlistName: z.string().optional(),
+  })
+  .refine((data) => data.targetWatchlistId || data.newWatchlistName, {
+    message: "Either targetWatchlistId or newWatchlistName must be provided",
+  });
+
+export type MergeWatchlistsInput = z.infer<typeof mergeWatchlistsSchema>;
+
 const addToWatchlistSchema = z.object({
   watchlistId: z.number(),
   media: UnifiedMediaSchema,
@@ -34,6 +48,13 @@ export const deleteWatchlist = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { WatchlistsWrite } = await import("./write.server");
     return WatchlistsWrite.delete(data);
+  });
+
+export const mergeWatchlists = createServerFn({ method: "POST" })
+  .inputValidator((data) => mergeWatchlistsSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { WatchlistsWrite } = await import("./write.server");
+    return WatchlistsWrite.merge(data);
   });
 
 export const addToWatchlist = createServerFn({ method: "POST" })

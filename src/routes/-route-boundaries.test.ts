@@ -33,6 +33,16 @@ describe("route module boundaries", () => {
     expect(watchlistDetailRoute).not.toMatch(/from\s+["']@\/controllers\/watchlists["']/);
   });
 
+  it("executes the merge watchlists flow through the feature-owned mutation surface", () => {
+    const mergeDialog = readFileSync(
+      workspaceFile("src/components/MergeWatchlistDialog.tsx"),
+      "utf8",
+    );
+
+    expect(mergeDialog).toMatch(/from\s+["']@\/features\/watchlists\/mutations["']/);
+    expect(mergeDialog).not.toMatch(/from\s+["']@\/controllers\/watchlists["']/);
+  });
+
   it("keeps the shared watchlist query surface free of server-only imports", () => {
     const watchlistQueries = readFileSync(
       workspaceFile("src/features/watchlists/detail/query.ts"),

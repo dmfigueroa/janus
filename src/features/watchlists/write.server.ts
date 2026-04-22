@@ -1,6 +1,6 @@
 import pLimit from "p-limit";
 import { getDb } from "@/db/db.server";
-import { watchlistItems, watchlists } from "@/db/schema";
+import { watchlistItems, watchlists, type InsertWatchlistItem } from "@/db/schema";
 import { getComicIssues } from "@/server/providers/comicvine.server";
 import { getBookDetails } from "@/server/providers/google-books.server";
 import { getGameDetails } from "@/server/providers/rawg.server";
@@ -11,8 +11,13 @@ import {
 } from "@/server/providers/tmdb-api.server";
 import { getDeprecatedWatchlistAddRejection, type WatchlistAddRejection } from "@/server/media";
 import { Watchlist } from "@/models/watchlist";
-import { and, eq, sql } from "drizzle-orm";
-import type { AddToWatchlistInput, CreateWatchlistInput, DeleteWatchlistInput } from "./mutations";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import type {
+  AddToWatchlistInput,
+  CreateWatchlistInput,
+  DeleteWatchlistInput,
+  MergeWatchlistsInput,
+} from "./mutations";
 
 const limit = pLimit(5);
 const DB_INSERT_CHUNK_SIZE = 50;
@@ -32,6 +37,8 @@ type WatchlistMedia = AddToWatchlistInput["media"];
 type GenericMedia = Omit<WatchlistMedia, "mediaType"> & {
   mediaType: Exclude<WatchlistMedia["mediaType"], "tv">;
 };
+type WatchlistDb = ReturnType<typeof getDb>;
+type WatchlistTransaction = Parameters<Parameters<WatchlistDb["transaction"]>[0]>[0];
 type WatchlistWriteResult = { success: true; message: string } | WatchlistAddRejection;
 type TMDBEpisode = {
   id: number;
@@ -51,6 +58,12 @@ const rejectAdd = (message: string): WatchlistAddRejection => ({
   success: false,
   message,
 });
+
+function assertMergeHasSources(sourceWatchlistIds: number[]) {
+  if (sourceWatchlistIds.length === 0) {
+    throw new Error("At least one source watchlist must be selected");
+  }
+}
 
 async function markLastItemAdded(watchlistId: number) {
   const db = getDb();
@@ -300,6 +313,126 @@ async function addComicToWatchlist(
   return { success: true, message };
 }
 
+function createMergedWatchlist(transaction: WatchlistTransaction, name: string) {
+  const [newWatchlist] = transaction
+    .insert(watchlists)
+    .values({
+      name,
+      description: "Merged watchlist",
+    })
+    .returning()
+    .all();
+
+  return newWatchlist.id;
+}
+
+function resolveMergeTarget(
+  transaction: WatchlistTransaction,
+  {
+    targetWatchlistId,
+    newWatchlistName,
+  }: Pick<MergeWatchlistsInput, "targetWatchlistId" | "newWatchlistName">,
+) {
+  const targetId =
+    targetWatchlistId ??
+    (newWatchlistName ? createMergedWatchlist(transaction, newWatchlistName) : null);
+
+  if (!targetId) {
+    throw new Error("Target watchlist ID resolution failed");
+  }
+
+  return targetId;
+}
+
+function sourceIdsToMove(sourceWatchlistIds: number[], targetId: number) {
+  return sourceWatchlistIds.filter((id) => id !== targetId);
+}
+
+function buildMergedWatchlistItem(
+  item: typeof watchlistItems.$inferSelect,
+  targetId: number,
+): InsertWatchlistItem {
+  return {
+    watchlistId: targetId,
+    tmdbId: item.tmdbId,
+    source: item.source,
+    mediaType: item.mediaType,
+    title: item.title,
+    parentTitle: item.parentTitle,
+    season: item.season,
+    episode: item.episode,
+    posterPath: item.posterPath,
+    releaseDate: item.releaseDate,
+    voteAverage: item.voteAverage,
+    runtime: item.runtime,
+    isWatched: item.isWatched,
+    addedAt: item.addedAt,
+  };
+}
+
+function insertMergedItems(
+  transaction: WatchlistTransaction,
+  itemsToInsert: InsertWatchlistItem[],
+) {
+  for (let i = 0; i < itemsToInsert.length; i += DB_INSERT_CHUNK_SIZE) {
+    const chunk = itemsToInsert.slice(i, i + DB_INSERT_CHUNK_SIZE);
+
+    transaction
+      .insert(watchlistItems)
+      .values(chunk)
+      .onConflictDoUpdate({
+        target: [watchlistItems.watchlistId, watchlistItems.tmdbId, watchlistItems.mediaType],
+        set: {
+          isWatched: sql`CASE WHEN ${watchlistItems.isWatched} OR excluded.is_watched THEN 1 ELSE 0 END`,
+        },
+      })
+      .run();
+  }
+}
+
+function mergeSourceItemsIntoTarget(
+  transaction: WatchlistTransaction,
+  sourceWatchlistIds: number[],
+  targetId: number,
+) {
+  if (sourceWatchlistIds.length === 0) {
+    return false;
+  }
+
+  const sourceItems = transaction
+    .select()
+    .from(watchlistItems)
+    .where(inArray(watchlistItems.watchlistId, sourceWatchlistIds))
+    .all();
+
+  if (sourceItems.length === 0) {
+    return false;
+  }
+
+  insertMergedItems(
+    transaction,
+    sourceItems.map((item) => buildMergedWatchlistItem(item, targetId)),
+  );
+
+  return true;
+}
+
+function markLastItemAddedInTransaction(transaction: WatchlistTransaction, watchlistId: number) {
+  transaction
+    .update(watchlists)
+    .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
+    .where(eq(watchlists.id, watchlistId))
+    .run();
+}
+
+function deleteMergedSources(transaction: WatchlistTransaction, sourceWatchlistIds: number[]) {
+  if (sourceWatchlistIds.length === 0) {
+    return;
+  }
+
+  transaction.delete(watchlists).where(inArray(watchlists.id, sourceWatchlistIds)).run();
+}
+
 export const WatchlistsWrite = {
   async create(input: CreateWatchlistInput) {
     return Watchlist.create(input);
@@ -308,6 +441,25 @@ export const WatchlistsWrite = {
   async delete({ id }: DeleteWatchlistInput) {
     await Watchlist.destroy(id);
     return { success: true };
+  },
+
+  async merge({ targetWatchlistId, sourceWatchlistIds, newWatchlistName }: MergeWatchlistsInput) {
+    assertMergeHasSources(sourceWatchlistIds);
+
+    const db = getDb();
+    return db.transaction((transaction) => {
+      const targetId = resolveMergeTarget(transaction, { targetWatchlistId, newWatchlistName });
+      const sourceIds = sourceIdsToMove(sourceWatchlistIds, targetId);
+      const mergedItems = mergeSourceItemsIntoTarget(transaction, sourceIds, targetId);
+
+      if (mergedItems) {
+        markLastItemAddedInTransaction(transaction, targetId);
+      }
+
+      deleteMergedSources(transaction, sourceIds);
+
+      return { success: true, targetId };
+    });
   },
 
   async add({ watchlistId, media }: AddToWatchlistInput) {
