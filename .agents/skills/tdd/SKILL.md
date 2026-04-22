@@ -15,6 +15,18 @@ description: Test-driven development with red-green-refactor loop. Use when user
 
 See [tests.md](tests.md) for examples and [mocking.md](mocking.md) for mocking guidelines.
 
+## Project Framework References
+
+This skill must be used together with the TanStack skills declared in `AGENTS.md`. Before planning tests or implementation, load the specific TanStack skill files that match the touched area:
+
+- TanStack Start app structure, router setup, root shell, and entries: `node_modules/@tanstack/react-start/skills/react-start/SKILL.md`
+- Route loaders, staleTime, pending states, and router context wiring: `node_modules/@tanstack/router-core/skills/router-core/data-loading/SKILL.md`
+- Dynamic route params like `$watchlistId` and route param parsing: `node_modules/@tanstack/router-core/skills/router-core/path-params/SKILL.md`
+- `notFound` handling, error boundaries, and route error behavior: `node_modules/@tanstack/router-core/skills/router-core/not-found-and-errors/SKILL.md`
+- `createServerFn`, server/client execution boundaries, and server-only imports: `node_modules/@tanstack/start-client-core/skills/start-core/server-functions/SKILL.md`
+
+Use those skills as the source of truth for framework boundaries. TDD should preserve the route and feature boundaries from `AGENTS.md`: keep small route-specific loader logic in the route file, avoid direct `.server` imports from shared route modules, call server functions from React components through `useServerFn(serverFn)`, include every loader/search/filter input in feature-owned query keys, and return structured error objects for expected user-facing `createServerFn` failures.
+
 ## Anti-Pattern: Horizontal Slices
 
 **DO NOT write all tests first, then all implementation.** This is "horizontal slicing" - treating RED as "write all tests" and GREEN as "write all code."
@@ -46,6 +58,7 @@ RIGHT (vertical):
 
 Before writing any code:
 
+- [ ] Load the relevant TanStack skill references for the touched route/server-function/query area
 - [ ] Confirm with user what interface changes are needed
 - [ ] Confirm with user which behaviors to test (prioritize)
 - [ ] Identify opportunities for [deep modules](deep-modules.md) (small interface, deep implementation)
