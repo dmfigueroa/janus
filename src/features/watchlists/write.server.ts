@@ -1,6 +1,6 @@
 import pLimit from "p-limit";
 import { getDb } from "@/db/db.server";
-import { watchlistItems, watchlists, type InsertWatchlistItem } from "@/db/schema";
+import { watchlistItems, watchlists } from "@/db/schema";
 import { getComicIssues } from "@/server/providers/comicvine.server";
 import { getBookDetails } from "@/server/providers/google-books.server";
 import { getGameDetails } from "@/server/providers/rawg.server";
@@ -348,48 +348,6 @@ function sourceIdsToMove(sourceWatchlistIds: number[], targetId: number) {
   return sourceWatchlistIds.filter((id) => id !== targetId);
 }
 
-function buildMergedWatchlistItem(
-  item: typeof watchlistItems.$inferSelect,
-  targetId: number,
-): InsertWatchlistItem {
-  return {
-    watchlistId: targetId,
-    tmdbId: item.tmdbId,
-    source: item.source,
-    mediaType: item.mediaType,
-    title: item.title,
-    parentTitle: item.parentTitle,
-    season: item.season,
-    episode: item.episode,
-    posterPath: item.posterPath,
-    releaseDate: item.releaseDate,
-    voteAverage: item.voteAverage,
-    runtime: item.runtime,
-    isWatched: item.isWatched,
-    addedAt: item.addedAt,
-  };
-}
-
-function insertMergedItems(
-  transaction: WatchlistTransaction,
-  itemsToInsert: InsertWatchlistItem[],
-) {
-  for (let i = 0; i < itemsToInsert.length; i += DB_INSERT_CHUNK_SIZE) {
-    const chunk = itemsToInsert.slice(i, i + DB_INSERT_CHUNK_SIZE);
-
-    transaction
-      .insert(watchlistItems)
-      .values(chunk)
-      .onConflictDoUpdate({
-        target: [watchlistItems.watchlistId, watchlistItems.tmdbId, watchlistItems.mediaType],
-        set: {
-          isWatched: sql`CASE WHEN ${watchlistItems.isWatched} OR excluded.is_watched THEN 1 ELSE 0 END`,
-        },
-      })
-      .run();
-  }
-}
-
 function mergeSourceItemsIntoTarget(
   transaction: WatchlistTransaction,
   sourceWatchlistIds: number[],
@@ -399,22 +357,39 @@ function mergeSourceItemsIntoTarget(
     return false;
   }
 
-  const sourceItems = transaction
-    .select()
-    .from(watchlistItems)
-    .where(inArray(watchlistItems.watchlistId, sourceWatchlistIds))
-    .all();
+  const result = transaction
+    .insert(watchlistItems)
+    .select(
+      transaction
+        .select({
+          id: sql<number | null>`NULL`.as("id"),
+          watchlistId: sql<number>`${targetId}`.as("watchlistId"),
+          tmdbId: watchlistItems.tmdbId,
+          source: watchlistItems.source,
+          mediaType: watchlistItems.mediaType,
+          title: watchlistItems.title,
+          parentTitle: watchlistItems.parentTitle,
+          season: watchlistItems.season,
+          episode: watchlistItems.episode,
+          posterPath: watchlistItems.posterPath,
+          releaseDate: watchlistItems.releaseDate,
+          voteAverage: watchlistItems.voteAverage,
+          runtime: watchlistItems.runtime,
+          isWatched: watchlistItems.isWatched,
+          addedAt: watchlistItems.addedAt,
+        })
+        .from(watchlistItems)
+        .where(inArray(watchlistItems.watchlistId, sourceWatchlistIds)),
+    )
+    .onConflictDoUpdate({
+      target: [watchlistItems.watchlistId, watchlistItems.tmdbId, watchlistItems.mediaType],
+      set: {
+        isWatched: sql`MAX(${watchlistItems.isWatched}, excluded.is_watched)`,
+      },
+    })
+    .run();
 
-  if (sourceItems.length === 0) {
-    return false;
-  }
-
-  insertMergedItems(
-    transaction,
-    sourceItems.map((item) => buildMergedWatchlistItem(item, targetId)),
-  );
-
-  return true;
+  return result.changes > 0;
 }
 
 function markLastItemAddedInTransaction(transaction: WatchlistTransaction, watchlistId: number) {
