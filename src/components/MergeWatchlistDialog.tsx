@@ -18,8 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { mergeWatchlists } from "@/controllers/watchlists";
+import { mergeWatchlists } from "@/features/watchlists/mutations";
 import { useRouter } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import type { EnrichedWatchlist } from "./WatchlistCard";
 
@@ -43,6 +44,7 @@ export function MergeWatchlistDialog({
   const [targetId, setTargetId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
+  const mergeWatchlistsFn = useServerFn(mergeWatchlists);
 
   const handleMerge = async () => {
     try {
@@ -52,7 +54,7 @@ export function MergeWatchlistDialog({
           toast.error("Please enter a name for the new watchlist");
           return;
         }
-        await mergeWatchlists({
+        await mergeWatchlistsFn({
           data: {
             sourceWatchlistIds: selectedWatchlistIds,
             newWatchlistName: newName,
@@ -63,7 +65,7 @@ export function MergeWatchlistDialog({
           toast.error("Please select a target watchlist");
           return;
         }
-        await mergeWatchlists({
+        await mergeWatchlistsFn({
           data: {
             sourceWatchlistIds: selectedWatchlistIds,
             targetWatchlistId: parseInt(targetId),

@@ -1,5 +1,3 @@
-"use server";
-
 import type { Watchlist as WatchlistRecord, WatchlistItem } from "../db/schema";
 import { watchlists, watchlistItems } from "../db/schema";
 import { getDb } from "../db/db.server";
@@ -360,84 +358,5 @@ export const Watchlist = {
   async destroy(id: number): Promise<void> {
     const db = getDb();
     await db.delete(watchlists).where(eq(watchlists.id, id));
-  },
-
-  async merge({
-    targetWatchlistId,
-    sourceWatchlistIds,
-    newWatchlistName,
-  }: {
-    targetWatchlistId?: number;
-    sourceWatchlistIds: number[];
-    newWatchlistName?: string;
-  }): Promise<{ targetId: number }> {
-    const db = getDb();
-    let targetId = targetWatchlistId;
-
-    if (newWatchlistName && !targetId) {
-      const [newWatchlist] = await db
-        .insert(watchlists)
-        .values({
-          name: newWatchlistName,
-          description: "Merged watchlist",
-        })
-        .returning();
-      targetId = newWatchlist.id;
-    }
-
-    if (!targetId) {
-      throw new Error("Target watchlist ID resolution failed");
-    }
-
-    const sourceItems = await db
-      .select()
-      .from(watchlistItems)
-      .where(inArray(watchlistItems.watchlistId, sourceWatchlistIds));
-
-    if (sourceItems.length > 0) {
-      const itemsToInsert = sourceItems.map((item) => ({
-        watchlistId: targetId,
-        tmdbId: item.tmdbId,
-        source: item.source,
-        mediaType: item.mediaType,
-        title: item.title,
-        parentTitle: item.parentTitle,
-        season: item.season,
-        episode: item.episode,
-        posterPath: item.posterPath,
-        releaseDate: item.releaseDate,
-        voteAverage: item.voteAverage,
-        runtime: item.runtime,
-        isWatched: item.isWatched,
-        addedAt: item.addedAt,
-      }));
-
-      const chunkSize = 50;
-      for (let i = 0; i < itemsToInsert.length; i += chunkSize) {
-        const chunk = itemsToInsert.slice(i, i + chunkSize);
-
-        await db
-          .insert(watchlistItems)
-          .values(chunk)
-          .onConflictDoUpdate({
-            target: [watchlistItems.watchlistId, watchlistItems.tmdbId, watchlistItems.mediaType],
-            set: {
-              isWatched: sql`CASE WHEN ${watchlistItems.isWatched} OR excluded.is_watched THEN 1 ELSE 0 END`,
-            },
-          });
-      }
-
-      await db
-        .update(watchlists)
-        .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
-        .where(eq(watchlists.id, targetId));
-    }
-
-    const sourcesToDelete = sourceWatchlistIds.filter((id) => id !== targetId);
-    if (sourcesToDelete.length > 0) {
-      await db.delete(watchlists).where(inArray(watchlists.id, sourcesToDelete));
-    }
-
-    return { targetId };
   },
 };

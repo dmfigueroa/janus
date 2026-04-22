@@ -6,8 +6,20 @@ const watchlistListSchema = z.object({
   order: z.enum(["asc", "desc"]).optional().default("desc"),
 });
 
+export type WatchlistListFilters = z.input<typeof watchlistListSchema>;
+
+function normalizeWatchlistListFilters(filters: WatchlistListFilters = {}) {
+  return watchlistListSchema.parse(filters);
+}
+
+export function watchlistListQueryKey(filters: WatchlistListFilters = {}) {
+  const normalized = normalizeWatchlistListFilters(filters);
+
+  return ["watchlists", "list", normalized] as const;
+}
+
 export const getWatchlistList = createServerFn()
-  .inputValidator((data) => watchlistListSchema.parse(data || {}))
+  .inputValidator((data) => normalizeWatchlistListFilters(data || {}))
   .handler(async ({ data }) => {
     const { WatchlistsRead } = await import("./read.server");
     return WatchlistsRead.listScreen(data);

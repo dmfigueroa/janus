@@ -98,6 +98,153 @@ describe("watchlist mutation contract", () => {
     await expect(WatchlistsRead.detailScreen({ watchlistId: watchlist.id })).resolves.toBeNull();
   });
 
+  it("merges selected watchlists into an existing target through the feature mutation boundary", async () => {
+    const [target, source, untouched] = await db
+      .insert(watchlists)
+      .values([{ name: "Keep This List" }, { name: "Move These Items" }, { name: "Leave Alone" }])
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: target.id,
+        tmdbId: "shared-movie",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Shared Movie",
+        releaseDate: "2024-01-01",
+        isWatched: false,
+      },
+      {
+        watchlistId: source.id,
+        tmdbId: "shared-movie",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Shared Movie",
+        releaseDate: "2024-01-01",
+        isWatched: true,
+      },
+      {
+        watchlistId: source.id,
+        tmdbId: "source-only",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Source Only",
+        releaseDate: "2024-02-01",
+        isWatched: false,
+      },
+      {
+        watchlistId: untouched.id,
+        tmdbId: "untouched",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Untouched",
+        releaseDate: "2024-03-01",
+        isWatched: false,
+      },
+    ]);
+
+    const result = await WatchlistsWrite.merge({
+      targetWatchlistId: target.id,
+      sourceWatchlistIds: [target.id, source.id],
+    });
+
+    expect(result).toEqual({ success: true, targetId: target.id });
+
+    const targetDetail = await WatchlistsRead.detailScreen({
+      watchlistId: target.id,
+      unwatchedOnly: false,
+    });
+    const sourceDetail = await WatchlistsRead.detailScreen({ watchlistId: source.id });
+    const untouchedDetail = await WatchlistsRead.detailScreen({ watchlistId: untouched.id });
+
+    expect(sourceDetail).toBeNull();
+    expect(untouchedDetail?.items).toHaveLength(1);
+    expect(targetDetail?.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          tmdbId: "shared-movie",
+          title: "Shared Movie",
+          isWatched: true,
+        }),
+        expect.objectContaining({
+          tmdbId: "source-only",
+          title: "Source Only",
+          isWatched: false,
+        }),
+      ]),
+    );
+    expect(targetDetail?.watchlist.stats).toMatchObject({
+      totalItems: 2,
+      watchedItems: 1,
+      progress: 50,
+    });
+  });
+
+  it("creates a target watchlist when merging through the feature mutation boundary with a new name", async () => {
+    const [firstSource, secondSource] = await db
+      .insert(watchlists)
+      .values([{ name: "First Source" }, { name: "Second Source" }])
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: firstSource.id,
+        tmdbId: "movie-1",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "First Movie",
+        releaseDate: "2024-01-01",
+        isWatched: true,
+      },
+      {
+        watchlistId: secondSource.id,
+        tmdbId: "movie-2",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Second Movie",
+        releaseDate: "2024-02-01",
+        isWatched: false,
+      },
+    ]);
+
+    const result = await WatchlistsWrite.merge({
+      sourceWatchlistIds: [firstSource.id, secondSource.id],
+      newWatchlistName: "Merged Queue",
+    });
+
+    const mergedDetail = await WatchlistsRead.detailScreen({
+      watchlistId: result.targetId,
+      unwatchedOnly: false,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.targetId).not.toBe(firstSource.id);
+    expect(result.targetId).not.toBe(secondSource.id);
+    expect(mergedDetail?.watchlist).toMatchObject({
+      name: "Merged Queue",
+      description: "Merged watchlist",
+    });
+    expect(mergedDetail?.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ tmdbId: "movie-1", title: "First Movie", isWatched: true }),
+        expect.objectContaining({ tmdbId: "movie-2", title: "Second Movie", isWatched: false }),
+      ]),
+    );
+    await expect(WatchlistsRead.detailScreen({ watchlistId: firstSource.id })).resolves.toBeNull();
+    await expect(WatchlistsRead.detailScreen({ watchlistId: secondSource.id })).resolves.toBeNull();
+  });
+
+  it("rejects a merge without source watchlists before creating a target", async () => {
+    await expect(
+      WatchlistsWrite.merge({
+        sourceWatchlistIds: [],
+        newWatchlistName: "Should Not Exist",
+      }),
+    ).rejects.toThrow("At least one source watchlist must be selected");
+
+    await expect(WatchlistsRead.listScreen()).resolves.toEqual([]);
+  });
+
   it("adds a custom item through the feature write boundary so it appears in detail reads", async () => {
     const [watchlist] = await db
       .insert(watchlists)
