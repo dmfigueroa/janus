@@ -289,11 +289,13 @@ chart:
 
 ## 1. Visual Theme & Atmosphere
 
-**Dark-Premium with Electric Pink Accents**
+**Premium Minimal with Vibrant Pink Accents**
 
-Janus presents a sophisticated, cinema-inspired interface that defaults to a deep purple-black palette reminiscent of a premium streaming service. The overall atmosphere is **dense yet breathable** — substantial content cards float on dark surfaces with generous margins, while a single vibrant pink accent color punctuates the interface at key interaction points. The design language feels both modern and functional, with shadows and subtle glass effects creating clear visual hierarchy without overwhelming the content.
+Janus presents a clean, cinema-inspired interface that works equally well in light and dark contexts. In **light mode**, the palette is bright and premium — pure white surfaces with near-black text create crisp contrast, while in **dark mode**, deep purple-black backgrounds evoke a sophisticated streaming service atmosphere. Either way, a single vibrant pink accent (#FF0055) punctuates key interaction points: primary actions, active states, progress indicators, and selection rings.
 
-The mobile-first layout prioritizes scannable watchlist cards in a 2:3 poster ratio, evoking the feel of browsing a personal media collection. Motion is restrained but purposeful — cards scale subtly on hover, active navigation glows with a soft pink radiance, and overlays animate with smooth fade-zoom transitions.
+The overall feel is **scannable yet tactile** — poster-ratio watchlist cards have strong presence with generous shadow and smooth hover transforms. Motion is restrained but purposeful: cards scale on hover, active navigation glows softly, and overlays animate with smooth fade-zoom transitions.
+
+The mobile-first layout prioritizes browsing a personal media collection. Touch targets meet 44px minimums, bottom navigation stays fixed with safe-area handling, and content breathes with generous padding even on larger screens.
 
 ## 2. Color Palette & Roles
 
