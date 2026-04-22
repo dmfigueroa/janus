@@ -33,6 +33,46 @@ describe("route module boundaries", () => {
     expect(watchlistDetailRoute).not.toMatch(/from\s+["']@\/controllers\/watchlists["']/);
   });
 
+  it("keeps search-to-watchlist integration inside the search feature boundary", () => {
+    const searchRoute = readFileSync(workspaceFile("src/routes/search.tsx"), "utf8");
+    const searchResults = readFileSync(
+      workspaceFile("src/features/search/SearchResults.tsx"),
+      "utf8",
+    );
+    const searchMediaDetailSheet = readFileSync(
+      workspaceFile("src/features/search/SearchMediaDetailSheet.tsx"),
+      "utf8",
+    );
+
+    expect(searchRoute).toMatch(/from\s+["']@\/features\/search\/SearchResults["']/);
+    expect(searchRoute).not.toMatch(/from\s+["']\.\.\/components\/SearchResults["']/);
+
+    expect(searchResults).toMatch(/from\s+["']\.\/SearchMediaDetailSheet["']/);
+    expect(searchMediaDetailSheet).toMatch(/from\s+["']@\/features\/watchlists\/mutations["']/);
+    expect(searchMediaDetailSheet).toMatch(/from\s+["']@\/features\/watchlists\/queries["']/);
+    expect(searchMediaDetailSheet).toMatch(/useServerFn\(getWatchlistList\)/);
+    expect(searchMediaDetailSheet).toMatch(/useServerFn\(addToWatchlist\)/);
+    expect(searchMediaDetailSheet).toMatch(/watchlistListQueryKey\(/);
+    expect(searchMediaDetailSheet).not.toMatch(/from\s+["']@\/server\/watchlist["']/);
+  });
+
+  it("keeps search-owned integration files free of server and client directives", () => {
+    const files = [
+      "src/routes/search.tsx",
+      "src/server/search.ts",
+      "src/features/search/SearchResults.tsx",
+      "src/features/search/SearchMediaDetailSheet.tsx",
+      "src/features/search/CreateCustomItemDialog.tsx",
+    ];
+
+    for (const file of files) {
+      const contents = readFileSync(workspaceFile(file), "utf8");
+
+      expect(contents).not.toMatch(/["']use server["']/);
+      expect(contents).not.toMatch(/["']use client["']/);
+    }
+  });
+
   it("executes the merge watchlists flow through the feature-owned mutation surface", () => {
     const mergeDialog = readFileSync(
       workspaceFile("src/components/MergeWatchlistDialog.tsx"),
@@ -48,7 +88,7 @@ describe("route module boundaries", () => {
 
   it("uses TanStack server functions and feature query keys in touched components", () => {
     const mediaDetailSheet = readFileSync(
-      workspaceFile("src/components/MediaDetailSheet.tsx"),
+      workspaceFile("src/features/search/SearchMediaDetailSheet.tsx"),
       "utf8",
     );
     const timelineItem = readFileSync(

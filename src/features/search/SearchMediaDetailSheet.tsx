@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { UnifiedMedia } from "@/server/media";
+import type { UnifiedMedia } from "@/server/media";
 import DOMPurify from "dompurify";
 import {
   Sheet,
@@ -13,11 +13,11 @@ import { Star, Calendar, Info } from "lucide-react";
 import { addToWatchlist } from "@/features/watchlists/mutations";
 import { getWatchlistList, watchlistListQueryKey } from "@/features/watchlists/queries";
 import { toast } from "sonner";
-import { WatchlistSelector } from "./watchlist/WatchlistSelector";
+import { WatchlistSelector } from "@/components/watchlist/WatchlistSelector";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 
-interface MediaDetailSheetProps {
+interface SearchMediaDetailSheetProps {
   media: UnifiedMedia | null;
   isOpen: boolean;
   onClose: () => void;
@@ -25,7 +25,7 @@ interface MediaDetailSheetProps {
 
 const watchlistSelectorFilters = { orderBy: "lastAdded" } as const;
 
-export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetProps) {
+export function SearchMediaDetailSheet({ media, isOpen, onClose }: SearchMediaDetailSheetProps) {
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string>("");
   const getWatchlistListFn = useServerFn(getWatchlistList);
   const addToWatchlistFn = useServerFn(addToWatchlist);
@@ -41,8 +41,8 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
       if (!media || !selectedWatchlistId) return;
       return addToWatchlistFn({
         data: {
-          watchlistId: parseInt(selectedWatchlistId),
-          media: media,
+          watchlistId: Number.parseInt(selectedWatchlistId, 10),
+          media,
         },
       });
     },
@@ -72,7 +72,6 @@ export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetPro
     mediaType,
   } = media;
 
-  // Rating might be undefined, handle gracefully
   const displayRating = rating ? rating.toFixed(1) : "N/A";
 
   const handleAddToWatchlist = () => {

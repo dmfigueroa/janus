@@ -1,9 +1,10 @@
 import { SearchInput } from "../components/SearchInput";
-import { SearchResults } from "../components/SearchResults";
+import { SearchResults } from "@/features/search/SearchResults";
 import { searchUnified } from "../server/search";
 import { useCallback } from "react";
 import { createFileRoute, useNavigate, useSearch, useRouterState } from "@tanstack/react-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { DEPRECATED_MEDIA_MESSAGE, isDeprecatedMediaType } from "../server/media";
@@ -47,6 +48,7 @@ function Search() {
   const { query, type } = useSearch({ from: Route.fullPath });
   const initialData = Route.useLoaderData();
   const isDeprecatedType = isDeprecatedMediaType(type);
+  const searchUnifiedFn = useServerFn(searchUnified);
 
   const isLoadingRoute = useRouterState({ select: (s) => s.isLoading });
 
@@ -63,7 +65,7 @@ function Search() {
         });
       }
 
-      return searchUnified({ data: { query, page: pageParam, type } });
+      return searchUnifiedFn({ data: { query, page: pageParam, type } });
     },
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
