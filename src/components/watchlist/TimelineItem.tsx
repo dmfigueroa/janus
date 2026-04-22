@@ -1,16 +1,15 @@
-"use client";
-
 import { cn } from "@/utils/cn";
 import { Check, Film, Tv, Gamepad2, Book, BookOpen } from "lucide-react";
 import type { WatchlistItem } from "@/db/schema";
 import { formatReleaseDate, formatRuntime } from "@/utils/datetime";
-import { type InfiniteData, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { toggleWatched } from "@/server/watchlist";
+import { toggleWatched } from "@/features/watchlists/mutations";
 import {
-  type WatchlistDetailQueryData,
-  updateWatchlistDetailPagesAfterToggle,
-  watchlistDetailQueryFamily,
+  invalidateWatchlistQueries,
+  optimisticallyToggleWatchedItem,
+  rollbackWatchedToggle,
 } from "@/features/watchlists/detail/query";
 
 type TimelineItemProps = {
@@ -118,43 +117,34 @@ const Content = ({
   );
 };
 
-export function TimelineItem({ item }: TimelineItemProps) {
+function useToggleWatchedItem(item: WatchlistItem) {
   const queryClient = useQueryClient();
-  const queryKey = watchlistDetailQueryFamily(item.watchlistId);
+  const toggleWatchedFn = useServerFn(toggleWatched);
+  const previousIsWatched = item.isWatched === true;
+  const nextIsWatched = !previousIsWatched;
 
-  const toggleMutation = useMutation({
+  return useMutation({
     mutationFn: async () => {
-      await toggleWatched({ data: { itemId: item.id, isWatched: !item.isWatched } });
+      await toggleWatchedFn({ data: { itemId: item.id, isWatched: nextIsWatched } });
     },
-    onMutate: async () => {
-      await queryClient.cancelQueries({ queryKey });
-      const previousEntries = queryClient.getQueriesData<
-        InfiniteData<WatchlistDetailQueryData, number>
-      >({ queryKey });
-
-      queryClient.setQueriesData<InfiniteData<WatchlistDetailQueryData, number>>(
-        { queryKey },
-        (old) =>
-          updateWatchlistDetailPagesAfterToggle({
-            data: old,
-            itemId: item.id,
-            nextIsWatched: !item.isWatched,
-          }),
-      );
-
-      return { previousEntries };
-    },
-    onError: (_err, _newTodo, context) => {
-      for (const [cacheKey, previousData] of context?.previousEntries ?? []) {
-        queryClient.setQueryData(cacheKey, previousData);
-      }
-
+    onMutate: () =>
+      optimisticallyToggleWatchedItem({
+        queryClient,
+        watchlistId: item.watchlistId,
+        itemId: item.id,
+        previousIsWatched,
+        nextIsWatched,
+      }),
+    onError: (_err, _variables, snapshot) => {
+      rollbackWatchedToggle({ queryClient, snapshot });
       toast.error("Failed to update status");
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey });
-    },
+    onSettled: () => invalidateWatchlistQueries(queryClient),
   });
+}
+
+export function TimelineItem({ item }: TimelineItemProps) {
+  const toggleMutation = useToggleWatchedItem(item);
 
   return (
     <div

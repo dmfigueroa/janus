@@ -17,6 +17,7 @@ import type {
   CreateWatchlistInput,
   DeleteWatchlistInput,
   MergeWatchlistsInput,
+  ToggleWatchedInput,
 } from "./mutations";
 
 const limit = pLimit(5);
@@ -490,5 +491,24 @@ export const WatchlistsWrite = {
     }
 
     return addGenericItemToWatchlist(watchlistId, media as GenericMedia);
+  },
+
+  async toggleWatched({ itemId, isWatched }: ToggleWatchedInput) {
+    const db = getDb();
+    const [item] = await db
+      .select({ watchlistId: watchlistItems.watchlistId })
+      .from(watchlistItems)
+      .where(eq(watchlistItems.id, itemId));
+
+    await db.update(watchlistItems).set({ isWatched }).where(eq(watchlistItems.id, itemId));
+
+    if (item && isWatched) {
+      await db
+        .update(watchlists)
+        .set({ lastWatchedAt: sql`CURRENT_TIMESTAMP` })
+        .where(eq(watchlists.id, item.watchlistId));
+    }
+
+    return { success: true };
   },
 };

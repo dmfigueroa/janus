@@ -51,11 +51,25 @@ describe("route module boundaries", () => {
       workspaceFile("src/components/MediaDetailSheet.tsx"),
       "utf8",
     );
+    const timelineItem = readFileSync(
+      workspaceFile("src/components/watchlist/TimelineItem.tsx"),
+      "utf8",
+    );
 
     expect(mediaDetailSheet).not.toMatch(/["']use client["']/);
     expect(mediaDetailSheet).toMatch(/useServerFn\(getWatchlistList\)/);
     expect(mediaDetailSheet).toMatch(/useServerFn\(addToWatchlist\)/);
     expect(mediaDetailSheet).toMatch(/watchlistListQueryKey\(/);
+
+    expect(timelineItem).not.toMatch(/["']use client["']/);
+    expect(timelineItem).toMatch(/from\s+["']@\/features\/watchlists\/mutations["']/);
+    expect(timelineItem).toMatch(/useServerFn\(toggleWatched\)/);
+    expect(timelineItem).toMatch(/toggleWatchedFn\(/);
+    expect(timelineItem).toMatch(/optimisticallyToggleWatchedItem\(/);
+    expect(timelineItem).toMatch(/rollbackWatchedToggle\(/);
+    expect(timelineItem).toMatch(/invalidateWatchlistQueries\(/);
+    expect(timelineItem).not.toMatch(/await\s+toggleWatched\(/);
+    expect(timelineItem).not.toMatch(/from\s+["']@\/server\/watchlist["']/);
   });
 
   it("keeps the shared watchlist query surface free of server-only imports", () => {

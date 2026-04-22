@@ -2,12 +2,16 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { QueryClient, type InfiniteData } from "@tanstack/react-query";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import path from "node:path";
+import { watchlistListQueryKey } from "../queries";
 
 let db: ReturnType<typeof import("@/db/db.server").getDb>;
 let watchlists: typeof import("@/db/schema").watchlists;
 let watchlistItems: typeof import("@/db/schema").watchlistItems;
 let closeDb: typeof import("@/db/db.server").closeDb;
 let readWatchlistDetailScreen: typeof import("../read.server").WatchlistsRead.detailScreen;
+let invalidateWatchlistQueries: typeof import("./query").invalidateWatchlistQueries;
+let optimisticallyToggleWatchedItem: typeof import("./query").optimisticallyToggleWatchedItem;
+let rollbackWatchedToggle: typeof import("./query").rollbackWatchedToggle;
 let watchlistDetailInfiniteQueryOptions: typeof import("./query").watchlistDetailInfiniteQueryOptions;
 let watchlistDetailQueryKey: typeof import("./query").watchlistDetailQueryKey;
 type WatchlistDetailQueryFilters = import("./query").WatchlistDetailQueryFilters;
@@ -25,6 +29,9 @@ beforeAll(async () => {
   watchlists = schemaModule.watchlists;
   watchlistItems = schemaModule.watchlistItems;
   readWatchlistDetailScreen = readModule.WatchlistsRead.detailScreen;
+  invalidateWatchlistQueries = queryModule.invalidateWatchlistQueries;
+  optimisticallyToggleWatchedItem = queryModule.optimisticallyToggleWatchedItem;
+  rollbackWatchedToggle = queryModule.rollbackWatchedToggle;
   watchlistDetailInfiniteQueryOptions = queryModule.watchlistDetailInfiniteQueryOptions;
   watchlistDetailQueryKey = queryModule.watchlistDetailQueryKey;
 
@@ -179,5 +186,106 @@ describe("watchlist detail query contract", () => {
       watchedItems: 1,
       progress: 33,
     });
+  });
+
+  it("optimistically updates watched toggles across detail caches, rolls back, and invalidates watchlists", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Optimistic Detail" })
+      .returning();
+
+    const [, nextUp] = await db
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "watched",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Already Watched",
+          releaseDate: "2024-01-01",
+          isWatched: true,
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "next",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Next Up",
+          releaseDate: "2024-02-01",
+          isWatched: false,
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "other",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Other Pick",
+          releaseDate: "2024-03-01",
+          isWatched: false,
+        },
+      ])
+      .returning();
+
+    const queryClient = new QueryClient();
+    const defaultFilters = { watchlistId: watchlist.id, unwatchedOnly: true };
+    const unfilteredFilters = { watchlistId: watchlist.id, unwatchedOnly: false };
+    const searchFilters = { watchlistId: watchlist.id, query: "Other", unwatchedOnly: false };
+    const listKey = watchlistListQueryKey();
+
+    await seedRouteLoadedDetail({ queryClient, filters: defaultFilters });
+    await seedRouteLoadedDetail({ queryClient, filters: unfilteredFilters });
+    await seedRouteLoadedDetail({ queryClient, filters: searchFilters });
+    queryClient.setQueryData(listKey, []);
+
+    const snapshot = await optimisticallyToggleWatchedItem({
+      queryClient,
+      watchlistId: watchlist.id,
+      itemId: nextUp.id,
+      previousIsWatched: false,
+      nextIsWatched: true,
+    });
+
+    const defaultData = queryClient.getQueryData<InfiniteData<WatchlistDetailQueryData, number>>(
+      watchlistDetailQueryKey(defaultFilters),
+    );
+    const unfilteredData = queryClient.getQueryData<InfiniteData<WatchlistDetailQueryData, number>>(
+      watchlistDetailQueryKey(unfilteredFilters),
+    );
+    const searchData = queryClient.getQueryData<InfiniteData<WatchlistDetailQueryData, number>>(
+      watchlistDetailQueryKey(searchFilters),
+    );
+
+    expect(defaultData?.pages[0]?.items.map((item) => item.title)).toEqual(["Other Pick"]);
+    expect(unfilteredData?.pages[0]?.items.find((item) => item.id === nextUp.id)).toMatchObject({
+      isWatched: true,
+    });
+    expect(searchData?.pages[0]?.items.map((item) => item.title)).toEqual(["Other Pick"]);
+    expect(searchData?.pages[0]?.watchlist.stats).toMatchObject({
+      watchedItems: 2,
+      progress: 67,
+    });
+
+    rollbackWatchedToggle({ queryClient, snapshot });
+
+    const rolledBackDefault = queryClient.getQueryData<
+      InfiniteData<WatchlistDetailQueryData, number>
+    >(watchlistDetailQueryKey(defaultFilters));
+
+    expect(rolledBackDefault?.pages[0]?.items.map((item) => item.title)).toEqual([
+      "Next Up",
+      "Other Pick",
+    ]);
+    expect(rolledBackDefault?.pages[0]?.watchlist.stats).toMatchObject({
+      watchedItems: 1,
+      progress: 33,
+    });
+
+    await invalidateWatchlistQueries(queryClient);
+
+    expect(queryClient.getQueryState(watchlistDetailQueryKey(defaultFilters))?.isInvalidated).toBe(
+      true,
+    );
+    expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(true);
   });
 });
