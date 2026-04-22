@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import path from "node:path";
+import { watchlistListQueryKey } from "./queries";
 
 let db: ReturnType<typeof import("@/db/db.server").getDb>;
 let watchlists: typeof import("@/db/schema").watchlists;
@@ -34,6 +35,25 @@ beforeEach(async () => {
 });
 
 describe("WatchlistsRead.listScreen", () => {
+  it("keys list queries by normalized filters", () => {
+    expect(watchlistListQueryKey({ orderBy: "lastAdded" })).toEqual([
+      "watchlists",
+      "list",
+      {
+        orderBy: "lastAdded",
+        order: "desc",
+      },
+    ]);
+    expect(watchlistListQueryKey({ orderBy: "lastWatched", order: "asc" })).toEqual([
+      "watchlists",
+      "list",
+      {
+        orderBy: "lastWatched",
+        order: "asc",
+      },
+    ]);
+  });
+
   it("returns an empty list when there are no watchlists", async () => {
     await expect(WatchlistsRead.listScreen()).resolves.toEqual([]);
   });

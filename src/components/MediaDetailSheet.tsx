@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { UnifiedMedia } from "@/server/media";
 import DOMPurify from "dompurify";
@@ -13,10 +11,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Star, Calendar, Info } from "lucide-react";
 import { addToWatchlist } from "@/features/watchlists/mutations";
-import { getWatchlistList } from "@/features/watchlists/queries";
+import { getWatchlistList, watchlistListQueryKey } from "@/features/watchlists/queries";
 import { toast } from "sonner";
 import { WatchlistSelector } from "./watchlist/WatchlistSelector";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 
 interface MediaDetailSheetProps {
   media: UnifiedMedia | null;
@@ -24,19 +23,23 @@ interface MediaDetailSheetProps {
   onClose: () => void;
 }
 
+const watchlistSelectorFilters = { orderBy: "lastAdded" } as const;
+
 export function MediaDetailSheet({ media, isOpen, onClose }: MediaDetailSheetProps) {
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string>("");
+  const getWatchlistListFn = useServerFn(getWatchlistList);
+  const addToWatchlistFn = useServerFn(addToWatchlist);
 
   const { data: watchlists } = useQuery({
-    queryKey: ["watchlists"],
-    queryFn: () => getWatchlistList({ data: { orderBy: "lastAdded" } }),
+    queryKey: watchlistListQueryKey(watchlistSelectorFilters),
+    queryFn: () => getWatchlistListFn({ data: watchlistSelectorFilters }),
     enabled: isOpen,
   });
 
   const addToWatchlistMutation = useMutation({
     mutationFn: async () => {
       if (!media || !selectedWatchlistId) return;
-      return addToWatchlist({
+      return addToWatchlistFn({
         data: {
           watchlistId: parseInt(selectedWatchlistId),
           media: media,

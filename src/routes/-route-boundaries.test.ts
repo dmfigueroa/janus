@@ -40,7 +40,22 @@ describe("route module boundaries", () => {
     );
 
     expect(mergeDialog).toMatch(/from\s+["']@\/features\/watchlists\/mutations["']/);
+    expect(mergeDialog).toMatch(/useServerFn\(mergeWatchlists\)/);
+    expect(mergeDialog).toMatch(/mergeWatchlistsFn\(/);
+    expect(mergeDialog).not.toMatch(/await\s+mergeWatchlists\(/);
     expect(mergeDialog).not.toMatch(/from\s+["']@\/controllers\/watchlists["']/);
+  });
+
+  it("uses TanStack server functions and feature query keys in touched components", () => {
+    const mediaDetailSheet = readFileSync(
+      workspaceFile("src/components/MediaDetailSheet.tsx"),
+      "utf8",
+    );
+
+    expect(mediaDetailSheet).not.toMatch(/["']use client["']/);
+    expect(mediaDetailSheet).toMatch(/useServerFn\(getWatchlistList\)/);
+    expect(mediaDetailSheet).toMatch(/useServerFn\(addToWatchlist\)/);
+    expect(mediaDetailSheet).toMatch(/watchlistListQueryKey\(/);
   });
 
   it("keeps the shared watchlist query surface free of server-only imports", () => {
