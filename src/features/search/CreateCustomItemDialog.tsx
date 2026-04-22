@@ -1,7 +1,5 @@
-"use client";
-
 import { useState } from "react";
-import { UnifiedMedia } from "@/server/media";
+import type { UnifiedMedia } from "@/server/media";
 import {
   Dialog,
   DialogContent,
@@ -63,7 +61,6 @@ export function CreateCustomItemDialog({
     onCreated(newMedia);
     setIsOpen(false);
 
-    // Reset form
     setTitle("");
     setMediaType("movie");
     setYear("");

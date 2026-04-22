@@ -1,10 +1,10 @@
-import { UnifiedMedia } from "../server/media";
-import { MediaCard } from "./MediaCard";
-import { useIntersectionObserver } from "../hooks/useIntersectionObserver";
+import type { UnifiedMedia } from "@/server/media";
+import { MediaCard } from "@/components/MediaCard";
+import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import { useState } from "react";
-import { MediaDetailSheet } from "./MediaDetailSheet";
-import { CreateCustomItemDialog } from "./search/CreateCustomItemDialog";
-import { Button } from "./ui/button";
+import { SearchMediaDetailSheet } from "./SearchMediaDetailSheet";
+import { CreateCustomItemDialog } from "./CreateCustomItemDialog";
+import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 
 interface SearchResultsProps {
@@ -70,7 +70,7 @@ export function SearchResults({
         </div>
       )}
 
-      <MediaDetailSheet
+      <SearchMediaDetailSheet
         key={selectedMedia?.id}
         media={selectedMedia}
         isOpen={!!selectedMedia}
