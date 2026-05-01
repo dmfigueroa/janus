@@ -1,7 +1,6 @@
 import type { Watchlist as WatchlistRecord, WatchlistItem } from "../db/schema";
 import { watchlists, watchlistItems } from "../db/schema";
 import { getDb } from "../db/db.server";
-import { escapeLikeString } from "../utils/search";
 import { calculateWatchlistProgress } from "@/features/watchlists/progress";
 import { and, asc, count, desc, eq, getTableColumns, inArray, or, sql } from "drizzle-orm";
 
@@ -26,13 +25,7 @@ export type WatchlistDetailPage = {
   nextCursor?: number;
 };
 
-const releaseDateOrder = [
-  sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
-  asc(watchlistItems.releaseDate),
-] as const;
-
 const isWatchedOrderExpression = sql<number>`CASE WHEN COALESCE(${watchlistItems.isWatched}, 0) = 1 THEN 1 ELSE 0 END`;
-const isUnwatchedExpression = sql<boolean>`COALESCE(${watchlistItems.isWatched}, 0) = 0`;
 
 type SummaryCounts = Pick<WatchlistStats, "totalItems" | "watchedItems">;
 type SummarySelection = {
@@ -151,76 +144,6 @@ function buildSummaryStats(counts: SummaryCounts, selection: SummarySelection): 
   };
 }
 
-async function loadWatchlistById(db: ReturnType<typeof getDb>, watchlistId: number) {
-  const [watchlist] = await db.select().from(watchlists).where(eq(watchlists.id, watchlistId));
-  return watchlist ?? null;
-}
-
-async function loadDetailCounts(db: ReturnType<typeof getDb>, watchlistId: number) {
-  const [counts] = await db
-    .select({
-      totalItems: count(),
-      watchedItems: watchedItemsExpression,
-    })
-    .from(watchlistItems)
-    .where(eq(watchlistItems.watchlistId, watchlistId));
-
-  return {
-    totalItems: counts?.totalItems ?? 0,
-    watchedItems: counts?.watchedItems ?? 0,
-  } satisfies SummaryCounts;
-}
-
-async function loadDetailSelection(db: ReturnType<typeof getDb>, watchlistId: number) {
-  const [nextUnwatchedResult, firstItemResult] = await Promise.all([
-    db
-      .select()
-      .from(watchlistItems)
-      .where(and(eq(watchlistItems.watchlistId, watchlistId), isUnwatchedExpression))
-      .orderBy(...releaseDateOrder)
-      .limit(1),
-    db
-      .select()
-      .from(watchlistItems)
-      .where(eq(watchlistItems.watchlistId, watchlistId))
-      .orderBy(...releaseDateOrder)
-      .limit(1),
-  ]);
-
-  const nextUnwatched = nextUnwatchedResult[0] ?? null;
-
-  return {
-    nextUnwatched,
-    coverItem: nextUnwatched ?? firstItemResult[0] ?? null,
-  } satisfies SummarySelection;
-}
-
-async function loadDetailItems({
-  db,
-  watchlistId,
-  cursor,
-  pageSize,
-  query,
-  unwatchedOnly,
-}: {
-  db: ReturnType<typeof getDb>;
-  watchlistId: number;
-  cursor: number;
-  pageSize: number;
-  query?: string;
-  unwatchedOnly?: boolean;
-}) {
-  const offset = (cursor - 1) * pageSize;
-
-  return db
-    .select()
-    .from(watchlistItems)
-    .where(buildDetailFilters({ watchlistId, query, unwatchedOnly }))
-    .orderBy(...releaseDateOrder)
-    .limit(pageSize)
-    .offset(offset);
-}
-
 function buildListOrderBy(orderBy: WatchlistListOrder, order: "asc" | "desc") {
   const orderFn = order === "desc" ? desc : asc;
 
@@ -240,28 +163,6 @@ function buildListOrderBy(orderBy: WatchlistListOrder, order: "asc" | "desc") {
     default:
       return [orderFn(watchlists.createdAt)] as const;
   }
-}
-
-function buildDetailFilters({
-  watchlistId,
-  query,
-  unwatchedOnly,
-}: {
-  watchlistId: number;
-  query?: string;
-  unwatchedOnly?: boolean;
-}) {
-  return and(
-    eq(watchlistItems.watchlistId, watchlistId),
-    unwatchedOnly ? isUnwatchedExpression : undefined,
-    query
-      ? or(
-          sql`${watchlistItems.title} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\\' COLLATE NOCASE`,
-          sql`${watchlistItems.parentTitle} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\\' COLLATE NOCASE`,
-          sql`${watchlistItems.episode} LIKE ${`%${escapeLikeString(query)}%`} ESCAPE '\\' COLLATE NOCASE`,
-        )
-      : undefined,
-  );
 }
 
 export const Watchlist = {
@@ -298,42 +199,6 @@ export const Watchlist = {
         selectionsByWatchlist[watchlist.id] ?? emptySummarySelection,
       ),
     }));
-  },
-
-  async getDetail({
-    watchlistId,
-    cursor = 1,
-    pageSize = 50,
-    query,
-    unwatchedOnly,
-  }: {
-    watchlistId: number;
-    cursor?: number;
-    pageSize?: number;
-    query?: string;
-    unwatchedOnly?: boolean;
-  }): Promise<WatchlistDetailPage | null> {
-    const db = getDb();
-    const watchlist = await loadWatchlistById(db, watchlistId);
-
-    if (!watchlist) {
-      return null;
-    }
-
-    const [counts, selection, items] = await Promise.all([
-      loadDetailCounts(db, watchlistId),
-      loadDetailSelection(db, watchlistId),
-      loadDetailItems({ db, watchlistId, cursor, pageSize, query, unwatchedOnly }),
-    ]);
-
-    return {
-      watchlist: {
-        ...watchlist,
-        stats: buildSummaryStats(counts, selection),
-      },
-      items,
-      nextCursor: items.length === pageSize ? cursor + 1 : undefined,
-    };
   },
 
   async create({

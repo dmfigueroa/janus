@@ -5,6 +5,7 @@ import path from "path";
 let db: ReturnType<typeof import("../db/db.server").getDb>;
 let watchlists: typeof import("../db/schema").watchlists;
 let watchlistItems: typeof import("../db/schema").watchlistItems;
+let getWatchlistDetail: typeof import("@/features/watchlists/detail/query.server").getWatchlistDetail;
 let Watchlist: typeof import("./watchlist").Watchlist;
 let closeDb: typeof import("../db/db.server").closeDb;
 
@@ -13,12 +14,14 @@ beforeAll(async () => {
 
   const dbModule = await import("../db/db.server");
   const schemaModule = await import("../db/schema");
+  const detailQueryModule = await import("@/features/watchlists/detail/query.server");
   const watchlistModelModule = await import("./watchlist");
 
   db = dbModule.getDb();
   closeDb = dbModule.closeDb;
   watchlists = schemaModule.watchlists;
   watchlistItems = schemaModule.watchlistItems;
+  getWatchlistDetail = detailQueryModule.getWatchlistDetail;
   Watchlist = watchlistModelModule.Watchlist;
 
   await migrate(db, { migrationsFolder: path.resolve(process.cwd(), "drizzle") });
@@ -35,13 +38,9 @@ beforeEach(async () => {
   await db.delete(watchlists);
 });
 
-describe("Watchlist.getDetail", () => {
+describe("getWatchlistDetail", () => {
   it("returns null for a missing watchlist", async () => {
-    await expect(
-      Watchlist.getDetail({
-        watchlistId: 999,
-      }),
-    ).resolves.toBeNull();
+    await expect(getWatchlistDetail({ watchlistId: 999 })).resolves.toBeNull();
   });
 
   it("returns paginated items in release order", async () => {
@@ -74,11 +73,11 @@ describe("Watchlist.getDetail", () => {
       },
     ]);
 
-    const firstPage = await Watchlist.getDetail({
+    const firstPage = await getWatchlistDetail({
       watchlistId: list.id,
       pageSize: 2,
     });
-    const secondPage = await Watchlist.getDetail({
+    const secondPage = await getWatchlistDetail({
       watchlistId: list.id,
       cursor: 2,
       pageSize: 2,
@@ -122,15 +121,15 @@ describe("Watchlist.getDetail", () => {
       },
     ]);
 
-    const bySeries = await Watchlist.getDetail({
+    const bySeries = await getWatchlistDetail({
       watchlistId: list.id,
       query: "saga",
     });
-    const byTitle = await Watchlist.getDetail({
+    const byTitle = await getWatchlistDetail({
       watchlistId: list.id,
       query: "Dune",
     });
-    const byEpisode = await Watchlist.getDetail({
+    const byEpisode = await getWatchlistDetail({
       watchlistId: list.id,
       query: "7",
     });
@@ -173,7 +172,7 @@ describe("Watchlist.getDetail", () => {
       },
     ]);
 
-    const detail = await Watchlist.getDetail({
+    const detail = await getWatchlistDetail({
       watchlistId: list.id,
       cursor: 2,
       pageSize: 1,
@@ -214,7 +213,7 @@ describe("Watchlist.getDetail", () => {
       },
     ]);
 
-    const detail = await Watchlist.getDetail({
+    const detail = await getWatchlistDetail({
       watchlistId: list.id,
       unwatchedOnly: true,
     });
@@ -265,7 +264,7 @@ describe("Watchlist.getDetail", () => {
     });
 
     try {
-      await Watchlist.getDetail({
+      await getWatchlistDetail({
         watchlistId: list.id,
         cursor: 2,
         pageSize: 1,
