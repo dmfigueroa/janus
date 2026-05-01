@@ -60,8 +60,8 @@ type WatchlistDetailItemToggleParams = Omit<WatchlistDetailToggleParams, "previo
 export const getWatchlistDetailPage = createServerFn()
   .inputValidator((data) => watchlistDetailPageSchema.parse(data))
   .handler(async ({ data }) => {
-    const { WatchlistsRead } = await import("../read.server");
-    return WatchlistsRead.detailScreen(data);
+    const { getWatchlistDetail } = await import("./query.server");
+    return getWatchlistDetail(data);
   });
 
 export function watchlistDetailInfiniteQueryOptions(filters: WatchlistDetailQueryFilters) {
