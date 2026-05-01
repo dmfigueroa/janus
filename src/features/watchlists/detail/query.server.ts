@@ -24,6 +24,12 @@ const releaseDateOrder = [
   asc(watchlistItems.releaseDate),
 ] as const;
 
+const customRankOrder = [
+  sql`CASE WHEN ${watchlistItems.customRank} IS NULL THEN 1 ELSE 0 END`,
+  asc(watchlistItems.customRank),
+  ...releaseDateOrder,
+] as const;
+
 const isUnwatchedExpression = sql<boolean>`COALESCE(${watchlistItems.isWatched}, 0) = 0`;
 const watchedItemsExpression = sql<number>`sum(case when ${watchlistItems.isWatched} then 1 else 0 end)`;
 
@@ -58,19 +64,28 @@ async function loadDetailCounts(db: ReturnType<typeof getDb>, watchlistId: numbe
   } satisfies SummaryCounts;
 }
 
-async function loadDetailSelection(db: ReturnType<typeof getDb>, watchlistId: number) {
+async function loadDetailSelection({
+  db,
+  watchlistId,
+  itemOrderMode,
+}: {
+  db: ReturnType<typeof getDb>;
+  watchlistId: number;
+  itemOrderMode: (typeof watchlists.$inferSelect)["itemOrderMode"];
+}) {
+  const itemOrder = buildDetailOrderBy(itemOrderMode);
   const [nextUnwatchedResult, firstItemResult] = await Promise.all([
     db
       .select()
       .from(watchlistItems)
       .where(and(eq(watchlistItems.watchlistId, watchlistId), isUnwatchedExpression))
-      .orderBy(...releaseDateOrder)
+      .orderBy(...itemOrder)
       .limit(1),
     db
       .select()
       .from(watchlistItems)
       .where(eq(watchlistItems.watchlistId, watchlistId))
-      .orderBy(...releaseDateOrder)
+      .orderBy(...itemOrder)
       .limit(1),
   ]);
 
@@ -80,6 +95,10 @@ async function loadDetailSelection(db: ReturnType<typeof getDb>, watchlistId: nu
     nextUnwatched,
     coverItem: nextUnwatched ?? firstItemResult[0] ?? null,
   } satisfies SummarySelection;
+}
+
+function buildDetailOrderBy(itemOrderMode: (typeof watchlists.$inferSelect)["itemOrderMode"]) {
+  return itemOrderMode === "custom" ? customRankOrder : releaseDateOrder;
 }
 
 function buildDetailFilters({
@@ -111,10 +130,12 @@ async function loadDetailItems({
   pageSize,
   query,
   unwatchedOnly,
+  itemOrderMode,
 }: GetWatchlistDetailParams & {
   db: ReturnType<typeof getDb>;
   cursor: number;
   pageSize: number;
+  itemOrderMode: (typeof watchlists.$inferSelect)["itemOrderMode"];
 }) {
   const offset = (cursor - 1) * pageSize;
 
@@ -122,8 +143,8 @@ async function loadDetailItems({
     .select()
     .from(watchlistItems)
     .where(buildDetailFilters({ watchlistId, query, unwatchedOnly }))
-    .orderBy(...releaseDateOrder)
-    .limit(pageSize)
+    .orderBy(...buildDetailOrderBy(itemOrderMode))
+    .limit(pageSize + 1)
     .offset(offset);
 }
 
@@ -143,16 +164,26 @@ export async function getWatchlistDetail({
 
   const [counts, selection, items] = await Promise.all([
     loadDetailCounts(db, watchlistId),
-    loadDetailSelection(db, watchlistId),
-    loadDetailItems({ db, watchlistId, cursor, pageSize, query, unwatchedOnly }),
+    loadDetailSelection({ db, watchlistId, itemOrderMode: watchlist.itemOrderMode }),
+    loadDetailItems({
+      db,
+      watchlistId,
+      cursor,
+      pageSize,
+      query,
+      unwatchedOnly,
+      itemOrderMode: watchlist.itemOrderMode,
+    }),
   ]);
+  const pageItems = items.slice(0, pageSize);
+  const hasNextPage = items.length > pageSize;
 
   return {
     watchlist: {
       ...watchlist,
-      stats: buildSummaryStats(counts, selection),
+      stats: buildSummaryStats(counts, selection ?? { nextUnwatched: null, coverItem: null }),
     } satisfies WatchlistSummary,
-    items,
-    nextCursor: items.length === pageSize ? cursor + 1 : undefined,
+    items: pageItems,
+    nextCursor: hasNextPage ? cursor + 1 : undefined,
   };
 }
