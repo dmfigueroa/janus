@@ -39,6 +39,7 @@ export const watchlistItems = sqliteTable(
     releaseDate: text("release_date"),
     voteAverage: real("vote_average"),
     runtime: integer("runtime"), // In minutes
+    customRank: integer("custom_rank"),
     isWatched: integer("is_watched", { mode: "boolean" }).default(false),
     addedAt: text("added_at")
       .default(sql`(CURRENT_TIMESTAMP)`)
@@ -53,6 +54,10 @@ export const watchlistItems = sqliteTable(
     byWatchlistReleaseDate: index("by_watchlist_release_date").on(
       table.watchlistId,
       table.releaseDate,
+    ),
+    byWatchlistCustomRank: index("by_watchlist_custom_rank").on(
+      table.watchlistId,
+      table.customRank,
     ),
   }),
 );

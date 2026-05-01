@@ -134,6 +134,229 @@ describe("watchlist detail query contract", () => {
     ]);
   });
 
+  it("returns items in persisted custom rank order when custom mode is active", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Custom Ranked", itemOrderMode: "custom" })
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "third",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Third Pick",
+        releaseDate: "2024-01-01",
+        customRank: 3,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "first",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "First Pick",
+        releaseDate: "2024-03-01",
+        customRank: 1,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "second",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Second Pick",
+        releaseDate: "2024-02-01",
+        customRank: 2,
+      },
+    ]);
+
+    const detail = await readWatchlistDetailScreen({ watchlistId: watchlist.id });
+
+    expect(detail?.watchlist.itemOrderMode).toBe("custom");
+    expect(detail?.items.map((item) => item.title)).toEqual([
+      "First Pick",
+      "Second Pick",
+      "Third Pick",
+    ]);
+  });
+
+  it("keeps pagination in stable custom rank order when custom mode is active", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Custom Ranked Pages", itemOrderMode: "custom" })
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "fourth",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Fourth Pick",
+        releaseDate: "2024-01-01",
+        customRank: 4,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "second-page-first",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Third Pick",
+        releaseDate: "2024-02-01",
+        customRank: 3,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "first-page-second",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Second Pick",
+        releaseDate: "2024-03-01",
+        customRank: 2,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "first-page-first",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "First Pick",
+        releaseDate: "2024-04-01",
+        customRank: 1,
+      },
+    ]);
+
+    const firstPage = await readWatchlistDetailScreen({
+      watchlistId: watchlist.id,
+      pageSize: 2,
+      cursor: 1,
+    });
+    const secondPage = await readWatchlistDetailScreen({
+      watchlistId: watchlist.id,
+      pageSize: 2,
+      cursor: 2,
+    });
+
+    expect(firstPage?.items.map((item) => item.title)).toEqual(["First Pick", "Second Pick"]);
+    expect(firstPage?.nextCursor).toBe(2);
+    expect(secondPage?.items.map((item) => item.title)).toEqual(["Third Pick", "Fourth Pick"]);
+    expect(secondPage?.nextCursor).toBeUndefined();
+  });
+
+  it("preserves relative custom rank order in search results", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Custom Ranked Search", itemOrderMode: "custom" })
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "search-third",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Alpha Finale",
+        releaseDate: "2024-01-01",
+        customRank: 3,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "search-first",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Alpha Origin",
+        releaseDate: "2024-03-01",
+        customRank: 1,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "search-second",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Alpha Rising",
+        releaseDate: "2024-02-01",
+        customRank: 2,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "non-match",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Beta Story",
+        releaseDate: "2024-04-01",
+        customRank: 4,
+      },
+    ]);
+
+    const detail = await readWatchlistDetailScreen({ watchlistId: watchlist.id, query: "Alpha" });
+
+    expect(detail?.items.map((item) => item.title)).toEqual([
+      "Alpha Origin",
+      "Alpha Rising",
+      "Alpha Finale",
+    ]);
+  });
+
+  it("preserves relative custom rank order in unwatched-only results", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Custom Ranked Unwatched", itemOrderMode: "custom" })
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "watched-high-rank",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Watched First",
+        releaseDate: "2024-04-01",
+        customRank: 1,
+        isWatched: true,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "unwatched-third",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Unwatched Third",
+        releaseDate: "2024-01-01",
+        customRank: 4,
+        isWatched: false,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "unwatched-first",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Unwatched First",
+        releaseDate: "2024-03-01",
+        customRank: 2,
+        isWatched: false,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "unwatched-second",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Unwatched Second",
+        releaseDate: "2024-02-01",
+        customRank: 3,
+        isWatched: false,
+      },
+    ]);
+
+    const detail = await readWatchlistDetailScreen({
+      watchlistId: watchlist.id,
+      unwatchedOnly: true,
+    });
+
+    expect(detail?.items.map((item) => item.title)).toEqual([
+      "Unwatched First",
+      "Unwatched Second",
+      "Unwatched Third",
+    ]);
+  });
+
   it("seeds route-loaded detail data and continues pagination through the shared query contract", async () => {
     const [watchlist] = await db.insert(watchlists).values({ name: "Paged Detail" }).returning();
 

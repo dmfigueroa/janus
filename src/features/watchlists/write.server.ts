@@ -376,6 +376,7 @@ function mergeSourceItemsIntoTarget(
           releaseDate: watchlistItems.releaseDate,
           voteAverage: watchlistItems.voteAverage,
           runtime: watchlistItems.runtime,
+          customRank: watchlistItems.customRank,
           isWatched: watchlistItems.isWatched,
           addedAt: watchlistItems.addedAt,
         })
