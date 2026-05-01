@@ -5,6 +5,9 @@ export const watchlists = sqliteTable("watchlists", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   description: text("description"),
+  itemOrderMode: text("item_order_mode", { enum: ["release", "custom"] })
+    .notNull()
+    .default("release"),
   createdAt: text("created_at")
     .default(sql`(CURRENT_TIMESTAMP)`)
     .notNull(),

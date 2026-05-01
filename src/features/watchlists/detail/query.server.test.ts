@@ -8,6 +8,7 @@ let db: ReturnType<typeof import("@/db/db.server").getDb>;
 let watchlists: typeof import("@/db/schema").watchlists;
 let watchlistItems: typeof import("@/db/schema").watchlistItems;
 let closeDb: typeof import("@/db/db.server").closeDb;
+let getWatchlistDetail: typeof import("./query.server").getWatchlistDetail;
 let readWatchlistDetailScreen: typeof import("../read.server").WatchlistsRead.detailScreen;
 let invalidateWatchlistQueries: typeof import("./query").invalidateWatchlistQueries;
 let optimisticallyToggleWatchedItem: typeof import("./query").optimisticallyToggleWatchedItem;
@@ -23,11 +24,13 @@ beforeAll(async () => {
   const dbModule = await import("@/db/db.server");
   const schemaModule = await import("@/db/schema");
   const queryModule = await import("./query");
+  const queryServerModule = await import("./query.server");
   const readModule = await import("../read.server");
   db = dbModule.getDb();
   closeDb = dbModule.closeDb;
   watchlists = schemaModule.watchlists;
   watchlistItems = schemaModule.watchlistItems;
+  getWatchlistDetail = queryServerModule.getWatchlistDetail;
   readWatchlistDetailScreen = readModule.WatchlistsRead.detailScreen;
   invalidateWatchlistQueries = queryModule.invalidateWatchlistQueries;
   optimisticallyToggleWatchedItem = queryModule.optimisticallyToggleWatchedItem;
@@ -69,6 +72,68 @@ async function seedRouteLoadedDetail({
 }
 
 describe("watchlist detail query contract", () => {
+  it("returns release item order mode by default from the direct detail read function", async () => {
+    const [watchlist] = await db.insert(watchlists).values({ name: "Default Mode" }).returning();
+
+    const detail = await getWatchlistDetail({ watchlistId: watchlist.id });
+
+    expect(detail?.watchlist.itemOrderMode).toBe("release");
+  });
+
+  it("returns a persisted custom item order mode from the direct detail read function", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Custom Mode", itemOrderMode: "custom" })
+      .returning();
+
+    const detail = await getWatchlistDetail({ watchlistId: watchlist.id });
+
+    expect(detail?.watchlist.itemOrderMode).toBe("custom");
+  });
+
+  it("falls back to release ordering when custom mode has no manual arrangement", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Custom Without Ranks", itemOrderMode: "custom" })
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "march",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "March Release",
+        releaseDate: "2024-03-01",
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "january",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "January Release",
+        releaseDate: "2024-01-01",
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "february",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "February Release",
+        releaseDate: "2024-02-01",
+      },
+    ]);
+
+    const detail = await getWatchlistDetail({ watchlistId: watchlist.id });
+
+    expect(detail?.watchlist.itemOrderMode).toBe("custom");
+    expect(detail?.items.map((item) => item.title)).toEqual([
+      "January Release",
+      "February Release",
+      "March Release",
+    ]);
+  });
+
   it("seeds route-loaded detail data and continues pagination through the shared query contract", async () => {
     const [watchlist] = await db.insert(watchlists).values({ name: "Paged Detail" }).returning();
 

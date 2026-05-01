@@ -4,16 +4,14 @@ import {
   type WatchlistListOrder,
   type WatchlistSummary,
 } from "@/models/watchlist";
+import {
+  getWatchlistDetail,
+  type GetWatchlistDetailParams,
+} from "@/features/watchlists/detail/query.server";
 
 export type WatchlistListScreenSummary = WatchlistSummary;
 
-export type WatchlistDetailScreenParams = {
-  watchlistId: number;
-  cursor?: number;
-  pageSize?: number;
-  query?: string;
-  unwatchedOnly?: boolean;
-};
+export type WatchlistDetailScreenParams = GetWatchlistDetailParams;
 
 export const WatchlistsRead = {
   async listScreen({
@@ -27,6 +25,6 @@ export const WatchlistsRead = {
   },
 
   async detailScreen(params: WatchlistDetailScreenParams): Promise<WatchlistDetailPage | null> {
-    return Watchlist.getDetail(params);
+    return getWatchlistDetail(params);
   },
 };
