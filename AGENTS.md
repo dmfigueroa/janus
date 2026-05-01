@@ -14,6 +14,11 @@
 - Use conventional pull request titles in the form `type(scope): summary` when a scope adds clarity, or `type: summary` when it does not.
 - Prefer standard conventional commit types like `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, and `build`.
 
+## Database Migrations
+
+- Never edit `drizzle/*.sql` files directly.
+- Always generate SQL migrations and snapshot updates through the Drizzle CLI from schema changes.
+
 ## Route And Feature Boundaries
 
 - Put business code under `src/features/*`, app shell code under `src/app/*`, design-system primitives under `src/ui/*`, and external adapters under `src/integrations/*`.
