@@ -1,5 +1,12 @@
 # AGENTS
 
+## Architecture Docs
+
+- `ARCHITECTURE.md` is the source of truth for Janus's target file structure, ownership model, and dependency rules.
+- `CONTRIBUTING.md` is the placement guide for new files and incremental migrations.
+- When adding files, moving modules, or introducing new boundaries, read those docs first and follow them.
+- Apply the target structure to new code and touched areas. Do not do broad drive-by reorganizations unless the user asks for them.
+
 ## Git Conventions
 
 - Use conventional branch names for all new branches, such as `feat/watchlists-write-boundary`, `fix/search-pagination`, or `chore/update-deps`.
@@ -9,6 +16,8 @@
 
 ## Route And Feature Boundaries
 
+- Put business code under `src/features/*`, app shell code under `src/app/*`, design-system primitives under `src/ui/*`, and external adapters under `src/integrations/*`.
+- Use shallow feature use-case folders with short role names such as `detail/query.ts`, `detail/query.server.ts`, and `detail/screen.tsx`.
 - Prefer current TanStack Start guidance over older local patterns when the two disagree.
 - Keep small route-specific loader logic in the route file. Param parsing, route defaults, redirects, and `notFound` handling usually belong in the route.
 - Do not extract route loaders into wrapper functions unless the extraction adds real value through reuse, deeper domain logic, or a stable shared boundary.

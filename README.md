@@ -100,11 +100,15 @@ The project is designed to be containerized. Ensure your `Dockerfile` (pending c
 
 ## 📂 Project Structure
 
-- `src/routes`: TanStack Start file-based routing.
-- `src/components`: Reusable UI components (shadcn/ui customised).
-- `src/db`: Drizzle schema (`schema.ts`) and connection logic.
-- `src/server`: Server-side logic and TMDB API integration.
-- `src/utils`: Helper functions.
+- See `ARCHITECTURE.md` for the target file structure and dependency rules.
+- See `CONTRIBUTING.md` for the file placement guide.
+- `src/routes`: TanStack Start route entrypoints.
+- `src/features`: Feature-owned business logic, screens, queries, mutations, and tests.
+- `src/app`: App shell, router setup, and global chrome.
+- `src/ui`: Reusable design-system primitives.
+- `src/shared`: Small set of cross-feature helpers and hooks.
+- `src/integrations`: External API adapters.
+- `src/db`: Drizzle schema, connection, and migrations.
 
 ## 📝 Roadmap & Todo
 
