@@ -1,12 +1,11 @@
 import pLimit from "p-limit";
-import { getDb } from "@/db/db.server";
 import { watchlistItems } from "@/db/schema";
 import type {
   AddToWatchlistInput,
   WatchlistMedia,
   GenericMedia,
 } from "@/features/watchlists/mutations";
-import { markLastItemAdded } from "@/features/watchlists/repository.server";
+import * as repository from "@/features/watchlists/repository.server";
 import { getComicIssues } from "@/server/providers/comicvine.server";
 import { getBookDetails } from "@/server/providers/google-books.server";
 import { getGameDetails } from "@/server/providers/rawg.server";
@@ -16,10 +15,8 @@ import {
   getTVDetails,
 } from "@/server/providers/tmdb-api.server";
 import { getDeprecatedWatchlistAddRejection, type WatchlistAddRejection } from "@/server/media";
-import { and, eq } from "drizzle-orm";
 
 const limit = pLimit(5);
-const DB_INSERT_CHUNK_SIZE = 50;
 const UNSUPPORTED_TV_SOURCE_MESSAGE =
   "TV shows must come from TMDB so Janus can expand them into episodes.";
 const COMICVINE_UNAVAILABLE_MESSAGE =
@@ -52,96 +49,39 @@ const rejectAdd = (message: string): WatchlistAddRejection => ({
   message,
 });
 
-async function insertItemsInChunks(items: Array<typeof watchlistItems.$inferInsert>) {
-  const db = getDb();
-
-  for (let index = 0; index < items.length; index += DB_INSERT_CHUNK_SIZE) {
-    const chunk = items.slice(index, index + DB_INSERT_CHUNK_SIZE);
-    await db.insert(watchlistItems).values(chunk).onConflictDoNothing();
-  }
-}
-
-async function addGenericItemToWatchlist(
-  watchlistId: number,
-  media: GenericMedia,
-): Promise<WatchlistWriteResult> {
-  const db = getDb();
-  const [inserted] = await db
-    .insert(watchlistItems)
-    .values({
-      watchlistId,
-      tmdbId: media.id,
-      source: media.source,
-      mediaType: media.mediaType,
-      title: media.title,
-      posterPath: media.poster,
-      releaseDate: media.releaseDate || media.year,
-      voteAverage: media.rating,
-      runtime: 0,
-    })
-    .onConflictDoNothing()
-    .returning({ id: watchlistItems.id });
-
-  if (!inserted) {
-    return { success: true, message: "Already in watchlist" };
+export async function addToWatchlistMutation({
+  watchlistId,
+  media,
+}: AddToWatchlistInput): Promise<WatchlistWriteResult> {
+  const deprecatedRejection = getDeprecatedWatchlistAddRejection(media.mediaType);
+  if (deprecatedRejection) {
+    return deprecatedRejection;
   }
 
-  await markLastItemAdded(watchlistId);
-
-  return { success: true, message: "Added to watchlist" };
-}
-
-async function addMovieToWatchlist(
-  watchlistId: number,
-  tmdbId: number,
-): Promise<WatchlistWriteResult> {
-  const db = getDb();
-  const existing = await db
-    .select()
-    .from(watchlistItems)
-    .where(
-      and(
-        eq(watchlistItems.watchlistId, watchlistId),
-        eq(watchlistItems.tmdbId, tmdbId.toString()),
-        eq(watchlistItems.mediaType, "movie"),
-      ),
-    )
-    .limit(1);
-
-  if (existing.length > 0) {
-    return { success: true, message: "Already in watchlist" };
+  if (media.mediaType === "tv") {
+    if (media.source !== "tmdb") {
+      return rejectAdd(UNSUPPORTED_TV_SOURCE_MESSAGE);
+    }
+    return addTVShowToWatchlist(watchlistId, Number.parseInt(media.id, 10), media);
   }
 
-  let details: Awaited<ReturnType<typeof getMovieDetails>>;
-  try {
-    details = await getMovieDetails({ data: { id: tmdbId } });
-  } catch {
-    return rejectAdd(TMDB_MOVIE_FETCH_FAILURE_MESSAGE);
+  if (media.source === "tmdb" && media.mediaType === "movie") {
+    return addMovieToWatchlist(watchlistId, Number.parseInt(media.id, 10));
   }
 
-  const [inserted] = await db
-    .insert(watchlistItems)
-    .values({
-      watchlistId,
-      tmdbId: tmdbId.toString(),
-      source: "tmdb",
-      mediaType: "movie",
-      title: details.title || details.name || "Unknown",
-      posterPath: details.poster_path,
-      releaseDate: details.release_date,
-      voteAverage: details.vote_average,
-      runtime: details.runtime || 0,
-    })
-    .onConflictDoNothing()
-    .returning({ id: watchlistItems.id });
-
-  if (!inserted) {
-    return { success: true, message: "Already in watchlist" };
+  if (media.source === "comicvine" && media.mediaType === "comic") {
+    return addComicToWatchlist(watchlistId, media.id, media);
   }
 
-  await markLastItemAdded(watchlistId);
+  if (media.source === "google_books" && media.mediaType === "book") {
+    return addBookToWatchlist(watchlistId, media);
+  }
 
-  return { success: true, message: "Added to watchlist" };
+  if (media.source === "rawg" && media.mediaType === "game") {
+    return addGameToWatchlist(watchlistId, media);
+  }
+
+  return addGenericItemToWatchlist(watchlistId, media as GenericMedia);
 }
 
 async function addTVShowToWatchlist(
@@ -149,7 +89,6 @@ async function addTVShowToWatchlist(
   tmdbId: number,
   media: WatchlistMedia,
 ): Promise<WatchlistWriteResult> {
-  const db = getDb();
   let showDetails: Awaited<ReturnType<typeof getTVDetails>>;
   let allEpisodes: Array<typeof watchlistItems.$inferInsert>;
 
@@ -191,17 +130,7 @@ async function addTVShowToWatchlist(
     return { success: true, message: "No episodes found for this show" };
   }
 
-  const existingEpisodeRows = await db
-    .select({ tmdbId: watchlistItems.tmdbId })
-    .from(watchlistItems)
-    .where(
-      and(
-        eq(watchlistItems.watchlistId, watchlistId),
-        eq(watchlistItems.mediaType, "episode"),
-        eq(watchlistItems.source, "tmdb"),
-      ),
-    );
-  const existingEpisodeIds = new Set(existingEpisodeRows.map((row) => row.tmdbId));
+  const existingEpisodeIds = await repository.getExistingEpisodesInWatchlist(watchlistId);
   const newEpisodes = allEpisodes.filter(
     (episode) => !existingEpisodeIds.has(episode.tmdbId ?? ""),
   );
@@ -210,8 +139,8 @@ async function addTVShowToWatchlist(
     return { success: true, message: "No new episodes found for this show" };
   }
 
-  await insertItemsInChunks(newEpisodes);
-  await markLastItemAdded(watchlistId);
+  await repository.insertWatchlistItems(newEpisodes);
+  await repository.markLastItemAdded(watchlistId);
 
   return {
     success: true,
@@ -219,25 +148,51 @@ async function addTVShowToWatchlist(
   };
 }
 
-async function addComicToWatchlist(
+async function addMovieToWatchlist(
   watchlistId: number,
-  volumeId: string,
-  media: WatchlistMedia,
-  apiKey: string,
-) {
-  const db = getDb();
-  const existingComicRows = await db
-    .select({ tmdbId: watchlistItems.tmdbId })
-    .from(watchlistItems)
-    .where(
-      and(
-        eq(watchlistItems.watchlistId, watchlistId),
-        eq(watchlistItems.mediaType, "comic"),
-        eq(watchlistItems.source, "comicvine"),
-      ),
-    );
+  tmdbId: number,
+): Promise<WatchlistWriteResult> {
+  const existing = await repository.getExistingMovieInWatchlist(watchlistId, tmdbId);
 
-  const existingIssueIds = new Set(existingComicRows.map((row) => row.tmdbId));
+  if (existing.length > 0) {
+    return { success: true, message: "Already in watchlist" };
+  }
+
+  let details: Awaited<ReturnType<typeof getMovieDetails>>;
+  try {
+    details = await getMovieDetails({ data: { id: tmdbId } });
+  } catch {
+    return rejectAdd(TMDB_MOVIE_FETCH_FAILURE_MESSAGE);
+  }
+
+  const inserted = await repository.insertWatchlistItem({
+    watchlistId,
+    tmdbId: tmdbId.toString(),
+    source: "tmdb",
+    mediaType: "movie",
+    title: details.title || details.name || "Unknown",
+    posterPath: details.poster_path,
+    releaseDate: details.release_date,
+    voteAverage: details.vote_average,
+    runtime: details.runtime || 0,
+  });
+
+  if (!inserted) {
+    return { success: true, message: "Already in watchlist" };
+  }
+
+  await repository.markLastItemAdded(watchlistId);
+
+  return { success: true, message: "Added to watchlist" };
+}
+
+async function addComicToWatchlist(watchlistId: number, volumeId: string, media: WatchlistMedia) {
+  const apiKey = process.env.COMICVINE_API_KEY;
+  if (!apiKey) {
+    return rejectAdd(COMICVINE_UNAVAILABLE_MESSAGE);
+  }
+
+  const existingIssueIds = await repository.getExistingComicsInWatchlist(watchlistId);
   let issues: Awaited<ReturnType<typeof getComicIssues>>;
   try {
     issues = await getComicIssues(volumeId, apiKey, { knownIssueIds: existingIssueIds });
@@ -270,8 +225,8 @@ async function addComicToWatchlist(
     runtime: 0,
   }));
 
-  await insertItemsInChunks(watchlistItemsData);
-  await markLastItemAdded(watchlistId);
+  await repository.insertWatchlistItems(watchlistItemsData);
+  await repository.markLastItemAdded(watchlistId);
 
   const newIssueCount = watchlistItemsData.length;
   const message =
@@ -282,60 +237,58 @@ async function addComicToWatchlist(
   return { success: true, message };
 }
 
-export async function addToWatchlistMutation({
-  watchlistId,
-  media,
-}: AddToWatchlistInput): Promise<WatchlistWriteResult> {
-  const deprecatedRejection = getDeprecatedWatchlistAddRejection(media.mediaType);
-  if (deprecatedRejection) {
-    return deprecatedRejection;
+async function addBookToWatchlist(
+  watchlistId: number,
+  media: WatchlistMedia,
+): Promise<WatchlistWriteResult> {
+  let details: Awaited<ReturnType<typeof getBookDetails>>;
+  try {
+    details = await getBookDetails(media.id);
+  } catch {
+    return rejectAdd(GOOGLE_BOOKS_FETCH_FAILURE_MESSAGE);
+  }
+  return addGenericItemToWatchlist(watchlistId, details);
+}
+
+async function addGameToWatchlist(
+  watchlistId: number,
+  media: WatchlistMedia,
+): Promise<WatchlistWriteResult> {
+  const apiKey = process.env.RAWG_API_KEY;
+  if (!apiKey) {
+    return rejectAdd(RAWG_UNAVAILABLE_MESSAGE);
   }
 
-  if (media.mediaType === "tv") {
-    if (media.source !== "tmdb") {
-      return rejectAdd(UNSUPPORTED_TV_SOURCE_MESSAGE);
-    }
+  let details: Awaited<ReturnType<typeof getGameDetails>>;
+  try {
+    details = await getGameDetails(media.id, apiKey);
+  } catch {
+    return rejectAdd(RAWG_FETCH_FAILURE_MESSAGE);
+  }
+  return addGenericItemToWatchlist(watchlistId, details);
+}
 
-    return addTVShowToWatchlist(watchlistId, Number.parseInt(media.id, 10), media);
+async function addGenericItemToWatchlist(
+  watchlistId: number,
+  media: GenericMedia,
+): Promise<WatchlistWriteResult> {
+  const inserted = await repository.insertWatchlistItem({
+    watchlistId,
+    tmdbId: media.id,
+    source: media.source,
+    mediaType: media.mediaType,
+    title: media.title,
+    posterPath: media.poster,
+    releaseDate: media.releaseDate || media.year,
+    voteAverage: media.rating,
+    runtime: 0,
+  });
+
+  if (!inserted) {
+    return { success: true, message: "Already in watchlist" };
   }
 
-  if (media.source === "tmdb" && media.mediaType === "movie") {
-    return addMovieToWatchlist(watchlistId, Number.parseInt(media.id, 10));
-  }
+  await repository.markLastItemAdded(watchlistId);
 
-  if (media.source === "comicvine" && media.mediaType === "comic") {
-    const apiKey = process.env.COMICVINE_API_KEY;
-    if (!apiKey) {
-      return rejectAdd(COMICVINE_UNAVAILABLE_MESSAGE);
-    }
-
-    return addComicToWatchlist(watchlistId, media.id, media, apiKey);
-  }
-
-  if (media.source === "google_books" && media.mediaType === "book") {
-    let details: Awaited<ReturnType<typeof getBookDetails>>;
-    try {
-      details = await getBookDetails(media.id);
-    } catch {
-      return rejectAdd(GOOGLE_BOOKS_FETCH_FAILURE_MESSAGE);
-    }
-    return addGenericItemToWatchlist(watchlistId, details);
-  }
-
-  if (media.source === "rawg" && media.mediaType === "game") {
-    const apiKey = process.env.RAWG_API_KEY;
-    if (!apiKey) {
-      return rejectAdd(RAWG_UNAVAILABLE_MESSAGE);
-    }
-
-    let details: Awaited<ReturnType<typeof getGameDetails>>;
-    try {
-      details = await getGameDetails(media.id, apiKey);
-    } catch {
-      return rejectAdd(RAWG_FETCH_FAILURE_MESSAGE);
-    }
-    return addGenericItemToWatchlist(watchlistId, details);
-  }
-
-  return addGenericItemToWatchlist(watchlistId, media as GenericMedia);
+  return { success: true, message: "Added to watchlist" };
 }

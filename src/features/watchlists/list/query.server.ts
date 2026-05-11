@@ -19,6 +19,41 @@ import { and, asc, count, desc, eq, getTableColumns, inArray, or, sql } from "dr
 export type WatchlistListOrder = "createdAt" | "lastWatched" | "lastAdded";
 export type WatchlistSummary = WatchlistRecord & { stats: WatchlistStats };
 
+export async function listWatchlistSummaries({
+  orderBy = "createdAt",
+  order = "desc",
+}: {
+  orderBy?: WatchlistListOrder;
+  order?: "asc" | "desc";
+} = {}): Promise<WatchlistSummary[]> {
+  const db = getDb();
+  const lists = await db
+    .select()
+    .from(watchlists)
+    .orderBy(...buildListOrderBy(orderBy, order));
+
+  if (lists.length === 0) {
+    return [];
+  }
+
+  const listIds = lists.map((watchlist) => watchlist.id);
+  const [countRows, summarySelectionRows] = await Promise.all([
+    loadSummaryCounts(db, listIds),
+    loadSummarySelections(db, listIds),
+  ]);
+
+  const countsByWatchlist = indexSummaryCounts(countRows);
+  const selectionsByWatchlist = indexSummarySelections(summarySelectionRows);
+
+  return lists.map((watchlist) => ({
+    ...watchlist,
+    stats: buildSummaryStats(
+      countsByWatchlist[watchlist.id] ?? emptySummaryCounts,
+      selectionsByWatchlist[watchlist.id] ?? emptySummarySelection,
+    ),
+  }));
+}
+
 const coverRankExpression = sql<number>`row_number() over (
   partition by ${watchlistItems.watchlistId}
   order by
@@ -125,39 +160,4 @@ function buildListOrderBy(orderBy: WatchlistListOrder, order: "asc" | "desc") {
     default:
       return [orderFn(watchlists.createdAt)] as const;
   }
-}
-
-export async function listWatchlistSummaries({
-  orderBy = "createdAt",
-  order = "desc",
-}: {
-  orderBy?: WatchlistListOrder;
-  order?: "asc" | "desc";
-} = {}): Promise<WatchlistSummary[]> {
-  const db = getDb();
-  const lists = await db
-    .select()
-    .from(watchlists)
-    .orderBy(...buildListOrderBy(orderBy, order));
-
-  if (lists.length === 0) {
-    return [];
-  }
-
-  const listIds = lists.map((watchlist) => watchlist.id);
-  const [countRows, summarySelectionRows] = await Promise.all([
-    loadSummaryCounts(db, listIds),
-    loadSummarySelections(db, listIds),
-  ]);
-
-  const countsByWatchlist = indexSummaryCounts(countRows);
-  const selectionsByWatchlist = indexSummarySelections(summarySelectionRows);
-
-  return lists.map((watchlist) => ({
-    ...watchlist,
-    stats: buildSummaryStats(
-      countsByWatchlist[watchlist.id] ?? emptySummaryCounts,
-      selectionsByWatchlist[watchlist.id] ?? emptySummarySelection,
-    ),
-  }));
 }

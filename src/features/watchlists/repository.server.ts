@@ -1,5 +1,5 @@
 import { getDb } from "@/db/db.server";
-import { watchlists } from "@/db/schema";
+import { watchlists, watchlistItems } from "@/db/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { MergeWatchlistsInput } from "@/features/watchlists/mutations";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
@@ -74,4 +74,69 @@ export async function updateWatchlistItemOrderMode({
 }) {
   const db = getDb();
   await db.update(watchlists).set({ itemOrderMode }).where(eq(watchlists.id, watchlistId));
+}
+
+export async function insertWatchlistItem(values: typeof watchlistItems.$inferInsert) {
+  const db = getDb();
+  const [inserted] = await db
+    .insert(watchlistItems)
+    .values(values)
+    .onConflictDoNothing()
+    .returning({ id: watchlistItems.id });
+  return inserted;
+}
+
+export async function insertWatchlistItems(values: Array<typeof watchlistItems.$inferInsert>) {
+  if (values.length === 0) return;
+  const db = getDb();
+  const DB_INSERT_CHUNK_SIZE = 50;
+  for (let index = 0; index < values.length; index += DB_INSERT_CHUNK_SIZE) {
+    const chunk = values.slice(index, index + DB_INSERT_CHUNK_SIZE);
+    await db.insert(watchlistItems).values(chunk).onConflictDoNothing();
+  }
+}
+
+export async function getExistingMovieInWatchlist(watchlistId: number, tmdbId: number) {
+  const db = getDb();
+  return db
+    .select()
+    .from(watchlistItems)
+    .where(
+      and(
+        eq(watchlistItems.watchlistId, watchlistId),
+        eq(watchlistItems.tmdbId, tmdbId.toString()),
+        eq(watchlistItems.mediaType, "movie"),
+      ),
+    )
+    .limit(1);
+}
+
+export async function getExistingEpisodesInWatchlist(watchlistId: number) {
+  const db = getDb();
+  const rows = await db
+    .select({ tmdbId: watchlistItems.tmdbId })
+    .from(watchlistItems)
+    .where(
+      and(
+        eq(watchlistItems.watchlistId, watchlistId),
+        eq(watchlistItems.mediaType, "episode"),
+        eq(watchlistItems.source, "tmdb"),
+      ),
+    );
+  return new Set(rows.map((row) => row.tmdbId));
+}
+
+export async function getExistingComicsInWatchlist(watchlistId: number) {
+  const db = getDb();
+  const rows = await db
+    .select({ tmdbId: watchlistItems.tmdbId })
+    .from(watchlistItems)
+    .where(
+      and(
+        eq(watchlistItems.watchlistId, watchlistId),
+        eq(watchlistItems.mediaType, "comic"),
+        eq(watchlistItems.source, "comicvine"),
+      ),
+    );
+  return new Set(rows.map((row) => row.tmdbId));
 }
