@@ -2,15 +2,7 @@ import { cn } from "@/utils/cn";
 import { Check, Film, Tv, Gamepad2, Book, BookOpen } from "lucide-react";
 import type { WatchlistItem } from "@/db/schema";
 import { formatReleaseDate, formatRuntime } from "@/utils/datetime";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { toast } from "sonner";
-import { toggleWatched } from "@/features/watchlists/mutations";
-import {
-  invalidateWatchlistQueries,
-  optimisticallyToggleWatchedItem,
-  rollbackWatchedToggle,
-} from "@/features/watchlists/detail/query";
+import { useToggleWatchedItem } from "@/features/watchlists/detail/use-toggle-watched-item";
 
 type TimelineItemProps = {
   item: WatchlistItem;
@@ -116,32 +108,6 @@ const Content = ({
     </div>
   );
 };
-
-function useToggleWatchedItem(item: WatchlistItem) {
-  const queryClient = useQueryClient();
-  const toggleWatchedFn = useServerFn(toggleWatched);
-  const previousIsWatched = item.isWatched === true;
-  const nextIsWatched = !previousIsWatched;
-
-  return useMutation({
-    mutationFn: async () => {
-      await toggleWatchedFn({ data: { itemId: item.id, isWatched: nextIsWatched } });
-    },
-    onMutate: () =>
-      optimisticallyToggleWatchedItem({
-        queryClient,
-        watchlistId: item.watchlistId,
-        itemId: item.id,
-        previousIsWatched,
-        nextIsWatched,
-      }),
-    onError: (_err, _variables, snapshot) => {
-      rollbackWatchedToggle({ queryClient, snapshot });
-      toast.error("Failed to update status");
-    },
-    onSettled: () => invalidateWatchlistQueries(queryClient),
-  });
-}
 
 export function TimelineItem({ item }: TimelineItemProps) {
   const toggleMutation = useToggleWatchedItem(item);

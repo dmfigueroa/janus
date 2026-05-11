@@ -99,8 +99,16 @@ describe("route module boundaries", () => {
       workspaceFile("src/components/watchlist/TimelineItem.tsx"),
       "utf8",
     );
+    const toggleWatchedHook = readFileSync(
+      workspaceFile("src/features/watchlists/detail/use-toggle-watched-item.ts"),
+      "utf8",
+    );
     const watchlistDetail = readFileSync(
       workspaceFile("src/features/watchlists/detail/screen.tsx"),
+      "utf8",
+    );
+    const itemOrderModeHook = readFileSync(
+      workspaceFile("src/features/watchlists/detail/use-item-order-mode-mutation.ts"),
       "utf8",
     );
 
@@ -110,22 +118,28 @@ describe("route module boundaries", () => {
     expect(mediaDetailSheet).toMatch(/watchlistListQueryKey\(/);
 
     expect(timelineItem).not.toMatch(/["']use client["']/);
-    expect(timelineItem).toMatch(/from\s+["']@\/features\/watchlists\/mutations["']/);
-    expect(timelineItem).toMatch(/useServerFn\(toggleWatched\)/);
-    expect(timelineItem).toMatch(/toggleWatchedFn\(/);
-    expect(timelineItem).toMatch(/optimisticallyToggleWatchedItem\(/);
-    expect(timelineItem).toMatch(/rollbackWatchedToggle\(/);
-    expect(timelineItem).toMatch(/invalidateWatchlistQueries\(/);
-    expect(timelineItem).not.toMatch(/await\s+toggleWatched\(/);
-    expect(timelineItem).not.toMatch(/from\s+["']@\/server\/watchlist["']/);
+    expect(timelineItem).toMatch(
+      /from\s+["']@\/features\/watchlists\/detail\/use-toggle-watched-item["']/,
+    );
+    expect(toggleWatchedHook).toMatch(/from\s+["']@\/features\/watchlists\/mutations["']/);
+    expect(toggleWatchedHook).toMatch(/useServerFn\(toggleWatched\)/);
+    expect(toggleWatchedHook).toMatch(/toggleWatchedFn\(/);
+    expect(toggleWatchedHook).toMatch(/optimisticallyToggleWatchedItem\(/);
+    expect(toggleWatchedHook).toMatch(/rollbackWatchedToggle\(/);
+    expect(toggleWatchedHook).toMatch(/invalidateWatchlistQueries\(/);
+    expect(toggleWatchedHook).not.toMatch(/await\s+toggleWatched\(/);
+    expect(toggleWatchedHook).not.toMatch(/from\s+["']@\/server\/watchlist["']/);
 
     expect(watchlistDetail).not.toMatch(/["']use client["']/);
-    expect(watchlistDetail).toMatch(/from\s+["']@\/features\/watchlists\/mutations["']/);
-    expect(watchlistDetail).toMatch(/useServerFn\(updateWatchlistItemOrderMode\)/);
-    expect(watchlistDetail).toMatch(/optimisticallyUpdateWatchlistItemOrderMode\(/);
-    expect(watchlistDetail).toMatch(/rollbackWatchlistItemOrderMode\(/);
-    expect(watchlistDetail).toMatch(/invalidateWatchlistQueries\(/);
-    expect(watchlistDetail).not.toMatch(/await\s+updateWatchlistItemOrderMode\(/);
+    expect(watchlistDetail).toMatch(
+      /from\s+["']@\/features\/watchlists\/detail\/use-item-order-mode-mutation["']/,
+    );
+    expect(itemOrderModeHook).toMatch(/from\s+["']@\/features\/watchlists\/mutations["']/);
+    expect(itemOrderModeHook).toMatch(/useServerFn\(updateWatchlistItemOrderMode\)/);
+    expect(itemOrderModeHook).toMatch(/optimisticallyUpdateWatchlistItemOrderMode\(/);
+    expect(itemOrderModeHook).toMatch(/rollbackWatchlistItemOrderMode\(/);
+    expect(itemOrderModeHook).toMatch(/invalidateWatchlistQueries\(/);
+    expect(itemOrderModeHook).not.toMatch(/await\s+updateWatchlistItemOrderMode\(/);
   });
 
   it("keeps the shared watchlist query surface free of server-only imports", () => {

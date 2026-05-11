@@ -1,18 +1,13 @@
 import { useEffect, useState } from "react";
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { toast } from "sonner";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { WatchlistTimeline } from "@/components/watchlist/WatchlistTimeline";
 import { WatchlistHeader } from "@/features/watchlists/components/watchlist-header";
 import {
-  invalidateWatchlistQueries,
-  optimisticallyUpdateWatchlistItemOrderMode,
-  rollbackWatchlistItemOrderMode,
-  type WatchlistDetailQueryData,
-  type WatchlistItemOrderMode,
   watchlistDetailInfiniteQueryOptions,
+  type WatchlistDetailQueryData,
 } from "@/features/watchlists/detail/query";
-import { updateWatchlistItemOrderMode } from "@/features/watchlists/mutations";
+import { useItemOrderModeMutation } from "@/features/watchlists/detail/use-item-order-mode-mutation";
+import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
 
 interface WatchlistDetailScreenProps {
   initialData: WatchlistDetailQueryData;
@@ -20,8 +15,6 @@ interface WatchlistDetailScreenProps {
 
 export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProps) {
   const watchlistId = initialData.watchlist.id;
-  const queryClient = useQueryClient();
-  const updateWatchlistItemOrderModeFn = useServerFn(updateWatchlistItemOrderMode);
   const [showUnwatchedOnly, setShowUnwatchedOnly] = useState(true);
   const [itemOrderMode, setItemOrderMode] = useState<WatchlistItemOrderMode>(
     initialData.watchlist.itemOrderMode,
@@ -46,38 +39,11 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
     }),
   );
 
-  const updateItemOrderModeMutation = useMutation({
-    mutationFn: async (nextItemOrderMode: WatchlistItemOrderMode) => {
-      const result = await updateWatchlistItemOrderModeFn({
-        data: { watchlistId, itemOrderMode: nextItemOrderMode },
-      });
-
-      if (!result.success) {
-        throw new Error(result.message);
-      }
-    },
-    onMutate: async (nextItemOrderMode) => {
-      const previousItemOrderMode = itemOrderMode;
-      const snapshot = await optimisticallyUpdateWatchlistItemOrderMode({
-        queryClient,
-        watchlistId,
-        previousItemOrderMode,
-        nextItemOrderMode,
-      });
-
-      setItemOrderMode(nextItemOrderMode);
-
-      return { previousItemOrderMode, snapshot };
-    },
-    onError: (error, _nextItemOrderMode, context) => {
-      rollbackWatchlistItemOrderMode({
-        queryClient,
-        snapshot: context?.snapshot,
-      });
-      setItemOrderMode(context?.previousItemOrderMode ?? initialData.watchlist.itemOrderMode);
-      toast.error(error instanceof Error ? error.message : "Failed to update item order");
-    },
-    onSettled: () => invalidateWatchlistQueries(queryClient),
+  const updateItemOrderModeMutation = useItemOrderModeMutation({
+    initialItemOrderMode: initialData.watchlist.itemOrderMode,
+    watchlistId,
+    onOptimisticChange: setItemOrderMode,
+    onRollback: setItemOrderMode,
   });
 
   const allItems = data?.pages.flatMap((page) => page.items) || [];
@@ -100,7 +66,10 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
             return;
           }
 
-          updateItemOrderModeMutation.mutate(nextItemOrderMode);
+          updateItemOrderModeMutation.mutate({
+            previousItemOrderMode: itemOrderMode,
+            nextItemOrderMode,
+          });
         }}
         isUpdatingItemOrderMode={updateItemOrderModeMutation.isPending}
         searchQuery={searchQuery}

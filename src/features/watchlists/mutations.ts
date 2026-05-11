@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { UnifiedMediaSchema } from "@/server/media";
+import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
 
 const createWatchlistSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -35,6 +36,10 @@ const addToWatchlistSchema = z.object({
 });
 
 export type AddToWatchlistInput = z.infer<typeof addToWatchlistSchema>;
+export type WatchlistMedia = AddToWatchlistInput["media"];
+export type GenericMedia = Omit<WatchlistMedia, "mediaType"> & {
+  mediaType: Exclude<WatchlistMedia["mediaType"], "tv">;
+};
 
 const toggleWatchedSchema = z.object({
   itemId: z.number(),
@@ -48,7 +53,10 @@ const updateWatchlistItemOrderModeSchema = z.object({
   itemOrderMode: z.enum(["release", "custom"]),
 });
 
-export type UpdateWatchlistItemOrderModeInput = z.infer<typeof updateWatchlistItemOrderModeSchema>;
+export type UpdateWatchlistItemOrderModeInput = {
+  watchlistId: number;
+  itemOrderMode: WatchlistItemOrderMode;
+};
 
 export const createWatchlist = createServerFn({ method: "POST" })
   .inputValidator((data) => createWatchlistSchema.parse(data))

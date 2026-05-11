@@ -1,5 +1,5 @@
 import type { Watchlist } from "@/db/schema";
-import type { WatchlistItemOrderMode } from "@/features/watchlists/detail/query";
+import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
 import { calculateWatchlistProgress } from "@/features/watchlists/progress";
 import { cn } from "@/utils/cn";
 import { Search } from "lucide-react";

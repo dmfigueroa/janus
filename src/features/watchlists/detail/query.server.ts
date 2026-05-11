@@ -1,9 +1,18 @@
 import { getDb } from "@/db/db.server";
-import { watchlists, watchlistItems, type WatchlistItem } from "@/db/schema";
-import { calculateWatchlistProgress } from "@/features/watchlists/progress";
-import type { WatchlistDetailPage, WatchlistStats, WatchlistSummary } from "@/models/watchlist";
+import { watchlists, watchlistItems } from "@/db/schema";
+import {
+  buildDetailOrderBy,
+  isUnwatchedExpression,
+  watchedItemsExpression,
+} from "@/features/watchlists/order.server";
+import {
+  buildSummaryStats,
+  type SummaryCounts,
+  type SummarySelection,
+} from "@/features/watchlists/summary.server";
+import type { WatchlistDetailPage } from "@/models/watchlist";
 import { escapeLikeString } from "@/utils/search";
-import { and, asc, count, eq, or, sql } from "drizzle-orm";
+import { and, count, eq, or, sql } from "drizzle-orm";
 
 export type GetWatchlistDetailParams = {
   watchlistId: number;
@@ -12,37 +21,6 @@ export type GetWatchlistDetailParams = {
   query?: string;
   unwatchedOnly?: boolean;
 };
-
-type SummaryCounts = Pick<WatchlistStats, "totalItems" | "watchedItems">;
-type SummarySelection = {
-  nextUnwatched: WatchlistItem | null;
-  coverItem: WatchlistItem | null;
-};
-
-const releaseDateOrder = [
-  sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
-  asc(watchlistItems.releaseDate),
-] as const;
-
-const customRankOrder = [
-  sql`CASE WHEN ${watchlistItems.customRank} IS NULL THEN 1 ELSE 0 END`,
-  asc(watchlistItems.customRank),
-  ...releaseDateOrder,
-] as const;
-
-const isUnwatchedExpression = sql<boolean>`COALESCE(${watchlistItems.isWatched}, 0) = 0`;
-const watchedItemsExpression = sql<number>`sum(case when ${watchlistItems.isWatched} then 1 else 0 end)`;
-
-function buildSummaryStats(counts: SummaryCounts, selection: SummarySelection): WatchlistStats {
-  return {
-    totalItems: counts.totalItems,
-    watchedItems: counts.watchedItems,
-    progress: calculateWatchlistProgress(counts),
-    nextUnwatched: selection.nextUnwatched,
-    coverImage: selection.coverItem?.posterPath ?? null,
-    coverMediaType: selection.coverItem?.mediaType ?? null,
-  };
-}
 
 async function loadWatchlistById(db: ReturnType<typeof getDb>, watchlistId: number) {
   const [watchlist] = await db.select().from(watchlists).where(eq(watchlists.id, watchlistId));
@@ -95,10 +73,6 @@ async function loadDetailSelection({
     nextUnwatched,
     coverItem: nextUnwatched ?? firstItemResult[0] ?? null,
   } satisfies SummarySelection;
-}
-
-function buildDetailOrderBy(itemOrderMode: (typeof watchlists.$inferSelect)["itemOrderMode"]) {
-  return itemOrderMode === "custom" ? customRankOrder : releaseDateOrder;
 }
 
 function buildDetailFilters({
@@ -182,7 +156,7 @@ export async function getWatchlistDetail({
     watchlist: {
       ...watchlist,
       stats: buildSummaryStats(counts, selection ?? { nextUnwatched: null, coverItem: null }),
-    } satisfies WatchlistSummary,
+    },
     items: pageItems,
     nextCursor: hasNextPage ? cursor + 1 : undefined,
   };

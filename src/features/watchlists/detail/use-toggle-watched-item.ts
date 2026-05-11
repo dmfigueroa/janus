@@ -1,0 +1,36 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
+import type { WatchlistItem } from "@/db/schema";
+import {
+  invalidateWatchlistQueries,
+  optimisticallyToggleWatchedItem,
+  rollbackWatchedToggle,
+} from "@/features/watchlists/detail/optimistic";
+import { toggleWatched } from "@/features/watchlists/mutations";
+
+export function useToggleWatchedItem(item: WatchlistItem) {
+  const queryClient = useQueryClient();
+  const toggleWatchedFn = useServerFn(toggleWatched);
+  const previousIsWatched = item.isWatched === true;
+  const nextIsWatched = !previousIsWatched;
+
+  return useMutation({
+    mutationFn: async () => {
+      await toggleWatchedFn({ data: { itemId: item.id, isWatched: nextIsWatched } });
+    },
+    onMutate: () =>
+      optimisticallyToggleWatchedItem({
+        queryClient,
+        watchlistId: item.watchlistId,
+        itemId: item.id,
+        previousIsWatched,
+        nextIsWatched,
+      }),
+    onError: (_err, _variables, snapshot) => {
+      rollbackWatchedToggle({ queryClient, snapshot });
+      toast.error("Failed to update status");
+    },
+    onSettled: () => invalidateWatchlistQueries(queryClient),
+  });
+}
