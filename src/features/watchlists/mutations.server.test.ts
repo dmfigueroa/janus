@@ -168,6 +168,7 @@ describe("watchlist mutation contract", () => {
         mediaType: "movie",
         title: "Source Only",
         releaseDate: "2024-02-01",
+        customRank: 1,
         isWatched: false,
       },
       {
@@ -207,6 +208,7 @@ describe("watchlist mutation contract", () => {
         expect.objectContaining({
           tmdbId: "source-only",
           title: "Source Only",
+          customRank: null,
           isWatched: false,
         }),
       ]),
@@ -250,12 +252,16 @@ describe("watchlist mutation contract", () => {
       newWatchlistName: "Merged Queue",
     });
 
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      throw new Error(result.message);
+    }
+
     const mergedDetail = await WatchlistsRead.detailScreen({
       watchlistId: result.targetId,
       unwatchedOnly: false,
     });
 
-    expect(result.success).toBe(true);
     expect(result.targetId).not.toBe(firstSource.id);
     expect(result.targetId).not.toBe(secondSource.id);
     expect(mergedDetail?.watchlist).toMatchObject({
@@ -270,6 +276,49 @@ describe("watchlist mutation contract", () => {
     );
     await expect(WatchlistsRead.detailScreen({ watchlistId: firstSource.id })).resolves.toBeNull();
     await expect(WatchlistsRead.detailScreen({ watchlistId: secondSource.id })).resolves.toBeNull();
+  });
+
+  it("rejects a merge when any selected source watchlist uses custom order", async () => {
+    const [releaseSource, customSource] = await db
+      .insert(watchlists)
+      .values([{ name: "Release Source" }, { name: "Custom Source", itemOrderMode: "custom" }])
+      .returning();
+
+    const result = await WatchlistsWrite.merge({
+      sourceWatchlistIds: [releaseSource.id, customSource.id],
+      newWatchlistName: "Merged Queue",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      message: "Merging custom-ordered watchlists is not supported yet.",
+    });
+    await expect(
+      WatchlistsRead.detailScreen({ watchlistId: releaseSource.id }),
+    ).resolves.not.toBeNull();
+    await expect(
+      WatchlistsRead.detailScreen({ watchlistId: customSource.id }),
+    ).resolves.not.toBeNull();
+    await expect(WatchlistsRead.listScreen()).resolves.toHaveLength(2);
+  });
+
+  it("rejects a merge into a custom-ordered target watchlist", async () => {
+    const [target, source] = await db
+      .insert(watchlists)
+      .values([{ name: "Custom Target", itemOrderMode: "custom" }, { name: "Release Source" }])
+      .returning();
+
+    const result = await WatchlistsWrite.merge({
+      targetWatchlistId: target.id,
+      sourceWatchlistIds: [source.id],
+    });
+
+    expect(result).toEqual({
+      success: false,
+      message: "Merging custom-ordered watchlists is not supported yet.",
+    });
+    await expect(WatchlistsRead.detailScreen({ watchlistId: target.id })).resolves.not.toBeNull();
+    await expect(WatchlistsRead.detailScreen({ watchlistId: source.id })).resolves.not.toBeNull();
   });
 
   it("rejects a merge without source watchlists before creating a target", async () => {

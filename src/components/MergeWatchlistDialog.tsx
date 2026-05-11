@@ -54,23 +54,33 @@ export function MergeWatchlistDialog({
           toast.error("Please enter a name for the new watchlist");
           return;
         }
-        await mergeWatchlistsFn({
+        const result = await mergeWatchlistsFn({
           data: {
             sourceWatchlistIds: selectedWatchlistIds,
             newWatchlistName: newName,
           },
         });
+
+        if (!result.success) {
+          toast.error(result.message);
+          return;
+        }
       } else {
         if (!targetId) {
           toast.error("Please select a target watchlist");
           return;
         }
-        await mergeWatchlistsFn({
+        const result = await mergeWatchlistsFn({
           data: {
             sourceWatchlistIds: selectedWatchlistIds,
             targetWatchlistId: parseInt(targetId),
           },
         });
+
+        if (!result.success) {
+          toast.error(result.message);
+          return;
+        }
       }
 
       toast.success("Watchlists merged successfully");
