@@ -43,19 +43,24 @@ const emptySummarySelection: SummarySelection = {
   coverItem: null,
 };
 
+const activeItemOrderExpression = sql`
+  CASE WHEN ${watchlists.itemOrderMode} = 'custom' AND ${watchlistItems.customRank} IS NULL THEN 1 ELSE 0 END,
+  CASE WHEN ${watchlists.itemOrderMode} = 'custom' THEN ${watchlistItems.customRank} END asc,
+  CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END,
+  ${watchlistItems.releaseDate} asc
+`;
+
 const coverRankExpression = sql<number>`row_number() over (
   partition by ${watchlistItems.watchlistId}
   order by
     ${isWatchedOrderExpression},
-    CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END,
-    ${watchlistItems.releaseDate} asc
+    ${activeItemOrderExpression}
 )`;
 
 const unwatchedRankExpression = sql<number>`row_number() over (
   partition by ${watchlistItems.watchlistId}, ${isWatchedOrderExpression}
   order by
-    CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END,
-    ${watchlistItems.releaseDate} asc
+    ${activeItemOrderExpression}
 )`;
 
 const watchedItemsExpression = sql<number>`sum(case when ${watchlistItems.isWatched} then 1 else 0 end)`;
@@ -69,6 +74,7 @@ function buildRankedSummaryItemsQuery(db: ReturnType<typeof getDb>, listIds: num
         unwatchedRank: unwatchedRankExpression.as("unwatched_rank"),
       })
       .from(watchlistItems)
+      .innerJoin(watchlists, eq(watchlists.id, watchlistItems.watchlistId))
       .where(inArray(watchlistItems.watchlistId, listIds)),
   );
 }

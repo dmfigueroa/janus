@@ -129,4 +129,119 @@ describe("WatchlistsRead.listScreen", () => {
       coverMediaType: null,
     });
   });
+
+  it("uses active custom item order for summary next-up selection", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Custom Summary", itemOrderMode: "custom" })
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "release-first",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Release First",
+        posterPath: "/release-first.jpg",
+        releaseDate: "2024-01-01",
+        customRank: 2,
+        isWatched: false,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "custom-first",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Custom First",
+        posterPath: "/custom-first.jpg",
+        releaseDate: "2024-02-01",
+        customRank: 1,
+        isWatched: false,
+      },
+    ]);
+
+    const [summary] = await WatchlistsRead.listScreen();
+
+    expect(summary?.stats.nextUnwatched?.title).toBe("Custom First");
+  });
+
+  it("uses active custom item order for summary cover selection", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Custom Cover", itemOrderMode: "custom" })
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "release-first",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Release First",
+        posterPath: "/release-first.jpg",
+        releaseDate: "2024-01-01",
+        customRank: 2,
+        isWatched: true,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "custom-first",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Custom First",
+        posterPath: "/custom-first.jpg",
+        releaseDate: "2024-02-01",
+        customRank: 1,
+        isWatched: true,
+      },
+    ]);
+
+    const [summary] = await WatchlistsRead.listScreen();
+
+    expect(summary?.stats).toMatchObject({
+      coverImage: "/custom-first.jpg",
+      coverMediaType: "episode",
+    });
+  });
+
+  it("preserves release-mode summary selection when custom ranks exist", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Release Summary", itemOrderMode: "release" })
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "release-first",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Release First",
+        posterPath: "/release-first.jpg",
+        releaseDate: "2024-01-01",
+        customRank: 2,
+        isWatched: false,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "custom-first",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Custom First",
+        posterPath: "/custom-first.jpg",
+        releaseDate: "2024-02-01",
+        customRank: 1,
+        isWatched: false,
+      },
+    ]);
+
+    const [summary] = await WatchlistsRead.listScreen();
+
+    expect(summary?.stats.nextUnwatched?.title).toBe("Release First");
+    expect(summary?.stats).toMatchObject({
+      coverImage: "/release-first.jpg",
+      coverMediaType: "movie",
+    });
+  });
 });
