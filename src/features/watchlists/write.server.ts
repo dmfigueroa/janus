@@ -22,6 +22,8 @@ import type {
 
 const limit = pLimit(5);
 const DB_INSERT_CHUNK_SIZE = 50;
+const CUSTOM_ORDER_MERGE_UNSUPPORTED_MESSAGE =
+  "Merging custom-ordered watchlists is not supported yet.";
 const UNSUPPORTED_TV_SOURCE_MESSAGE =
   "TV shows must come from TMDB so Janus can expand them into episodes.";
 const COMICVINE_UNAVAILABLE_MESSAGE =
@@ -41,6 +43,9 @@ type GenericMedia = Omit<WatchlistMedia, "mediaType"> & {
 type WatchlistDb = ReturnType<typeof getDb>;
 type WatchlistTransaction = Parameters<Parameters<WatchlistDb["transaction"]>[0]>[0];
 type WatchlistWriteResult = { success: true; message: string } | WatchlistAddRejection;
+type MergeWatchlistsResult =
+  | { success: true; targetId: number }
+  | { success: false; message: string };
 type TMDBEpisode = {
   id: number;
   name: string;
@@ -64,6 +69,24 @@ function assertMergeHasSources(sourceWatchlistIds: number[]) {
   if (sourceWatchlistIds.length === 0) {
     throw new Error("At least one source watchlist must be selected");
   }
+}
+
+async function hasCustomOrderMergeParticipant({
+  targetWatchlistId,
+  sourceWatchlistIds,
+}: Pick<MergeWatchlistsInput, "targetWatchlistId" | "sourceWatchlistIds">) {
+  const participantIds = Array.from(
+    new Set(targetWatchlistId ? [...sourceWatchlistIds, targetWatchlistId] : sourceWatchlistIds),
+  );
+
+  const db = getDb();
+  const [customOrderParticipant] = await db
+    .select({ id: watchlists.id })
+    .from(watchlists)
+    .where(and(inArray(watchlists.id, participantIds), eq(watchlists.itemOrderMode, "custom")))
+    .limit(1);
+
+  return customOrderParticipant !== undefined;
 }
 
 async function markLastItemAdded(watchlistId: number) {
@@ -376,6 +399,7 @@ function mergeSourceItemsIntoTarget(
           releaseDate: watchlistItems.releaseDate,
           voteAverage: watchlistItems.voteAverage,
           runtime: watchlistItems.runtime,
+          customRank: sql<number | null>`NULL`.as("customRank"),
           isWatched: watchlistItems.isWatched,
           addedAt: watchlistItems.addedAt,
         })
@@ -419,8 +443,16 @@ export const WatchlistsWrite = {
     return { success: true };
   },
 
-  async merge({ targetWatchlistId, sourceWatchlistIds, newWatchlistName }: MergeWatchlistsInput) {
+  async merge({
+    targetWatchlistId,
+    sourceWatchlistIds,
+    newWatchlistName,
+  }: MergeWatchlistsInput): Promise<MergeWatchlistsResult> {
     assertMergeHasSources(sourceWatchlistIds);
+
+    if (await hasCustomOrderMergeParticipant({ targetWatchlistId, sourceWatchlistIds })) {
+      return { success: false, message: CUSTOM_ORDER_MERGE_UNSUPPORTED_MESSAGE };
+    }
 
     const db = getDb();
     return db.transaction((transaction) => {
