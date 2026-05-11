@@ -2,8 +2,8 @@ import {
   getWatchlistDetailPage,
   watchlistDetailQueryKey,
 } from "@/features/watchlists/detail/query";
+import { WatchlistDetailScreen } from "@/features/watchlists/detail/screen";
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { WatchlistDetail as WatchlistDetailView } from "@/components/watchlist/WatchlistDetail";
 
 export const Route = createFileRoute("/watchlists/$watchlistId")({
   loader: async ({ context, params: { watchlistId } }) => {
@@ -34,5 +34,5 @@ export const Route = createFileRoute("/watchlists/$watchlistId")({
 
 export function WatchlistDetail() {
   const initialData = Route.useLoaderData();
-  return <WatchlistDetailView initialData={initialData} />;
+  return <WatchlistDetailScreen initialData={initialData} />;
 }

@@ -48,7 +48,6 @@ export function WatchlistHeader({
           <span className="text-muted-foreground">{percentage}% Complete</span>
         </div>
 
-        {/* Progress Bar */}
         <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
           <div
             className="h-full bg-primary transition-all duration-500 ease-out"
@@ -56,7 +55,6 @@ export function WatchlistHeader({
           />
         </div>
 
-        {/* Controls: Search & Filters */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />

@@ -30,7 +30,11 @@ describe("route module boundaries", () => {
     );
 
     expect(watchlistDetailRoute).toMatch(/from\s+["']@\/features\/watchlists\/detail\/query["']/);
+    expect(watchlistDetailRoute).toMatch(/from\s+["']@\/features\/watchlists\/detail\/screen["']/);
     expect(watchlistDetailRoute).not.toMatch(/from\s+["']@\/controllers\/watchlists["']/);
+    expect(watchlistDetailRoute).not.toMatch(
+      /from\s+["']@\/components\/watchlist\/WatchlistDetail["']/,
+    );
   });
 
   it("keeps search-to-watchlist integration inside the search feature boundary", () => {
@@ -96,7 +100,7 @@ describe("route module boundaries", () => {
       "utf8",
     );
     const watchlistDetail = readFileSync(
-      workspaceFile("src/components/watchlist/WatchlistDetail.tsx"),
+      workspaceFile("src/features/watchlists/detail/screen.tsx"),
       "utf8",
     );
 
@@ -132,5 +136,21 @@ describe("route module boundaries", () => {
 
     expect(watchlistQueries).not.toMatch(/from\s+["'][^"']+\.server["']/);
     expect(watchlistQueries).not.toMatch(/from\s+["']\.\.\/read\.server["']/);
+  });
+
+  it("keeps touched watchlist UI inside the watchlists feature boundary", () => {
+    const watchlistDetailScreen = readFileSync(
+      workspaceFile("src/features/watchlists/detail/screen.tsx"),
+      "utf8",
+    );
+    const watchlistHeader = readFileSync(
+      workspaceFile("src/features/watchlists/components/watchlist-header.tsx"),
+      "utf8",
+    );
+
+    expect(watchlistDetailScreen).toMatch(
+      /from\s+["']@\/features\/watchlists\/components\/watchlist-header["']/,
+    );
+    expect(watchlistHeader).not.toMatch(/from\s+["']@\/components\/watchlist\/WatchlistHeader["']/);
   });
 });

@@ -47,6 +47,7 @@ type WatchlistWriteResult = { success: true; message: string } | WatchlistAddRej
 type MergeWatchlistsResult =
   | { success: true; targetId: number }
   | { success: false; message: string };
+type UpdateWatchlistItemOrderModeResult = { success: true } | { success: false; message: string };
 type TMDBEpisode = {
   id: number;
   name: string;
@@ -545,8 +546,20 @@ export const WatchlistsWrite = {
     return { success: true };
   },
 
-  async updateItemOrderMode({ watchlistId, itemOrderMode }: UpdateWatchlistItemOrderModeInput) {
+  async updateItemOrderMode({
+    watchlistId,
+    itemOrderMode,
+  }: UpdateWatchlistItemOrderModeInput): Promise<UpdateWatchlistItemOrderModeResult> {
     const db = getDb();
+    const [watchlist] = await db
+      .select({ id: watchlists.id })
+      .from(watchlists)
+      .where(eq(watchlists.id, watchlistId))
+      .limit(1);
+
+    if (!watchlist) {
+      return { success: false, message: "Watchlist not found." };
+    }
 
     await db.update(watchlists).set({ itemOrderMode }).where(eq(watchlists.id, watchlistId));
 

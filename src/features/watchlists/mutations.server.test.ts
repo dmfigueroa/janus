@@ -175,6 +175,15 @@ describe("watchlist mutation contract", () => {
     expect(detail?.items.map((item) => item.title)).toEqual(["Custom First", "Release First"]);
   });
 
+  it("returns a structured failure when updating item order mode for a missing watchlist", async () => {
+    const result = await WatchlistsWrite.updateItemOrderMode({
+      watchlistId: 999_999,
+      itemOrderMode: "custom",
+    });
+
+    expect(result).toEqual({ success: false, message: "Watchlist not found." });
+  });
+
   it("merges selected watchlists into an existing target through the feature mutation boundary", async () => {
     const [target, source, untouched] = await db
       .insert(watchlists)
