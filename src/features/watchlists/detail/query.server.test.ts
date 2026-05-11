@@ -11,7 +11,9 @@ let closeDb: typeof import("@/db/db.server").closeDb;
 let getWatchlistDetail: typeof import("./query.server").getWatchlistDetail;
 let readWatchlistDetailScreen: typeof import("../read.server").WatchlistsRead.detailScreen;
 let invalidateWatchlistQueries: typeof import("./query").invalidateWatchlistQueries;
+let optimisticallyUpdateWatchlistItemOrderMode: typeof import("./query").optimisticallyUpdateWatchlistItemOrderMode;
 let optimisticallyToggleWatchedItem: typeof import("./query").optimisticallyToggleWatchedItem;
+let rollbackWatchlistItemOrderMode: typeof import("./query").rollbackWatchlistItemOrderMode;
 let rollbackWatchedToggle: typeof import("./query").rollbackWatchedToggle;
 let watchlistDetailInfiniteQueryOptions: typeof import("./query").watchlistDetailInfiniteQueryOptions;
 let watchlistDetailQueryKey: typeof import("./query").watchlistDetailQueryKey;
@@ -33,7 +35,10 @@ beforeAll(async () => {
   getWatchlistDetail = queryServerModule.getWatchlistDetail;
   readWatchlistDetailScreen = readModule.WatchlistsRead.detailScreen;
   invalidateWatchlistQueries = queryModule.invalidateWatchlistQueries;
+  optimisticallyUpdateWatchlistItemOrderMode =
+    queryModule.optimisticallyUpdateWatchlistItemOrderMode;
   optimisticallyToggleWatchedItem = queryModule.optimisticallyToggleWatchedItem;
+  rollbackWatchlistItemOrderMode = queryModule.rollbackWatchlistItemOrderMode;
   rollbackWatchedToggle = queryModule.rollbackWatchedToggle;
   watchlistDetailInfiniteQueryOptions = queryModule.watchlistDetailInfiniteQueryOptions;
   watchlistDetailQueryKey = queryModule.watchlistDetailQueryKey;
@@ -474,6 +479,87 @@ describe("watchlist detail query contract", () => {
       watchedItems: 1,
       progress: 33,
     });
+  });
+
+  it("isolates release and custom detail caches and switches modes optimistically", async () => {
+    const [watchlist] = await db.insert(watchlists).values({ name: "Optimistic Mode" }).returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "release-first",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Release First",
+        releaseDate: "2024-01-01",
+        customRank: 2,
+        isWatched: false,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "custom-first",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Custom First",
+        releaseDate: "2024-02-01",
+        customRank: 1,
+        isWatched: false,
+      },
+    ]);
+
+    const queryClient = new QueryClient();
+    const releaseFilters = {
+      watchlistId: watchlist.id,
+      unwatchedOnly: false,
+      itemOrderMode: "release" as const,
+    };
+    const customFilters = {
+      watchlistId: watchlist.id,
+      unwatchedOnly: false,
+      itemOrderMode: "custom" as const,
+    };
+
+    await seedRouteLoadedDetail({ queryClient, filters: releaseFilters });
+
+    const snapshot = await optimisticallyUpdateWatchlistItemOrderMode({
+      queryClient,
+      watchlistId: watchlist.id,
+      previousItemOrderMode: "release",
+      nextItemOrderMode: "custom",
+    });
+
+    const releaseData = queryClient.getQueryData<InfiniteData<WatchlistDetailQueryData, number>>(
+      watchlistDetailQueryKey(releaseFilters),
+    );
+    const customData = queryClient.getQueryData<InfiniteData<WatchlistDetailQueryData, number>>(
+      watchlistDetailQueryKey(customFilters),
+    );
+
+    expect(watchlistDetailQueryKey(releaseFilters)).not.toEqual(
+      watchlistDetailQueryKey(customFilters),
+    );
+    expect(releaseData?.pages[0]?.items.map((item) => item.title)).toEqual([
+      "Release First",
+      "Custom First",
+    ]);
+    expect(customData?.pages[0]?.watchlist.itemOrderMode).toBe("custom");
+    expect(customData?.pages[0]?.items.map((item) => item.title)).toEqual([
+      "Custom First",
+      "Release First",
+    ]);
+
+    rollbackWatchlistItemOrderMode({ queryClient, snapshot });
+
+    expect(
+      queryClient.getQueryData<InfiniteData<WatchlistDetailQueryData, number>>(
+        watchlistDetailQueryKey(customFilters),
+      ),
+    ).toBeUndefined();
+    expect(
+      queryClient.getQueryData<InfiniteData<WatchlistDetailQueryData, number>>(
+        watchlistDetailQueryKey(releaseFilters),
+      )?.pages[0]?.watchlist.itemOrderMode,
+    ).toBe("release");
   });
 
   it("optimistically updates watched toggles across detail caches, rolls back, and invalidates watchlists", async () => {

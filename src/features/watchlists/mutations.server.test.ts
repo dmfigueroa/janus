@@ -136,6 +136,45 @@ describe("watchlist mutation contract", () => {
     });
   });
 
+  it("switches the active item order mode through the feature write boundary so detail reads use the persisted order", async () => {
+    const [watchlist] = await db.insert(watchlists).values({ name: "Order Toggle" }).returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "release-first",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Release First",
+        releaseDate: "2024-01-01",
+        customRank: 2,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "custom-first",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Custom First",
+        releaseDate: "2024-02-01",
+        customRank: 1,
+      },
+    ]);
+
+    const result = await WatchlistsWrite.updateItemOrderMode({
+      watchlistId: watchlist.id,
+      itemOrderMode: "custom",
+    });
+
+    const detail = await WatchlistsRead.detailScreen({
+      watchlistId: watchlist.id,
+      unwatchedOnly: false,
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(detail?.watchlist.itemOrderMode).toBe("custom");
+    expect(detail?.items.map((item) => item.title)).toEqual(["Custom First", "Release First"]);
+  });
+
   it("merges selected watchlists into an existing target through the feature mutation boundary", async () => {
     const [target, source, untouched] = await db
       .insert(watchlists)

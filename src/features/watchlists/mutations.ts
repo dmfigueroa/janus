@@ -43,6 +43,13 @@ const toggleWatchedSchema = z.object({
 
 export type ToggleWatchedInput = z.infer<typeof toggleWatchedSchema>;
 
+const updateWatchlistItemOrderModeSchema = z.object({
+  watchlistId: z.number(),
+  itemOrderMode: z.enum(["release", "custom"]),
+});
+
+export type UpdateWatchlistItemOrderModeInput = z.infer<typeof updateWatchlistItemOrderModeSchema>;
+
 export const createWatchlist = createServerFn({ method: "POST" })
   .inputValidator((data) => createWatchlistSchema.parse(data))
   .handler(async ({ data }) => {
@@ -76,4 +83,11 @@ export const toggleWatched = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { WatchlistsWrite } = await import("./write.server");
     return WatchlistsWrite.toggleWatched(data);
+  });
+
+export const updateWatchlistItemOrderMode = createServerFn({ method: "POST" })
+  .inputValidator((data) => updateWatchlistItemOrderModeSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { WatchlistsWrite } = await import("./write.server");
+    return WatchlistsWrite.updateItemOrderMode(data);
   });

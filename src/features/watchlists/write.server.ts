@@ -18,6 +18,7 @@ import type {
   DeleteWatchlistInput,
   MergeWatchlistsInput,
   ToggleWatchedInput,
+  UpdateWatchlistItemOrderModeInput,
 } from "./mutations";
 
 const limit = pLimit(5);
@@ -540,6 +541,14 @@ export const WatchlistsWrite = {
         .set({ lastWatchedAt: sql`CURRENT_TIMESTAMP` })
         .where(eq(watchlists.id, item.watchlistId));
     }
+
+    return { success: true };
+  },
+
+  async updateItemOrderMode({ watchlistId, itemOrderMode }: UpdateWatchlistItemOrderModeInput) {
+    const db = getDb();
+
+    await db.update(watchlists).set({ itemOrderMode }).where(eq(watchlists.id, watchlistId));
 
     return { success: true };
   },

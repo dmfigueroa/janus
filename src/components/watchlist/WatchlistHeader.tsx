@@ -1,4 +1,5 @@
 import type { Watchlist } from "@/db/schema";
+import type { WatchlistItemOrderMode } from "@/features/watchlists/detail/query";
 import { calculateWatchlistProgress } from "@/features/watchlists/progress";
 import { cn } from "@/utils/cn";
 import { Search } from "lucide-react";
@@ -9,6 +10,9 @@ interface WatchlistHeaderProps {
   watchedItems: number;
   showUnwatchedOnly: boolean;
   onFilterChange: (showUnwatchedOnly: boolean) => void;
+  itemOrderMode: WatchlistItemOrderMode;
+  onItemOrderModeChange: (itemOrderMode: WatchlistItemOrderMode) => void;
+  isUpdatingItemOrderMode: boolean;
   searchQuery: string;
   onSearchChange: (query: string) => void;
 }
@@ -19,6 +23,9 @@ export function WatchlistHeader({
   watchedItems,
   showUnwatchedOnly,
   onFilterChange,
+  itemOrderMode,
+  onItemOrderModeChange,
+  isUpdatingItemOrderMode,
   searchQuery,
   onSearchChange,
 }: WatchlistHeaderProps) {
@@ -62,29 +69,58 @@ export function WatchlistHeader({
             />
           </div>
 
-          <div className="flex items-center gap-2 border rounded-lg p-1 w-fit bg-secondary/30 self-start sm:self-auto">
-            <button
-              onClick={() => onFilterChange(false)}
-              className={cn(
-                "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-                !showUnwatchedOnly
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "hover:bg-accent text-muted-foreground",
-              )}
-            >
-              All
-            </button>
-            <button
-              onClick={() => onFilterChange(true)}
-              className={cn(
-                "px-3 py-1.5 text-xs font-medium rounded-md transition-all",
-                showUnwatchedOnly
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "hover:bg-accent text-muted-foreground",
-              )}
-            >
-              Unwatched
-            </button>
+          <div className="flex flex-col gap-2 self-start sm:self-auto sm:items-end">
+            <div className="flex items-center gap-2 rounded-lg border bg-secondary/30 p-1">
+              <button
+                onClick={() => onItemOrderModeChange("release")}
+                disabled={isUpdatingItemOrderMode}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-xs font-medium transition-all disabled:pointer-events-none disabled:opacity-60",
+                  itemOrderMode === "release"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-accent",
+                )}
+              >
+                Release
+              </button>
+              <button
+                onClick={() => onItemOrderModeChange("custom")}
+                disabled={isUpdatingItemOrderMode}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-xs font-medium transition-all disabled:pointer-events-none disabled:opacity-60",
+                  itemOrderMode === "custom"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-accent",
+                )}
+              >
+                Custom
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 rounded-lg border bg-secondary/30 p-1">
+              <button
+                onClick={() => onFilterChange(false)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-xs font-medium transition-all",
+                  !showUnwatchedOnly
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-accent",
+                )}
+              >
+                All
+              </button>
+              <button
+                onClick={() => onFilterChange(true)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-xs font-medium transition-all",
+                  showUnwatchedOnly
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-accent",
+                )}
+              >
+                Unwatched
+              </button>
+            </div>
           </div>
         </div>
       </div>

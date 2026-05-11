@@ -1,11 +1,18 @@
 import { useEffect, useState } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  invalidateWatchlistQueries,
+  optimisticallyUpdateWatchlistItemOrderMode,
+  rollbackWatchlistItemOrderMode,
+  type WatchlistItemOrderMode,
   watchlistDetailInfiniteQueryOptions,
   type WatchlistDetailQueryData,
 } from "@/features/watchlists/detail/query";
 import { WatchlistHeader } from "@/components/watchlist/WatchlistHeader";
 import { WatchlistTimeline } from "@/components/watchlist/WatchlistTimeline";
+import { updateWatchlistItemOrderMode } from "@/features/watchlists/mutations";
+import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 
 interface WatchlistDetailProps {
   initialData: WatchlistDetailQueryData;
@@ -13,7 +20,12 @@ interface WatchlistDetailProps {
 
 export function WatchlistDetail({ initialData }: WatchlistDetailProps) {
   const watchlistId = initialData.watchlist.id;
+  const queryClient = useQueryClient();
+  const updateWatchlistItemOrderModeFn = useServerFn(updateWatchlistItemOrderMode);
   const [showUnwatchedOnly, setShowUnwatchedOnly] = useState(true);
+  const [itemOrderMode, setItemOrderMode] = useState<WatchlistItemOrderMode>(
+    initialData.watchlist.itemOrderMode,
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
 
@@ -28,10 +40,41 @@ export function WatchlistDetail({ initialData }: WatchlistDetailProps) {
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery(
     watchlistDetailInfiniteQueryOptions({
       watchlistId,
+      itemOrderMode,
       query: debouncedSearchQuery || undefined,
       unwatchedOnly: showUnwatchedOnly,
     }),
   );
+
+  const updateItemOrderModeMutation = useMutation({
+    mutationFn: async (nextItemOrderMode: WatchlistItemOrderMode) => {
+      await updateWatchlistItemOrderModeFn({
+        data: { watchlistId, itemOrderMode: nextItemOrderMode },
+      });
+    },
+    onMutate: async (nextItemOrderMode) => {
+      const previousItemOrderMode = itemOrderMode;
+      const snapshot = await optimisticallyUpdateWatchlistItemOrderMode({
+        queryClient,
+        watchlistId,
+        previousItemOrderMode,
+        nextItemOrderMode,
+      });
+
+      setItemOrderMode(nextItemOrderMode);
+
+      return { previousItemOrderMode, snapshot };
+    },
+    onError: (_err, _nextItemOrderMode, context) => {
+      rollbackWatchlistItemOrderMode({
+        queryClient,
+        snapshot: context?.snapshot,
+      });
+      setItemOrderMode(context?.previousItemOrderMode ?? initialData.watchlist.itemOrderMode);
+      toast.error("Failed to update item order");
+    },
+    onSettled: () => invalidateWatchlistQueries(queryClient),
+  });
 
   const allItems = data?.pages.flatMap((page) => page.items) || [];
   const latestWatchlist = data?.pages[data.pages.length - 1]?.watchlist || initialData.watchlist;
@@ -47,6 +90,15 @@ export function WatchlistDetail({ initialData }: WatchlistDetailProps) {
         watchedItems={watchedItems}
         showUnwatchedOnly={showUnwatchedOnly}
         onFilterChange={setShowUnwatchedOnly}
+        itemOrderMode={itemOrderMode}
+        onItemOrderModeChange={(nextItemOrderMode) => {
+          if (nextItemOrderMode === itemOrderMode) {
+            return;
+          }
+
+          updateItemOrderModeMutation.mutate(nextItemOrderMode);
+        }}
+        isUpdatingItemOrderMode={updateItemOrderModeMutation.isPending}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
       />

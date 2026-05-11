@@ -16,10 +16,16 @@ export const Route = createFileRoute("/watchlists/$watchlistId")({
       throw notFound();
     }
 
-    context.queryClient.setQueryData(watchlistDetailQueryKey(filters), {
-      pages: [detail],
-      pageParams: [1],
-    });
+    context.queryClient.setQueryData(
+      watchlistDetailQueryKey({
+        ...filters,
+        itemOrderMode: detail.watchlist.itemOrderMode,
+      }),
+      {
+        pages: [detail],
+        pageParams: [1],
+      },
+    );
 
     return detail;
   },
