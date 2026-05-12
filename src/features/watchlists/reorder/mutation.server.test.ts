@@ -1,33 +1,29 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import Database from "better-sqlite3";
-import path from "node:path";
 import { eq } from "drizzle-orm";
 import * as schema from "@/db/schema";
+import { createIsolatedTestDb, type IsolatedTestDb } from "@/test/isolated-db";
 import { reorderItems } from "./mutation.server";
 
 const dbState = vi.hoisted(() => ({
-  db: undefined as unknown,
+  db: undefined as IsolatedTestDb | undefined,
 }));
 
 vi.mock("@/db/db.server", () => ({
   getDb: () => dbState.db,
 }));
 
-let sqlite: Database.Database;
-let db: BetterSQLite3Database<typeof schema>;
+let testDb: Awaited<ReturnType<typeof createIsolatedTestDb>>;
+let db: IsolatedTestDb;
 const { watchlists, watchlistItems } = schema;
 
 beforeAll(async () => {
-  sqlite = new Database(":memory:");
-  db = drizzle(sqlite, { schema });
+  testDb = await createIsolatedTestDb();
+  db = testDb.db;
   dbState.db = db;
-  await migrate(db, { migrationsFolder: path.resolve(process.cwd(), "drizzle") });
 });
 
 afterAll(() => {
-  sqlite.close();
+  testDb.close();
 });
 
 beforeEach(async () => {

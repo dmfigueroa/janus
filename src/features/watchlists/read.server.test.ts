@@ -1,32 +1,29 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import path from "node:path";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import * as schema from "@/db/schema";
+import { createIsolatedTestDb, type IsolatedTestDb } from "@/test/isolated-db";
 import { watchlistListQueryKey } from "./list/query";
+import { WatchlistsRead } from "./read.server";
 
-let db: ReturnType<typeof import("@/db/db.server").getDb>;
-let watchlists: typeof import("@/db/schema").watchlists;
-let watchlistItems: typeof import("@/db/schema").watchlistItems;
-let WatchlistsRead: typeof import("./read.server").WatchlistsRead;
-let closeDb: typeof import("@/db/db.server").closeDb;
+const dbState = vi.hoisted(() => ({
+  db: undefined as IsolatedTestDb | undefined,
+}));
+
+vi.mock("@/db/db.server", () => ({
+  getDb: () => dbState.db,
+}));
+
+let testDb: Awaited<ReturnType<typeof createIsolatedTestDb>>;
+let db: IsolatedTestDb;
+const { watchlists, watchlistItems } = schema;
 
 beforeAll(async () => {
-  process.env.DATABASE_URL = ":memory:";
-
-  const dbModule = await import("@/db/db.server");
-  const schemaModule = await import("@/db/schema");
-  const readModule = await import("./read.server");
-
-  db = dbModule.getDb();
-  closeDb = dbModule.closeDb;
-  watchlists = schemaModule.watchlists;
-  watchlistItems = schemaModule.watchlistItems;
-  WatchlistsRead = readModule.WatchlistsRead;
-
-  await migrate(db, { migrationsFolder: path.resolve(process.cwd(), "drizzle") });
+  testDb = await createIsolatedTestDb();
+  db = testDb.db;
+  dbState.db = db;
 });
 
 afterAll(() => {
-  closeDb?.();
+  testDb.close();
 });
 
 beforeEach(async () => {

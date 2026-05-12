@@ -1,13 +1,20 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, type InfiniteData } from "@tanstack/react-query";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import path from "node:path";
+import * as schema from "@/db/schema";
+import { createIsolatedTestDb, type IsolatedTestDb } from "@/test/isolated-db";
 import { watchlistListQueryKey } from "../list/query";
 
-let db: ReturnType<typeof import("@/db/db.server").getDb>;
-let watchlists: typeof import("@/db/schema").watchlists;
-let watchlistItems: typeof import("@/db/schema").watchlistItems;
-let closeDb: typeof import("@/db/db.server").closeDb;
+const dbState = vi.hoisted(() => ({
+  db: undefined as IsolatedTestDb | undefined,
+}));
+
+vi.mock("@/db/db.server", () => ({
+  getDb: () => dbState.db,
+}));
+
+let testDb: Awaited<ReturnType<typeof createIsolatedTestDb>>;
+let db: IsolatedTestDb;
+const { watchlists, watchlistItems } = schema;
 let getWatchlistDetail: typeof import("./query.server").getWatchlistDetail;
 let readWatchlistDetailScreen: typeof import("../read.server").WatchlistsRead.detailScreen;
 let invalidateWatchlistQueries: typeof import("../cache").invalidateWatchlistQueries;
@@ -21,18 +28,14 @@ type WatchlistDetailQueryFilters = import("./query").WatchlistDetailQueryFilters
 type WatchlistDetailQueryData = import("./query").WatchlistDetailQueryData;
 
 beforeAll(async () => {
-  process.env.DATABASE_URL = ":memory:";
+  testDb = await createIsolatedTestDb();
+  db = testDb.db;
+  dbState.db = db;
 
-  const dbModule = await import("@/db/db.server");
-  const schemaModule = await import("@/db/schema");
   const queryModule = await import("./query");
   const cacheModule = await import("../cache");
   const queryServerModule = await import("./query.server");
   const readModule = await import("../read.server");
-  db = dbModule.getDb();
-  closeDb = dbModule.closeDb;
-  watchlists = schemaModule.watchlists;
-  watchlistItems = schemaModule.watchlistItems;
   getWatchlistDetail = queryServerModule.getWatchlistDetail;
   readWatchlistDetailScreen = readModule.WatchlistsRead.detailScreen;
   invalidateWatchlistQueries = cacheModule.invalidateWatchlistQueries;
@@ -43,12 +46,10 @@ beforeAll(async () => {
   restoreWatchlistDetailSnapshot = queryModule.restoreWatchlistDetailSnapshot;
   watchlistDetailInfiniteQueryOptions = queryModule.watchlistDetailInfiniteQueryOptions;
   watchlistDetailQueryKey = queryModule.watchlistDetailQueryKey;
-
-  await migrate(db, { migrationsFolder: path.resolve(process.cwd(), "drizzle") });
 });
 
 afterAll(() => {
-  closeDb?.();
+  testDb.close();
 });
 
 beforeEach(async () => {

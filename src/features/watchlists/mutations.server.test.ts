@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import path from "node:path";
+import * as schema from "@/db/schema";
+import { createIsolatedTestDb, type IsolatedTestDb } from "@/test/isolated-db";
 
 const { getMovieDetailsMock, getSeasonDetailsMock, getTVDetailsMock } = vi.hoisted(() => ({
   getMovieDetailsMock: vi.fn(),
@@ -14,10 +14,17 @@ vi.mock("@/server/providers/tmdb-api.server", () => ({
   getTVDetails: getTVDetailsMock,
 }));
 
-let db: ReturnType<typeof import("@/db/db.server").getDb>;
-let watchlists: typeof import("@/db/schema").watchlists;
-let watchlistItems: typeof import("@/db/schema").watchlistItems;
-let closeDb: typeof import("@/db/db.server").closeDb;
+const dbState = vi.hoisted(() => ({
+  db: undefined as IsolatedTestDb | undefined,
+}));
+
+vi.mock("@/db/db.server", () => ({
+  getDb: () => dbState.db,
+}));
+
+let testDb: Awaited<ReturnType<typeof createIsolatedTestDb>>;
+let db: IsolatedTestDb;
+const { watchlists, watchlistItems } = schema;
 let WatchlistsRead: typeof import("./read.server").WatchlistsRead;
 let addToWatchlistMutation: typeof import("./add/mutation.server").addToWatchlistMutation;
 let createWatchlistMutation: typeof import("./create/mutation.server").createWatchlistMutation;
@@ -27,11 +34,11 @@ let toggleWatchedMutation: typeof import("./toggle/mutation.server").toggleWatch
 let updateWatchlistItemOrderModeMutation: typeof import("./order-mode/mutation.server").updateWatchlistItemOrderModeMutation;
 
 beforeAll(async () => {
-  process.env.DATABASE_URL = ":memory:";
+  testDb = await createIsolatedTestDb();
+  db = testDb.db;
+  dbState.db = db;
 
   const [
-    dbModule,
-    schemaModule,
     readModule,
     addModule,
     createModule,
@@ -40,8 +47,6 @@ beforeAll(async () => {
     toggleModule,
     orderModeModule,
   ] = await Promise.all([
-    import("@/db/db.server"),
-    import("@/db/schema"),
     import("./read.server"),
     import("./add/mutation.server"),
     import("./create/mutation.server"),
@@ -51,10 +56,6 @@ beforeAll(async () => {
     import("./order-mode/mutation.server"),
   ]);
 
-  db = dbModule.getDb();
-  closeDb = dbModule.closeDb;
-  watchlists = schemaModule.watchlists;
-  watchlistItems = schemaModule.watchlistItems;
   WatchlistsRead = readModule.WatchlistsRead;
   addToWatchlistMutation = addModule.addToWatchlistMutation;
   createWatchlistMutation = createModule.createWatchlistMutation;
@@ -62,12 +63,10 @@ beforeAll(async () => {
   mergeWatchlistsMutation = mergeModule.mergeWatchlistsMutation;
   toggleWatchedMutation = toggleModule.toggleWatchedMutation;
   updateWatchlistItemOrderModeMutation = orderModeModule.updateWatchlistItemOrderModeMutation;
-
-  await migrate(db, { migrationsFolder: path.resolve(process.cwd(), "drizzle") });
 });
 
 afterAll(() => {
-  closeDb?.();
+  testDb.close();
 });
 
 beforeEach(async () => {
