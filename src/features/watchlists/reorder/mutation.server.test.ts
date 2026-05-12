@@ -1,34 +1,33 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
+import Database from "better-sqlite3";
 import path from "node:path";
 import { eq } from "drizzle-orm";
+import * as schema from "@/db/schema";
+import { reorderItems } from "./mutation.server";
 
-let db: ReturnType<typeof import("@/db/db.server").getDb>;
-let watchlists: typeof import("@/db/schema").watchlists;
-let watchlistItems: typeof import("@/db/schema").watchlistItems;
-let closeDb: typeof import("@/db/db.server").closeDb;
-let reorderItems: typeof import("./mutation.server").reorderItems;
+const dbState = vi.hoisted(() => ({
+  db: undefined as unknown,
+}));
+
+vi.mock("@/db/db.server", () => ({
+  getDb: () => dbState.db,
+}));
+
+let sqlite: Database.Database;
+let db: BetterSQLite3Database<typeof schema>;
+const { watchlists, watchlistItems } = schema;
 
 beforeAll(async () => {
-  process.env.DATABASE_URL = ":memory:";
-
-  const [dbModule, schemaModule, mutationModule] = await Promise.all([
-    import("@/db/db.server"),
-    import("@/db/schema"),
-    import("./mutation.server"),
-  ]);
-
-  db = dbModule.getDb();
-  closeDb = dbModule.closeDb;
-  watchlists = schemaModule.watchlists;
-  watchlistItems = schemaModule.watchlistItems;
-  reorderItems = mutationModule.reorderItems;
-
+  sqlite = new Database(":memory:");
+  db = drizzle(sqlite, { schema });
+  dbState.db = db;
   await migrate(db, { migrationsFolder: path.resolve(process.cwd(), "drizzle") });
 });
 
 afterAll(() => {
-  closeDb?.();
+  sqlite.close();
 });
 
 beforeEach(async () => {
