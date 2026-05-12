@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { WatchlistTimeline } from "@/components/watchlist/WatchlistTimeline";
 import { WatchlistHeader } from "@/features/watchlists/components/watchlist-header";
 import {
+  getWatchlistDetailPage,
   watchlistDetailInfiniteQueryOptions,
   type WatchlistDetailQueryData,
 } from "@/features/watchlists/detail/query";
@@ -22,6 +24,8 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
 
+  const getWatchlistDetailPageFn = useServerFn(getWatchlistDetailPage);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
@@ -30,14 +34,30 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery(
-    watchlistDetailInfiniteQueryOptions({
+  const filters = useMemo(
+    () => ({
       watchlistId,
       itemOrderMode,
       query: debouncedSearchQuery || undefined,
       unwatchedOnly: showUnwatchedOnly,
     }),
+    [watchlistId, itemOrderMode, debouncedSearchQuery, showUnwatchedOnly],
   );
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    ...watchlistDetailInfiniteQueryOptions(filters),
+    queryFn: async ({ pageParam }) => {
+      const detail = await getWatchlistDetailPageFn({
+        data: { ...filters, cursor: pageParam },
+      });
+
+      if (!detail) {
+        throw new Error("Watchlist not found");
+      }
+
+      return detail;
+    },
+  });
 
   const updateItemOrderModeMutation = useItemOrderModeMutation({
     initialItemOrderMode: initialData.watchlist.itemOrderMode,

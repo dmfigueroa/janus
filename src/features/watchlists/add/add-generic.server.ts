@@ -1,4 +1,4 @@
-import type { GenericMedia } from "@/features/watchlists/mutations";
+import type { GenericMedia } from "./mutation";
 import * as repository from "@/features/watchlists/repository.server";
 import { type WatchlistWriteResult } from "./shared.server";
 

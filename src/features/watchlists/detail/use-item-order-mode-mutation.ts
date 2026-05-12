@@ -6,7 +6,7 @@ import {
   optimisticallyUpdateWatchlistItemOrderMode,
   rollbackWatchlistItemOrderMode,
 } from "@/features/watchlists/detail/optimistic";
-import { updateWatchlistItemOrderMode } from "@/features/watchlists/mutations";
+import { updateWatchlistItemOrderMode } from "@/features/watchlists/order-mode/mutation";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
 
 export function useItemOrderModeMutation({

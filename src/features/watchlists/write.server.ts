@@ -7,14 +7,12 @@ import {
   type UpdateWatchlistItemOrderModeResult,
 } from "@/features/watchlists/order-mode/mutation.server";
 import { toggleWatchedMutation } from "@/features/watchlists/toggle/mutation.server";
-import type {
-  AddToWatchlistInput,
-  CreateWatchlistInput,
-  DeleteWatchlistInput,
-  MergeWatchlistsInput,
-  ToggleWatchedInput,
-  UpdateWatchlistItemOrderModeInput,
-} from "./mutations";
+import type { AddToWatchlistInput } from "./add/mutation";
+import type { CreateWatchlistInput } from "./create/mutation";
+import type { DeleteWatchlistInput } from "./delete/mutation";
+import type { MergeWatchlistsInput } from "./merge/mutation";
+import type { ToggleWatchedInput } from "./toggle/mutation";
+import type { UpdateWatchlistItemOrderModeInput } from "./order-mode/mutation";
 
 export const WatchlistsWrite = {
   async create(input: CreateWatchlistInput) {

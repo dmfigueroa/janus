@@ -1,4 +1,4 @@
-import type { AddToWatchlistInput, GenericMedia } from "@/features/watchlists/mutations";
+import type { AddToWatchlistInput, GenericMedia } from "./mutation";
 import { getDeprecatedWatchlistAddRejection } from "@/server/media";
 import { rejectAdd, type WatchlistWriteResult } from "./shared.server";
 import { addTVShowToWatchlist } from "./add-tv.server";

@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { mergeWatchlists } from "@/features/watchlists/mutations";
+import { mergeWatchlists } from "@/features/watchlists/merge/mutation";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";

@@ -1,7 +1,7 @@
 import { getDb } from "@/db/db.server";
 import { watchlists, watchlistItems } from "@/db/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import type { MergeWatchlistsInput } from "@/features/watchlists/mutations";
+import type { MergeWatchlistsInput } from "@/features/watchlists/merge/mutation";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
 
 export async function createWatchlist({

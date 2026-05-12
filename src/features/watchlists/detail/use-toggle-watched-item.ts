@@ -7,7 +7,7 @@ import {
   optimisticallyToggleWatchedItem,
   rollbackWatchedToggle,
 } from "@/features/watchlists/detail/optimistic";
-import { toggleWatched } from "@/features/watchlists/mutations";
+import { toggleWatched } from "@/features/watchlists/toggle/mutation";
 
 export function useToggleWatchedItem(item: WatchlistItem) {
   const queryClient = useQueryClient();
@@ -17,7 +17,10 @@ export function useToggleWatchedItem(item: WatchlistItem) {
 
   return useMutation({
     mutationFn: async () => {
-      await toggleWatchedFn({ data: { itemId: item.id, isWatched: nextIsWatched } });
+      const result = await toggleWatchedFn({ data: { itemId: item.id, isWatched: nextIsWatched } });
+      if (!result.success) {
+        throw new Error(result.message);
+      }
     },
     onMutate: () =>
       optimisticallyToggleWatchedItem({

@@ -1,6 +1,6 @@
 import { getDb } from "@/db/db.server";
 import { watchlistItems, watchlists } from "@/db/schema";
-import type { MergeWatchlistsInput } from "@/features/watchlists/mutations";
+import type { MergeWatchlistsInput } from "./mutation";
 import { hasCustomOrderMergeParticipant } from "@/features/watchlists/repository.server";
 import { eq, inArray, sql } from "drizzle-orm";
 

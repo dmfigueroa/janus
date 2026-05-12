@@ -1,4 +1,4 @@
-import type { WatchlistMedia } from "@/features/watchlists/mutations";
+import type { WatchlistMedia } from "./mutation";
 import { getBookDetails } from "@/server/providers/google-books.server";
 import { rejectAdd, type WatchlistWriteResult } from "./shared.server";
 import { addGenericItemToWatchlist } from "./add-generic.server";

@@ -1,5 +1,5 @@
 import { watchlistItems } from "@/db/schema";
-import type { WatchlistMedia } from "@/features/watchlists/mutations";
+import type { WatchlistMedia } from "./mutation";
 import * as repository from "@/features/watchlists/repository.server";
 import { getComicIssues } from "@/server/providers/comicvine.server";
 import { rejectAdd, type WatchlistWriteResult } from "./shared.server";

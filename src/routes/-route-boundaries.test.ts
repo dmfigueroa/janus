@@ -52,7 +52,7 @@ describe("route module boundaries", () => {
     expect(searchRoute).not.toMatch(/from\s+["']\.\.\/components\/SearchResults["']/);
 
     expect(searchResults).toMatch(/from\s+["']\.\/SearchMediaDetailSheet["']/);
-    expect(searchMediaDetailSheet).toMatch(/from\s+["']@\/features\/watchlists\/mutations["']/);
+    expect(searchMediaDetailSheet).toMatch(/from\s+["']@\/features\/watchlists\/add\/mutation["']/);
     expect(searchMediaDetailSheet).toMatch(/from\s+["']@\/features\/watchlists\/queries["']/);
     expect(searchMediaDetailSheet).toMatch(/useServerFn\(getWatchlistList\)/);
     expect(searchMediaDetailSheet).toMatch(/useServerFn\(addToWatchlist\)/);
@@ -83,7 +83,7 @@ describe("route module boundaries", () => {
       "utf8",
     );
 
-    expect(mergeDialog).toMatch(/from\s+["']@\/features\/watchlists\/mutations["']/);
+    expect(mergeDialog).toMatch(/from\s+["']@\/features\/watchlists\/merge\/mutation["']/);
     expect(mergeDialog).toMatch(/useServerFn\(mergeWatchlists\)/);
     expect(mergeDialog).toMatch(/mergeWatchlistsFn\(/);
     expect(mergeDialog).not.toMatch(/await\s+mergeWatchlists\(/);
@@ -121,7 +121,7 @@ describe("route module boundaries", () => {
     expect(timelineItem).toMatch(
       /from\s+["']@\/features\/watchlists\/detail\/use-toggle-watched-item["']/,
     );
-    expect(toggleWatchedHook).toMatch(/from\s+["']@\/features\/watchlists\/mutations["']/);
+    expect(toggleWatchedHook).toMatch(/from\s+["']@\/features\/watchlists\/toggle\/mutation["']/);
     expect(toggleWatchedHook).toMatch(/useServerFn\(toggleWatched\)/);
     expect(toggleWatchedHook).toMatch(/toggleWatchedFn\(/);
     expect(toggleWatchedHook).toMatch(/optimisticallyToggleWatchedItem\(/);
@@ -134,7 +134,9 @@ describe("route module boundaries", () => {
     expect(watchlistDetail).toMatch(
       /from\s+["']@\/features\/watchlists\/detail\/use-item-order-mode-mutation["']/,
     );
-    expect(itemOrderModeHook).toMatch(/from\s+["']@\/features\/watchlists\/mutations["']/);
+    expect(itemOrderModeHook).toMatch(
+      /from\s+["']@\/features\/watchlists\/order-mode\/mutation["']/,
+    );
     expect(itemOrderModeHook).toMatch(/useServerFn\(updateWatchlistItemOrderMode\)/);
     expect(itemOrderModeHook).toMatch(/optimisticallyUpdateWatchlistItemOrderMode\(/);
     expect(itemOrderModeHook).toMatch(/rollbackWatchlistItemOrderMode\(/);

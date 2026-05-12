@@ -1,4 +1,4 @@
-import type { UpdateWatchlistItemOrderModeInput } from "@/features/watchlists/mutations";
+import type { UpdateWatchlistItemOrderModeInput } from "./mutation";
 import {
   getWatchlistById,
   updateWatchlistItemOrderMode,
