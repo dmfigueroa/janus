@@ -6,7 +6,7 @@ import {
   invalidateWatchlistQueries,
   optimisticallyToggleWatchedItem,
   rollbackWatchedToggle,
-} from "@/features/watchlists/detail/optimistic";
+} from "@/features/watchlists/detail/cache";
 import { toggleWatched } from "@/features/watchlists/toggle/mutation";
 
 export function useToggleWatchedItem(item: WatchlistItem) {

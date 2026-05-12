@@ -40,6 +40,34 @@ export function watchlistDetailQueryKey(filters: WatchlistDetailQueryFilters) {
   ] as const;
 }
 
+export type WatchlistDetailQueryKeyFilters = ReturnType<typeof watchlistDetailQueryKey>[3];
+
+export function readFiltersFromDetailQueryKey(queryKey: any) {
+  const filters = queryKey[3];
+
+  if (!filters || typeof filters !== "object" || Array.isArray(filters)) {
+    return null;
+  }
+
+  return filters as Partial<WatchlistDetailQueryKeyFilters>;
+}
+
+export function normalizeFiltersFromDetailQueryKey(queryKey: any, watchlistId: number) {
+  const filters = readFiltersFromDetailQueryKey(queryKey);
+
+  if (!filters) {
+    return null;
+  }
+
+  return normalizeWatchlistDetailFilters({
+    watchlistId,
+    pageSize: filters.pageSize,
+    query: filters.query,
+    unwatchedOnly: filters.unwatchedOnly,
+    itemOrderMode: filters.itemOrderMode,
+  });
+}
+
 export const getWatchlistDetailPage = createServerFn()
   .inputValidator((data) => watchlistDetailPageSchema.parse(data))
   .handler(async ({ data }) => {
@@ -74,4 +102,4 @@ export {
   optimisticallyUpdateWatchlistItemOrderMode,
   rollbackWatchedToggle,
   rollbackWatchlistItemOrderMode,
-} from "./optimistic";
+} from "./cache";

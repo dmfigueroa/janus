@@ -5,7 +5,7 @@ import {
   invalidateWatchlistQueries,
   optimisticallyUpdateWatchlistItemOrderMode,
   rollbackWatchlistItemOrderMode,
-} from "@/features/watchlists/detail/optimistic";
+} from "@/features/watchlists/detail/cache";
 import { updateWatchlistItemOrderMode } from "@/features/watchlists/order-mode/mutation";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
 
