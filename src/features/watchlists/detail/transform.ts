@@ -29,11 +29,13 @@ export function updateWatchlistDetailPagesAfterToggle({
 
   return {
     ...data,
-    pages: data.pages.map((page) => ({
-      ...page,
-      watchlist: updateWatchlistStatsAfterToggle(page.watchlist, watchedDelta),
-      items: updateWatchlistItemsAfterToggle(page.items, { ...toggle, nextIsWatched }),
-    })),
+    pages: data.pages.map((page) =>
+      updateWatchlistDetailPageAfterToggle(page, {
+        ...toggle,
+        nextIsWatched,
+        watchedDelta,
+      }),
+    ),
   };
 }
 
@@ -48,21 +50,16 @@ export function updateWatchlistDetailPagesAfterItemOrderMode({
     return data;
   }
 
-  const reorderedItems = data.pages
-    .flatMap((page) => page.items)
-    .sort((left, right) => compareItemsByOrderMode(left, right, nextItemOrderMode));
+  const items = sortWatchlistItemsByOrderMode(getWatchlistItemsFromPages(data.pages), {
+    itemOrderMode: nextItemOrderMode,
+  });
+  const pages = updateWatchlistPagesItemOrderMode(data.pages, nextItemOrderMode);
 
   return {
     ...data,
     pages: repartitionItemsAcrossPages({
-      pages: data.pages.map((page) => ({
-        ...page,
-        watchlist: {
-          ...page.watchlist,
-          itemOrderMode: nextItemOrderMode,
-        },
-      })),
-      items: reorderedItems,
+      pages,
+      items,
     }),
   };
 }
@@ -78,20 +75,16 @@ export function updateWatchlistDetailPagesAfterReorder({
     return data;
   }
 
-  const rankByItemId = new Map(itemIds.map((itemId, index) => [itemId, index + 1]));
-  const reorderedItems = data.pages
-    .flatMap((page) => page.items)
-    .map((item) => ({
-      ...item,
-      customRank: rankByItemId.get(item.id) ?? item.customRank,
-    }))
-    .sort((left, right) => compareItemsByOrderMode(left, right, "custom"));
+  const items = sortWatchlistItemsByOrderMode(
+    updateWatchlistItemsCustomRanks(getWatchlistItemsFromPages(data.pages), itemIds),
+    { itemOrderMode: "custom" },
+  );
 
   return {
     ...data,
     pages: repartitionItemsAcrossPages({
       pages: data.pages,
-      items: reorderedItems,
+      items,
     }),
   };
 }
@@ -123,6 +116,22 @@ function updateWatchlistStatsAfterToggle(
   };
 }
 
+function updateWatchlistDetailPageAfterToggle(
+  page: WatchlistDetailPage,
+  {
+    watchedDelta,
+    ...toggle
+  }: WatchlistDetailItemToggleParams & {
+    watchedDelta: number;
+  },
+) {
+  return {
+    ...page,
+    watchlist: updateWatchlistStatsAfterToggle(page.watchlist, watchedDelta),
+    items: updateWatchlistItemsAfterToggle(page.items, toggle),
+  };
+}
+
 function updateWatchlistItemsAfterToggle(
   items: WatchlistDetailPage["items"],
   {
@@ -136,6 +145,43 @@ function updateWatchlistItemsAfterToggle(
   }
 
   return items.map((item) => (item.id === itemId ? { ...item, isWatched: nextIsWatched } : item));
+}
+
+function updateWatchlistPagesItemOrderMode(
+  pages: InfiniteData<WatchlistDetailPage, number>["pages"],
+  itemOrderMode: WatchlistItemOrderMode,
+) {
+  return pages.map((page) => ({
+    ...page,
+    watchlist: {
+      ...page.watchlist,
+      itemOrderMode,
+    },
+  }));
+}
+
+function getWatchlistItemsFromPages(pages: InfiniteData<WatchlistDetailPage, number>["pages"]) {
+  return pages.flatMap((page) => page.items);
+}
+
+function updateWatchlistItemsCustomRanks(items: WatchlistItem[], itemIds: number[]) {
+  const rankByItemId = createRankByItemId(itemIds);
+
+  return items.map((item) => ({
+    ...item,
+    customRank: rankByItemId.get(item.id) ?? item.customRank,
+  }));
+}
+
+function createRankByItemId(itemIds: number[]) {
+  return new Map(itemIds.map((itemId, index) => [itemId, index + 1]));
+}
+
+function sortWatchlistItemsByOrderMode(
+  items: WatchlistItem[],
+  { itemOrderMode }: { itemOrderMode: WatchlistItemOrderMode },
+) {
+  return [...items].sort((left, right) => compareItemsByOrderMode(left, right, itemOrderMode));
 }
 
 function repartitionItemsAcrossPages({
