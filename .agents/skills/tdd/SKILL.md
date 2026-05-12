@@ -54,17 +54,6 @@ RIGHT (vertical):
 
 ## Workflow
 
-### 0. Branch, Commit, And PR Discipline
-
-Before making changes:
-
-- [ ] Create a new branch for the work unless the user explicitly names an existing branch to continue.
-- [ ] Keep commits very frequent: commit after each green TDD cycle and after each safe refactor checkpoint.
-- [ ] Use small, coherent commits that tell the red-green-refactor story instead of one large end-of-task commit.
-- [ ] Open a pull request for the completed work unless the user explicitly asks not to.
-
-If work is already in progress when this skill is loaded, split the existing diff into the smallest practical logical commits before opening the PR.
-
 ### 1. Planning
 
 Before writing any code:
