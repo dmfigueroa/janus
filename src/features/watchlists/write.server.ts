@@ -11,8 +11,10 @@ import type { AddToWatchlistInput } from "./add/mutation";
 import type { CreateWatchlistInput } from "./create/mutation";
 import type { DeleteWatchlistInput } from "./delete/mutation";
 import type { MergeWatchlistsInput } from "./merge/mutation";
+import type { ReorderItemsInput } from "./reorder/schema";
 import type { ToggleWatchedInput } from "./toggle/mutation";
 import type { UpdateWatchlistItemOrderModeInput } from "./order-mode/mutation";
+import { reorderItems } from "@/features/watchlists/reorder/mutation.server";
 
 export const WatchlistsWrite = {
   async create(input: CreateWatchlistInput) {
@@ -37,6 +39,10 @@ export const WatchlistsWrite = {
 
   async toggleWatched({ itemId, isWatched }: ToggleWatchedInput) {
     return toggleWatchedMutation({ itemId, isWatched });
+  },
+
+  async reorder({ watchlistId, itemIds }: ReorderItemsInput) {
+    return reorderItems({ watchlistId, itemIds });
   },
 
   async updateItemOrderMode({
