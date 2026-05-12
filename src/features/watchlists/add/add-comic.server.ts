@@ -13,36 +13,56 @@ export async function addComicToWatchlist(
   volumeId: string,
   media: WatchlistMedia,
 ): Promise<WatchlistWriteResult> {
-  const apiKey = process.env.COMICVINE_API_KEY;
+  const apiKey = getApiKey();
   if (!apiKey) {
     return rejectAdd(COMICVINE_UNAVAILABLE_MESSAGE);
   }
 
   const existingIssueIds = await repository.getExistingComicsInWatchlist(watchlistId);
-  let issues: Awaited<ReturnType<typeof getComicIssues>>;
-  try {
-    issues = await getComicIssues(volumeId, apiKey, { knownIssueIds: existingIssueIds });
-  } catch {
+
+  const issues = await fetchIssues(volumeId, apiKey, existingIssueIds);
+  if (!issues) {
     return rejectAdd(COMICVINE_FETCH_FAILURE_MESSAGE);
   }
 
   if (issues.length === 0) {
-    return {
-      success: true,
-      message:
-        existingIssueIds.size > 0
-          ? "No new issues found for this volume"
-          : "No issues found for this volume",
-    };
+    return { success: true, message: getNoNewIssuesMessage(existingIssueIds.size) };
   }
 
-  const watchlistItemsData: Array<typeof watchlistItems.$inferInsert> = issues.map((issue) => ({
+  const items = mapIssuesToWatchlistItems(issues, watchlistId, media.title);
+
+  await repository.insertWatchlistItems(items);
+  await repository.markLastItemAdded(watchlistId);
+
+  return { success: true, message: getSuccessMessage(items.length, existingIssueIds.size) };
+}
+
+// --- Implementation Details ---
+
+function getApiKey() {
+  return process.env.COMICVINE_API_KEY;
+}
+
+async function fetchIssues(volumeId: string, apiKey: string, existingIssueIds: Set<string>) {
+  try {
+    return await getComicIssues(volumeId, apiKey, { knownIssueIds: existingIssueIds });
+  } catch {
+    return null;
+  }
+}
+
+function mapIssuesToWatchlistItems(
+  issues: Awaited<ReturnType<typeof getComicIssues>>,
+  watchlistId: number,
+  parentTitle: string,
+): Array<typeof watchlistItems.$inferInsert> {
+  return issues.map((issue) => ({
     watchlistId,
     tmdbId: issue.id,
     source: "comicvine",
     mediaType: "comic" as const,
     title: issue.title,
-    parentTitle: media.title,
+    parentTitle,
     season: null,
     episode: issue.issueNumber,
     posterPath: issue.poster,
@@ -50,15 +70,15 @@ export async function addComicToWatchlist(
     voteAverage: 0,
     runtime: 0,
   }));
+}
 
-  await repository.insertWatchlistItems(watchlistItemsData);
-  await repository.markLastItemAdded(watchlistId);
+function getNoNewIssuesMessage(existingCount: number) {
+  return existingCount > 0
+    ? "No new issues found for this volume"
+    : "No issues found for this volume";
+}
 
-  const newIssueCount = watchlistItemsData.length;
-  const message =
-    existingIssueIds.size > 0
-      ? `Added ${newIssueCount} new issues to watchlist`
-      : `Added ${newIssueCount} issues to watchlist`;
-
-  return { success: true, message };
+function getSuccessMessage(newCount: number, existingCount: number) {
+  const suffix = existingCount > 0 ? "new issues" : "issues";
+  return `Added ${newCount} ${suffix} to watchlist`;
 }
