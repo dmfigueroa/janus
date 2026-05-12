@@ -97,9 +97,8 @@ export function watchlistDetailInfiniteQueryOptions(filters: WatchlistDetailQuer
 }
 
 export {
-  invalidateWatchlistQueries,
   optimisticallyToggleWatchedItem,
   optimisticallyUpdateWatchlistItemOrderMode,
-  rollbackWatchedToggle,
   rollbackWatchlistItemOrderMode,
+  restoreWatchlistDetailSnapshot,
 } from "./cache";

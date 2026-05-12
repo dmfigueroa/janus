@@ -10,11 +10,11 @@ let watchlistItems: typeof import("@/db/schema").watchlistItems;
 let closeDb: typeof import("@/db/db.server").closeDb;
 let getWatchlistDetail: typeof import("./query.server").getWatchlistDetail;
 let readWatchlistDetailScreen: typeof import("../read.server").WatchlistsRead.detailScreen;
-let invalidateWatchlistQueries: typeof import("./query").invalidateWatchlistQueries;
+let invalidateWatchlistQueries: typeof import("../cache").invalidateWatchlistQueries;
 let optimisticallyUpdateWatchlistItemOrderMode: typeof import("./query").optimisticallyUpdateWatchlistItemOrderMode;
 let optimisticallyToggleWatchedItem: typeof import("./query").optimisticallyToggleWatchedItem;
 let rollbackWatchlistItemOrderMode: typeof import("./query").rollbackWatchlistItemOrderMode;
-let rollbackWatchedToggle: typeof import("./query").rollbackWatchedToggle;
+let restoreWatchlistDetailSnapshot: typeof import("./query").restoreWatchlistDetailSnapshot;
 let watchlistDetailInfiniteQueryOptions: typeof import("./query").watchlistDetailInfiniteQueryOptions;
 let watchlistDetailQueryKey: typeof import("./query").watchlistDetailQueryKey;
 type WatchlistDetailQueryFilters = import("./query").WatchlistDetailQueryFilters;
@@ -26,6 +26,7 @@ beforeAll(async () => {
   const dbModule = await import("@/db/db.server");
   const schemaModule = await import("@/db/schema");
   const queryModule = await import("./query");
+  const cacheModule = await import("../cache");
   const queryServerModule = await import("./query.server");
   const readModule = await import("../read.server");
   db = dbModule.getDb();
@@ -34,12 +35,12 @@ beforeAll(async () => {
   watchlistItems = schemaModule.watchlistItems;
   getWatchlistDetail = queryServerModule.getWatchlistDetail;
   readWatchlistDetailScreen = readModule.WatchlistsRead.detailScreen;
-  invalidateWatchlistQueries = queryModule.invalidateWatchlistQueries;
+  invalidateWatchlistQueries = cacheModule.invalidateWatchlistQueries;
   optimisticallyUpdateWatchlistItemOrderMode =
     queryModule.optimisticallyUpdateWatchlistItemOrderMode;
   optimisticallyToggleWatchedItem = queryModule.optimisticallyToggleWatchedItem;
   rollbackWatchlistItemOrderMode = queryModule.rollbackWatchlistItemOrderMode;
-  rollbackWatchedToggle = queryModule.rollbackWatchedToggle;
+  restoreWatchlistDetailSnapshot = queryModule.restoreWatchlistDetailSnapshot;
   watchlistDetailInfiniteQueryOptions = queryModule.watchlistDetailInfiniteQueryOptions;
   watchlistDetailQueryKey = queryModule.watchlistDetailQueryKey;
 
@@ -524,7 +525,6 @@ describe("watchlist detail query contract", () => {
     const snapshot = await optimisticallyUpdateWatchlistItemOrderMode({
       queryClient,
       watchlistId: watchlist.id,
-      previousItemOrderMode: "release",
       nextItemOrderMode: "custom",
     });
 
@@ -640,7 +640,7 @@ describe("watchlist detail query contract", () => {
       progress: 67,
     });
 
-    rollbackWatchedToggle({ queryClient, snapshot });
+    restoreWatchlistDetailSnapshot({ queryClient, snapshot });
 
     const rolledBackDefault = queryClient.getQueryData<
       InfiniteData<WatchlistDetailQueryData, number>

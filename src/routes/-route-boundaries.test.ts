@@ -125,7 +125,8 @@ describe("route module boundaries", () => {
     expect(toggleWatchedHook).toMatch(/useServerFn\(toggleWatched\)/);
     expect(toggleWatchedHook).toMatch(/toggleWatchedFn\(/);
     expect(toggleWatchedHook).toMatch(/optimisticallyToggleWatchedItem\(/);
-    expect(toggleWatchedHook).toMatch(/rollbackWatchedToggle\(/);
+    expect(toggleWatchedHook).toMatch(/restoreWatchlistDetailSnapshot\(/);
+    expect(toggleWatchedHook).toMatch(/from\s+["']@\/features\/watchlists\/cache["']/);
     expect(toggleWatchedHook).toMatch(/invalidateWatchlistQueries\(/);
     expect(toggleWatchedHook).not.toMatch(/await\s+toggleWatched\(/);
     expect(toggleWatchedHook).not.toMatch(/from\s+["']@\/server\/watchlist["']/);
@@ -140,6 +141,7 @@ describe("route module boundaries", () => {
     expect(itemOrderModeHook).toMatch(/useServerFn\(updateWatchlistItemOrderMode\)/);
     expect(itemOrderModeHook).toMatch(/optimisticallyUpdateWatchlistItemOrderMode\(/);
     expect(itemOrderModeHook).toMatch(/rollbackWatchlistItemOrderMode\(/);
+    expect(itemOrderModeHook).toMatch(/from\s+["']@\/features\/watchlists\/cache["']/);
     expect(itemOrderModeHook).toMatch(/invalidateWatchlistQueries\(/);
     expect(itemOrderModeHook).not.toMatch(/await\s+updateWatchlistItemOrderMode\(/);
   });

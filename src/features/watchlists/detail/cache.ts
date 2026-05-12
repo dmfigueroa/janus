@@ -1,7 +1,7 @@
 import { type InfiniteData, type QueryClient, type QueryKey } from "@tanstack/react-query";
 import type { WatchlistItem } from "@/db/schema";
 import type { WatchlistDetailPage } from "@/models/watchlist";
-import { type WatchlistItemOrderMode } from "@/features/watchlists/order";
+import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
 import {
   watchlistDetailQueryFamily,
   watchlistDetailQueryKey,
@@ -37,11 +37,9 @@ export async function optimisticallyToggleWatchedItem({
   previousIsWatched: boolean;
   nextIsWatched: boolean;
 }): Promise<WatchlistDetailCacheSnapshot> {
-  const queryKey = watchlistDetailQueryFamily(watchlistId);
-
-  await queryClient.cancelQueries({ queryKey });
-  const snapshot = queryClient.getQueriesData<InfiniteData<WatchlistDetailPage, number>>({
-    queryKey,
+  const snapshot = await snapshotWatchlistDetailCache({
+    queryClient,
+    watchlistId,
   });
 
   for (const [cacheKey, previousData] of snapshot) {
@@ -69,15 +67,49 @@ export async function optimisticallyUpdateWatchlistItemOrderMode({
 }: {
   queryClient: QueryClient;
   watchlistId: number;
-  previousItemOrderMode: WatchlistItemOrderMode;
   nextItemOrderMode: WatchlistItemOrderMode;
 }): Promise<WatchlistDetailItemOrderModeSnapshot> {
+  const previousEntries = await snapshotWatchlistDetailCache({
+    queryClient,
+    watchlistId,
+  });
+  const createdKeys = copyEntriesToItemOrderModeCache({
+    queryClient,
+    watchlistId,
+    previousEntries,
+    nextItemOrderMode,
+  });
+
+  return { previousEntries, createdKeys };
+}
+
+async function snapshotWatchlistDetailCache({
+  queryClient,
+  watchlistId,
+}: {
+  queryClient: QueryClient;
+  watchlistId: number;
+}) {
   const queryKey = watchlistDetailQueryFamily(watchlistId);
 
   await queryClient.cancelQueries({ queryKey });
-  const previousEntries = queryClient.getQueriesData<InfiniteData<WatchlistDetailPage, number>>({
+
+  return queryClient.getQueriesData<InfiniteData<WatchlistDetailPage, number>>({
     queryKey,
   });
+}
+
+function copyEntriesToItemOrderModeCache({
+  queryClient,
+  watchlistId,
+  previousEntries,
+  nextItemOrderMode,
+}: {
+  queryClient: QueryClient;
+  watchlistId: number;
+  previousEntries: WatchlistDetailCacheSnapshot;
+  nextItemOrderMode: WatchlistItemOrderMode;
+}) {
   const previousKeys = new Set(previousEntries.map(([cacheKey]) => JSON.stringify(cacheKey)));
   const createdKeys: QueryKey[] = [];
 
@@ -106,7 +138,7 @@ export async function optimisticallyUpdateWatchlistItemOrderMode({
     }
   }
 
-  return { previousEntries, createdKeys };
+  return createdKeys;
 }
 
 export async function optimisticallyReorderWatchlistItems({
@@ -118,11 +150,9 @@ export async function optimisticallyReorderWatchlistItems({
   watchlistId: number;
   itemIds: number[];
 }): Promise<WatchlistDetailCacheSnapshot> {
-  const queryKey = watchlistDetailQueryFamily(watchlistId);
-
-  await queryClient.cancelQueries({ queryKey });
-  const snapshot = queryClient.getQueriesData<InfiniteData<WatchlistDetailPage, number>>({
-    queryKey,
+  const snapshot = await snapshotWatchlistDetailCache({
+    queryClient,
+    watchlistId,
   });
 
   for (const [cacheKey, previousData] of snapshot) {
@@ -144,7 +174,7 @@ export async function optimisticallyReorderWatchlistItems({
   return snapshot;
 }
 
-export function rollbackWatchedToggle({
+export function restoreWatchlistDetailSnapshot({
   queryClient,
   snapshot,
 }: {
@@ -170,20 +200,4 @@ export function rollbackWatchlistItemOrderMode({
   for (const [cacheKey, previousData] of snapshot?.previousEntries ?? []) {
     queryClient.setQueryData(cacheKey, previousData);
   }
-}
-
-export function rollbackWatchlistReorder({
-  queryClient,
-  snapshot,
-}: {
-  queryClient: QueryClient;
-  snapshot: WatchlistDetailCacheSnapshot | undefined;
-}) {
-  for (const [cacheKey, previousData] of snapshot ?? []) {
-    queryClient.setQueryData(cacheKey, previousData);
-  }
-}
-
-export function invalidateWatchlistQueries(queryClient: QueryClient) {
-  return queryClient.invalidateQueries({ queryKey: ["watchlists"] });
 }

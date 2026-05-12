@@ -1,10 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { invalidateWatchlistQueries } from "@/features/watchlists/cache";
 import {
-  invalidateWatchlistQueries,
   optimisticallyReorderWatchlistItems,
-  rollbackWatchlistReorder,
+  restoreWatchlistDetailSnapshot,
 } from "@/features/watchlists/detail/cache";
 import { reorderWatchlistItems } from "@/features/watchlists/reorder/mutation";
 
@@ -29,7 +29,7 @@ export function useReorderWatchlistItemsMutation({ watchlistId }: { watchlistId:
         itemIds,
       }),
     onError: (error, _itemIds, snapshot) => {
-      rollbackWatchlistReorder({ queryClient, snapshot });
+      restoreWatchlistDetailSnapshot({ queryClient, snapshot });
       toast.error(error instanceof Error ? error.message : "Failed to reorder watchlist");
     },
     onSettled: () => invalidateWatchlistQueries(queryClient),
