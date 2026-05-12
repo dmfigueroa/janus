@@ -96,7 +96,7 @@ describe("route module boundaries", () => {
       "utf8",
     );
     const timelineItem = readFileSync(
-      workspaceFile("src/components/watchlist/TimelineItem.tsx"),
+      workspaceFile("src/features/watchlists/components/timeline-item.tsx"),
       "utf8",
     );
     const toggleWatchedHook = readFileSync(
@@ -166,6 +166,9 @@ describe("route module boundaries", () => {
 
     expect(watchlistDetailScreen).toMatch(
       /from\s+["']@\/features\/watchlists\/components\/watchlist-header["']/,
+    );
+    expect(watchlistDetailScreen).toMatch(
+      /from\s+["']@\/features\/watchlists\/components\/watchlist-timeline["']/,
     );
     expect(watchlistHeader).not.toMatch(/from\s+["']@\/components\/watchlist\/WatchlistHeader["']/);
   });

@@ -3,9 +3,9 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistItem } from "@/db/schema";
-import { WatchlistTimeline } from "@/components/watchlist/WatchlistTimeline";
+import { WatchlistTimeline } from "@/features/watchlists/components/watchlist-timeline";
 
-vi.mock("./TimelineItem", () => ({
+vi.mock("./timeline-item", () => ({
   TimelineItem: ({ item }: { item: WatchlistItem }) => <div>{item.title}</div>,
 }));
 

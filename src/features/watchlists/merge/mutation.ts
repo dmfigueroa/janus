@@ -18,6 +18,6 @@ export type MergeWatchlistsInput = z.infer<typeof mergeWatchlistsSchema>;
 export const mergeWatchlists = createServerFn({ method: "POST" })
   .inputValidator((data) => mergeWatchlistsSchema.parse(data))
   .handler(async ({ data }) => {
-    const { WatchlistsWrite } = await import("../write.server");
-    return WatchlistsWrite.merge(data);
+    const { mergeWatchlistsMutation } = await import("./mutation.server");
+    return mergeWatchlistsMutation(data);
   });

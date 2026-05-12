@@ -1,9 +1,8 @@
 import type { WatchlistItem } from "@/db/schema";
-import { TimelineItem } from "./TimelineItem";
 import { useMemo, useState } from "react";
-import { Flag, GripVertical, Loader2 } from "lucide-react";
+import { Flag, Loader2 } from "lucide-react";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
-import { cn } from "@/utils/cn";
+import { ReorderableTimelineRow } from "./reorderable-timeline-row";
 
 interface WatchlistTimelineProps {
   items: WatchlistItem[];
@@ -25,7 +24,6 @@ export function WatchlistTimeline({
   const [draggedItemId, setDraggedItemId] = useState<number | null>(null);
   const reorderEnabled = canReorder && Boolean(onReorder);
 
-  // Group items by year
   const groups = useMemo(() => {
     const grouped: { year: string; items: WatchlistItem[] }[] = [];
 
@@ -52,25 +50,6 @@ export function WatchlistTimeline({
 
     return grouped;
   }, [items]);
-
-  function submitDrop(targetItemId: number, placement: "before" | "after") {
-    if (!reorderEnabled || draggedItemId === null || draggedItemId === targetItemId) {
-      setDraggedItemId(null);
-      return;
-    }
-
-    const reorderedIds = items.map((item) => item.id).filter((itemId) => itemId !== draggedItemId);
-    const targetIndex = reorderedIds.indexOf(targetItemId);
-
-    if (targetIndex === -1) {
-      setDraggedItemId(null);
-      return;
-    }
-
-    reorderedIds.splice(placement === "before" ? targetIndex : targetIndex + 1, 0, draggedItemId);
-    onReorder?.(reorderedIds);
-    setDraggedItemId(null);
-  }
 
   const { ref } = useIntersectionObserver({
     onIntersect: onLoadMore,
@@ -105,50 +84,16 @@ export function WatchlistTimeline({
 
             <div className="space-y-2 md:pl-16">
               {group.items.map((item) => (
-                <div
+                <ReorderableTimelineRow
                   key={item.id}
-                  data-testid={`watchlist-timeline-row-${item.id}`}
-                  onDragOver={(event) => {
-                    if (!reorderEnabled) {
-                      return;
-                    }
-
-                    event.preventDefault();
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    const bounds = event.currentTarget.getBoundingClientRect();
-                    const placement =
-                      bounds.height > 0 && event.clientY < bounds.top + bounds.height / 2
-                        ? "before"
-                        : "after";
-                    submitDrop(item.id, placement);
-                  }}
-                  className={cn(
-                    "flex items-center gap-2 rounded-md",
-                    draggedItemId === item.id && "opacity-50",
-                  )}
-                >
-                  <button
-                    type="button"
-                    aria-label={`Move ${item.title}`}
-                    disabled={!reorderEnabled}
-                    draggable={reorderEnabled}
-                    onDragStart={() => setDraggedItemId(item.id)}
-                    onDragEnd={() => setDraggedItemId(null)}
-                    className={cn(
-                      "flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors",
-                      reorderEnabled
-                        ? "cursor-grab hover:bg-secondary hover:text-foreground active:cursor-grabbing"
-                        : "cursor-not-allowed opacity-35",
-                    )}
-                  >
-                    <GripVertical className="size-4" />
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <TimelineItem item={item} />
-                  </div>
-                </div>
+                  item={item}
+                  items={items}
+                  reorderEnabled={reorderEnabled}
+                  draggedItemId={draggedItemId}
+                  onDragStart={setDraggedItemId}
+                  onDragEnd={() => setDraggedItemId(null)}
+                  onReorder={onReorder}
+                />
               ))}
             </div>
           </div>

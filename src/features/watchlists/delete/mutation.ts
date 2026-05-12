@@ -10,6 +10,6 @@ export type DeleteWatchlistInput = z.infer<typeof deleteWatchlistSchema>;
 export const deleteWatchlist = createServerFn({ method: "POST" })
   .inputValidator((data) => deleteWatchlistSchema.parse(data))
   .handler(async ({ data }) => {
-    const { WatchlistsWrite } = await import("../write.server");
-    return WatchlistsWrite.delete(data);
+    const { deleteWatchlistMutation } = await import("./mutation.server");
+    return deleteWatchlistMutation(data);
   });

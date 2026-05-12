@@ -11,6 +11,6 @@ export type ToggleWatchedInput = z.infer<typeof toggleWatchedSchema>;
 export const toggleWatched = createServerFn({ method: "POST" })
   .inputValidator((data) => toggleWatchedSchema.parse(data))
   .handler(async ({ data }) => {
-    const { WatchlistsWrite } = await import("../write.server");
-    return WatchlistsWrite.toggleWatched(data);
+    const { toggleWatchedMutation } = await import("./mutation.server");
+    return toggleWatchedMutation(data);
   });

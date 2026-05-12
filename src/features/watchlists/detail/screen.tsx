@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { WatchlistTimeline } from "@/components/watchlist/WatchlistTimeline";
 import { WatchlistHeader } from "@/features/watchlists/components/watchlist-header";
+import { WatchlistTimeline } from "@/features/watchlists/components/watchlist-timeline";
 import {
   getWatchlistDetailPage,
   watchlistDetailInfiniteQueryOptions,
@@ -10,6 +10,7 @@ import {
 } from "@/features/watchlists/detail/query";
 import { useItemOrderModeMutation } from "@/features/watchlists/detail/use-item-order-mode-mutation";
 import { useReorderWatchlistItemsMutation } from "@/features/watchlists/detail/use-reorder-watchlist-items-mutation";
+import { canReorderWatchlistItems } from "@/features/watchlists/detail/reorder";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
 
 interface WatchlistDetailScreenProps {
@@ -70,14 +71,15 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
 
   const allItems = data?.pages.flatMap((page) => page.items) || [];
   const latestWatchlist = data?.pages[data.pages.length - 1]?.watchlist || initialData.watchlist;
-  const canReorderItems =
-    itemOrderMode === "custom" &&
-    !showUnwatchedOnly &&
-    searchQuery.trim().length === 0 &&
-    debouncedSearchQuery.length === 0 &&
-    hasNextPage === false &&
-    allItems.length > 1 &&
-    !reorderItemsMutation.isPending;
+  const canReorderItems = canReorderWatchlistItems({
+    itemOrderMode,
+    showUnwatchedOnly,
+    searchQuery,
+    debouncedSearchQuery,
+    hasNextPage,
+    itemCount: allItems.length,
+    isReorderPending: reorderItemsMutation.isPending,
+  });
 
   const totalItems = latestWatchlist.stats.totalItems;
   const watchedItems = latestWatchlist.stats.watchedItems;

@@ -11,6 +11,6 @@ export type CreateWatchlistInput = z.infer<typeof createWatchlistSchema>;
 export const createWatchlist = createServerFn({ method: "POST" })
   .inputValidator((data) => createWatchlistSchema.parse(data))
   .handler(async ({ data }) => {
-    const { WatchlistsWrite } = await import("../write.server");
-    return WatchlistsWrite.create(data);
+    const { createWatchlistMutation } = await import("./mutation.server");
+    return createWatchlistMutation(data);
   });

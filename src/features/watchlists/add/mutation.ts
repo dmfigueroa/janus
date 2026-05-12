@@ -16,6 +16,6 @@ export type GenericMedia = Omit<WatchlistMedia, "mediaType"> & {
 export const addToWatchlist = createServerFn({ method: "POST" })
   .inputValidator((data) => addToWatchlistSchema.parse(data))
   .handler(async ({ data }) => {
-    const { WatchlistsWrite } = await import("../write.server");
-    return WatchlistsWrite.add(data);
+    const { addToWatchlistMutation } = await import("./mutation.server");
+    return addToWatchlistMutation(data);
   });

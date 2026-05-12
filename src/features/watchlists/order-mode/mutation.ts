@@ -15,6 +15,6 @@ export type UpdateWatchlistItemOrderModeInput = {
 export const updateWatchlistItemOrderMode = createServerFn({ method: "POST" })
   .inputValidator((data) => updateWatchlistItemOrderModeSchema.parse(data))
   .handler(async ({ data }) => {
-    const { WatchlistsWrite } = await import("../write.server");
-    return WatchlistsWrite.updateItemOrderMode(data);
+    const { updateWatchlistItemOrderModeMutation } = await import("./mutation.server");
+    return updateWatchlistItemOrderModeMutation(data);
   });

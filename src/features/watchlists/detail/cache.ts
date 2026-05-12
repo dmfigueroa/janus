@@ -8,6 +8,7 @@ import {
   normalizeFiltersFromDetailQueryKey,
   readFiltersFromDetailQueryKey,
 } from "@/features/watchlists/detail/query";
+import { isFullCustomWatchlistDetailQuery } from "@/features/watchlists/detail/reorder";
 import {
   updateWatchlistDetailPagesAfterToggle,
   updateWatchlistDetailPagesAfterItemOrderMode,
@@ -126,10 +127,8 @@ export async function optimisticallyReorderWatchlistItems({
 
   for (const [cacheKey, previousData] of snapshot) {
     const filters = readFiltersFromDetailQueryKey(cacheKey);
-    const isFullCustomDetail =
-      filters?.itemOrderMode === "custom" && filters.unwatchedOnly === false && !filters.query;
 
-    if (!isFullCustomDetail) {
+    if (!isFullCustomWatchlistDetailQuery(filters)) {
       continue;
     }
 
