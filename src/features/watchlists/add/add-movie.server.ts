@@ -10,19 +10,19 @@ export async function addMovieToWatchlist(
 ): Promise<WatchlistWriteResult> {
   const existing = await repository.getExistingMovieInWatchlist(watchlistId, tmdbId);
   if (existing.length > 0) {
-    return alreadyInWatchlist();
+    return alreadyInWatchlistResult();
   }
 
-  const details = await fetchDetails(tmdbId);
+  const details = await fetchMovieDetails(tmdbId);
   if (!details) {
     return rejectAdd(TMDB_MOVIE_FETCH_FAILURE_MESSAGE);
   }
 
-  const item = mapToWatchlistItem(details, watchlistId, tmdbId);
+  const item = mapToWatchlistMovie(details, watchlistId, tmdbId);
   const inserted = await repository.insertWatchlistItem(item);
 
   if (!inserted) {
-    return alreadyInWatchlist();
+    return alreadyInWatchlistResult();
   }
 
   await repository.markLastItemAdded(watchlistId);
@@ -32,7 +32,7 @@ export async function addMovieToWatchlist(
 
 // --- Implementation Details ---
 
-async function fetchDetails(tmdbId: number) {
+async function fetchMovieDetails(tmdbId: number) {
   try {
     return await getMovieDetails({ data: { id: tmdbId } });
   } catch {
@@ -40,7 +40,7 @@ async function fetchDetails(tmdbId: number) {
   }
 }
 
-function mapToWatchlistItem(
+function mapToWatchlistMovie(
   details: Awaited<ReturnType<typeof getMovieDetails>>,
   watchlistId: number,
   tmdbId: number,
@@ -58,7 +58,7 @@ function mapToWatchlistItem(
   };
 }
 
-function alreadyInWatchlist(): WatchlistWriteResult {
+function alreadyInWatchlistResult(): WatchlistWriteResult {
   return { success: true, message: "Already in watchlist" };
 }
 

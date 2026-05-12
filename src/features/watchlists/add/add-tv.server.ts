@@ -13,16 +13,20 @@ export async function addTVShowToWatchlist(
   tmdbId: number,
   media: WatchlistMedia,
 ): Promise<WatchlistWriteResult> {
-  const allEpisodes = await fetchAndMapAllEpisodes(watchlistId, tmdbId, media.title);
-  if (!allEpisodes) {
+  const showDetails = await fetchShowDetails(tmdbId);
+  if (!showDetails) {
     return rejectAdd(TMDB_TV_FETCH_FAILURE_MESSAGE);
   }
 
-  if (allEpisodes.length === 0) {
+  const episodes = await fetchEpisodesAcrossSeasons(tmdbId, showDetails.seasons);
+  if (episodes.length === 0) {
     return { success: true, message: "No episodes found for this show" };
   }
 
-  const newEpisodes = await filterNewEpisodes(watchlistId, allEpisodes);
+  const showTitle = showDetails.name || media.title;
+  const items = mapToWatchlistEpisodes(episodes, watchlistId, showTitle, showDetails.poster_path);
+
+  const newEpisodes = await filterNewEpisodes(watchlistId, items);
   if (newEpisodes.length === 0) {
     return { success: true, message: "No new episodes found for this show" };
   }
@@ -46,31 +50,34 @@ type TMDBEpisode = {
   runtime?: number | null;
 };
 
-async function fetchAndMapAllEpisodes(watchlistId: number, tmdbId: number, searchTitle: string) {
+async function fetchShowDetails(tmdbId: number) {
   try {
-    const showDetails = await getTVDetails({ data: { id: tmdbId } });
-    const showTitle = showDetails.name || searchTitle;
-    const seasons = (showDetails.seasons || []).filter(
-      (s: { season_number: number }) => s.season_number !== 0,
-    );
-
-    const episodes = await Promise.all(
-      seasons.map((season: { season_number: number }) =>
-        limit(() =>
-          getSeasonDetails({ data: { id: tmdbId, seasonNumber: season.season_number } }).then(
-            (sd: { episodes: TMDBEpisode[] }) => sd.episodes,
-          ),
-        ),
-      ),
-    );
-
-    return mapEpisodes(episodes.flat(), watchlistId, showTitle, showDetails.poster_path);
+    return await getTVDetails({ data: { id: tmdbId } });
   } catch {
     return null;
   }
 }
 
-function mapEpisodes(
+async function fetchEpisodesAcrossSeasons(
+  tmdbId: number,
+  seasons: Array<{ season_number: number }> | undefined,
+) {
+  const targetSeasons = (seasons || []).filter((s) => s.season_number !== 0);
+
+  const results = await Promise.all(
+    targetSeasons.map((season) =>
+      limit(() =>
+        getSeasonDetails({ data: { id: tmdbId, seasonNumber: season.season_number } }).then(
+          (sd: { episodes: TMDBEpisode[] }) => sd.episodes,
+        ),
+      ),
+    ),
+  );
+
+  return results.flat();
+}
+
+function mapToWatchlistEpisodes(
   episodes: TMDBEpisode[],
   watchlistId: number,
   showTitle: string,

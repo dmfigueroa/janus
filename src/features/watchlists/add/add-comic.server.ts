@@ -29,7 +29,7 @@ export async function addComicToWatchlist(
     return { success: true, message: getNoNewIssuesMessage(existingIssueIds.size) };
   }
 
-  const items = mapIssuesToWatchlistItems(issues, watchlistId, media.title);
+  const items = mapToWatchlistComics(issues, watchlistId, media.title);
 
   await repository.insertWatchlistItems(items);
   await repository.markLastItemAdded(watchlistId);
@@ -51,7 +51,7 @@ async function fetchIssues(volumeId: string, apiKey: string, existingIssueIds: S
   }
 }
 
-function mapIssuesToWatchlistItems(
+function mapToWatchlistComics(
   issues: Awaited<ReturnType<typeof getComicIssues>>,
   watchlistId: number,
   parentTitle: string,

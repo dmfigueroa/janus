@@ -54,6 +54,7 @@ Think of every function as a "TO" paragraph:
 ### Method Level
 
 - [ ] Does the method name accurately describe _everything_ it does?
+- [ ] **The "And" Rule**: Does the function name contain "and" (e.g., `fetchAndMap`)? If so, it is doing more than one thing and MUST be split.
 - [ ] Does it mix different levels of abstraction (e.g., business logic and raw data manipulation)?
 - [ ] Is it longer than 20 lines? (Long methods often hide multiple responsibilities).
 
