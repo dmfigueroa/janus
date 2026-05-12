@@ -98,6 +98,7 @@ export function watchlistDetailInfiniteQueryOptions(filters: WatchlistDetailQuer
 
 export {
   optimisticallyToggleWatchedItem,
+  optimisticallyReorderWatchlistItems,
   optimisticallyUpdateWatchlistItemOrderMode,
   rollbackWatchlistItemOrderMode,
   restoreWatchlistDetailSnapshot,
