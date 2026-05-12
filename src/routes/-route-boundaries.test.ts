@@ -19,7 +19,7 @@ describe("route module boundaries", () => {
   it("loads the watchlist list screen through the feature-owned read surface", () => {
     const indexRoute = readFileSync(workspaceFile("src/routes/index.tsx"), "utf8");
 
-    expect(indexRoute).toMatch(/from\s+["']@\/features\/watchlists\/queries["']/);
+    expect(indexRoute).toMatch(/from\s+["']@\/features\/watchlists\/list\/query["']/);
     expect(indexRoute).not.toMatch(/from\s+["']@\/controllers\/watchlists["']/);
   });
 
@@ -53,7 +53,7 @@ describe("route module boundaries", () => {
 
     expect(searchResults).toMatch(/from\s+["']\.\/SearchMediaDetailSheet["']/);
     expect(searchMediaDetailSheet).toMatch(/from\s+["']@\/features\/watchlists\/add\/mutation["']/);
-    expect(searchMediaDetailSheet).toMatch(/from\s+["']@\/features\/watchlists\/queries["']/);
+    expect(searchMediaDetailSheet).toMatch(/from\s+["']@\/features\/watchlists\/list\/query["']/);
     expect(searchMediaDetailSheet).toMatch(/useServerFn\(getWatchlistList\)/);
     expect(searchMediaDetailSheet).toMatch(/useServerFn\(addToWatchlist\)/);
     expect(searchMediaDetailSheet).toMatch(/watchlistListQueryKey\(/);
