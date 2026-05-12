@@ -79,7 +79,7 @@
     "web-vitals": "^5.1.0"
   },
   "simple-git-hooks": {
-    "pre-commit": "npx lint-staged --concurrent 1"
+    "pre-commit": "npm run typecheck && npm run test && npx lint-staged --concurrent 1"
   },
   "lint-staged": {
     "*.{js,ts,jsx,tsx,mjs,cjs}": [
