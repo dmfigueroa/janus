@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/command";
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 import { Watchlist } from "@/db/schema";
-import { createWatchlist } from "@/features/watchlists/mutations";
+import { createWatchlist } from "@/features/watchlists/create/mutation";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 

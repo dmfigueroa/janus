@@ -1,9 +1,9 @@
 import {
-  Watchlist,
   type WatchlistDetailPage,
   type WatchlistListOrder,
   type WatchlistSummary,
 } from "@/models/watchlist";
+import { listWatchlistSummaries } from "@/features/watchlists/list/query.server";
 import {
   getWatchlistDetail,
   type GetWatchlistDetailParams,
@@ -21,7 +21,7 @@ export const WatchlistsRead = {
     orderBy?: WatchlistListOrder;
     order?: "asc" | "desc";
   } = {}): Promise<WatchlistListScreenSummary[]> {
-    return Watchlist.listSummaries({ orderBy, order });
+    return listWatchlistSummaries({ orderBy, order });
   },
 
   async detailScreen(params: WatchlistDetailScreenParams): Promise<WatchlistDetailPage | null> {

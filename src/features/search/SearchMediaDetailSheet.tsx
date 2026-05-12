@@ -10,8 +10,8 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Star, Calendar, Info } from "lucide-react";
-import { addToWatchlist } from "@/features/watchlists/mutations";
-import { getWatchlistList, watchlistListQueryKey } from "@/features/watchlists/queries";
+import { addToWatchlist } from "@/features/watchlists/add/mutation";
+import { getWatchlistList, watchlistListQueryKey } from "@/features/watchlists/list/query";
 import { toast } from "sonner";
 import { WatchlistSelector } from "@/components/watchlist/WatchlistSelector";
 import { useQuery, useMutation } from "@tanstack/react-query";

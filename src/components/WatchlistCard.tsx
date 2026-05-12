@@ -1,5 +1,6 @@
 import { useRouter, Link } from "@tanstack/react-router";
-import { deleteWatchlist } from "@/features/watchlists/mutations";
+import { useServerFn } from "@tanstack/react-start";
+import { deleteWatchlist } from "@/features/watchlists/delete/mutation";
 import { useState } from "react";
 import { cn } from "@/utils/cn";
 import { toast } from "sonner";
@@ -95,13 +96,14 @@ export function WatchlistCard({
 }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
+  const deleteWatchlistFn = useServerFn(deleteWatchlist);
 
   const fallbackGradient = "bg-gradient-to-br from-zinc-800 to-zinc-900";
 
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      await deleteWatchlist({ data: { id: watchlist.id } });
+      await deleteWatchlistFn({ data: { id: watchlist.id } });
       await router.invalidate?.();
       toast.success("Watchlist deleted successfully");
     } catch (error) {

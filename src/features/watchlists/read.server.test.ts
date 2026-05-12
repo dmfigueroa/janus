@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import path from "node:path";
-import { watchlistListQueryKey } from "./queries";
+import { watchlistListQueryKey } from "./list/query";
 
 let db: ReturnType<typeof import("@/db/db.server").getDb>;
 let watchlists: typeof import("@/db/schema").watchlists;

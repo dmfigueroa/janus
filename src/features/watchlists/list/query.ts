@@ -21,6 +21,6 @@ export function watchlistListQueryKey(filters: WatchlistListFilters = {}) {
 export const getWatchlistList = createServerFn()
   .inputValidator((data) => normalizeWatchlistListFilters(data || {}))
   .handler(async ({ data }) => {
-    const { WatchlistsRead } = await import("./read.server");
-    return WatchlistsRead.listScreen(data);
+    const { listWatchlistSummaries } = await import("./query.server");
+    return listWatchlistSummaries(data);
   });

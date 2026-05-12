@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { getWatchlistList } from "@/features/watchlists/queries";
+import { getWatchlistList } from "@/features/watchlists/list/query";
 import { WatchlistCard } from "@/components/WatchlistCard";
 import { CreateWatchlistCard } from "@/components/CreateWatchlistCard";
 import { CreateWatchlistDialog } from "@/components/CreateWatchlistDialog";

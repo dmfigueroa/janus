@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "@tanstack/react-router";
-import { createWatchlist } from "@/features/watchlists/mutations";
+import { useServerFn } from "@tanstack/react-start";
+import { createWatchlist } from "@/features/watchlists/create/mutation";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,6 +26,7 @@ export function CreateWatchlistDialog({ asCard }: CreateWatchlistDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const createWatchlistFn = useServerFn(createWatchlist);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -34,7 +36,7 @@ export function CreateWatchlistDialog({ asCard }: CreateWatchlistDialogProps) {
     const description = formData.get("description") as string;
 
     try {
-      await createWatchlist({ data: { name, description } });
+      await createWatchlistFn({ data: { name, description } });
       setOpen(false);
       await router.invalidate?.();
       toast.success("Watchlist created successfully");
