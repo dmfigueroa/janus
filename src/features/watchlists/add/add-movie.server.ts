@@ -9,35 +9,59 @@ export async function addMovieToWatchlist(
   tmdbId: number,
 ): Promise<WatchlistWriteResult> {
   const existing = await repository.getExistingMovieInWatchlist(watchlistId, tmdbId);
-
   if (existing.length > 0) {
-    return { success: true, message: "Already in watchlist" };
+    return alreadyInWatchlist();
   }
 
-  let details: Awaited<ReturnType<typeof getMovieDetails>>;
-  try {
-    details = await getMovieDetails({ data: { id: tmdbId } });
-  } catch {
+  const details = await fetchDetails(tmdbId);
+  if (!details) {
     return rejectAdd(TMDB_MOVIE_FETCH_FAILURE_MESSAGE);
   }
 
-  const inserted = await repository.insertWatchlistItem({
+  const item = mapToWatchlistItem(details, watchlistId, tmdbId);
+  const inserted = await repository.insertWatchlistItem(item);
+
+  if (!inserted) {
+    return alreadyInWatchlist();
+  }
+
+  await repository.markLastItemAdded(watchlistId);
+
+  return successResult();
+}
+
+// --- Implementation Details ---
+
+async function fetchDetails(tmdbId: number) {
+  try {
+    return await getMovieDetails({ data: { id: tmdbId } });
+  } catch {
+    return null;
+  }
+}
+
+function mapToWatchlistItem(
+  details: Awaited<ReturnType<typeof getMovieDetails>>,
+  watchlistId: number,
+  tmdbId: number,
+) {
+  return {
     watchlistId,
     tmdbId: tmdbId.toString(),
-    source: "tmdb",
-    mediaType: "movie",
+    source: "tmdb" as const,
+    mediaType: "movie" as const,
     title: details.title || details.name || "Unknown",
     posterPath: details.poster_path,
     releaseDate: details.release_date,
     voteAverage: details.vote_average,
     runtime: details.runtime || 0,
-  });
+  };
+}
 
-  if (!inserted) {
-    return { success: true, message: "Already in watchlist" };
-  }
+function alreadyInWatchlist(): WatchlistWriteResult {
+  return { success: true, message: "Already in watchlist" };
+}
 
-  await repository.markLastItemAdded(watchlistId);
-
+function successResult(): WatchlistWriteResult {
   return { success: true, message: "Added to watchlist" };
 }
