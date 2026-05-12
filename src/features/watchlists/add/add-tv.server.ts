@@ -8,6 +8,33 @@ import { rejectAdd, type WatchlistWriteResult } from "./shared.server";
 const limit = pLimit(5);
 const TMDB_TV_FETCH_FAILURE_MESSAGE = "Failed to fetch TV details from TMDB.";
 
+export async function addTVShowToWatchlist(
+  watchlistId: number,
+  tmdbId: number,
+  media: WatchlistMedia,
+): Promise<WatchlistWriteResult> {
+  const allEpisodes = await fetchAndMapAllEpisodes(watchlistId, tmdbId, media.title);
+  if (!allEpisodes) {
+    return rejectAdd(TMDB_TV_FETCH_FAILURE_MESSAGE);
+  }
+
+  if (allEpisodes.length === 0) {
+    return { success: true, message: "No episodes found for this show" };
+  }
+
+  const newEpisodes = await filterNewEpisodes(watchlistId, allEpisodes);
+  if (newEpisodes.length === 0) {
+    return { success: true, message: "No new episodes found for this show" };
+  }
+
+  await repository.insertWatchlistItems(newEpisodes);
+  await repository.markLastItemAdded(watchlistId);
+
+  return successResult(newEpisodes.length);
+}
+
+// --- Implementation Details ---
+
 type TMDBEpisode = {
   id: number;
   name: string;
@@ -19,69 +46,64 @@ type TMDBEpisode = {
   runtime?: number | null;
 };
 
-const formatCount = (count: number, singular: string, plural: string) =>
-  `${count} ${count === 1 ? singular : plural}`;
-
-export async function addTVShowToWatchlist(
-  watchlistId: number,
-  tmdbId: number,
-  media: WatchlistMedia,
-): Promise<WatchlistWriteResult> {
-  let showDetails: Awaited<ReturnType<typeof getTVDetails>>;
-  let allEpisodes: Array<typeof watchlistItems.$inferInsert>;
-
+async function fetchAndMapAllEpisodes(watchlistId: number, tmdbId: number, searchTitle: string) {
   try {
-    showDetails = await getTVDetails({ data: { id: tmdbId } });
-    const showTitle = showDetails.name || media.title;
-    const seasons = showDetails.seasons || [];
-    const seasonEpisodeLists = await Promise.all(
-      seasons
-        .filter((season: { season_number: number }) => season.season_number !== 0)
-        .map((season: { season_number: number }) =>
-          limit(() =>
-            getSeasonDetails({ data: { id: tmdbId, seasonNumber: season.season_number } }).then(
-              (seasonDetails: { episodes: TMDBEpisode[] }) => seasonDetails.episodes,
-            ),
-          ),
-        ),
+    const showDetails = await getTVDetails({ data: { id: tmdbId } });
+    const showTitle = showDetails.name || searchTitle;
+    const seasons = (showDetails.seasons || []).filter(
+      (s: { season_number: number }) => s.season_number !== 0,
     );
 
-    allEpisodes = seasonEpisodeLists.flat().map((episode) => ({
-      watchlistId,
-      tmdbId: episode.id.toString(),
-      source: "tmdb" as const,
-      mediaType: "episode" as const,
-      title: episode.name,
-      parentTitle: showTitle,
-      season: episode.season_number,
-      episode: episode.episode_number.toString(),
-      posterPath: episode.still_path || showDetails.poster_path,
-      releaseDate: episode.air_date,
-      voteAverage: episode.vote_average,
-      runtime: episode.runtime || 0,
-    }));
+    const episodes = await Promise.all(
+      seasons.map((season: { season_number: number }) =>
+        limit(() =>
+          getSeasonDetails({ data: { id: tmdbId, seasonNumber: season.season_number } }).then(
+            (sd: { episodes: TMDBEpisode[] }) => sd.episodes,
+          ),
+        ),
+      ),
+    );
+
+    return mapEpisodes(episodes.flat(), watchlistId, showTitle, showDetails.poster_path);
   } catch {
-    return rejectAdd(TMDB_TV_FETCH_FAILURE_MESSAGE);
+    return null;
   }
+}
 
-  if (allEpisodes.length === 0) {
-    return { success: true, message: "No episodes found for this show" };
-  }
+function mapEpisodes(
+  episodes: TMDBEpisode[],
+  watchlistId: number,
+  showTitle: string,
+  showPoster: string | null,
+): Array<typeof watchlistItems.$inferInsert> {
+  return episodes.map((episode) => ({
+    watchlistId,
+    tmdbId: episode.id.toString(),
+    source: "tmdb" as const,
+    mediaType: "episode" as const,
+    title: episode.name,
+    parentTitle: showTitle,
+    season: episode.season_number,
+    episode: episode.episode_number.toString(),
+    posterPath: episode.still_path || showPoster,
+    releaseDate: episode.air_date,
+    voteAverage: episode.vote_average,
+    runtime: episode.runtime || 0,
+  }));
+}
 
-  const existingEpisodeIds = await repository.getExistingEpisodesInWatchlist(watchlistId);
-  const newEpisodes = allEpisodes.filter(
-    (episode) => !existingEpisodeIds.has(episode.tmdbId ?? ""),
-  );
+async function filterNewEpisodes(
+  watchlistId: number,
+  episodes: Array<typeof watchlistItems.$inferInsert>,
+) {
+  const existingIds = await repository.getExistingEpisodesInWatchlist(watchlistId);
+  return episodes.filter((e) => !existingIds.has(e.tmdbId ?? ""));
+}
 
-  if (newEpisodes.length === 0) {
-    return { success: true, message: "No new episodes found for this show" };
-  }
-
-  await repository.insertWatchlistItems(newEpisodes);
-  await repository.markLastItemAdded(watchlistId);
-
+function successResult(count: number): WatchlistWriteResult {
+  const label = count === 1 ? "new episode" : "new episodes";
   return {
     success: true,
-    message: `Added ${formatCount(newEpisodes.length, "new episode", "new episodes")} to watchlist`,
+    message: `Added ${count} ${label} to watchlist`,
   };
 }
