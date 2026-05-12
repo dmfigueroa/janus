@@ -9,6 +9,7 @@ import {
   type WatchlistDetailQueryData,
 } from "@/features/watchlists/detail/query";
 import { useItemOrderModeMutation } from "@/features/watchlists/detail/use-item-order-mode-mutation";
+import { useReorderWatchlistItemsMutation } from "@/features/watchlists/detail/use-reorder-watchlist-items-mutation";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
 
 interface WatchlistDetailScreenProps {
@@ -65,9 +66,18 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
     onOptimisticChange: setItemOrderMode,
     onRollback: setItemOrderMode,
   });
+  const reorderItemsMutation = useReorderWatchlistItemsMutation({ watchlistId });
 
   const allItems = data?.pages.flatMap((page) => page.items) || [];
   const latestWatchlist = data?.pages[data.pages.length - 1]?.watchlist || initialData.watchlist;
+  const canReorderItems =
+    itemOrderMode === "custom" &&
+    !showUnwatchedOnly &&
+    searchQuery.trim().length === 0 &&
+    debouncedSearchQuery.length === 0 &&
+    hasNextPage === false &&
+    allItems.length > 1 &&
+    !reorderItemsMutation.isPending;
 
   const totalItems = latestWatchlist.stats.totalItems;
   const watchedItems = latestWatchlist.stats.watchedItems;
@@ -102,6 +112,8 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
           hasMore={hasNextPage}
           isLoadingMore={isFetchingNextPage}
           onLoadMore={fetchNextPage}
+          canReorder={canReorderItems}
+          onReorder={(itemIds) => reorderItemsMutation.mutate(itemIds)}
         />
       </div>
     </div>

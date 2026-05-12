@@ -11,6 +11,7 @@ import {
 import {
   updateWatchlistDetailPagesAfterToggle,
   updateWatchlistDetailPagesAfterItemOrderMode,
+  updateWatchlistDetailPagesAfterReorder,
 } from "@/features/watchlists/detail/transform";
 
 export type WatchlistDetailCacheSnapshot = Array<
@@ -107,6 +108,43 @@ export async function optimisticallyUpdateWatchlistItemOrderMode({
   return { previousEntries, createdKeys };
 }
 
+export async function optimisticallyReorderWatchlistItems({
+  queryClient,
+  watchlistId,
+  itemIds,
+}: {
+  queryClient: QueryClient;
+  watchlistId: number;
+  itemIds: number[];
+}): Promise<WatchlistDetailCacheSnapshot> {
+  const queryKey = watchlistDetailQueryFamily(watchlistId);
+
+  await queryClient.cancelQueries({ queryKey });
+  const snapshot = queryClient.getQueriesData<InfiniteData<WatchlistDetailPage, number>>({
+    queryKey,
+  });
+
+  for (const [cacheKey, previousData] of snapshot) {
+    const filters = readFiltersFromDetailQueryKey(cacheKey);
+    const isFullCustomDetail =
+      filters?.itemOrderMode === "custom" && filters.unwatchedOnly === false && !filters.query;
+
+    if (!isFullCustomDetail) {
+      continue;
+    }
+
+    queryClient.setQueryData(
+      cacheKey,
+      updateWatchlistDetailPagesAfterReorder({
+        data: previousData,
+        itemIds,
+      }),
+    );
+  }
+
+  return snapshot;
+}
+
 export function rollbackWatchedToggle({
   queryClient,
   snapshot,
@@ -131,6 +169,18 @@ export function rollbackWatchlistItemOrderMode({
   }
 
   for (const [cacheKey, previousData] of snapshot?.previousEntries ?? []) {
+    queryClient.setQueryData(cacheKey, previousData);
+  }
+}
+
+export function rollbackWatchlistReorder({
+  queryClient,
+  snapshot,
+}: {
+  queryClient: QueryClient;
+  snapshot: WatchlistDetailCacheSnapshot | undefined;
+}) {
+  for (const [cacheKey, previousData] of snapshot ?? []) {
     queryClient.setQueryData(cacheKey, previousData);
   }
 }

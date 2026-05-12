@@ -67,6 +67,35 @@ export function updateWatchlistDetailPagesAfterItemOrderMode({
   };
 }
 
+export function updateWatchlistDetailPagesAfterReorder({
+  data,
+  itemIds,
+}: {
+  data: InfiniteData<WatchlistDetailPage, number> | undefined;
+  itemIds: number[];
+}) {
+  if (!data) {
+    return data;
+  }
+
+  const rankByItemId = new Map(itemIds.map((itemId, index) => [itemId, index + 1]));
+  const reorderedItems = data.pages
+    .flatMap((page) => page.items)
+    .map((item) => ({
+      ...item,
+      customRank: rankByItemId.get(item.id) ?? item.customRank,
+    }))
+    .sort((left, right) => compareItemsByOrderMode(left, right, "custom"));
+
+  return {
+    ...data,
+    pages: repartitionItemsAcrossPages({
+      pages: data.pages,
+      items: reorderedItems,
+    }),
+  };
+}
+
 function calculateWatchedDelta({
   previousIsWatched,
   nextIsWatched,
