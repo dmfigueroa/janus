@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
+import { updateWatchlistItemOrderModeMutation } from "./mutation.server";
 
 export const updateWatchlistItemOrderModeSchema = z.object({
   watchlistId: z.number(),
@@ -15,6 +16,5 @@ export type UpdateWatchlistItemOrderModeInput = {
 export const updateWatchlistItemOrderMode = createServerFn({ method: "POST" })
   .inputValidator((data) => updateWatchlistItemOrderModeSchema.parse(data))
   .handler(async ({ data }) => {
-    const { updateWatchlistItemOrderModeMutation } = await import("./mutation.server");
     return updateWatchlistItemOrderModeMutation(data);
   });

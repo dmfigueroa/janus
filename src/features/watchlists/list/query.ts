@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { listWatchlistSummaries } from "./query.server";
 
 const watchlistListSchema = z.object({
   orderBy: z.enum(["createdAt", "lastWatched", "lastAdded"]).optional().default("createdAt"),
@@ -21,6 +22,5 @@ export function watchlistListQueryKey(filters: WatchlistListFilters = {}) {
 export const getWatchlistList = createServerFn()
   .inputValidator((data) => normalizeWatchlistListFilters(data || {}))
   .handler(async ({ data }) => {
-    const { listWatchlistSummaries } = await import("./query.server");
     return listWatchlistSummaries(data);
   });

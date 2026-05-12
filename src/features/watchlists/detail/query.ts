@@ -2,6 +2,7 @@ import { infiniteQueryOptions } from "@tanstack/react-query";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import type { WatchlistDetailPage } from "@/models/watchlist";
+import { getWatchlistDetail } from "./query.server";
 
 const watchlistDetailFiltersSchema = z.object({
   watchlistId: z.coerce.number(),
@@ -71,7 +72,6 @@ export function normalizeFiltersFromDetailQueryKey(queryKey: any, watchlistId: n
 export const getWatchlistDetailPage = createServerFn()
   .inputValidator((data) => watchlistDetailPageSchema.parse(data))
   .handler(async ({ data }) => {
-    const { getWatchlistDetail } = await import("./query.server");
     return getWatchlistDetail(data);
   });
 

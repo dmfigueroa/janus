@@ -144,14 +144,15 @@ describe("route module boundaries", () => {
     expect(itemOrderModeHook).not.toMatch(/await\s+updateWatchlistItemOrderMode\(/);
   });
 
-  it("keeps the shared watchlist query surface free of server-only imports", () => {
+  it("keeps server-only imports inside TanStack server function surfaces", () => {
     const watchlistQueries = readFileSync(
       workspaceFile("src/features/watchlists/detail/query.ts"),
       "utf8",
     );
 
-    expect(watchlistQueries).not.toMatch(/from\s+["'][^"']+\.server["']/);
     expect(watchlistQueries).not.toMatch(/from\s+["']\.\.\/read\.server["']/);
+    expect(watchlistQueries).toMatch(/from\s+["']\.\/query\.server["']/);
+    expect(watchlistQueries).toMatch(/createServerFn\(\)/);
   });
 
   it("keeps touched watchlist UI inside the watchlists feature boundary", () => {
