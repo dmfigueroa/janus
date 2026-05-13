@@ -1,6 +1,7 @@
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   DndContext,
+  DragOverlay,
   MouseSensor,
   TouchSensor,
   closestCenter,
@@ -21,7 +22,7 @@ import {
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import { Flag, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { ReorderableTimelineRow } from "./reorderable-timeline-row";
+import { DragOverlayTimelineRow, ReorderableTimelineRow } from "./reorderable-timeline-row";
 
 interface WatchlistTimelineProps {
   items: WatchlistItem[];
@@ -53,6 +54,8 @@ export function WatchlistTimeline({
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const reorderEnabled = canReorder && Boolean(onReorder);
   const showHandleSlot = itemOrderMode === "custom";
+  const activeItem =
+    activeItemId === null ? null : (items.find((item) => item.id === activeItemId) ?? null);
 
   const groups = useMemo(() => {
     if (itemOrderMode === "custom") {
@@ -178,6 +181,12 @@ export function WatchlistTimeline({
       onDragCancel={clearDragState}
       onDragEnd={handleDragEnd}
     >
+      <DragOverlay>
+        {activeItem ? (
+          <DragOverlayTimelineRow item={activeItem} interactionDisabled={interactionDisabled} />
+        ) : null}
+      </DragOverlay>
+
       <div className="relative pl-6 md:pl-0">
         {itemOrderMode === "release" ? (
           <>
