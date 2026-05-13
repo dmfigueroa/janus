@@ -38,7 +38,6 @@ export function ReorderableTimelineRow({
           showHandle={showHandle}
           interactionDisabled={interactionDisabled}
           dragging={isDragging}
-          dropCue={dropCue}
           handleProps={{
             ...attributes,
             ...listeners,
@@ -76,7 +75,6 @@ function TimelineRowShell({
   showHandle,
   interactionDisabled,
   dragging,
-  dropCue,
   handleProps,
 }: {
   item: WatchlistItem;
@@ -84,16 +82,10 @@ function TimelineRowShell({
   showHandle: boolean;
   interactionDisabled: boolean;
   dragging: boolean;
-  dropCue?: "before" | "after" | null;
   handleProps?: Record<string, unknown>;
 }) {
   return (
-    <div
-      className={cn(
-        "flex items-center gap-2 rounded-xl bg-background/80 transition-colors",
-        dropCue && "ring-2 ring-primary/30 bg-primary/5",
-      )}
-    >
+    <div className="flex items-center gap-2 rounded-xl bg-background/80">
       {showHandle ? (
         <button
           type="button"
