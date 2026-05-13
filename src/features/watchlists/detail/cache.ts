@@ -8,7 +8,6 @@ import {
   normalizeFiltersFromDetailQueryKey,
   readFiltersFromDetailQueryKey,
 } from "@/features/watchlists/detail/query";
-import { isFullCustomWatchlistDetailQuery } from "@/features/watchlists/detail/reorder";
 import {
   updateWatchlistDetailPagesAfterToggle,
   updateWatchlistDetailPagesAfterItemOrderMode,
@@ -144,29 +143,35 @@ function copyEntriesToItemOrderModeCache({
 export async function optimisticallyReorderWatchlistItems({
   queryClient,
   watchlistId,
-  itemIds,
+  activeQueryKey,
+  movedItemId,
+  referenceItemId,
+  position,
 }: {
   queryClient: QueryClient;
   watchlistId: number;
-  itemIds: number[];
+  activeQueryKey: QueryKey;
+  movedItemId: number;
+  referenceItemId: number;
+  position: "before" | "after";
 }): Promise<WatchlistDetailCacheSnapshot> {
   const snapshot = await snapshotWatchlistDetailCache({
     queryClient,
     watchlistId,
   });
 
-  for (const [cacheKey, previousData] of snapshot) {
-    const filters = readFiltersFromDetailQueryKey(cacheKey);
+  const activeEntry = snapshot.find(
+    ([cacheKey]) => JSON.stringify(cacheKey) === JSON.stringify(activeQueryKey),
+  );
 
-    if (!isFullCustomWatchlistDetailQuery(filters)) {
-      continue;
-    }
-
+  if (activeEntry) {
     queryClient.setQueryData(
-      cacheKey,
+      activeQueryKey,
       updateWatchlistDetailPagesAfterReorder({
-        data: previousData,
-        itemIds,
+        data: activeEntry[1],
+        movedItemId,
+        referenceItemId,
+        position,
       }),
     );
   }

@@ -54,6 +54,15 @@ RIGHT (vertical):
 
 ## Workflow
 
+## Expected Outcome
+
+The expected result of TDD work is an open pull request, not just local code changes.
+
+- Drive the work all the way through to a branch with commits and an open PR unless the user explicitly asks you to stop earlier.
+- Prefer opening the PR once the implementation is coherent and the relevant tests are green, even if follow-up manual verification is still called out in the PR body.
+- Use conventional commit messages that describe the behavior change being introduced.
+- Write commits as often as possible during the TDD loop. Prefer small, behavior-shaped commits that capture each meaningful red-green-refactor slice or cleanup step once that slice is green.
+
 ### 1. Planning
 
 Before writing any code:

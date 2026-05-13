@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useIsMutating } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { WatchlistHeader } from "@/features/watchlists/components/watchlist-header";
 import { WatchlistTimeline } from "@/features/watchlists/components/watchlist-timeline";
@@ -67,18 +67,21 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
     onOptimisticChange: setItemOrderMode,
     onRollback: setItemOrderMode,
   });
-  const reorderItemsMutation = useReorderWatchlistItemsMutation({ watchlistId });
+  const reorderItemsMutation = useReorderWatchlistItemsMutation({
+    watchlistId,
+    activeFilters: filters,
+  });
+  const isWatchedTogglePending =
+    useIsMutating({ mutationKey: ["watchlists", "toggle-watched", watchlistId] }) > 0;
+  const isReorderPending = reorderItemsMutation.isPending;
 
   const allItems = data?.pages.flatMap((page) => page.items) || [];
   const latestWatchlist = data?.pages[data.pages.length - 1]?.watchlist || initialData.watchlist;
   const canReorderItems = canReorderWatchlistItems({
     itemOrderMode,
-    showUnwatchedOnly,
-    searchQuery,
-    debouncedSearchQuery,
-    hasNextPage,
     itemCount: allItems.length,
-    isReorderPending: reorderItemsMutation.isPending,
+    isReorderPending,
+    isWatchedTogglePending,
   });
 
   const totalItems = latestWatchlist.stats.totalItems;
@@ -106,16 +109,19 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
         isUpdatingItemOrderMode={updateItemOrderModeMutation.isPending}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        interactionDisabled={isReorderPending}
       />
 
       <div className="mt-8">
         <WatchlistTimeline
           items={allItems}
+          itemOrderMode={itemOrderMode}
           hasMore={hasNextPage}
           isLoadingMore={isFetchingNextPage}
-          onLoadMore={fetchNextPage}
+          onLoadMore={isReorderPending ? undefined : fetchNextPage}
           canReorder={canReorderItems}
-          onReorder={(itemIds) => reorderItemsMutation.mutate(itemIds)}
+          interactionDisabled={isReorderPending}
+          onReorder={(intent) => reorderItemsMutation.mutate(intent)}
         />
       </div>
     </div>

@@ -64,7 +64,7 @@ describe("watchlist detail page transforms", () => {
     ]);
   });
 
-  it("applies custom ranks and repartitions reordered items across existing pages", () => {
+  it("reorders the active visible items around an anchor and preserves page sizes", () => {
     const data = createDetailData({
       pages: [
         createPage({
@@ -83,12 +83,14 @@ describe("watchlist detail page transforms", () => {
 
     const nextData = updateWatchlistDetailPagesAfterReorder({
       data,
-      itemIds: [3, 1, 2],
+      movedItemId: 1,
+      referenceItemId: 3,
+      position: "after",
     });
 
     expect(nextData?.pages.map((page) => page.items.map((item) => item.title))).toEqual([
-      ["Third", "First"],
-      ["Second"],
+      ["Second", "Third"],
+      ["First"],
     ]);
     expect(nextData?.pages.flatMap((page) => page.items).map((item) => item.customRank)).toEqual([
       1, 2, 3,

@@ -15,6 +15,7 @@ interface WatchlistHeaderProps {
   isUpdatingItemOrderMode: boolean;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  interactionDisabled?: boolean;
 }
 
 /**
@@ -32,6 +33,7 @@ export function WatchlistHeader({
   isUpdatingItemOrderMode,
   searchQuery,
   onSearchChange,
+  interactionDisabled = false,
 }: WatchlistHeaderProps) {
   return (
     <header className="sticky top-0 z-40 bg-background/95 pb-4 pt-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:pb-6">
@@ -41,17 +43,22 @@ export function WatchlistHeader({
         <WatchlistProgress totalItems={totalItems} watchedItems={watchedItems} />
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <WatchlistSearch query={searchQuery} onChange={onSearchChange} />
+          <WatchlistSearch
+            query={searchQuery}
+            onChange={onSearchChange}
+            disabled={interactionDisabled}
+          />
 
           <div className="flex flex-col gap-2 self-start sm:self-auto sm:items-end">
             <WatchlistOrderToggle
               mode={itemOrderMode}
               onChange={onItemOrderModeChange}
-              isUpdating={isUpdatingItemOrderMode}
+              isUpdating={isUpdatingItemOrderMode || interactionDisabled}
             />
             <WatchlistFilterToggle
               showUnwatchedOnly={showUnwatchedOnly}
               onChange={onFilterChange}
+              disabled={interactionDisabled}
             />
           </div>
         </div>
@@ -102,9 +109,11 @@ function WatchlistProgress({
 function WatchlistSearch({
   query,
   onChange,
+  disabled = false,
 }: {
   query: string;
   onChange: (query: string) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="relative flex-1 max-w-sm">
@@ -112,6 +121,7 @@ function WatchlistSearch({
       <input
         type="text"
         placeholder="Search titles..."
+        disabled={disabled}
         className="h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         value={query}
         onChange={(e) => onChange(e.target.value)}
@@ -152,16 +162,18 @@ function WatchlistOrderToggle({
 function WatchlistFilterToggle({
   showUnwatchedOnly,
   onChange,
+  disabled = false,
 }: {
   showUnwatchedOnly: boolean;
   onChange: (showUnwatchedOnly: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="flex items-center gap-2 rounded-lg border bg-secondary/30 p-1">
-      <ToggleButton active={!showUnwatchedOnly} onClick={() => onChange(false)}>
+      <ToggleButton active={!showUnwatchedOnly} onClick={() => onChange(false)} disabled={disabled}>
         All
       </ToggleButton>
-      <ToggleButton active={showUnwatchedOnly} onClick={() => onChange(true)}>
+      <ToggleButton active={showUnwatchedOnly} onClick={() => onChange(true)} disabled={disabled}>
         Unwatched
       </ToggleButton>
     </div>

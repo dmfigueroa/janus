@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistItem } from "@/db/schema";
 import { WatchlistTimeline } from "@/features/watchlists/components/watchlist-timeline";
@@ -49,38 +49,54 @@ describe("WatchlistTimeline reorder controls", () => {
     cleanup();
   });
 
-  it("submits item ids in the dropped order when reordering is enabled", () => {
-    const onReorder = vi.fn();
-
+  it("renders a flat custom-mode list with reorder handles", () => {
     render(
       <WatchlistTimeline
         items={[
-          item({ id: 1, title: "First" }),
-          item({ id: 2, title: "Second" }),
-          item({ id: 3, title: "Third" }),
+          item({ id: 1, title: "First", releaseDate: "2024-01-01" }),
+          item({ id: 2, title: "Second", releaseDate: "2025-01-01" }),
         ]}
+        itemOrderMode="custom"
         canReorder
-        onReorder={onReorder}
+        onReorder={vi.fn()}
       />,
     );
 
-    fireEvent.dragStart(screen.getByRole("button", { name: "Move First" }));
-    fireEvent.dragOver(screen.getByTestId("watchlist-timeline-row-3"));
-    fireEvent.drop(screen.getByTestId("watchlist-timeline-row-3"));
-
-    expect(onReorder).toHaveBeenCalledWith([2, 3, 1]);
+    expect(screen.queryByText("2024")).toBeNull();
+    expect(screen.queryByText("2025")).toBeNull();
+    expect(screen.getByRole("button", { name: "Move First" })).toHaveProperty("disabled", false);
+    expect(screen.getByRole("button", { name: "Move Second" })).toHaveProperty("disabled", false);
   });
 
-  it("keeps reorder controls disabled when reordering is unavailable", () => {
+  it("hides reorder handles in custom mode when reordering is unavailable", () => {
     render(
       <WatchlistTimeline
         items={[item({ id: 1, title: "First" }), item({ id: 2, title: "Second" })]}
+        itemOrderMode="custom"
         canReorder={false}
         onReorder={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Move First" })).toHaveProperty("disabled", true);
-    expect(screen.getByRole("button", { name: "Move Second" })).toHaveProperty("disabled", true);
+    expect(screen.queryByRole("button", { name: "Move First" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Move Second" })).toBeNull();
+  });
+
+  it("keeps year groupings and removes reorder affordances in release mode", () => {
+    render(
+      <WatchlistTimeline
+        items={[
+          item({ id: 1, title: "First", releaseDate: "2024-01-01" }),
+          item({ id: 2, title: "Second", releaseDate: "2025-01-01" }),
+        ]}
+        itemOrderMode="release"
+        canReorder
+        onReorder={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("2024")).not.toBeNull();
+    expect(screen.getByText("2025")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Move First" })).toBeNull();
   });
 });

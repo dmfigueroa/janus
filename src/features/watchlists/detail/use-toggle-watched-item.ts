@@ -16,6 +16,7 @@ export function useToggleWatchedItem(item: WatchlistItem) {
   const nextIsWatched = !previousIsWatched;
 
   return useMutation({
+    mutationKey: ["watchlists", "toggle-watched", item.watchlistId],
     mutationFn: async () => {
       const result = await toggleWatchedFn({ data: { itemId: item.id, isWatched: nextIsWatched } });
       if (!result.success) {

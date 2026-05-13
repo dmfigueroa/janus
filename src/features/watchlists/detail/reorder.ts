@@ -1,65 +1,87 @@
-import type { WatchlistItem } from "@/db/schema";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
-import type { WatchlistDetailQueryKeyFilters } from "@/features/watchlists/detail/query";
+import type { WatchlistItem } from "@/db/schema";
 
 export type DropPlacement = "before" | "after";
+export type ReorderIntent = {
+  movedItemId: number;
+  referenceItemId: number;
+  position: DropPlacement;
+};
 
 export function canReorderWatchlistItems({
   itemOrderMode,
-  showUnwatchedOnly,
-  searchQuery,
-  debouncedSearchQuery,
-  hasNextPage,
   itemCount,
   isReorderPending,
+  isWatchedTogglePending,
 }: {
   itemOrderMode: WatchlistItemOrderMode;
-  showUnwatchedOnly: boolean;
-  searchQuery: string;
-  debouncedSearchQuery: string;
-  hasNextPage: boolean | undefined;
   itemCount: number;
   isReorderPending: boolean;
+  isWatchedTogglePending: boolean;
 }) {
   return (
-    itemOrderMode === "custom" &&
-    !showUnwatchedOnly &&
-    searchQuery.trim().length === 0 &&
-    debouncedSearchQuery.length === 0 &&
-    hasNextPage === false &&
-    itemCount > 1 &&
-    !isReorderPending
+    itemOrderMode === "custom" && itemCount > 1 && !isReorderPending && !isWatchedTogglePending
   );
 }
 
-export function isFullCustomWatchlistDetailQuery(
-  filters: Partial<WatchlistDetailQueryKeyFilters> | null,
-) {
-  return filters?.itemOrderMode === "custom" && filters.unwatchedOnly === false && !filters.query;
+export function reorderVisibleItemsByAnchor<TItem extends Pick<WatchlistItem, "id">>({
+  items,
+  movedItemId,
+  referenceItemId,
+  position,
+}: {
+  items: TItem[];
+  movedItemId: number;
+  referenceItemId: number;
+  position: DropPlacement;
+}): number[] | null {
+  const orderedIds = items.map((item) => item.id);
+
+  if (movedItemId === referenceItemId) {
+    return null;
+  }
+
+  const movedIndex = orderedIds.indexOf(movedItemId);
+  if (movedIndex === -1) {
+    return null;
+  }
+
+  const reorderedIds = orderedIds.filter((itemId) => itemId !== movedItemId);
+  const referenceIndex = reorderedIds.indexOf(referenceItemId);
+  if (referenceIndex === -1) {
+    return null;
+  }
+
+  reorderedIds.splice(position === "before" ? referenceIndex : referenceIndex + 1, 0, movedItemId);
+
+  if (reorderedIds.indexOf(movedItemId) === movedIndex) {
+    return null;
+  }
+
+  return reorderedIds;
 }
 
-export function orderItemIdsAfterDrop({
+export function resolveReorderIntent({
   items,
-  draggedItemId,
-  targetItemId,
-  placement,
+  movedItemId,
+  referenceItemId,
+  position,
 }: {
   items: Pick<WatchlistItem, "id">[];
-  draggedItemId: number;
-  targetItemId: number;
-  placement: DropPlacement;
-}) {
-  if (draggedItemId === targetItemId) {
+  movedItemId: number;
+  referenceItemId: number;
+  position: DropPlacement;
+}): ReorderIntent | null {
+  const reorderedIds = reorderVisibleItemsByAnchor({
+    items,
+    movedItemId,
+    referenceItemId,
+    position,
+  });
+
+  if (!reorderedIds) {
     return null;
   }
 
-  const reorderedIds = items.map((item) => item.id).filter((itemId) => itemId !== draggedItemId);
-  const targetIndex = reorderedIds.indexOf(targetItemId);
-
-  if (targetIndex === -1) {
-    return null;
-  }
-
-  reorderedIds.splice(placement === "before" ? targetIndex : targetIndex + 1, 0, draggedItemId);
-  return reorderedIds;
+  return { movedItemId, referenceItemId, position };
 }
