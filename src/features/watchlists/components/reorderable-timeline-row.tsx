@@ -10,7 +10,6 @@ type ReorderableTimelineRowProps = {
   showHandleSlot: boolean;
   showHandle: boolean;
   interactionDisabled: boolean;
-  dropCue: "before" | "after" | null;
 };
 
 export function ReorderableTimelineRow({
@@ -18,7 +17,6 @@ export function ReorderableTimelineRow({
   showHandleSlot,
   showHandle,
   interactionDisabled,
-  dropCue,
 }: ReorderableTimelineRowProps) {
   const {
     attributes,
@@ -38,29 +36,25 @@ export function ReorderableTimelineRow({
   };
 
   return (
-    <>
-      {dropCue === "before" ? <InsertionGap /> : null}
-      <div
-        ref={setNodeRef}
-        data-testid={`watchlist-timeline-row-${item.id}`}
-        style={style}
-        className={cn("rounded-xl", isDragging && "h-0 overflow-hidden opacity-0")}
-      >
-        <TimelineRowShell
-          item={item}
-          showHandleSlot={showHandleSlot}
-          showHandle={showHandle}
-          interactionDisabled={interactionDisabled}
-          dragging={isDragging}
-          handleProps={{
-            ...attributes,
-            ...listeners,
-            ref: setActivatorNodeRef,
-          }}
-        />
-      </div>
-      {dropCue === "after" ? <InsertionGap /> : null}
-    </>
+    <div
+      ref={setNodeRef}
+      data-testid={`watchlist-timeline-row-${item.id}`}
+      style={style}
+      className={cn("rounded-xl", isDragging && "h-0 overflow-hidden opacity-0")}
+    >
+      <TimelineRowShell
+        item={item}
+        showHandleSlot={showHandleSlot}
+        showHandle={showHandle}
+        interactionDisabled={interactionDisabled}
+        dragging={isDragging}
+        handleProps={{
+          ...attributes,
+          ...listeners,
+          ref: setActivatorNodeRef,
+        }}
+      />
+    </div>
   );
 }
 
@@ -123,14 +117,5 @@ function TimelineRowShell({
         <TimelineItem item={item} interactionDisabled={interactionDisabled} />
       </div>
     </div>
-  );
-}
-
-function InsertionGap() {
-  return (
-    <div
-      aria-hidden
-      className="my-2 h-5 rounded-xl border-2 border-dashed border-primary/60 bg-primary/15 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.2)]"
-    />
   );
 }

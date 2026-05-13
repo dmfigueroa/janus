@@ -6,19 +6,13 @@ import {
   TouchSensor,
   closestCenter,
   type DragEndEvent,
-  type DragMoveEvent,
-  type DragOverEvent,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { WatchlistItem } from "@/db/schema";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
-import {
-  resolveReorderIntent,
-  type DropPlacement,
-  type ReorderIntent,
-} from "@/features/watchlists/detail/reorder";
+import { resolveReorderIntent, type ReorderIntent } from "@/features/watchlists/detail/reorder";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import { Flag, Loader2 } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -34,11 +28,6 @@ interface WatchlistTimelineProps {
   interactionDisabled?: boolean;
   onReorder?: (intent: ReorderIntent) => void;
 }
-
-type DropTarget = {
-  referenceItemId: number;
-  position: DropPlacement;
-};
 
 type PendingDrop = {
   itemIdsBeforeDrop: number[];
@@ -56,7 +45,6 @@ export function WatchlistTimeline({
   onReorder,
 }: WatchlistTimelineProps) {
   const [activeItemId, setActiveItemId] = useState<number | null>(null);
-  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
   const pendingDropTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reorderEnabled = canReorder && Boolean(onReorder);
@@ -85,7 +73,6 @@ export function WatchlistTimeline({
     window.scrollTo({ top: pendingDrop.scrollTop });
     setPendingDrop(null);
     setActiveItemId(null);
-    setDropTarget(null);
   }, [itemIds, pendingDrop]);
 
   useLayoutEffect(() => {
@@ -157,37 +144,7 @@ export function WatchlistTimeline({
       pendingDropTimeoutRef.current = null;
     }
     setActiveItemId(null);
-    setDropTarget(null);
     setPendingDrop(null);
-  }
-
-  function updateDropTarget(event: DragMoveEvent | DragOverEvent) {
-    if (!reorderEnabled || !event.over) {
-      setDropTarget(null);
-      return;
-    }
-
-    const referenceItemId = Number(event.over.id);
-    if (Number.isNaN(referenceItemId)) {
-      setDropTarget(null);
-      return;
-    }
-
-    const initialRect = event.active.rect.current.initial;
-    if (!initialRect) {
-      setDropTarget(null);
-      return;
-    }
-
-    const activeTop = event.active.rect.current.translated?.top ?? initialRect.top;
-    const activeHeight = event.active.rect.current.translated?.height ?? initialRect.height;
-    const activeMidpoint = activeTop + activeHeight / 2;
-    const overMidpoint = event.over.rect.top + event.over.rect.height / 2;
-
-    setDropTarget({
-      referenceItemId,
-      position: activeMidpoint < overMidpoint ? "before" : "after",
-    });
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -196,12 +153,14 @@ export function WatchlistTimeline({
       return;
     }
 
-    const position =
-      dropTarget?.referenceItemId === Number(event.over.id) ? dropTarget.position : "after";
+    const referenceItemId = Number(event.over.id);
+    const movedIndex = items.findIndex((item) => item.id === activeItemId);
+    const referenceIndex = items.findIndex((item) => item.id === referenceItemId);
+    const position = movedIndex < referenceIndex ? "after" : "before";
     const intent = resolveReorderIntent({
       items,
       movedItemId: activeItemId,
-      referenceItemId: Number(event.over.id),
+      referenceItemId,
       position,
     });
 
@@ -217,10 +176,8 @@ export function WatchlistTimeline({
         pendingDropTimeoutRef.current = null;
         setPendingDrop(null);
         setActiveItemId(null);
-        setDropTarget(null);
       }, 500);
       onReorder?.(intent);
-      setDropTarget(null);
       return;
     }
 
@@ -235,8 +192,6 @@ export function WatchlistTimeline({
       onDragStart={(event) => {
         setActiveItemId(Number(event.active.id));
       }}
-      onDragMove={updateDropTarget}
-      onDragOver={updateDropTarget}
       onDragCancel={clearDragState}
       onDragEnd={handleDragEnd}
     >
@@ -277,11 +232,6 @@ export function WatchlistTimeline({
                       showHandleSlot={showHandleSlot}
                       showHandle={showHandleSlot && reorderEnabled}
                       interactionDisabled={interactionDisabled}
-                      dropCue={
-                        activeItemId === null || dropTarget?.referenceItemId !== item.id
-                          ? null
-                          : dropTarget.position
-                      }
                     />
                   ))}
                 </div>

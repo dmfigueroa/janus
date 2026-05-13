@@ -30,7 +30,10 @@ vi.mock("@dnd-kit/sortable", () => ({
   useSortable: vi.fn(({ id, disabled }: { id: number; disabled: boolean }) => ({
     attributes: { "data-sortable-id": id },
     listeners: {},
+    setActivatorNodeRef: vi.fn(),
     setNodeRef: vi.fn(),
+    transform: null,
+    transition: undefined,
     isDragging: false,
     disabled,
   })),
@@ -164,20 +167,6 @@ describe("WatchlistTimeline reorder controls", () => {
     window.scrollY = 540;
 
     act(() => {
-      latestDndContextProps.onDragOver?.({
-        active: {
-          rect: {
-            current: {
-              initial: { top: 100, height: 40 },
-              translated: { top: 180, height: 40 },
-            },
-          },
-        },
-        over: {
-          id: 2,
-          rect: { top: 120, height: 40 },
-        },
-      });
       latestDndContextProps.onDragEnd?.({
         active: { id: 1 },
         over: {
