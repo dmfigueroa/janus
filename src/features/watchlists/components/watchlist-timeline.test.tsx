@@ -1,9 +1,40 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistItem } from "@/db/schema";
 import { WatchlistTimeline } from "@/features/watchlists/components/watchlist-timeline";
+
+let latestDndContextProps: Record<string, ((event: any) => void) | undefined> = {};
+
+vi.mock("@dnd-kit/core", () => ({
+  DndContext: ({ children, ...props }: { children: React.ReactNode }) => {
+    latestDndContextProps = props;
+    return <div>{children}</div>;
+  },
+  DragOverlay: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  MouseSensor: class MouseSensor {},
+  TouchSensor: class TouchSensor {},
+  closestCenter: vi.fn(),
+  useSensor: vi.fn((sensor, options) => ({ sensor, options })),
+  useSensors: vi.fn((...sensors) => sensors),
+}));
+
+vi.mock("@dnd-kit/modifiers", () => ({
+  restrictToVerticalAxis: vi.fn(),
+}));
+
+vi.mock("@dnd-kit/sortable", () => ({
+  SortableContext: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  verticalListSortingStrategy: {},
+  useSortable: vi.fn(({ id, disabled }: { id: number; disabled: boolean }) => ({
+    attributes: { "data-sortable-id": id },
+    listeners: {},
+    setNodeRef: vi.fn(),
+    isDragging: false,
+    disabled,
+  })),
+}));
 
 vi.mock("./timeline-item", () => ({
   TimelineItem: ({ item }: { item: WatchlistItem }) => <div>{item.title}</div>,
@@ -47,6 +78,7 @@ describe("WatchlistTimeline reorder controls", () => {
 
   afterEach(() => {
     cleanup();
+    latestDndContextProps = {};
   });
 
   it("renders a flat custom-mode list with reorder handles", () => {
@@ -98,5 +130,67 @@ describe("WatchlistTimeline reorder controls", () => {
     expect(screen.getByText("2024")).not.toBeNull();
     expect(screen.getByText("2025")).not.toBeNull();
     expect(screen.queryByRole("button", { name: "Move First" })).toBeNull();
+  });
+
+  it("restores the live scroll position after dropping an item", () => {
+    const onReorder = vi.fn();
+    const scrollTo = vi.fn();
+
+    Object.defineProperty(window, "scrollTo", {
+      configurable: true,
+      value: scrollTo,
+    });
+    Object.defineProperty(window, "scrollY", {
+      configurable: true,
+      writable: true,
+      value: 180,
+    });
+
+    render(
+      <WatchlistTimeline
+        items={[item({ id: 1, title: "First" }), item({ id: 2, title: "Second" })]}
+        itemOrderMode="custom"
+        canReorder
+        onReorder={onReorder}
+      />,
+    );
+
+    act(() => {
+      latestDndContextProps.onDragStart?.({
+        active: { id: 1 },
+      });
+    });
+
+    window.scrollY = 540;
+
+    act(() => {
+      latestDndContextProps.onDragOver?.({
+        active: {
+          rect: {
+            current: {
+              initial: { top: 100, height: 40 },
+              translated: { top: 180, height: 40 },
+            },
+          },
+        },
+        over: {
+          id: 2,
+          rect: { top: 120, height: 40 },
+        },
+      });
+      latestDndContextProps.onDragEnd?.({
+        active: { id: 1 },
+        over: {
+          id: 2,
+        },
+      });
+    });
+
+    expect(onReorder).toHaveBeenCalledWith({
+      movedItemId: 1,
+      position: "after",
+      referenceItemId: 2,
+    });
+    expect(scrollTo).toHaveBeenCalledWith({ top: 540 });
   });
 });

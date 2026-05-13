@@ -21,7 +21,7 @@ import {
 } from "@/features/watchlists/detail/reorder";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import { Flag, Loader2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DragOverlayTimelineRow, ReorderableTimelineRow } from "./reorderable-timeline-row";
 
 interface WatchlistTimelineProps {
@@ -52,10 +52,20 @@ export function WatchlistTimeline({
 }: WatchlistTimelineProps) {
   const [activeItemId, setActiveItemId] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const pendingScrollTopRef = useRef<number | null>(null);
   const reorderEnabled = canReorder && Boolean(onReorder);
   const showHandleSlot = itemOrderMode === "custom";
   const activeItem =
     activeItemId === null ? null : (items.find((item) => item.id === activeItemId) ?? null);
+
+  useLayoutEffect(() => {
+    if (activeItemId !== null || pendingScrollTopRef.current === null) {
+      return;
+    }
+
+    window.scrollTo({ top: pendingScrollTopRef.current });
+    pendingScrollTopRef.current = null;
+  }, [activeItemId, items]);
 
   const groups = useMemo(() => {
     if (itemOrderMode === "custom") {
@@ -162,6 +172,10 @@ export function WatchlistTimeline({
     });
 
     if (intent) {
+      pendingScrollTopRef.current = window.scrollY;
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
       onReorder?.(intent);
     }
 
