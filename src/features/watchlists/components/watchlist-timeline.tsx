@@ -1,14 +1,16 @@
 import type { WatchlistItem } from "@/db/schema";
-import { TimelineItem } from "./TimelineItem";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Flag, Loader2 } from "lucide-react";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
+import { ReorderableTimelineRow } from "./reorderable-timeline-row";
 
 interface WatchlistTimelineProps {
   items: WatchlistItem[];
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
+  canReorder?: boolean;
+  onReorder?: (itemIds: number[]) => void;
 }
 
 export function WatchlistTimeline({
@@ -16,8 +18,12 @@ export function WatchlistTimeline({
   hasMore,
   isLoadingMore,
   onLoadMore,
+  canReorder = false,
+  onReorder,
 }: WatchlistTimelineProps) {
-  // Group items by year
+  const [draggedItemId, setDraggedItemId] = useState<number | null>(null);
+  const reorderEnabled = canReorder && Boolean(onReorder);
+
   const groups = useMemo(() => {
     const grouped: { year: string; items: WatchlistItem[] }[] = [];
 
@@ -78,7 +84,16 @@ export function WatchlistTimeline({
 
             <div className="space-y-2 md:pl-16">
               {group.items.map((item) => (
-                <TimelineItem key={item.id} item={item} />
+                <ReorderableTimelineRow
+                  key={item.id}
+                  item={item}
+                  items={items}
+                  reorderEnabled={reorderEnabled}
+                  draggedItemId={draggedItemId}
+                  onDragStart={setDraggedItemId}
+                  onDragEnd={() => setDraggedItemId(null)}
+                  onReorder={onReorder}
+                />
               ))}
             </div>
           </div>

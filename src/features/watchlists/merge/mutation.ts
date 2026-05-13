@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { mergeWatchlistsMutation } from "./mutation.server";
 
 export const mergeWatchlistsSchema = z
   .object({
@@ -18,6 +19,5 @@ export type MergeWatchlistsInput = z.infer<typeof mergeWatchlistsSchema>;
 export const mergeWatchlists = createServerFn({ method: "POST" })
   .inputValidator((data) => mergeWatchlistsSchema.parse(data))
   .handler(async ({ data }) => {
-    const { WatchlistsWrite } = await import("../write.server");
-    return WatchlistsWrite.merge(data);
+    return mergeWatchlistsMutation(data);
   });

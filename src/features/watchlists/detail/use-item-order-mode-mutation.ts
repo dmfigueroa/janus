@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
+import { invalidateWatchlistQueries } from "@/features/watchlists/cache";
 import {
-  invalidateWatchlistQueries,
   optimisticallyUpdateWatchlistItemOrderMode,
   rollbackWatchlistItemOrderMode,
 } from "@/features/watchlists/detail/cache";
@@ -42,7 +42,6 @@ export function useItemOrderModeMutation({
       const snapshot = await optimisticallyUpdateWatchlistItemOrderMode({
         queryClient,
         watchlistId,
-        previousItemOrderMode,
         nextItemOrderMode,
       });
 

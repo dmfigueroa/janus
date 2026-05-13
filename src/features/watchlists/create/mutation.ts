@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { createWatchlistMutation } from "./mutation.server";
 
 export const createWatchlistSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -11,6 +12,5 @@ export type CreateWatchlistInput = z.infer<typeof createWatchlistSchema>;
 export const createWatchlist = createServerFn({ method: "POST" })
   .inputValidator((data) => createWatchlistSchema.parse(data))
   .handler(async ({ data }) => {
-    const { WatchlistsWrite } = await import("../write.server");
-    return WatchlistsWrite.create(data);
+    return createWatchlistMutation(data);
   });

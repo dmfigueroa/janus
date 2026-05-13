@@ -1,14 +1,16 @@
 import { useEffect, useState, useMemo } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { WatchlistTimeline } from "@/components/watchlist/WatchlistTimeline";
 import { WatchlistHeader } from "@/features/watchlists/components/watchlist-header";
+import { WatchlistTimeline } from "@/features/watchlists/components/watchlist-timeline";
 import {
   getWatchlistDetailPage,
   watchlistDetailInfiniteQueryOptions,
   type WatchlistDetailQueryData,
 } from "@/features/watchlists/detail/query";
 import { useItemOrderModeMutation } from "@/features/watchlists/detail/use-item-order-mode-mutation";
+import { useReorderWatchlistItemsMutation } from "@/features/watchlists/detail/use-reorder-watchlist-items-mutation";
+import { canReorderWatchlistItems } from "@/features/watchlists/detail/reorder";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
 
 interface WatchlistDetailScreenProps {
@@ -65,9 +67,19 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
     onOptimisticChange: setItemOrderMode,
     onRollback: setItemOrderMode,
   });
+  const reorderItemsMutation = useReorderWatchlistItemsMutation({ watchlistId });
 
   const allItems = data?.pages.flatMap((page) => page.items) || [];
   const latestWatchlist = data?.pages[data.pages.length - 1]?.watchlist || initialData.watchlist;
+  const canReorderItems = canReorderWatchlistItems({
+    itemOrderMode,
+    showUnwatchedOnly,
+    searchQuery,
+    debouncedSearchQuery,
+    hasNextPage,
+    itemCount: allItems.length,
+    isReorderPending: reorderItemsMutation.isPending,
+  });
 
   const totalItems = latestWatchlist.stats.totalItems;
   const watchedItems = latestWatchlist.stats.watchedItems;
@@ -102,6 +114,8 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
           hasMore={hasNextPage}
           isLoadingMore={isFetchingNextPage}
           onLoadMore={fetchNextPage}
+          canReorder={canReorderItems}
+          onReorder={(itemIds) => reorderItemsMutation.mutate(itemIds)}
         />
       </div>
     </div>

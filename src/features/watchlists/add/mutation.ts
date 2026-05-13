@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { UnifiedMediaSchema } from "@/server/media";
+import { addToWatchlistMutation } from "./mutation.server";
 
 export const addToWatchlistSchema = z.object({
   watchlistId: z.number(),
@@ -16,6 +17,5 @@ export type GenericMedia = Omit<WatchlistMedia, "mediaType"> & {
 export const addToWatchlist = createServerFn({ method: "POST" })
   .inputValidator((data) => addToWatchlistSchema.parse(data))
   .handler(async ({ data }) => {
-    const { WatchlistsWrite } = await import("../write.server");
-    return WatchlistsWrite.add(data);
+    return addToWatchlistMutation(data);
   });

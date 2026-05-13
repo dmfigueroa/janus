@@ -96,7 +96,7 @@ describe("route module boundaries", () => {
       "utf8",
     );
     const timelineItem = readFileSync(
-      workspaceFile("src/components/watchlist/TimelineItem.tsx"),
+      workspaceFile("src/features/watchlists/components/timeline-item.tsx"),
       "utf8",
     );
     const toggleWatchedHook = readFileSync(
@@ -125,7 +125,8 @@ describe("route module boundaries", () => {
     expect(toggleWatchedHook).toMatch(/useServerFn\(toggleWatched\)/);
     expect(toggleWatchedHook).toMatch(/toggleWatchedFn\(/);
     expect(toggleWatchedHook).toMatch(/optimisticallyToggleWatchedItem\(/);
-    expect(toggleWatchedHook).toMatch(/rollbackWatchedToggle\(/);
+    expect(toggleWatchedHook).toMatch(/restoreWatchlistDetailSnapshot\(/);
+    expect(toggleWatchedHook).toMatch(/from\s+["']@\/features\/watchlists\/cache["']/);
     expect(toggleWatchedHook).toMatch(/invalidateWatchlistQueries\(/);
     expect(toggleWatchedHook).not.toMatch(/await\s+toggleWatched\(/);
     expect(toggleWatchedHook).not.toMatch(/from\s+["']@\/server\/watchlist["']/);
@@ -140,18 +141,20 @@ describe("route module boundaries", () => {
     expect(itemOrderModeHook).toMatch(/useServerFn\(updateWatchlistItemOrderMode\)/);
     expect(itemOrderModeHook).toMatch(/optimisticallyUpdateWatchlistItemOrderMode\(/);
     expect(itemOrderModeHook).toMatch(/rollbackWatchlistItemOrderMode\(/);
+    expect(itemOrderModeHook).toMatch(/from\s+["']@\/features\/watchlists\/cache["']/);
     expect(itemOrderModeHook).toMatch(/invalidateWatchlistQueries\(/);
     expect(itemOrderModeHook).not.toMatch(/await\s+updateWatchlistItemOrderMode\(/);
   });
 
-  it("keeps the shared watchlist query surface free of server-only imports", () => {
+  it("keeps server-only imports inside TanStack server function surfaces", () => {
     const watchlistQueries = readFileSync(
       workspaceFile("src/features/watchlists/detail/query.ts"),
       "utf8",
     );
 
-    expect(watchlistQueries).not.toMatch(/from\s+["'][^"']+\.server["']/);
     expect(watchlistQueries).not.toMatch(/from\s+["']\.\.\/read\.server["']/);
+    expect(watchlistQueries).toMatch(/from\s+["']\.\/query\.server["']/);
+    expect(watchlistQueries).toMatch(/createServerFn\(\)/);
   });
 
   it("keeps touched watchlist UI inside the watchlists feature boundary", () => {
@@ -166,6 +169,9 @@ describe("route module boundaries", () => {
 
     expect(watchlistDetailScreen).toMatch(
       /from\s+["']@\/features\/watchlists\/components\/watchlist-header["']/,
+    );
+    expect(watchlistDetailScreen).toMatch(
+      /from\s+["']@\/features\/watchlists\/components\/watchlist-timeline["']/,
     );
     expect(watchlistHeader).not.toMatch(/from\s+["']@\/components\/watchlist\/WatchlistHeader["']/);
   });
