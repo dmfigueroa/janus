@@ -38,6 +38,7 @@ export function ReorderableTimelineRow({
           showHandle={showHandle}
           interactionDisabled={interactionDisabled}
           dragging={isDragging}
+          dropCue={dropCue}
           handleProps={{
             ...attributes,
             ...listeners,
@@ -75,6 +76,7 @@ function TimelineRowShell({
   showHandle,
   interactionDisabled,
   dragging,
+  dropCue,
   handleProps,
 }: {
   item: WatchlistItem;
@@ -82,10 +84,16 @@ function TimelineRowShell({
   showHandle: boolean;
   interactionDisabled: boolean;
   dragging: boolean;
+  dropCue?: "before" | "after" | null;
   handleProps?: Record<string, unknown>;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl bg-background/80">
+    <div
+      className={cn(
+        "flex items-center gap-2 rounded-xl bg-background/80 transition-colors",
+        dropCue && "ring-2 ring-primary/30 bg-primary/5",
+      )}
+    >
       {showHandle ? (
         <button
           type="button"
@@ -115,7 +123,7 @@ function InsertionGap() {
   return (
     <div
       aria-hidden
-      className="my-1 h-4 rounded-xl border border-dashed border-primary/40 bg-primary/10"
+      className="my-2 h-5 rounded-xl border-2 border-dashed border-primary/60 bg-primary/15 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.2)]"
     />
   );
 }
