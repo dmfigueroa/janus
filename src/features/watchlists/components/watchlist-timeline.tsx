@@ -40,6 +40,11 @@ type DropTarget = {
   position: DropPlacement;
 };
 
+type PendingDrop = {
+  itemIdsBeforeDrop: number[];
+  scrollTop: number;
+};
+
 export function WatchlistTimeline({
   items,
   itemOrderMode,
@@ -52,20 +57,44 @@ export function WatchlistTimeline({
 }: WatchlistTimelineProps) {
   const [activeItemId, setActiveItemId] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
-  const pendingScrollTopRef = useRef<number | null>(null);
+  const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
+  const pendingDropTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reorderEnabled = canReorder && Boolean(onReorder);
   const showHandleSlot = itemOrderMode === "custom";
   const activeItem =
     activeItemId === null ? null : (items.find((item) => item.id === activeItemId) ?? null);
+  const itemIds = useMemo(() => items.map((item) => item.id), [items]);
 
   useLayoutEffect(() => {
-    if (activeItemId !== null || pendingScrollTopRef.current === null) {
+    if (!pendingDrop) {
       return;
     }
 
-    window.scrollTo({ top: pendingScrollTopRef.current });
-    pendingScrollTopRef.current = null;
-  }, [activeItemId, items]);
+    const hasOrderChanged =
+      pendingDrop.itemIdsBeforeDrop.length === itemIds.length &&
+      pendingDrop.itemIdsBeforeDrop.some((itemId, index) => itemId !== itemIds[index]);
+
+    if (!hasOrderChanged) {
+      return;
+    }
+
+    if (pendingDropTimeoutRef.current) {
+      clearTimeout(pendingDropTimeoutRef.current);
+      pendingDropTimeoutRef.current = null;
+    }
+    window.scrollTo({ top: pendingDrop.scrollTop });
+    setPendingDrop(null);
+    setActiveItemId(null);
+    setDropTarget(null);
+  }, [itemIds, pendingDrop]);
+
+  useLayoutEffect(() => {
+    return () => {
+      if (pendingDropTimeoutRef.current) {
+        clearTimeout(pendingDropTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const groups = useMemo(() => {
     if (itemOrderMode === "custom") {
@@ -123,8 +152,13 @@ export function WatchlistTimeline({
   }
 
   function clearDragState() {
+    if (pendingDropTimeoutRef.current) {
+      clearTimeout(pendingDropTimeoutRef.current);
+      pendingDropTimeoutRef.current = null;
+    }
     setActiveItemId(null);
     setDropTarget(null);
+    setPendingDrop(null);
   }
 
   function updateDropTarget(event: DragMoveEvent | DragOverEvent) {
@@ -172,11 +206,22 @@ export function WatchlistTimeline({
     });
 
     if (intent) {
-      pendingScrollTopRef.current = window.scrollY;
       if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();
       }
+      setPendingDrop({
+        itemIdsBeforeDrop: itemIds,
+        scrollTop: window.scrollY,
+      });
+      pendingDropTimeoutRef.current = setTimeout(() => {
+        pendingDropTimeoutRef.current = null;
+        setPendingDrop(null);
+        setActiveItemId(null);
+        setDropTarget(null);
+      }, 500);
       onReorder?.(intent);
+      setDropTarget(null);
+      return;
     }
 
     clearDragState();

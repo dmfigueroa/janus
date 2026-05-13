@@ -146,7 +146,7 @@ describe("WatchlistTimeline reorder controls", () => {
       value: 180,
     });
 
-    render(
+    const { rerender } = render(
       <WatchlistTimeline
         items={[item({ id: 1, title: "First" }), item({ id: 2, title: "Second" })]}
         itemOrderMode="custom"
@@ -191,6 +191,16 @@ describe("WatchlistTimeline reorder controls", () => {
       position: "after",
       referenceItemId: 2,
     });
+
+    rerender(
+      <WatchlistTimeline
+        items={[item({ id: 2, title: "Second" }), item({ id: 1, title: "First" })]}
+        itemOrderMode="custom"
+        canReorder
+        onReorder={onReorder}
+      />,
+    );
+
     expect(scrollTo).toHaveBeenCalledWith({ top: 540 });
   });
 });
