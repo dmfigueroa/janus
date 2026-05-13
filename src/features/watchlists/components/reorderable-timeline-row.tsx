@@ -1,4 +1,5 @@
 import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import type { WatchlistItem } from "@/db/schema";
 import { cn } from "@/utils/cn";
@@ -19,10 +20,22 @@ export function ReorderableTimelineRow({
   interactionDisabled,
   dropCue,
 }: ReorderableTimelineRowProps) {
-  const { attributes, listeners, setNodeRef, isDragging } = useSortable({
+  const {
+    attributes,
+    listeners,
+    setActivatorNodeRef,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
     id: item.id,
     disabled: !showHandle,
   });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   return (
     <>
@@ -30,6 +43,7 @@ export function ReorderableTimelineRow({
       <div
         ref={setNodeRef}
         data-testid={`watchlist-timeline-row-${item.id}`}
+        style={style}
         className={cn("rounded-xl", isDragging && "h-0 overflow-hidden opacity-0")}
       >
         <TimelineRowShell
@@ -41,6 +55,7 @@ export function ReorderableTimelineRow({
           handleProps={{
             ...attributes,
             ...listeners,
+            ref: setActivatorNodeRef,
           }}
         />
       </div>
