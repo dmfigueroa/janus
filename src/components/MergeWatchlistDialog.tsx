@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -43,8 +43,40 @@ export function MergeWatchlistDialog({
   const [newName, setNewName] = useState("");
   const [targetId, setTargetId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [orderedSourceWatchlistIds, setOrderedSourceWatchlistIds] = useState(selectedWatchlistIds);
   const router = useRouter();
   const mergeWatchlistsFn = useServerFn(mergeWatchlists);
+  const selectedWatchlists = orderedSourceWatchlistIds.flatMap((watchlistId) => {
+    const watchlist = allWatchlists.find((list) => list.id === watchlistId);
+    return watchlist ? [watchlist] : [];
+  });
+  const hasCustomOrderedSelection = selectedWatchlists.some(
+    (watchlist) => watchlist.itemOrderMode === "custom",
+  );
+
+  useEffect(() => {
+    setOrderedSourceWatchlistIds(selectedWatchlistIds);
+  }, [selectedWatchlistIds, open]);
+
+  const moveSelectedWatchlist = (watchlistId: number, direction: "up" | "down") => {
+    setOrderedSourceWatchlistIds((currentIds) => {
+      const currentIndex = currentIds.indexOf(watchlistId);
+
+      if (currentIndex === -1) {
+        return currentIds;
+      }
+
+      const nextIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+
+      if (nextIndex < 0 || nextIndex >= currentIds.length) {
+        return currentIds;
+      }
+
+      const nextIds = [...currentIds];
+      [nextIds[currentIndex], nextIds[nextIndex]] = [nextIds[nextIndex], nextIds[currentIndex]];
+      return nextIds;
+    });
+  };
 
   const handleMerge = async () => {
     try {
@@ -56,7 +88,7 @@ export function MergeWatchlistDialog({
         }
         const result = await mergeWatchlistsFn({
           data: {
-            sourceWatchlistIds: selectedWatchlistIds,
+            sourceWatchlistIds: orderedSourceWatchlistIds,
             newWatchlistName: newName,
           },
         });
@@ -72,8 +104,8 @@ export function MergeWatchlistDialog({
         }
         const result = await mergeWatchlistsFn({
           data: {
-            sourceWatchlistIds: selectedWatchlistIds,
-            targetWatchlistId: parseInt(targetId),
+            sourceWatchlistIds: orderedSourceWatchlistIds,
+            targetWatchlistId: parseInt(targetId, 10),
           },
         });
 
@@ -91,6 +123,7 @@ export function MergeWatchlistDialog({
       setNewName("");
       setTargetId("");
       setMode("new");
+      setOrderedSourceWatchlistIds(selectedWatchlistIds);
     } catch (e) {
       console.error(e);
       toast.error("Failed to merge watchlists");
@@ -111,6 +144,57 @@ export function MergeWatchlistDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Merge order</p>
+              <p className="text-xs text-muted-foreground">
+                {hasCustomOrderedSelection
+                  ? "This order sets the final custom ranking when any selected list uses custom order."
+                  : "This order is kept for the selected lists and release ordering still applies within each list."}
+              </p>
+            </div>
+
+            <ol className="mt-3 space-y-2">
+              {selectedWatchlists.map((watchlist, index) => (
+                <li
+                  key={watchlist.id}
+                  data-testid={`merge-order-item-${watchlist.id}`}
+                  className="flex items-center justify-between gap-3 rounded-md border bg-background px-3 py-2"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{watchlist.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {watchlist.itemOrderMode === "custom" ? "Custom order" : "Release order"}
+                    </p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => moveSelectedWatchlist(watchlist.id, "up")}
+                      disabled={isSubmitting || index === 0}
+                      aria-label={`Move ${watchlist.name} up`}
+                    >
+                      Up
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => moveSelectedWatchlist(watchlist.id, "down")}
+                      disabled={isSubmitting || index === selectedWatchlists.length - 1}
+                      aria-label={`Move ${watchlist.name} down`}
+                    >
+                      Down
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </div>
+
           <RadioGroup value={mode} onValueChange={(v) => setMode(v as "new" | "existing")}>
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="new" id="r-new" />
@@ -137,13 +221,11 @@ export function MergeWatchlistDialog({
                     <SelectValue placeholder="Select target watchlist" />
                   </SelectTrigger>
                   <SelectContent>
-                    {allWatchlists
-                      .filter((list) => selectedWatchlistIds.includes(list.id))
-                      .map((list) => (
-                        <SelectItem key={list.id} value={list.id.toString()}>
-                          {list.name}
-                        </SelectItem>
-                      ))}
+                    {selectedWatchlists.map((list) => (
+                      <SelectItem key={list.id} value={list.id.toString()}>
+                        {list.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
