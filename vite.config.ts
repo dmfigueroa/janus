@@ -31,6 +31,7 @@ const config = defineConfig({
       injectRegister: null,
       manifestFilename: "manifest.json",
       registerType: "prompt",
+      useCredentials: true,
       manifest: {
         short_name: "Janus",
         name: "Janus Watchlist App",

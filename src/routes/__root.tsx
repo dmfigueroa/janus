@@ -6,6 +6,7 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
+import { pwaInfo } from "virtual:pwa-info";
 import { Toaster } from "@/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BottomNav } from "@/components/BottomNav";
@@ -45,10 +46,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      {
-        rel: "manifest",
-        href: "/manifest.json",
-      },
+      ...(pwaInfo?.webManifest
+        ? [
+            {
+              rel: "manifest" as const,
+              href: pwaInfo.webManifest.href,
+              crossOrigin: pwaInfo.webManifest.useCredentials
+                ? ("use-credentials" as const)
+                : undefined,
+            },
+          ]
+        : []),
     ],
   }),
 
