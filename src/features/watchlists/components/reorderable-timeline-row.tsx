@@ -40,7 +40,7 @@ export function ReorderableTimelineRow({
       ref={setNodeRef}
       data-testid={`watchlist-timeline-row-${item.id}`}
       style={style}
-      className={cn("rounded-xl", isDragging && "h-0 overflow-hidden opacity-0")}
+      className={cn("rounded-xl", isDragging && "opacity-0")}
     >
       <TimelineRowShell
         item={item}
