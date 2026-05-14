@@ -350,47 +350,214 @@ describe("watchlist mutation contract", () => {
     await expect(WatchlistsRead.detailScreen({ watchlistId: secondSource.id })).resolves.toBeNull();
   });
 
-  it("rejects a merge when any selected source watchlist uses custom order", async () => {
+  it("keeps release ordering when merging only release-ordered watchlists", async () => {
+    const [firstSource, secondSource] = await db
+      .insert(watchlists)
+      .values([{ name: "First Source" }, { name: "Second Source" }])
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: firstSource.id,
+        tmdbId: "march",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "March Release",
+        releaseDate: "2024-03-01",
+      },
+      {
+        watchlistId: secondSource.id,
+        tmdbId: "january",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "January Release",
+        releaseDate: "2024-01-01",
+      },
+      {
+        watchlistId: secondSource.id,
+        tmdbId: "february",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "February Release",
+        releaseDate: "2024-02-01",
+      },
+    ]);
+
+    const result = await mergeWatchlistsMutation({
+      sourceWatchlistIds: [firstSource.id, secondSource.id],
+      newWatchlistName: "Release Merge",
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      throw new Error(result.message);
+    }
+
+    const mergedDetail = await WatchlistsRead.detailScreen({
+      watchlistId: result.targetId,
+      unwatchedOnly: false,
+    });
+
+    expect(mergedDetail?.watchlist.itemOrderMode).toBe("release");
+    expect(
+      mergedDetail?.items.map((item) => ({
+        title: item.title,
+        customRank: item.customRank,
+      })),
+    ).toEqual([
+      { title: "January Release", customRank: null },
+      { title: "February Release", customRank: null },
+      { title: "March Release", customRank: null },
+    ]);
+  });
+
+  it("merges mixed release/custom sources into a custom-ordered target with sequential ranks", async () => {
     const [releaseSource, customSource] = await db
       .insert(watchlists)
       .values([{ name: "Release Source" }, { name: "Custom Source", itemOrderMode: "custom" }])
       .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: releaseSource.id,
+        tmdbId: "release-later",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Release Later",
+        releaseDate: "2024-03-01",
+      },
+      {
+        watchlistId: releaseSource.id,
+        tmdbId: "release-earlier",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Release Earlier",
+        releaseDate: "2024-01-01",
+      },
+      {
+        watchlistId: customSource.id,
+        tmdbId: "custom-second",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Custom Second",
+        releaseDate: "2024-02-01",
+        customRank: 2,
+      },
+      {
+        watchlistId: customSource.id,
+        tmdbId: "custom-first",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Custom First",
+        releaseDate: "2024-04-01",
+        customRank: 1,
+      },
+    ]);
 
     const result = await mergeWatchlistsMutation({
       sourceWatchlistIds: [releaseSource.id, customSource.id],
       newWatchlistName: "Merged Queue",
     });
 
-    expect(result).toEqual({
-      success: false,
-      message: "Merging custom-ordered watchlists is not supported yet.",
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      throw new Error(result.message);
+    }
+
+    const mergedDetail = await WatchlistsRead.detailScreen({
+      watchlistId: result.targetId,
+      unwatchedOnly: false,
     });
-    await expect(
-      WatchlistsRead.detailScreen({ watchlistId: releaseSource.id }),
-    ).resolves.not.toBeNull();
-    await expect(
-      WatchlistsRead.detailScreen({ watchlistId: customSource.id }),
-    ).resolves.not.toBeNull();
-    await expect(WatchlistsRead.listScreen()).resolves.toHaveLength(2);
+
+    expect(mergedDetail?.watchlist.itemOrderMode).toBe("custom");
+    expect(
+      mergedDetail?.items.map((item) => ({
+        title: item.title,
+        customRank: item.customRank,
+      })),
+    ).toEqual([
+      { title: "Release Earlier", customRank: 1 },
+      { title: "Release Later", customRank: 2 },
+      { title: "Custom First", customRank: 3 },
+      { title: "Custom Second", customRank: 4 },
+    ]);
   });
 
-  it("rejects a merge into a custom-ordered target watchlist", async () => {
+  it("merges into an existing custom-ordered target using selected-list order for duplicate placement", async () => {
     const [target, source] = await db
       .insert(watchlists)
       .values([{ name: "Custom Target", itemOrderMode: "custom" }, { name: "Release Source" }])
       .returning();
 
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: target.id,
+        tmdbId: "target-only",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Target Only",
+        releaseDate: "2024-04-01",
+        customRank: 1,
+        isWatched: false,
+      },
+      {
+        watchlistId: target.id,
+        tmdbId: "shared-item",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Shared Item",
+        releaseDate: "2024-05-01",
+        customRank: 2,
+        isWatched: false,
+      },
+      {
+        watchlistId: source.id,
+        tmdbId: "shared-item",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Shared Item",
+        releaseDate: "2024-01-01",
+        isWatched: true,
+      },
+      {
+        watchlistId: source.id,
+        tmdbId: "source-only",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Source Only",
+        releaseDate: "2024-02-01",
+        isWatched: false,
+      },
+    ]);
+
     const result = await mergeWatchlistsMutation({
+      sourceWatchlistIds: [source.id, target.id],
       targetWatchlistId: target.id,
-      sourceWatchlistIds: [source.id],
     });
 
     expect(result).toEqual({
-      success: false,
-      message: "Merging custom-ordered watchlists is not supported yet.",
+      success: true,
+      targetId: target.id,
     });
-    await expect(WatchlistsRead.detailScreen({ watchlistId: target.id })).resolves.not.toBeNull();
-    await expect(WatchlistsRead.detailScreen({ watchlistId: source.id })).resolves.not.toBeNull();
+
+    const targetDetail = await WatchlistsRead.detailScreen({
+      watchlistId: target.id,
+      unwatchedOnly: false,
+    });
+
+    expect(targetDetail?.watchlist.itemOrderMode).toBe("custom");
+    expect(
+      targetDetail?.items.map((item) => ({
+        title: item.title,
+        customRank: item.customRank,
+        isWatched: item.isWatched,
+      })),
+    ).toEqual([
+      { title: "Shared Item", customRank: 1, isWatched: true },
+      { title: "Source Only", customRank: 2, isWatched: false },
+      { title: "Target Only", customRank: 3, isWatched: false },
+    ]);
+    await expect(WatchlistsRead.detailScreen({ watchlistId: source.id })).resolves.toBeNull();
   });
 
   it("rejects a merge without source watchlists before creating a target", async () => {

@@ -2,6 +2,7 @@ import { getDb } from "@/db/db.server";
 import { watchlistItems, watchlists } from "@/db/schema";
 import type { MergeWatchlistsInput } from "./mutation";
 import { hasCustomOrderMergeParticipant } from "@/features/watchlists/repository.server";
+import { compareItemsByOrderMode } from "@/features/watchlists/order";
 import { eq, inArray, sql } from "drizzle-orm";
 
 type WatchlistDb = ReturnType<typeof getDb>;
@@ -9,9 +10,6 @@ type WatchlistTransaction = Parameters<Parameters<WatchlistDb["transaction"]>[0]
 type MergeWatchlistsResult =
   | { success: true; targetId: number }
   | { success: false; message: string };
-
-const CUSTOM_ORDER_MERGE_UNSUPPORTED_MESSAGE =
-  "Merging custom-ordered watchlists is not supported yet.";
 
 function assertMergeHasSources(sourceWatchlistIds: number[]) {
   if (sourceWatchlistIds.length === 0) {
@@ -52,6 +50,109 @@ function resolveMergeTarget(
 
 function sourceIdsToMove(sourceWatchlistIds: number[], targetId: number) {
   return sourceWatchlistIds.filter((id) => id !== targetId);
+}
+
+function uniqueMergeParticipantIds(sourceWatchlistIds: number[]) {
+  return Array.from(new Set(sourceWatchlistIds));
+}
+
+function buildWatchlistItemKey(item: typeof watchlistItems.$inferSelect) {
+  return `${item.tmdbId}:${item.mediaType}`;
+}
+
+function loadMergeParticipants(transaction: WatchlistTransaction, orderedWatchlistIds: number[]) {
+  const participants = uniqueMergeParticipantIds(orderedWatchlistIds);
+
+  const participantWatchlists = transaction
+    .select()
+    .from(watchlists)
+    .where(inArray(watchlists.id, participants))
+    .all();
+  const participantItems = transaction
+    .select()
+    .from(watchlistItems)
+    .where(inArray(watchlistItems.watchlistId, participants))
+    .all();
+
+  const watchlistsById = new Map(
+    participantWatchlists.map((watchlist) => [watchlist.id, watchlist]),
+  );
+  const itemsByWatchlistId = participantItems.reduce<
+    Map<number, Array<typeof watchlistItems.$inferSelect>>
+  >((acc, item) => {
+    const items = acc.get(item.watchlistId) ?? [];
+    items.push(item);
+    acc.set(item.watchlistId, items);
+    return acc;
+  }, new Map());
+
+  return orderedWatchlistIds.flatMap((watchlistId) => {
+    const watchlist = watchlistsById.get(watchlistId);
+
+    if (!watchlist) {
+      return [];
+    }
+
+    const items = [...(itemsByWatchlistId.get(watchlistId) ?? [])].sort((left, right) =>
+      compareItemsByOrderMode(left, right, watchlist.itemOrderMode),
+    );
+
+    return [{ watchlist, items }];
+  });
+}
+
+function buildCustomMergedItems({
+  orderedWatchlistIds,
+  targetId,
+  transaction,
+}: {
+  orderedWatchlistIds: number[];
+  targetId: number;
+  transaction: WatchlistTransaction;
+}) {
+  const mergedItems: Array<typeof watchlistItems.$inferInsert> = [];
+  const mergedItemsByKey = new Map<
+    string,
+    typeof watchlistItems.$inferInsert & { isWatched: boolean }
+  >();
+
+  for (const participant of loadMergeParticipants(transaction, orderedWatchlistIds)) {
+    for (const item of participant.items) {
+      const key = buildWatchlistItemKey(item);
+      const existing = mergedItemsByKey.get(key);
+
+      if (existing) {
+        existing.isWatched = existing.isWatched || Boolean(item.isWatched);
+        continue;
+      }
+
+      const mergedItem = {
+        watchlistId: targetId,
+        tmdbId: item.tmdbId,
+        source: item.source,
+        mediaType: item.mediaType,
+        title: item.title,
+        parentTitle: item.parentTitle,
+        season: item.season,
+        episode: item.episode,
+        posterPath: item.posterPath,
+        releaseDate: item.releaseDate,
+        voteAverage: item.voteAverage,
+        runtime: item.runtime,
+        customRank: mergedItems.length + 1,
+        isWatched: Boolean(item.isWatched),
+        addedAt: item.addedAt,
+      } satisfies typeof watchlistItems.$inferInsert;
+
+      mergedItems.push(mergedItem);
+      mergedItemsByKey.set(key, mergedItem);
+    }
+  }
+
+  return mergedItems.map((item, index) => ({
+    ...item,
+    customRank: index + 1,
+  }));
 }
 
 function mergeSourceItemsIntoTarget(
@@ -115,6 +216,18 @@ function deleteMergedSources(transaction: WatchlistTransaction, sourceWatchlistI
   transaction.delete(watchlists).where(inArray(watchlists.id, sourceWatchlistIds)).run();
 }
 
+function clearTargetItems(transaction: WatchlistTransaction, targetId: number) {
+  transaction.delete(watchlistItems).where(eq(watchlistItems.watchlistId, targetId)).run();
+}
+
+function updateTargetOrderMode(
+  transaction: WatchlistTransaction,
+  targetId: number,
+  itemOrderMode: (typeof watchlists.$inferInsert)["itemOrderMode"],
+) {
+  transaction.update(watchlists).set({ itemOrderMode }).where(eq(watchlists.id, targetId)).run();
+}
+
 export async function mergeWatchlistsMutation({
   targetWatchlistId,
   sourceWatchlistIds,
@@ -122,15 +235,33 @@ export async function mergeWatchlistsMutation({
 }: MergeWatchlistsInput): Promise<MergeWatchlistsResult> {
   assertMergeHasSources(sourceWatchlistIds);
 
-  if (await hasCustomOrderMergeParticipant({ targetWatchlistId, sourceWatchlistIds })) {
-    return { success: false, message: CUSTOM_ORDER_MERGE_UNSUPPORTED_MESSAGE };
-  }
+  const shouldUseCustomOrder = await hasCustomOrderMergeParticipant({
+    targetWatchlistId,
+    sourceWatchlistIds,
+  });
 
   const db = getDb();
   return db.transaction((transaction) => {
     const targetId = resolveMergeTarget(transaction, { targetWatchlistId, newWatchlistName });
     const sourceIds = sourceIdsToMove(sourceWatchlistIds, targetId);
-    const mergedItems = mergeSourceItemsIntoTarget(transaction, sourceIds, targetId);
+    const mergedItems = shouldUseCustomOrder
+      ? (() => {
+          const mergedItemValues = buildCustomMergedItems({
+            orderedWatchlistIds: uniqueMergeParticipantIds(sourceWatchlistIds),
+            targetId,
+            transaction,
+          });
+
+          clearTargetItems(transaction, targetId);
+
+          if (mergedItemValues.length > 0) {
+            transaction.insert(watchlistItems).values(mergedItemValues).run();
+          }
+
+          updateTargetOrderMode(transaction, targetId, "custom");
+          return mergedItemValues.length > 0;
+        })()
+      : mergeSourceItemsIntoTarget(transaction, sourceIds, targetId);
 
     if (mergedItems) {
       markLastItemAddedInTransaction(transaction, targetId);
