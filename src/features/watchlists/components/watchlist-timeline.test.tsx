@@ -135,19 +135,8 @@ describe("WatchlistTimeline reorder controls", () => {
     expect(screen.queryByRole("button", { name: "Move First" })).toBeNull();
   });
 
-  it("restores the live scroll position after dropping an item", () => {
+  it("keeps the dropped order locally until the reordered items arrive", () => {
     const onReorder = vi.fn();
-    const scrollTo = vi.fn();
-
-    Object.defineProperty(window, "scrollTo", {
-      configurable: true,
-      value: scrollTo,
-    });
-    Object.defineProperty(window, "scrollY", {
-      configurable: true,
-      writable: true,
-      value: 180,
-    });
 
     const { rerender } = render(
       <WatchlistTimeline
@@ -163,8 +152,6 @@ describe("WatchlistTimeline reorder controls", () => {
         active: { id: 1 },
       });
     });
-
-    window.scrollY = 540;
 
     act(() => {
       latestDndContextProps.onDragEnd?.({
@@ -189,7 +176,5 @@ describe("WatchlistTimeline reorder controls", () => {
         onReorder={onReorder}
       />,
     );
-
-    expect(scrollTo).toHaveBeenCalledWith({ top: 540 });
   });
 });

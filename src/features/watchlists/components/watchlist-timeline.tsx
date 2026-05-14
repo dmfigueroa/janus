@@ -19,7 +19,7 @@ import {
 } from "@/features/watchlists/detail/reorder";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import { Flag, Loader2 } from "lucide-react";
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DragOverlayTimelineRow, ReorderableTimelineRow } from "./reorderable-timeline-row";
 
 interface WatchlistTimelineProps {
@@ -35,7 +35,6 @@ interface WatchlistTimelineProps {
 
 type PendingDrop = {
   itemIdsAfterDrop: number[];
-  scrollTop: number;
 };
 
 export function WatchlistTimeline({
@@ -63,15 +62,7 @@ export function WatchlistTimeline({
     return reorderItemsByIds(items, pendingDrop.itemIdsAfterDrop);
   }, [items, pendingDrop]);
 
-  useLayoutEffect(() => {
-    if (!pendingDrop) {
-      return;
-    }
-
-    window.scrollTo({ top: pendingDrop.scrollTop });
-  }, [pendingDrop]);
-
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!pendingDrop) {
       return;
     }
@@ -170,7 +161,6 @@ export function WatchlistTimeline({
       }
       setPendingDrop({
         itemIdsAfterDrop: nextItemIds,
-        scrollTop: window.scrollY,
       });
       setActiveItemId(null);
       onReorder?.(intent);
