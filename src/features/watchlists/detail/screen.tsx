@@ -122,6 +122,7 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
           onLoadMore={isReorderPending ? undefined : fetchNextPage}
           canReorder={canReorderItems}
           interactionDisabled={isReorderPending}
+          reorderFailed={reorderItemsMutation.isError}
           onReorder={async (intent) => {
             await reorderItemsMutation.mutateAsync(intent);
             toast.success("Order saved", { duration: 2000 });

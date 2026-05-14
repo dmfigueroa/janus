@@ -12,10 +12,14 @@ import {
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { WatchlistItem } from "@/db/schema";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
-import { resolveReorderIntent, type ReorderIntent } from "@/features/watchlists/detail/reorder";
+import {
+  reorderVisibleItemsByAnchor,
+  resolveReorderIntent,
+  type ReorderIntent,
+} from "@/features/watchlists/detail/reorder";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import { Flag, Loader2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DragOverlayTimelineRow, ReorderableTimelineRow } from "./reorderable-timeline-row";
 
 interface WatchlistTimelineProps {
@@ -26,6 +30,7 @@ interface WatchlistTimelineProps {
   onLoadMore?: () => void;
   canReorder?: boolean;
   interactionDisabled?: boolean;
+  reorderFailed?: boolean;
   onReorder?: (intent: ReorderIntent) => void;
 }
 
@@ -37,24 +42,54 @@ export function WatchlistTimeline({
   onLoadMore,
   canReorder = false,
   interactionDisabled = false,
+  reorderFailed = false,
   onReorder,
 }: WatchlistTimelineProps) {
   const [activeItemId, setActiveItemId] = useState<number | null>(null);
+  const [localOrderIds, setLocalOrderIds] = useState<number[] | null>(null);
   const reorderEnabled = canReorder && Boolean(onReorder);
   const showHandleSlot = itemOrderMode === "custom";
+  const itemIds = useMemo(() => items.map((item) => item.id), [items]);
+  const displayedItems = useMemo(
+    () => (localOrderIds ? reorderItemsByIds(items, localOrderIds) : items),
+    [items, localOrderIds],
+  );
   const activeItem =
-    activeItemId === null ? null : (items.find((item) => item.id === activeItemId) ?? null);
+    activeItemId === null
+      ? null
+      : (displayedItems.find((item) => item.id === activeItemId) ?? null);
+
+  useEffect(() => {
+    if (itemOrderMode !== "custom") {
+      setLocalOrderIds(null);
+      return;
+    }
+
+    if (!localOrderIds) {
+      return;
+    }
+
+    if (areItemIdsEqual(itemIds, localOrderIds) || !haveSameItemSet(itemIds, localOrderIds)) {
+      setLocalOrderIds(null);
+    }
+  }, [itemIds, itemOrderMode, localOrderIds]);
+
+  useEffect(() => {
+    if (reorderFailed) {
+      setLocalOrderIds(null);
+    }
+  }, [reorderFailed]);
 
   const groups = useMemo(() => {
     if (itemOrderMode === "custom") {
-      return [{ year: "custom", items }];
+      return [{ year: "custom", items: displayedItems }];
     }
 
     const grouped: { year: string; items: WatchlistItem[] }[] = [];
     let currentYear = "";
     let currentGroup: WatchlistItem[] = [];
 
-    items.forEach((item) => {
+    displayedItems.forEach((item) => {
       const year = item.releaseDate ? item.releaseDate.split("-")[0] : "TBA";
 
       if (year !== currentYear) {
@@ -73,7 +108,7 @@ export function WatchlistTimeline({
     }
 
     return grouped;
-  }, [items, itemOrderMode]);
+  }, [displayedItems, itemOrderMode]);
 
   const sensors = useSensors(
     useSensor(MouseSensor),
@@ -111,20 +146,27 @@ export function WatchlistTimeline({
     }
 
     const referenceItemId = Number(event.over.id);
-    const movedIndex = items.findIndex((item) => item.id === activeItemId);
-    const referenceIndex = items.findIndex((item) => item.id === referenceItemId);
+    const movedIndex = displayedItems.findIndex((item) => item.id === activeItemId);
+    const referenceIndex = displayedItems.findIndex((item) => item.id === referenceItemId);
     const position = movedIndex < referenceIndex ? "after" : "before";
+    const nextItemIds = reorderVisibleItemsByAnchor({
+      items: displayedItems,
+      movedItemId: activeItemId,
+      referenceItemId,
+      position,
+    });
     const intent = resolveReorderIntent({
-      items,
+      items: displayedItems,
       movedItemId: activeItemId,
       referenceItemId,
       position,
     });
 
-    if (intent) {
+    if (intent && nextItemIds) {
       if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();
       }
+      setLocalOrderIds(nextItemIds);
       setActiveItemId(null);
       onReorder?.(intent);
       return;
@@ -207,4 +249,50 @@ export function WatchlistTimeline({
       </div>
     </DndContext>
   );
+}
+
+function reorderItemsByIds(items: WatchlistItem[], itemIds: number[]) {
+  if (
+    areItemIdsEqual(
+      items.map((item) => item.id),
+      itemIds,
+    )
+  ) {
+    return items;
+  }
+
+  const rankByItemId = new Map(itemIds.map((itemId, index) => [itemId, index]));
+  const originalIndexByItemId = new Map(items.map((item, index) => [item.id, index]));
+
+  return [...items].sort((left, right) => {
+    const leftRank = rankByItemId.get(left.id);
+    const rightRank = rankByItemId.get(right.id);
+
+    if (leftRank === undefined && rightRank === undefined) {
+      return (originalIndexByItemId.get(left.id) ?? 0) - (originalIndexByItemId.get(right.id) ?? 0);
+    }
+
+    if (leftRank === undefined) {
+      return 1;
+    }
+
+    if (rightRank === undefined) {
+      return -1;
+    }
+
+    return leftRank - rightRank;
+  });
+}
+
+function areItemIdsEqual(left: number[], right: number[]) {
+  return left.length === right.length && left.every((itemId, index) => itemId === right[index]);
+}
+
+function haveSameItemSet(left: number[], right: number[]) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  const rightIds = new Set(right);
+  return left.every((itemId) => rightIds.has(itemId));
 }

@@ -135,7 +135,7 @@ describe("WatchlistTimeline reorder controls", () => {
     expect(screen.queryByRole("button", { name: "Move First" })).toBeNull();
   });
 
-  it("derives reordered rows from the parent items", () => {
+  it("keeps the dropped order locally until the reordered items arrive", () => {
     const onReorder = vi.fn();
 
     const { rerender } = render(
@@ -170,7 +170,7 @@ describe("WatchlistTimeline reorder controls", () => {
 
     rerender(
       <WatchlistTimeline
-        items={[item({ id: 2, title: "Second" }), item({ id: 1, title: "First" })]}
+        items={[item({ id: 1, title: "First" }), item({ id: 2, title: "Second" })]}
         itemOrderMode="custom"
         canReorder
         onReorder={onReorder}
@@ -181,5 +181,14 @@ describe("WatchlistTimeline reorder controls", () => {
       .getAllByTestId(/watchlist-timeline-row-/)
       .map((row) => row.textContent?.trim());
     expect(rowLabels).toEqual(["Second", "First"]);
+
+    rerender(
+      <WatchlistTimeline
+        items={[item({ id: 2, title: "Second" }), item({ id: 1, title: "First" })]}
+        itemOrderMode="custom"
+        canReorder
+        onReorder={onReorder}
+      />,
+    );
   });
 });
