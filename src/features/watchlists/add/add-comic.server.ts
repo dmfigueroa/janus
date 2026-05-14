@@ -2,6 +2,8 @@ import { watchlistItems } from "@/db/schema";
 import type { WatchlistMedia } from "./mutation";
 import * as repository from "@/features/watchlists/repository.server";
 import { getComicIssues } from "@/server/providers/comicvine.server";
+import type { AddToWatchlistInsertionPosition } from "./mutation";
+import { persistAddedItems } from "./insert.server";
 import { rejectAdd, type WatchlistWriteResult } from "./shared.server";
 
 const COMICVINE_UNAVAILABLE_MESSAGE =
@@ -12,6 +14,7 @@ export async function addComicToWatchlist(
   watchlistId: number,
   volumeId: string,
   media: WatchlistMedia,
+  insertionPosition?: AddToWatchlistInsertionPosition,
 ): Promise<WatchlistWriteResult> {
   const apiKey = getApiKey();
   if (!apiKey) {
@@ -31,10 +34,20 @@ export async function addComicToWatchlist(
 
   const items = mapToWatchlistComics(issues, watchlistId, media.title);
 
-  await repository.insertWatchlistItems(items);
-  await repository.markLastItemAdded(watchlistId);
+  const result = await persistAddedItems({
+    watchlistId,
+    insertionPosition,
+    items,
+  });
 
-  return { success: true, message: getSuccessMessage(items.length, existingIssueIds.size) };
+  if (!result.success) {
+    return result;
+  }
+
+  return {
+    success: true,
+    message: getSuccessMessage(result.insertedCount, existingIssueIds.size),
+  };
 }
 
 // --- Implementation Details ---

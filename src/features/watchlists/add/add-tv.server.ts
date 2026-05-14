@@ -3,6 +3,8 @@ import { watchlistItems } from "@/db/schema";
 import type { WatchlistMedia } from "./mutation";
 import * as repository from "@/features/watchlists/repository.server";
 import { getSeasonDetails, getTVDetails } from "@/server/providers/tmdb-api.server";
+import type { AddToWatchlistInsertionPosition } from "./mutation";
+import { persistAddedItems } from "./insert.server";
 import { rejectAdd, type WatchlistWriteResult } from "./shared.server";
 
 const limit = pLimit(5);
@@ -12,6 +14,7 @@ export async function addTVShowToWatchlist(
   watchlistId: number,
   tmdbId: number,
   media: WatchlistMedia,
+  insertionPosition?: AddToWatchlistInsertionPosition,
 ): Promise<WatchlistWriteResult> {
   const showDetails = await fetchShowDetails(tmdbId);
   if (!showDetails) {
@@ -31,10 +34,17 @@ export async function addTVShowToWatchlist(
     return { success: true, message: "No new episodes found for this show" };
   }
 
-  await repository.insertWatchlistItems(newEpisodes);
-  await repository.markLastItemAdded(watchlistId);
+  const result = await persistAddedItems({
+    watchlistId,
+    insertionPosition,
+    items: newEpisodes,
+  });
 
-  return successResult(newEpisodes.length);
+  if (!result.success) {
+    return result;
+  }
+
+  return successResult(result.insertedCount);
 }
 
 // --- Implementation Details ---
