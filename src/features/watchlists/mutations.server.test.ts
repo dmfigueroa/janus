@@ -446,11 +446,12 @@ describe("watchlist mutation contract", () => {
       {
         watchlistId: customSource.id,
         tmdbId: "custom-first",
-        source: "tmdb",
-        mediaType: "movie",
+        source: "google_books",
+        mediaType: "book",
         title: "Custom First",
         releaseDate: "2024-04-01",
         customRank: 1,
+        authors: ["Author One", "Author Two"],
       },
     ]);
 
@@ -474,12 +475,13 @@ describe("watchlist mutation contract", () => {
       mergedDetail?.items.map((item) => ({
         title: item.title,
         customRank: item.customRank,
+        authors: item.authors,
       })),
     ).toEqual([
-      { title: "Release Earlier", customRank: 1 },
-      { title: "Release Later", customRank: 2 },
-      { title: "Custom First", customRank: 3 },
-      { title: "Custom Second", customRank: 4 },
+      { title: "Release Earlier", customRank: 1, authors: null },
+      { title: "Release Later", customRank: 2, authors: null },
+      { title: "Custom First", customRank: 3, authors: ["Author One", "Author Two"] },
+      { title: "Custom Second", customRank: 4, authors: null },
     ]);
   });
 

@@ -141,6 +141,7 @@ function buildCustomMergedItems({
         runtime: item.runtime,
         customRank: mergedItems.length + 1,
         isWatched: Boolean(item.isWatched),
+        authors: item.authors,
         addedAt: item.addedAt,
       } satisfies typeof watchlistItems.$inferInsert;
 
