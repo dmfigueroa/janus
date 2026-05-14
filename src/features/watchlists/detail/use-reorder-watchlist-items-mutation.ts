@@ -50,7 +50,7 @@ export function useReorderWatchlistItemsMutation({
       toast.error(error instanceof Error ? error.message : "Failed to reorder watchlist");
     },
     onSuccess: () => {
-      toast.success("Saved", { duration: 1200 });
+      toast.success("Order saved", { duration: 2000 });
     },
     onSettled: () =>
       queryClient.invalidateQueries({
