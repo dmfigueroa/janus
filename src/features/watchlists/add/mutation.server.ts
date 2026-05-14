@@ -14,6 +14,7 @@ const UNSUPPORTED_TV_SOURCE_MESSAGE =
 export async function addToWatchlistMutation({
   watchlistId,
   media,
+  insertionPosition,
 }: AddToWatchlistInput): Promise<WatchlistWriteResult> {
   const deprecatedRejection = getDeprecatedWatchlistAddRejection(media.mediaType);
   if (deprecatedRejection) {
@@ -24,24 +25,29 @@ export async function addToWatchlistMutation({
     if (media.source !== "tmdb") {
       return rejectAdd(UNSUPPORTED_TV_SOURCE_MESSAGE);
     }
-    return addTVShowToWatchlist(watchlistId, Number.parseInt(media.id, 10), media);
+    return addTVShowToWatchlist(
+      watchlistId,
+      Number.parseInt(media.id, 10),
+      media,
+      insertionPosition,
+    );
   }
 
   if (media.source === "tmdb" && media.mediaType === "movie") {
-    return addMovieToWatchlist(watchlistId, Number.parseInt(media.id, 10));
+    return addMovieToWatchlist(watchlistId, Number.parseInt(media.id, 10), insertionPosition);
   }
 
   if (media.source === "comicvine" && media.mediaType === "comic") {
-    return addComicToWatchlist(watchlistId, media.id, media);
+    return addComicToWatchlist(watchlistId, media.id, media, insertionPosition);
   }
 
   if (media.source === "google_books" && media.mediaType === "book") {
-    return addBookToWatchlist(watchlistId, media);
+    return addBookToWatchlist(watchlistId, media, insertionPosition);
   }
 
   if (media.source === "rawg" && media.mediaType === "game") {
-    return addGameToWatchlist(watchlistId, media);
+    return addGameToWatchlist(watchlistId, media, insertionPosition);
   }
 
-  return addGenericItemToWatchlist(watchlistId, media as GenericMedia);
+  return addGenericItemToWatchlist(watchlistId, media as GenericMedia, insertionPosition);
 }

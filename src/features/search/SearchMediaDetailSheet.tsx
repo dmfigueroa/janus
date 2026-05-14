@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { UnifiedMedia } from "@/server/media";
 import DOMPurify from "dompurify";
 import {
@@ -9,8 +9,13 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Star, Calendar, Info } from "lucide-react";
-import { addToWatchlist } from "@/features/watchlists/add/mutation";
+import {
+  addToWatchlist,
+  type AddToWatchlistInsertionPosition,
+} from "@/features/watchlists/add/mutation";
 import { getWatchlistList, watchlistListQueryKey } from "@/features/watchlists/list/query";
 import { toast } from "sonner";
 import { WatchlistSelector } from "@/components/watchlist/WatchlistSelector";
@@ -27,6 +32,9 @@ const watchlistSelectorFilters = { orderBy: "lastAdded" } as const;
 
 export function SearchMediaDetailSheet({ media, isOpen, onClose }: SearchMediaDetailSheetProps) {
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string>("");
+  const [insertionPosition, setInsertionPosition] = useState<AddToWatchlistInsertionPosition | "">(
+    "",
+  );
   const getWatchlistListFn = useServerFn(getWatchlistList);
   const addToWatchlistFn = useServerFn(addToWatchlist);
 
@@ -36,6 +44,15 @@ export function SearchMediaDetailSheet({ media, isOpen, onClose }: SearchMediaDe
     enabled: isOpen,
   });
 
+  const selectedWatchlist = watchlists?.find((watchlist) => {
+    return watchlist.id.toString() === selectedWatchlistId;
+  });
+  const requiresInsertionChoice = selectedWatchlist?.itemOrderMode === "custom";
+
+  useEffect(() => {
+    setInsertionPosition("");
+  }, [selectedWatchlistId]);
+
   const addToWatchlistMutation = useMutation({
     mutationFn: async () => {
       if (!media || !selectedWatchlistId) return;
@@ -43,6 +60,8 @@ export function SearchMediaDetailSheet({ media, isOpen, onClose }: SearchMediaDe
         data: {
           watchlistId: Number.parseInt(selectedWatchlistId, 10),
           media,
+          insertionPosition:
+            requiresInsertionChoice && insertionPosition ? insertionPosition : undefined,
         },
       });
     },
@@ -79,6 +98,12 @@ export function SearchMediaDetailSheet({ media, isOpen, onClose }: SearchMediaDe
       toast.error("Please select a watchlist");
       return;
     }
+
+    if (requiresInsertionChoice && !insertionPosition) {
+      toast.error("Choose where to insert this item in the custom order.");
+      return;
+    }
+
     addToWatchlistMutation.mutate();
   };
 
@@ -148,6 +173,35 @@ export function SearchMediaDetailSheet({ media, isOpen, onClose }: SearchMediaDe
               {addToWatchlistMutation.isPending ? "Adding..." : "Add"}
             </Button>
           </div>
+          {requiresInsertionChoice && (
+            <div className="space-y-3 rounded-md border bg-secondary/20 p-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Insert in custom order</p>
+                <p className="text-xs text-muted-foreground">
+                  Choose where this item should land in the watchlist&apos;s manual sequence.
+                </p>
+              </div>
+              <RadioGroup
+                value={insertionPosition}
+                onValueChange={(value) => {
+                  setInsertionPosition(value as AddToWatchlistInsertionPosition);
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="watchlist-insert-beginning" value="beginning" />
+                  <Label htmlFor="watchlist-insert-beginning">Beginning</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="watchlist-insert-end" value="end" />
+                  <Label htmlFor="watchlist-insert-end">End</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="watchlist-insert-release-adjacent" value="release-adjacent" />
+                  <Label htmlFor="watchlist-insert-release-adjacent">Release-adjacent</Label>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
           {(mediaType === "tv" ||
             mediaType === "anime" ||
             mediaType === "comic" ||

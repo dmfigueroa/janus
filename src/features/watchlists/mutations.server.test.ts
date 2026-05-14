@@ -452,6 +452,199 @@ describe("watchlist mutation contract", () => {
     });
   });
 
+  it("adds an item to the beginning of a custom-ordered watchlist", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({
+        name: "Priority Queue",
+        itemOrderMode: "custom",
+      })
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "existing-1",
+        source: "custom",
+        mediaType: "movie",
+        title: "Existing First",
+        releaseDate: "2024-02-01",
+        customRank: 1,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "existing-2",
+        source: "custom",
+        mediaType: "movie",
+        title: "Existing Second",
+        releaseDate: "2024-03-01",
+        customRank: 2,
+      },
+    ]);
+
+    const result = await addToWatchlistMutation({
+      watchlistId: watchlist.id,
+      insertionPosition: "beginning",
+      media: {
+        id: "urgent-pick",
+        mediaType: "movie",
+        source: "custom",
+        title: "Urgent Pick",
+        poster: null,
+        year: "2025",
+      },
+    });
+
+    expect(result).toEqual({
+      success: true,
+      message: "Added to watchlist",
+    });
+
+    const detail = await WatchlistsRead.detailScreen({
+      watchlistId: watchlist.id,
+      unwatchedOnly: false,
+    });
+
+    expect(detail?.items.map((item) => item.title)).toEqual([
+      "Urgent Pick",
+      "Existing First",
+      "Existing Second",
+    ]);
+    expect(detail?.items.map((item) => item.customRank)).toEqual([1, 2, 3]);
+  });
+
+  it("inserts release-adjacent additions deterministically in custom order", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({
+        name: "Chronology with Priorities",
+        itemOrderMode: "custom",
+      })
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "alpha",
+        source: "custom",
+        mediaType: "movie",
+        title: "Alpha",
+        releaseDate: "2024-01-01",
+        customRank: 1,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "beta",
+        source: "custom",
+        mediaType: "movie",
+        title: "Beta",
+        releaseDate: "2024-01-01",
+        customRank: 2,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "gamma",
+        source: "custom",
+        mediaType: "movie",
+        title: "Gamma",
+        releaseDate: "2024-03-01",
+        customRank: 3,
+      },
+    ]);
+
+    await addToWatchlistMutation({
+      watchlistId: watchlist.id,
+      insertionPosition: "release-adjacent",
+      media: {
+        id: "new-same-date",
+        mediaType: "movie",
+        source: "custom",
+        title: "New Same Date",
+        poster: null,
+        year: "2024",
+        releaseDate: "2024-01-01",
+      },
+    });
+
+    await addToWatchlistMutation({
+      watchlistId: watchlist.id,
+      insertionPosition: "release-adjacent",
+      media: {
+        id: "new-earliest",
+        mediaType: "movie",
+        source: "custom",
+        title: "New Earliest",
+        poster: null,
+        year: "2023",
+        releaseDate: "2023-12-01",
+      },
+    });
+
+    await addToWatchlistMutation({
+      watchlistId: watchlist.id,
+      insertionPosition: "release-adjacent",
+      media: {
+        id: "new-undated",
+        mediaType: "movie",
+        source: "custom",
+        title: "New Undated",
+        poster: null,
+        year: "",
+      },
+    });
+
+    const detail = await WatchlistsRead.detailScreen({
+      watchlistId: watchlist.id,
+      unwatchedOnly: false,
+    });
+
+    expect(detail?.items.map((item) => item.title)).toEqual([
+      "New Earliest",
+      "Alpha",
+      "Beta",
+      "New Same Date",
+      "Gamma",
+      "New Undated",
+    ]);
+    expect(detail?.items.map((item) => item.customRank)).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it("returns a structured failure when a custom-ordered watchlist is missing an insertion choice", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({
+        name: "Choose First",
+        itemOrderMode: "custom",
+      })
+      .returning();
+
+    const result = await addToWatchlistMutation({
+      watchlistId: watchlist.id,
+      media: {
+        id: "missing-choice",
+        mediaType: "movie",
+        source: "custom",
+        title: "Missing Choice",
+        poster: null,
+        year: "2025",
+      },
+    });
+
+    expect(result).toEqual({
+      success: false,
+      message: "Choose where to insert this item in the custom order.",
+    });
+
+    await expect(
+      WatchlistsRead.detailScreen({
+        watchlistId: watchlist.id,
+        unwatchedOnly: false,
+      }),
+    ).resolves.toMatchObject({
+      items: [],
+    });
+  });
+
   it("adds a TMDB movie through the feature write boundary using provider details", async () => {
     const [watchlist] = await db
       .insert(watchlists)

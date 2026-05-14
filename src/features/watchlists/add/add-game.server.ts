@@ -1,5 +1,6 @@
 import type { WatchlistMedia } from "./mutation";
 import { getGameDetails } from "@/server/providers/rawg.server";
+import type { AddToWatchlistInsertionPosition } from "./mutation";
 import { rejectAdd, type WatchlistWriteResult } from "./shared.server";
 import { addGenericItemToWatchlist } from "./add-generic.server";
 
@@ -10,6 +11,7 @@ const RAWG_FETCH_FAILURE_MESSAGE = "Failed to fetch game details from RAWG.";
 export async function addGameToWatchlist(
   watchlistId: number,
   media: WatchlistMedia,
+  insertionPosition?: AddToWatchlistInsertionPosition,
 ): Promise<WatchlistWriteResult> {
   const apiKey = process.env.RAWG_API_KEY;
   if (!apiKey) {
@@ -22,5 +24,5 @@ export async function addGameToWatchlist(
   } catch {
     return rejectAdd(RAWG_FETCH_FAILURE_MESSAGE);
   }
-  return addGenericItemToWatchlist(watchlistId, details);
+  return addGenericItemToWatchlist(watchlistId, details, insertionPosition);
 }
