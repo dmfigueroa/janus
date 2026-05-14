@@ -116,6 +116,7 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
       <div className="mt-8">
         <WatchlistTimeline
           items={allItems}
+          activeFilters={filters}
           itemOrderMode={itemOrderMode}
           hasMore={hasNextPage}
           isLoadingMore={isFetchingNextPage}

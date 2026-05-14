@@ -27,7 +27,13 @@ export async function addTVShowToWatchlist(
   }
 
   const showTitle = showDetails.name || media.title;
-  const items = mapToWatchlistEpisodes(episodes, watchlistId, showTitle, showDetails.poster_path);
+  const items = mapToWatchlistEpisodes(
+    episodes,
+    watchlistId,
+    tmdbId,
+    showTitle,
+    showDetails.poster_path,
+  );
 
   const newEpisodes = await filterNewEpisodes(watchlistId, items);
   if (newEpisodes.length === 0) {
@@ -90,6 +96,7 @@ async function fetchEpisodesAcrossSeasons(
 function mapToWatchlistEpisodes(
   episodes: TMDBEpisode[],
   watchlistId: number,
+  showId: number,
   showTitle: string,
   showPoster: string | null,
 ): Array<typeof watchlistItems.$inferInsert> {
@@ -99,6 +106,7 @@ function mapToWatchlistEpisodes(
     source: "tmdb" as const,
     mediaType: "episode" as const,
     title: episode.name,
+    parentId: `tmdb:${showId}`,
     parentTitle: showTitle,
     season: episode.season_number,
     episode: episode.episode_number.toString(),

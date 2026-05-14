@@ -915,6 +915,7 @@ describe("watchlist mutation contract", () => {
       source: "tmdb",
       mediaType: "episode",
       title: "Pilot",
+      parentId: "tmdb:42",
       parentTitle: "Provider Show",
       season: 1,
       episode: "1",
@@ -977,6 +978,7 @@ describe("watchlist mutation contract", () => {
         expect.objectContaining({
           tmdbId: "1002",
           title: "Second Wave",
+          parentId: "tmdb:42",
           parentTitle: "Provider Show",
           posterPath: "/provider-show.jpg",
           releaseDate: "2024-01-17",

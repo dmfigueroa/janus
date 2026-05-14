@@ -2,11 +2,13 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import type { WatchlistItem } from "@/db/schema";
+import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/query";
 import { cn } from "@/utils/cn";
 import { TimelineItem } from "./timeline-item";
 
 type ReorderableTimelineRowProps = {
   item: WatchlistItem;
+  activeFilters?: WatchlistDetailQueryFilters;
   showHandleSlot: boolean;
   showHandle: boolean;
   interactionDisabled: boolean;
@@ -14,6 +16,7 @@ type ReorderableTimelineRowProps = {
 
 export function ReorderableTimelineRow({
   item,
+  activeFilters,
   showHandleSlot,
   showHandle,
   interactionDisabled,
@@ -44,6 +47,7 @@ export function ReorderableTimelineRow({
     >
       <TimelineRowShell
         item={item}
+        activeFilters={activeFilters}
         showHandleSlot={showHandleSlot}
         showHandle={showHandle}
         interactionDisabled={interactionDisabled}
@@ -80,6 +84,7 @@ export function DragOverlayTimelineRow({
 
 function TimelineRowShell({
   item,
+  activeFilters,
   showHandleSlot,
   showHandle,
   interactionDisabled,
@@ -87,6 +92,7 @@ function TimelineRowShell({
   handleProps,
 }: {
   item: WatchlistItem;
+  activeFilters?: WatchlistDetailQueryFilters;
   showHandleSlot: boolean;
   showHandle: boolean;
   interactionDisabled: boolean;
@@ -118,7 +124,11 @@ function TimelineRowShell({
       ) : null}
 
       <div className="min-w-0 flex-1">
-        <TimelineItem item={item} interactionDisabled={interactionDisabled} />
+        <TimelineItem
+          item={item}
+          activeFilters={activeFilters}
+          interactionDisabled={interactionDisabled}
+        />
       </div>
     </div>
   );

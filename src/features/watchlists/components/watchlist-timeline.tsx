@@ -2,6 +2,7 @@ import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { DndContext, DragOverlay, closestCenter } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { WatchlistItem } from "@/db/schema";
+import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/query";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
 import type { ReorderIntent } from "@/features/watchlists/detail/reorder";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
@@ -16,6 +17,7 @@ import {
 
 interface WatchlistTimelineProps {
   items: WatchlistItem[];
+  activeFilters: WatchlistDetailQueryFilters;
   itemOrderMode: WatchlistItemOrderMode;
   hasMore?: boolean;
   isLoadingMore?: boolean;
@@ -28,6 +30,7 @@ interface WatchlistTimelineProps {
 
 export function WatchlistTimeline({
   items,
+  activeFilters,
   itemOrderMode,
   hasMore,
   isLoadingMore,
@@ -87,6 +90,7 @@ export function WatchlistTimeline({
         <ReleaseTimelineDecorations itemOrderMode={itemOrderMode} />
         <TimelineGroups
           groups={groups}
+          activeFilters={activeFilters}
           itemOrderMode={itemOrderMode}
           interactionDisabled={interactionDisabled}
           reorderEnabled={reorderEnabled}
@@ -122,12 +126,14 @@ function ReleaseTimelineDecorations({ itemOrderMode }: { itemOrderMode: Watchlis
 
 function TimelineGroups({
   groups,
+  activeFilters,
   itemOrderMode,
   interactionDisabled,
   reorderEnabled,
   showHandleSlot,
 }: {
   groups: WatchlistTimelineGroup[];
+  activeFilters: WatchlistDetailQueryFilters;
   itemOrderMode: WatchlistItemOrderMode;
   interactionDisabled: boolean;
   reorderEnabled: boolean;
@@ -139,6 +145,7 @@ function TimelineGroups({
         <TimelineGroupSection
           key={group.year}
           group={group}
+          activeFilters={activeFilters}
           itemOrderMode={itemOrderMode}
           interactionDisabled={interactionDisabled}
           reorderEnabled={reorderEnabled}
@@ -151,12 +158,14 @@ function TimelineGroups({
 
 function TimelineGroupSection({
   group,
+  activeFilters,
   itemOrderMode,
   interactionDisabled,
   reorderEnabled,
   showHandleSlot,
 }: {
   group: WatchlistTimelineGroup;
+  activeFilters: WatchlistDetailQueryFilters;
   itemOrderMode: WatchlistItemOrderMode;
   interactionDisabled: boolean;
   reorderEnabled: boolean;
@@ -177,6 +186,7 @@ function TimelineGroupSection({
             <ReorderableTimelineRow
               key={item.id}
               item={item}
+              activeFilters={activeFilters}
               showHandleSlot={showHandleSlot}
               showHandle={showHandleSlot && reorderEnabled}
               interactionDisabled={interactionDisabled}

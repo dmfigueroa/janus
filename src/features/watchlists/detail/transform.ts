@@ -12,6 +12,11 @@ export type WatchlistDetailToggleParams = {
   removeWatchedFromUnwatchedOnly?: boolean;
 };
 
+type WatchlistDetailRemovalStats = {
+  removedCount: number;
+  watchedCount: number;
+};
+
 type WatchlistDetailItemToggleParams = Omit<WatchlistDetailToggleParams, "previousIsWatched">;
 
 export function updateWatchlistDetailPagesAfterToggle({
@@ -105,6 +110,40 @@ export function updateWatchlistDetailPagesAfterReorder({
   };
 }
 
+export function updateWatchlistDetailPagesAfterItemRemoval({
+  data,
+  itemId,
+  removedCount,
+  watchedCount,
+}: {
+  data: InfiniteData<WatchlistDetailPage, number> | undefined;
+  itemId: WatchlistItem["id"];
+} & WatchlistDetailRemovalStats) {
+  return updateWatchlistDetailPagesAfterRemoval({
+    data,
+    removedCount,
+    watchedCount,
+    shouldRemove: (item) => item.id === itemId,
+  });
+}
+
+export function updateWatchlistDetailPagesAfterParentRemoval({
+  data,
+  parentId,
+  removedCount,
+  watchedCount,
+}: {
+  data: InfiniteData<WatchlistDetailPage, number> | undefined;
+  parentId: string;
+} & WatchlistDetailRemovalStats) {
+  return updateWatchlistDetailPagesAfterRemoval({
+    data,
+    removedCount,
+    watchedCount,
+    shouldRemove: (item) => item.parentId === parentId,
+  });
+}
+
 function calculateWatchedDelta({
   previousIsWatched,
   nextIsWatched,
@@ -126,6 +165,27 @@ function updateWatchlistStatsAfterToggle(
     ...watchlist,
     stats: {
       ...watchlist.stats,
+      watchedItems,
+      progress: calculateWatchlistProgress({ totalItems, watchedItems }),
+    },
+  };
+}
+
+function updateWatchlistStatsAfterRemoval(
+  watchlist: WatchlistDetailPage["watchlist"],
+  { removedCount, watchedCount }: WatchlistDetailRemovalStats,
+) {
+  const totalItems = Math.max(0, watchlist.stats.totalItems - removedCount);
+  const watchedItems = Math.min(
+    totalItems,
+    Math.max(0, watchlist.stats.watchedItems - watchedCount),
+  );
+
+  return {
+    ...watchlist,
+    stats: {
+      ...watchlist.stats,
+      totalItems,
       watchedItems,
       progress: calculateWatchlistProgress({ totalItems, watchedItems }),
     },
@@ -161,6 +221,31 @@ function updateWatchlistItemsAfterToggle(
   }
 
   return items.map((item) => (item.id === itemId ? { ...item, isWatched: nextIsWatched } : item));
+}
+
+function updateWatchlistDetailPagesAfterRemoval({
+  data,
+  removedCount,
+  watchedCount,
+  shouldRemove,
+}: {
+  data: InfiniteData<WatchlistDetailPage, number> | undefined;
+  removedCount: number;
+  watchedCount: number;
+  shouldRemove: (item: WatchlistItem) => boolean;
+}) {
+  if (!data) {
+    return data;
+  }
+
+  return {
+    ...data,
+    pages: data.pages.map((page) => ({
+      ...page,
+      watchlist: updateWatchlistStatsAfterRemoval(page.watchlist, { removedCount, watchedCount }),
+      items: page.items.filter((item) => !shouldRemove(item)),
+    })),
+  };
 }
 
 function updateWatchlistPagesItemOrderMode(

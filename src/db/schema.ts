@@ -32,6 +32,7 @@ export const watchlistItems = sqliteTable(
       enum: ["movie", "episode", "game", "book", "comic", "anime", "manga"], // Expanded enum
     }).notNull(),
     title: text("title").notNull(),
+    parentId: text("parent_id"),
     parentTitle: text("parent_title"), // For TV Show name
     season: integer("season"),
     episode: text("episode"),
