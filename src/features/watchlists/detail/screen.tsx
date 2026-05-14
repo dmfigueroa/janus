@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useInfiniteQuery, useIsMutating } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { toast } from "sonner";
 import { WatchlistHeader } from "@/features/watchlists/components/watchlist-header";
 import { WatchlistTimeline } from "@/features/watchlists/components/watchlist-timeline";
 import {
@@ -122,7 +123,10 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
           canReorder={canReorderItems}
           interactionDisabled={isReorderPending}
           reorderFailed={reorderItemsMutation.isError}
-          onReorder={(intent) => reorderItemsMutation.mutate(intent)}
+          onReorder={async (intent) => {
+            await reorderItemsMutation.mutateAsync(intent);
+            toast.success("Order saved", { duration: 2000 });
+          }}
         />
       </div>
     </div>
