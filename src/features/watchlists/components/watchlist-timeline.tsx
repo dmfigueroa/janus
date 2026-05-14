@@ -187,7 +187,7 @@ export function WatchlistTimeline({
         ) : null}
       </DragOverlay>
 
-      <div className="relative pl-6 md:pl-0">
+      <div className="relative pl-6 md:pl-0" style={{ overflowAnchor: "none" }}>
         {itemOrderMode === "release" ? (
           <>
             <div className="absolute bottom-12 left-[26px] top-6 w-[2px] bg-border md:hidden" />
