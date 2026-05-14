@@ -49,6 +49,9 @@ export function useReorderWatchlistItemsMutation({
       restoreWatchlistDetailSnapshot({ queryClient, snapshot });
       toast.error(error instanceof Error ? error.message : "Failed to reorder watchlist");
     },
+    onSuccess: () => {
+      toast.success("Saved", { duration: 1200 });
+    },
     onSettled: () =>
       queryClient.invalidateQueries({
         queryKey: ["watchlists", "detail", watchlistId],
