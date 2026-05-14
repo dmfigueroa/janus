@@ -170,6 +170,20 @@ describe("WatchlistTimeline reorder controls", () => {
 
     rerender(
       <WatchlistTimeline
+        items={[item({ id: 1, title: "First" }), item({ id: 2, title: "Second" })]}
+        itemOrderMode="custom"
+        canReorder
+        onReorder={onReorder}
+      />,
+    );
+
+    const rowLabels = screen
+      .getAllByTestId(/watchlist-timeline-row-/)
+      .map((row) => row.textContent?.trim());
+    expect(rowLabels).toEqual(["Second", "First"]);
+
+    rerender(
+      <WatchlistTimeline
         items={[item({ id: 2, title: "Second" }), item({ id: 1, title: "First" })]}
         itemOrderMode="custom"
         canReorder
