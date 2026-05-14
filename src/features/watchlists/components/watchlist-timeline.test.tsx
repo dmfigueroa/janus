@@ -62,6 +62,7 @@ function item(
     runtime: null,
     customRank: overrides.customRank ?? null,
     isWatched: false,
+    authors: null,
     addedAt: "2024-01-01 00:00:00",
   };
 }

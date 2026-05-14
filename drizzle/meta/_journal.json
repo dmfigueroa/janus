@@ -57,6 +57,13 @@
       "when": 1777672236224,
       "tag": "0007_abnormal_the_executioner",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1778785967274,
+      "tag": "0008_hesitant_madame_web",
+      "breakpoints": true
     }
   ]
 }

@@ -77,9 +77,11 @@ const Content = ({
   episode,
   releaseDate,
   runtime,
+  authors,
 }: WatchlistItem) => {
   const formattedDate = formatReleaseDate(releaseDate);
   const runtimeStr = formatRuntime(runtime);
+  const authorsList = authors ? JSON.parse(authors) : null;
 
   return (
     <div className="flex min-w-0 flex-1 flex-col justify-center gap-1">
@@ -89,6 +91,9 @@ const Content = ({
         </span>
       )}
       <h3 className="text-base font-semibold leading-tight text-foreground md:text-lg">{title}</h3>
+      {mediaType === "book" && authorsList && (
+        <p className="text-xs text-muted-foreground">{authorsList.join(", ")}</p>
+      )}
       <div className="flex items-center gap-2 md:gap-3 text-xs md:text-sm text-muted-foreground">
         {mediaType !== "movie" && (
           <>

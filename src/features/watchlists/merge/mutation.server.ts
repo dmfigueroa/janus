@@ -184,6 +184,7 @@ function mergeSourceItemsIntoTarget(
           runtime: watchlistItems.runtime,
           customRank: sql<number | null>`NULL`.as("customRank"),
           isWatched: watchlistItems.isWatched,
+          authors: watchlistItems.authors,
           addedAt: watchlistItems.addedAt,
         })
         .from(watchlistItems)

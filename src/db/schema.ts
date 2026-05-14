@@ -41,6 +41,7 @@ export const watchlistItems = sqliteTable(
     runtime: integer("runtime"), // In minutes
     customRank: integer("custom_rank"),
     isWatched: integer("is_watched", { mode: "boolean" }).default(false),
+    authors: text("authors"), // JSON array of author names
     addedAt: text("added_at")
       .default(sql`(CURRENT_TIMESTAMP)`)
       .notNull(),

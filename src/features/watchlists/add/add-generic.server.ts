@@ -21,6 +21,7 @@ export async function addGenericItemToWatchlist(
         releaseDate: media.releaseDate || media.year,
         voteAverage: media.rating,
         runtime: 0,
+        authors: media.authors ? JSON.stringify(media.authors) : null,
       },
     ],
   });
