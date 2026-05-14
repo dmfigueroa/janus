@@ -33,6 +33,9 @@ const config = defineConfig({
       manifestFilename: "manifest.json",
       registerType: "prompt",
       useCredentials: true,
+      workbox: {
+        navigateFallback: undefined,
+      },
       manifest: {
         short_name: "Janus",
         name: "Janus",
