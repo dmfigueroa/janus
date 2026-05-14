@@ -1,7 +1,39 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getBookDetails } from "./providers/google-books.server";
+import { getBookDetails, searchBooks } from "./providers/google-books.server";
 
 vi.stubGlobal("fetch", vi.fn());
+
+describe("google-books searchBooks", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    process.env.GOOGLE_BOOKS_API_KEY = "test-api-key";
+  });
+
+  it("should return authors from API response", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        totalItems: 1,
+        items: [
+          {
+            id: "book123",
+            volumeInfo: {
+              title: "Test Book",
+              authors: ["Author One", "Author Two"],
+              publishedDate: "2024",
+              imageLinks: { thumbnail: "http://example.com/cover.jpg" },
+            },
+          },
+        ],
+      }),
+    } as Response);
+
+    const result = await searchBooks("test query");
+
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0].authors).toEqual(["Author One", "Author Two"]);
+  });
+});
 
 describe("google-books getBookDetails", () => {
   beforeEach(() => {
@@ -52,5 +84,23 @@ describe("google-books getBookDetails", () => {
     expect(fetch).toHaveBeenCalledWith(
       "https://www.googleapis.com/books/v1/volumes/..%2Fvolumes%2Fother-endpoint?key=test-api-key",
     );
+  });
+
+  it("should return authors from API response", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        id: "book123",
+        volumeInfo: {
+          title: "Test Book",
+          authors: ["Single Author"],
+          publishedDate: "2024",
+        },
+      }),
+    } as Response);
+
+    const result = await getBookDetails("book123");
+
+    expect(result.authors).toEqual(["Single Author"]);
   });
 });

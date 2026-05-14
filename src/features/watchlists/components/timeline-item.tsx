@@ -77,6 +77,7 @@ const Content = ({
   episode,
   releaseDate,
   runtime,
+  authors,
 }: WatchlistItem) => {
   const formattedDate = formatReleaseDate(releaseDate);
   const runtimeStr = formatRuntime(runtime);
@@ -89,6 +90,9 @@ const Content = ({
         </span>
       )}
       <h3 className="text-base font-semibold leading-tight text-foreground md:text-lg">{title}</h3>
+      {mediaType === "book" && authors && authors.length > 0 && (
+        <p className="text-xs text-muted-foreground">{authors.join(", ")}</p>
+      )}
       <div className="flex items-center gap-2 md:gap-3 text-xs md:text-sm text-muted-foreground">
         {mediaType !== "movie" && (
           <>

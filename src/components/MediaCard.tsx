@@ -42,6 +42,9 @@ export function MediaCard({ media, onClick }: MediaCardProps) {
         <h3 className="line-clamp-1 text-sm font-medium text-foreground group-hover:text-primary transition-colors">
           {media.title}
         </h3>
+        {media.mediaType === "book" && media.authors && media.authors.length > 0 && (
+          <p className="line-clamp-1 text-xs text-muted-foreground">{media.authors.join(", ")}</p>
+        )}
         <p className="text-xs text-muted-foreground">{media.year}</p>
       </div>
     </div>

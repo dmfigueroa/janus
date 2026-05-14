@@ -7,6 +7,7 @@ const GoogleBookItemSchema = z.object({
   id: z.string(),
   volumeInfo: z.object({
     title: z.string().optional(),
+    authors: z.array(z.string()).optional(),
     imageLinks: z.object({ thumbnail: z.string().optional() }).optional(),
     publishedDate: z.string().optional(),
     averageRating: z.number().optional(),
@@ -61,6 +62,7 @@ export async function searchBooks(
       releaseDate: item.volumeInfo.publishedDate,
       rating: item.volumeInfo.averageRating ? item.volumeInfo.averageRating * 2 : undefined,
       overview: item.volumeInfo.description,
+      authors: item.volumeInfo.authors,
     }));
 
     return {
@@ -103,6 +105,7 @@ export async function getBookDetails(id: string) {
       releaseDate: data.volumeInfo.publishedDate,
       rating: data.volumeInfo.averageRating ? data.volumeInfo.averageRating * 2 : undefined,
       overview: data.volumeInfo.description,
+      authors: data.volumeInfo.authors,
     };
   } catch (e) {
     const errorMessage = getErrorMessage(e);

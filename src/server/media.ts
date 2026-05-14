@@ -35,6 +35,7 @@ export const UnifiedMediaSchema = z.object({
   releaseDate: z.string().optional(),
   rating: z.number().optional(),
   overview: z.string().optional(),
+  authors: z.array(z.string()).optional(),
   source: z.enum(["tmdb", "google_books", "rawg", "comicvine", "anilist", "custom"]),
 });
 

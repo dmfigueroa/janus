@@ -141,6 +141,7 @@ function buildCustomMergedItems({
         runtime: item.runtime,
         customRank: mergedItems.length + 1,
         isWatched: Boolean(item.isWatched),
+        authors: item.authors,
         addedAt: item.addedAt,
       } satisfies typeof watchlistItems.$inferInsert;
 
@@ -184,6 +185,7 @@ function mergeSourceItemsIntoTarget(
           runtime: watchlistItems.runtime,
           customRank: sql<number | null>`NULL`.as("customRank"),
           isWatched: watchlistItems.isWatched,
+          authors: watchlistItems.authors,
           addedAt: watchlistItems.addedAt,
         })
         .from(watchlistItems)
