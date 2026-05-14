@@ -32,7 +32,7 @@ export async function addComicToWatchlist(
     return { success: true, message: getNoNewIssuesMessage(existingIssueIds.size) };
   }
 
-  const items = mapToWatchlistComics(issues, watchlistId, media.title);
+  const items = mapToWatchlistComics(issues, watchlistId, volumeId, media.title);
 
   const result = await persistAddedItems({
     watchlistId,
@@ -67,6 +67,7 @@ async function fetchIssues(volumeId: string, apiKey: string, existingIssueIds: S
 function mapToWatchlistComics(
   issues: Awaited<ReturnType<typeof getComicIssues>>,
   watchlistId: number,
+  volumeId: string,
   parentTitle: string,
 ): Array<typeof watchlistItems.$inferInsert> {
   return issues.map((issue) => ({
@@ -75,6 +76,7 @@ function mapToWatchlistComics(
     source: "comicvine",
     mediaType: "comic" as const,
     title: issue.title,
+    parentId: `comicvine:${volumeId}`,
     parentTitle,
     season: null,
     episode: issue.issueNumber,

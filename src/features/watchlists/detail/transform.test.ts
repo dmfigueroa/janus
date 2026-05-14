@@ -4,7 +4,9 @@ import type { WatchlistItem } from "@/db/schema";
 import type { WatchlistSummary } from "@/features/watchlists/list/query.server";
 import type { WatchlistDetailPage } from "@/models/watchlist";
 import {
+  updateWatchlistDetailPagesAfterItemRemoval,
   updateWatchlistDetailPagesAfterItemOrderMode,
+  updateWatchlistDetailPagesAfterParentRemoval,
   updateWatchlistDetailPagesAfterReorder,
   updateWatchlistDetailPagesAfterToggle,
 } from "./transform";
@@ -96,6 +98,65 @@ describe("watchlist detail page transforms", () => {
       1, 2, 3,
     ]);
   });
+
+  it("removes one visible item and decrements watchlist stats immediately", () => {
+    const data = createDetailData({
+      pages: [
+        createPage({
+          totalItems: 3,
+          watchedItems: 2,
+          items: [
+            createItem({ id: 1, title: "Remove Me", isWatched: true }),
+            createItem({ id: 2, title: "Keep Me" }),
+          ],
+        }),
+      ],
+    });
+
+    const nextData = updateWatchlistDetailPagesAfterItemRemoval({
+      data,
+      itemId: 1,
+      removedCount: 1,
+      watchedCount: 1,
+    });
+
+    expect(nextData?.pages[0]?.items.map((item) => item.title)).toEqual(["Keep Me"]);
+    expect(nextData?.pages[0]?.watchlist.stats).toMatchObject({
+      totalItems: 2,
+      watchedItems: 1,
+      progress: 50,
+    });
+  });
+
+  it("removes visible parent rows while applying preview counts to the header stats", () => {
+    const data = createDetailData({
+      pages: [
+        createPage({
+          totalItems: 5,
+          watchedItems: 2,
+          items: [
+            createItem({ id: 1, title: "Pilot", parentId: "tmdb:42" }),
+            createItem({ id: 2, title: "Second", parentId: "tmdb:42", isWatched: true }),
+            createItem({ id: 3, title: "Standalone" }),
+          ],
+        }),
+      ],
+    });
+
+    const nextData = updateWatchlistDetailPagesAfterParentRemoval({
+      data,
+      parentId: "tmdb:42",
+      removedCount: 4,
+      watchedCount: 2,
+    });
+
+    expect(nextData?.pages[0]?.items.map((item) => item.title)).toEqual(["Standalone"]);
+    expect(nextData?.pages[0]?.watchlist.stats).toMatchObject({
+      totalItems: 1,
+      watchedItems: 0,
+      progress: 0,
+    });
+  });
 });
 
 function createDetailData({
@@ -162,12 +223,14 @@ function createWatchlist({
 function createItem({
   id,
   title,
+  parentId = null,
   releaseDate = null,
   customRank = null,
   isWatched = false,
 }: {
   id: number;
   title: string;
+  parentId?: string | null;
   releaseDate?: string | null;
   customRank?: number | null;
   isWatched?: boolean;
@@ -179,6 +242,7 @@ function createItem({
     source: "tmdb",
     mediaType: "movie",
     title,
+    parentId,
     parentTitle: null,
     season: null,
     episode: null,

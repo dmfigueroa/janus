@@ -9,6 +9,8 @@ import {
   readFiltersFromDetailQueryKey,
 } from "@/features/watchlists/detail/query";
 import {
+  updateWatchlistDetailPagesAfterItemRemoval,
+  updateWatchlistDetailPagesAfterParentRemoval,
   updateWatchlistDetailPagesAfterToggle,
   updateWatchlistDetailPagesAfterItemOrderMode,
   updateWatchlistDetailPagesAfterReorder,
@@ -82,6 +84,82 @@ export async function optimisticallyUpdateWatchlistItemOrderMode({
   return { previousEntries, createdKeys };
 }
 
+export async function optimisticallyRemoveWatchlistItem({
+  queryClient,
+  watchlistId,
+  activeQueryKey,
+  itemId,
+  removedCount,
+  watchedCount,
+}: {
+  queryClient: QueryClient;
+  watchlistId: number;
+  activeQueryKey: QueryKey;
+  itemId: WatchlistItem["id"];
+  removedCount: number;
+  watchedCount: number;
+}): Promise<WatchlistDetailCacheSnapshot> {
+  const snapshot = await snapshotActiveWatchlistDetailCache({
+    queryClient,
+    watchlistId,
+    activeQueryKey,
+  });
+
+  const activeEntry = snapshot[0];
+
+  if (activeEntry) {
+    queryClient.setQueryData(
+      activeQueryKey,
+      updateWatchlistDetailPagesAfterItemRemoval({
+        data: activeEntry[1],
+        itemId,
+        removedCount,
+        watchedCount,
+      }),
+    );
+  }
+
+  return snapshot;
+}
+
+export async function optimisticallyRemoveWatchlistParent({
+  queryClient,
+  watchlistId,
+  activeQueryKey,
+  parentId,
+  removedCount,
+  watchedCount,
+}: {
+  queryClient: QueryClient;
+  watchlistId: number;
+  activeQueryKey: QueryKey;
+  parentId: string;
+  removedCount: number;
+  watchedCount: number;
+}): Promise<WatchlistDetailCacheSnapshot> {
+  const snapshot = await snapshotActiveWatchlistDetailCache({
+    queryClient,
+    watchlistId,
+    activeQueryKey,
+  });
+
+  const activeEntry = snapshot[0];
+
+  if (activeEntry) {
+    queryClient.setQueryData(
+      activeQueryKey,
+      updateWatchlistDetailPagesAfterParentRemoval({
+        data: activeEntry[1],
+        parentId,
+        removedCount,
+        watchedCount,
+      }),
+    );
+  }
+
+  return snapshot;
+}
+
 async function snapshotWatchlistDetailCache({
   queryClient,
   watchlistId,
@@ -96,6 +174,25 @@ async function snapshotWatchlistDetailCache({
   return queryClient.getQueriesData<InfiniteData<WatchlistDetailPage, number>>({
     queryKey,
   });
+}
+
+async function snapshotActiveWatchlistDetailCache({
+  queryClient,
+  watchlistId,
+  activeQueryKey,
+}: {
+  queryClient: QueryClient;
+  watchlistId: number;
+  activeQueryKey: QueryKey;
+}) {
+  await queryClient.cancelQueries({ queryKey: watchlistDetailQueryFamily(watchlistId) });
+
+  return [
+    [
+      activeQueryKey,
+      queryClient.getQueryData<InfiniteData<WatchlistDetailPage, number>>(activeQueryKey),
+    ],
+  ] satisfies WatchlistDetailCacheSnapshot;
 }
 
 function copyEntriesToItemOrderModeCache({

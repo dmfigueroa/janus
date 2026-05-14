@@ -1,11 +1,14 @@
 import { cn } from "@/utils/cn";
 import { Check, Film, Tv, Gamepad2, Book, BookOpen } from "lucide-react";
 import type { WatchlistItem } from "@/db/schema";
+import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/query";
 import { formatReleaseDate, formatRuntime } from "@/utils/datetime";
 import { useToggleWatchedItem } from "@/features/watchlists/detail/use-toggle-watched-item";
+import { TimelineItemActions } from "./timeline-item-actions";
 
 type TimelineItemProps = {
   item: WatchlistItem;
+  activeFilters?: WatchlistDetailQueryFilters;
   interactionDisabled?: boolean;
 };
 
@@ -114,7 +117,11 @@ const Content = ({
   );
 };
 
-export function TimelineItem({ item, interactionDisabled = false }: TimelineItemProps) {
+export function TimelineItem({
+  item,
+  activeFilters,
+  interactionDisabled = false,
+}: TimelineItemProps) {
   const toggleMutation = useToggleWatchedItem(item);
   const isDisabled = interactionDisabled || toggleMutation.isPending;
 
@@ -127,6 +134,14 @@ export function TimelineItem({ item, interactionDisabled = false }: TimelineItem
     >
       <Poster {...item} />
       <Content {...item} />
+
+      {activeFilters ? (
+        <TimelineItemActions
+          item={item}
+          activeFilters={activeFilters}
+          interactionDisabled={interactionDisabled}
+        />
+      ) : null}
 
       <button
         onClick={() => toggleMutation.mutate()}

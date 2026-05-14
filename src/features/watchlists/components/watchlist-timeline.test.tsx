@@ -5,6 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistItem } from "@/db/schema";
 import { WatchlistTimeline } from "@/features/watchlists/components/watchlist-timeline";
 
+const activeFilters = {
+  watchlistId: 1,
+  itemOrderMode: "custom" as const,
+  unwatchedOnly: false,
+  query: "",
+};
+
 let latestDndContextProps: Record<string, ((event: any) => void) | undefined> = {};
 
 vi.mock("@dnd-kit/core", () => ({
@@ -53,6 +60,7 @@ function item(
     source: "tmdb",
     mediaType: "movie",
     title: overrides.title,
+    parentId: null,
     parentTitle: null,
     season: null,
     episode: null,
@@ -92,6 +100,7 @@ describe("WatchlistTimeline reorder controls", () => {
           item({ id: 1, title: "First", releaseDate: "2024-01-01" }),
           item({ id: 2, title: "Second", releaseDate: "2025-01-01" }),
         ]}
+        activeFilters={activeFilters}
         itemOrderMode="custom"
         canReorder
         onReorder={vi.fn()}
@@ -108,6 +117,7 @@ describe("WatchlistTimeline reorder controls", () => {
     render(
       <WatchlistTimeline
         items={[item({ id: 1, title: "First" }), item({ id: 2, title: "Second" })]}
+        activeFilters={activeFilters}
         itemOrderMode="custom"
         canReorder={false}
         onReorder={vi.fn()}
@@ -125,6 +135,7 @@ describe("WatchlistTimeline reorder controls", () => {
           item({ id: 1, title: "First", releaseDate: "2024-01-01" }),
           item({ id: 2, title: "Second", releaseDate: "2025-01-01" }),
         ]}
+        activeFilters={{ ...activeFilters, itemOrderMode: "release" }}
         itemOrderMode="release"
         canReorder
         onReorder={vi.fn()}
@@ -142,6 +153,7 @@ describe("WatchlistTimeline reorder controls", () => {
     const { rerender } = render(
       <WatchlistTimeline
         items={[item({ id: 1, title: "First" }), item({ id: 2, title: "Second" })]}
+        activeFilters={activeFilters}
         itemOrderMode="custom"
         canReorder
         onReorder={onReorder}
@@ -172,6 +184,7 @@ describe("WatchlistTimeline reorder controls", () => {
     rerender(
       <WatchlistTimeline
         items={[item({ id: 1, title: "First" }), item({ id: 2, title: "Second" })]}
+        activeFilters={activeFilters}
         itemOrderMode="custom"
         canReorder
         onReorder={onReorder}
@@ -186,6 +199,7 @@ describe("WatchlistTimeline reorder controls", () => {
     rerender(
       <WatchlistTimeline
         items={[item({ id: 2, title: "Second" }), item({ id: 1, title: "First" })]}
+        activeFilters={activeFilters}
         itemOrderMode="custom"
         canReorder
         onReorder={onReorder}
