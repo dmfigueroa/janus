@@ -121,6 +121,7 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
           onLoadMore={isReorderPending ? undefined : fetchNextPage}
           canReorder={canReorderItems}
           interactionDisabled={isReorderPending}
+          isReordering={isReorderPending}
           onReorder={(intent) => reorderItemsMutation.mutate(intent)}
         />
       </div>

@@ -30,12 +30,9 @@ interface WatchlistTimelineProps {
   onLoadMore?: () => void;
   canReorder?: boolean;
   interactionDisabled?: boolean;
+  isReordering?: boolean;
   onReorder?: (intent: ReorderIntent) => void;
 }
-
-type PendingDrop = {
-  itemIdsAfterDrop: number[];
-};
 
 export function WatchlistTimeline({
   items,
@@ -45,43 +42,47 @@ export function WatchlistTimeline({
   onLoadMore,
   canReorder = false,
   interactionDisabled = false,
+  isReordering = false,
   onReorder,
 }: WatchlistTimelineProps) {
   const [activeItemId, setActiveItemId] = useState<number | null>(null);
-  const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
+  const [localItems, setLocalItems] = useState(items);
   const reorderEnabled = canReorder && Boolean(onReorder);
   const showHandleSlot = itemOrderMode === "custom";
   const activeItem =
-    activeItemId === null ? null : (items.find((item) => item.id === activeItemId) ?? null);
-  const itemIds = useMemo(() => items.map((item) => item.id), [items]);
-  const displayedItems = useMemo(() => {
-    if (!pendingDrop) {
-      return items;
-    }
-
-    return reorderItemsByIds(items, pendingDrop.itemIdsAfterDrop);
-  }, [items, pendingDrop]);
+    activeItemId === null ? null : (localItems.find((item) => item.id === activeItemId) ?? null);
 
   useEffect(() => {
-    if (!pendingDrop) {
-      return;
-    }
+    setLocalItems((currentItems) => {
+      if (activeItemId !== null) {
+        return currentItems;
+      }
 
-    if (areItemIdsEqual(itemIds, pendingDrop.itemIdsAfterDrop) || !interactionDisabled) {
-      setPendingDrop(null);
-    }
-  }, [interactionDisabled, itemIds, pendingDrop]);
+      if (itemOrderMode !== "custom") {
+        return items;
+      }
+
+      const currentIds = currentItems.map((item) => item.id);
+      const nextIds = items.map((item) => item.id);
+
+      if (!isReordering || areItemIdsEqual(currentIds, nextIds)) {
+        return items;
+      }
+
+      return reorderItemsByIds(items, currentIds);
+    });
+  }, [activeItemId, isReordering, itemOrderMode, items]);
 
   const groups = useMemo(() => {
     if (itemOrderMode === "custom") {
-      return [{ year: "custom", items: displayedItems }];
+      return [{ year: "custom", items: localItems }];
     }
 
     const grouped: { year: string; items: WatchlistItem[] }[] = [];
     let currentYear = "";
     let currentGroup: WatchlistItem[] = [];
 
-    displayedItems.forEach((item) => {
+    localItems.forEach((item) => {
       const year = item.releaseDate ? item.releaseDate.split("-")[0] : "TBA";
 
       if (year !== currentYear) {
@@ -100,7 +101,7 @@ export function WatchlistTimeline({
     }
 
     return grouped;
-  }, [displayedItems, itemOrderMode]);
+  }, [itemOrderMode, localItems]);
 
   const sensors = useSensors(
     useSensor(MouseSensor),
@@ -129,7 +130,6 @@ export function WatchlistTimeline({
 
   function clearDragState() {
     setActiveItemId(null);
-    setPendingDrop(null);
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -139,17 +139,17 @@ export function WatchlistTimeline({
     }
 
     const referenceItemId = Number(event.over.id);
-    const movedIndex = displayedItems.findIndex((item) => item.id === activeItemId);
-    const referenceIndex = displayedItems.findIndex((item) => item.id === referenceItemId);
+    const movedIndex = localItems.findIndex((item) => item.id === activeItemId);
+    const referenceIndex = localItems.findIndex((item) => item.id === referenceItemId);
     const position = movedIndex < referenceIndex ? "after" : "before";
     const nextItemIds = reorderVisibleItemsByAnchor({
-      items: displayedItems,
+      items: localItems,
       movedItemId: activeItemId,
       referenceItemId,
       position,
     });
     const intent = resolveReorderIntent({
-      items: displayedItems,
+      items: localItems,
       movedItemId: activeItemId,
       referenceItemId,
       position,
@@ -159,9 +159,7 @@ export function WatchlistTimeline({
       if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();
       }
-      setPendingDrop({
-        itemIdsAfterDrop: nextItemIds,
-      });
+      setLocalItems((currentItems) => reorderItemsByIds(currentItems, nextItemIds));
       setActiveItemId(null);
       onReorder?.(intent);
       return;
@@ -257,13 +255,22 @@ function reorderItemsByIds(items: WatchlistItem[], itemIds: number[]) {
   }
 
   const rankByItemId = new Map(itemIds.map((itemId, index) => [itemId, index]));
+  const originalIndexByItemId = new Map(items.map((item, index) => [item.id, index]));
 
   return [...items].sort((left, right) => {
     const leftRank = rankByItemId.get(left.id);
     const rightRank = rankByItemId.get(right.id);
 
-    if (leftRank === undefined || rightRank === undefined) {
-      return 0;
+    if (leftRank === undefined && rightRank === undefined) {
+      return (originalIndexByItemId.get(left.id) ?? 0) - (originalIndexByItemId.get(right.id) ?? 0);
+    }
+
+    if (leftRank === undefined) {
+      return 1;
+    }
+
+    if (rightRank === undefined) {
+      return -1;
     }
 
     return leftRank - rightRank;
