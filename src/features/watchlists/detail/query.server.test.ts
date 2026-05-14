@@ -663,4 +663,122 @@ describe("watchlist detail query contract", () => {
     );
     expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(true);
   });
+
+  it("re-inserts newly unwatched custom-ranked items into filtered caches at their persisted position", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Optimistic Custom Detail", itemOrderMode: "custom" })
+      .returning();
+
+    const [firstPick, secondPick, thirdPick] = await db
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "first-pick",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "First Pick",
+          releaseDate: "2024-01-01",
+          customRank: 1,
+          isWatched: false,
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "second-pick",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Second Pick",
+          releaseDate: "2024-02-01",
+          customRank: 2,
+          isWatched: true,
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "third-pick",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Third Pick",
+          releaseDate: "2024-03-01",
+          customRank: 3,
+          isWatched: false,
+        },
+      ])
+      .returning();
+
+    const queryClient = new QueryClient();
+    const unwatchedFilters = {
+      watchlistId: watchlist.id,
+      itemOrderMode: "custom" as const,
+      unwatchedOnly: true,
+    };
+    const unfilteredFilters = {
+      watchlistId: watchlist.id,
+      itemOrderMode: "custom" as const,
+      unwatchedOnly: false,
+    };
+    const searchFilters = {
+      watchlistId: watchlist.id,
+      itemOrderMode: "custom" as const,
+      unwatchedOnly: true,
+      query: "Pick",
+    };
+
+    await seedRouteLoadedDetail({ queryClient, filters: unwatchedFilters });
+    await seedRouteLoadedDetail({ queryClient, filters: unfilteredFilters });
+    await seedRouteLoadedDetail({ queryClient, filters: searchFilters });
+
+    const snapshot = await optimisticallyToggleWatchedItem({
+      queryClient,
+      watchlistId: watchlist.id,
+      itemId: secondPick.id,
+      previousIsWatched: true,
+      nextIsWatched: false,
+    });
+
+    expect(
+      queryClient
+        .getQueryData<InfiniteData<WatchlistDetailQueryData, number>>(
+          watchlistDetailQueryKey(unwatchedFilters),
+        )
+        ?.pages[0]?.items.map((item) => item.title),
+    ).toEqual(["First Pick", "Second Pick", "Third Pick"]);
+    expect(
+      queryClient
+        .getQueryData<InfiniteData<WatchlistDetailQueryData, number>>(
+          watchlistDetailQueryKey(searchFilters),
+        )
+        ?.pages[0]?.items.map((item) => item.title),
+    ).toEqual(["First Pick", "Second Pick", "Third Pick"]);
+    expect(
+      queryClient
+        .getQueryData<InfiniteData<WatchlistDetailQueryData, number>>(
+          watchlistDetailQueryKey(unfilteredFilters),
+        )
+        ?.pages[0]?.items.find((item) => item.id === secondPick.id),
+    ).toMatchObject({
+      id: secondPick.id,
+      customRank: 2,
+      isWatched: false,
+    });
+    expect(
+      queryClient.getQueryData<InfiniteData<WatchlistDetailQueryData, number>>(
+        watchlistDetailQueryKey(unwatchedFilters),
+      )?.pages[0]?.watchlist.stats,
+    ).toMatchObject({
+      totalItems: 3,
+      watchedItems: 0,
+      progress: 0,
+    });
+
+    restoreWatchlistDetailSnapshot({ queryClient, snapshot });
+
+    expect(
+      queryClient
+        .getQueryData<InfiniteData<WatchlistDetailQueryData, number>>(
+          watchlistDetailQueryKey(unwatchedFilters),
+        )
+        ?.pages[0]?.items.map((item) => item.title),
+    ).toEqual([firstPick.title, thirdPick.title]);
+  });
 });

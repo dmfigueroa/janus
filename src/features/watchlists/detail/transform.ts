@@ -9,6 +9,9 @@ export type WatchlistDetailToggleParams = {
   itemId: WatchlistItem["id"];
   previousIsWatched: boolean;
   nextIsWatched: boolean;
+  pageSize?: number;
+  toggledItem?: WatchlistItem | null;
+  searchQuery?: string;
   removeWatchedFromUnwatchedOnly?: boolean;
 };
 
@@ -30,13 +33,23 @@ export function updateWatchlistDetailPagesAfterToggle({
 
   return {
     ...data,
-    pages: data.pages.map((page) =>
-      updateWatchlistDetailPageAfterToggle(page, {
+    pages: repartitionItemsAcrossPages({
+      pages: data.pages.map((page) =>
+        updateWatchlistDetailPageAfterToggle(page, {
+          ...toggle,
+          nextIsWatched,
+          watchedDelta,
+        }),
+      ),
+      pageSize: toggle.pageSize,
+      items: updateVisibleWatchlistItemsAfterToggle({
+        items: getWatchlistItemsFromPages(data.pages),
+        itemOrderMode: data.pages[0]?.watchlist.itemOrderMode ?? "release",
+        previousIsWatched,
         ...toggle,
         nextIsWatched,
-        watchedDelta,
       }),
-    ),
+    }),
   };
 }
 
@@ -136,7 +149,7 @@ function updateWatchlistDetailPageAfterToggle(
   page: WatchlistDetailPage,
   {
     watchedDelta,
-    ...toggle
+    itemId,
   }: WatchlistDetailItemToggleParams & {
     watchedDelta: number;
   },
@@ -144,23 +157,85 @@ function updateWatchlistDetailPageAfterToggle(
   return {
     ...page,
     watchlist: updateWatchlistStatsAfterToggle(page.watchlist, watchedDelta),
-    items: updateWatchlistItemsAfterToggle(page.items, toggle),
+    items: page.items.map((item) => (item.id === itemId ? { ...item } : item)),
   };
 }
 
-function updateWatchlistItemsAfterToggle(
-  items: WatchlistDetailPage["items"],
-  {
-    itemId,
-    nextIsWatched,
-    removeWatchedFromUnwatchedOnly = false,
-  }: WatchlistDetailItemToggleParams,
-) {
-  if (removeWatchedFromUnwatchedOnly && nextIsWatched) {
-    return items.filter((item) => item.id !== itemId);
+function updateVisibleWatchlistItemsAfterToggle({
+  itemOrderMode,
+  previousIsWatched,
+  searchQuery,
+  toggledItem,
+  ...toggle
+}: {
+  items: WatchlistDetailPage["items"];
+  itemOrderMode: WatchlistItemOrderMode;
+} & WatchlistDetailToggleParams) {
+  let nextItems = updateExistingWatchlistItemsAfterToggle(toggle.items, toggle);
+
+  if (toggle.removeWatchedFromUnwatchedOnly && toggle.nextIsWatched) {
+    nextItems = nextItems.filter((item) => item.id !== toggle.itemId);
   }
 
+  if (
+    shouldInsertToggledItemAfterToggle({
+      items: nextItems,
+      previousIsWatched,
+      nextIsWatched: toggle.nextIsWatched,
+      removeWatchedFromUnwatchedOnly: toggle.removeWatchedFromUnwatchedOnly,
+      toggledItem,
+      searchQuery,
+    })
+  ) {
+    nextItems = [...nextItems, { ...toggledItem!, isWatched: toggle.nextIsWatched }];
+  }
+
+  return sortWatchlistItemsByOrderMode(nextItems, { itemOrderMode });
+}
+
+function updateExistingWatchlistItemsAfterToggle(
+  items: WatchlistDetailPage["items"],
+  { itemId, nextIsWatched }: WatchlistDetailItemToggleParams,
+) {
   return items.map((item) => (item.id === itemId ? { ...item, isWatched: nextIsWatched } : item));
+}
+
+function shouldInsertToggledItemAfterToggle({
+  items,
+  previousIsWatched,
+  nextIsWatched,
+  removeWatchedFromUnwatchedOnly,
+  toggledItem,
+  searchQuery,
+}: {
+  items: WatchlistItem[];
+  previousIsWatched: boolean;
+  nextIsWatched: boolean;
+  removeWatchedFromUnwatchedOnly?: boolean;
+  toggledItem?: WatchlistItem | null;
+  searchQuery?: string;
+}) {
+  if (!removeWatchedFromUnwatchedOnly || !previousIsWatched || nextIsWatched || !toggledItem) {
+    return false;
+  }
+
+  if (items.some((item) => item.id === toggledItem.id)) {
+    return false;
+  }
+
+  return matchesWatchlistItemQuery(toggledItem, searchQuery);
+}
+
+function matchesWatchlistItemQuery(item: WatchlistItem, query?: string) {
+  const normalizedQuery = query?.trim().toLocaleLowerCase();
+
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  return [item.title, item.parentTitle, item.episode].some((value) =>
+    value?.toLocaleLowerCase().includes(normalizedQuery),
+  );
 }
 
 function updateWatchlistPagesItemOrderMode(
@@ -203,14 +278,16 @@ function sortWatchlistItemsByOrderMode(
 function repartitionItemsAcrossPages({
   pages,
   items,
+  pageSize,
 }: {
   pages: InfiniteData<WatchlistDetailPage, number>["pages"];
   items: WatchlistItem[];
+  pageSize?: number;
 }) {
   let offset = 0;
 
   return pages.map((page) => {
-    const nextOffset = offset + page.items.length;
+    const nextOffset = offset + (pageSize ?? page.items.length);
     const nextPageItems = items.slice(offset, nextOffset);
     offset = nextOffset;
 

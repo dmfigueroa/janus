@@ -40,6 +40,7 @@ export async function optimisticallyToggleWatchedItem({
     queryClient,
     watchlistId,
   });
+  const toggledItem = findWatchlistDetailItem(snapshot, itemId);
 
   for (const [cacheKey, previousData] of snapshot) {
     const filters = readFiltersFromDetailQueryKey(cacheKey);
@@ -51,6 +52,9 @@ export async function optimisticallyToggleWatchedItem({
         itemId,
         previousIsWatched,
         nextIsWatched,
+        pageSize: filters?.pageSize,
+        toggledItem,
+        searchQuery: filters?.query,
         removeWatchedFromUnwatchedOnly: filters?.unwatchedOnly === true,
       }),
     );
@@ -138,6 +142,23 @@ function copyEntriesToItemOrderModeCache({
   }
 
   return createdKeys;
+}
+
+function findWatchlistDetailItem(
+  snapshot: WatchlistDetailCacheSnapshot,
+  itemId: WatchlistItem["id"],
+) {
+  for (const [, previousData] of snapshot) {
+    const item = previousData?.pages
+      .flatMap((page) => page.items)
+      .find((entry) => entry.id === itemId);
+
+    if (item) {
+      return item;
+    }
+  }
+
+  return null;
 }
 
 export async function optimisticallyReorderWatchlistItems({
