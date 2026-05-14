@@ -12,10 +12,14 @@ import {
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { WatchlistItem } from "@/db/schema";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
-import { resolveReorderIntent, type ReorderIntent } from "@/features/watchlists/detail/reorder";
+import {
+  reorderVisibleItemsByAnchor,
+  resolveReorderIntent,
+  type ReorderIntent,
+} from "@/features/watchlists/detail/reorder";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import { Flag, Loader2 } from "lucide-react";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import { DragOverlayTimelineRow, ReorderableTimelineRow } from "./reorderable-timeline-row";
 
 interface WatchlistTimelineProps {
@@ -30,7 +34,7 @@ interface WatchlistTimelineProps {
 }
 
 type PendingDrop = {
-  itemIdsBeforeDrop: number[];
+  itemIdsAfterDrop: number[];
   scrollTop: number;
 };
 
@@ -46,53 +50,47 @@ export function WatchlistTimeline({
 }: WatchlistTimelineProps) {
   const [activeItemId, setActiveItemId] = useState<number | null>(null);
   const [pendingDrop, setPendingDrop] = useState<PendingDrop | null>(null);
-  const pendingDropTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reorderEnabled = canReorder && Boolean(onReorder);
   const showHandleSlot = itemOrderMode === "custom";
   const activeItem =
     activeItemId === null ? null : (items.find((item) => item.id === activeItemId) ?? null);
   const itemIds = useMemo(() => items.map((item) => item.id), [items]);
+  const displayedItems = useMemo(() => {
+    if (!pendingDrop) {
+      return items;
+    }
+
+    return reorderItemsByIds(items, pendingDrop.itemIdsAfterDrop);
+  }, [items, pendingDrop]);
 
   useLayoutEffect(() => {
     if (!pendingDrop) {
       return;
     }
 
-    const hasOrderChanged =
-      pendingDrop.itemIdsBeforeDrop.length === itemIds.length &&
-      pendingDrop.itemIdsBeforeDrop.some((itemId, index) => itemId !== itemIds[index]);
+    window.scrollTo({ top: pendingDrop.scrollTop });
+  }, [pendingDrop]);
 
-    if (!hasOrderChanged) {
+  useLayoutEffect(() => {
+    if (!pendingDrop) {
       return;
     }
 
-    if (pendingDropTimeoutRef.current) {
-      clearTimeout(pendingDropTimeoutRef.current);
-      pendingDropTimeoutRef.current = null;
+    if (areItemIdsEqual(itemIds, pendingDrop.itemIdsAfterDrop) || !interactionDisabled) {
+      setPendingDrop(null);
     }
-    window.scrollTo({ top: pendingDrop.scrollTop });
-    setPendingDrop(null);
-    setActiveItemId(null);
-  }, [itemIds, pendingDrop]);
-
-  useLayoutEffect(() => {
-    return () => {
-      if (pendingDropTimeoutRef.current) {
-        clearTimeout(pendingDropTimeoutRef.current);
-      }
-    };
-  }, []);
+  }, [interactionDisabled, itemIds, pendingDrop]);
 
   const groups = useMemo(() => {
     if (itemOrderMode === "custom") {
-      return [{ year: "custom", items }];
+      return [{ year: "custom", items: displayedItems }];
     }
 
     const grouped: { year: string; items: WatchlistItem[] }[] = [];
     let currentYear = "";
     let currentGroup: WatchlistItem[] = [];
 
-    items.forEach((item) => {
+    displayedItems.forEach((item) => {
       const year = item.releaseDate ? item.releaseDate.split("-")[0] : "TBA";
 
       if (year !== currentYear) {
@@ -111,7 +109,7 @@ export function WatchlistTimeline({
     }
 
     return grouped;
-  }, [itemOrderMode, items]);
+  }, [displayedItems, itemOrderMode]);
 
   const sensors = useSensors(
     useSensor(MouseSensor),
@@ -139,10 +137,6 @@ export function WatchlistTimeline({
   }
 
   function clearDragState() {
-    if (pendingDropTimeoutRef.current) {
-      clearTimeout(pendingDropTimeoutRef.current);
-      pendingDropTimeoutRef.current = null;
-    }
     setActiveItemId(null);
     setPendingDrop(null);
   }
@@ -154,29 +148,31 @@ export function WatchlistTimeline({
     }
 
     const referenceItemId = Number(event.over.id);
-    const movedIndex = items.findIndex((item) => item.id === activeItemId);
-    const referenceIndex = items.findIndex((item) => item.id === referenceItemId);
+    const movedIndex = displayedItems.findIndex((item) => item.id === activeItemId);
+    const referenceIndex = displayedItems.findIndex((item) => item.id === referenceItemId);
     const position = movedIndex < referenceIndex ? "after" : "before";
+    const nextItemIds = reorderVisibleItemsByAnchor({
+      items: displayedItems,
+      movedItemId: activeItemId,
+      referenceItemId,
+      position,
+    });
     const intent = resolveReorderIntent({
-      items,
+      items: displayedItems,
       movedItemId: activeItemId,
       referenceItemId,
       position,
     });
 
-    if (intent) {
+    if (intent && nextItemIds) {
       if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();
       }
       setPendingDrop({
-        itemIdsBeforeDrop: itemIds,
+        itemIdsAfterDrop: nextItemIds,
         scrollTop: window.scrollY,
       });
-      pendingDropTimeoutRef.current = setTimeout(() => {
-        pendingDropTimeoutRef.current = null;
-        setPendingDrop(null);
-        setActiveItemId(null);
-      }, 500);
+      setActiveItemId(null);
       onReorder?.(intent);
       return;
     }
@@ -258,4 +254,32 @@ export function WatchlistTimeline({
       </div>
     </DndContext>
   );
+}
+
+function reorderItemsByIds(items: WatchlistItem[], itemIds: number[]) {
+  if (
+    areItemIdsEqual(
+      items.map((item) => item.id),
+      itemIds,
+    )
+  ) {
+    return items;
+  }
+
+  const rankByItemId = new Map(itemIds.map((itemId, index) => [itemId, index]));
+
+  return [...items].sort((left, right) => {
+    const leftRank = rankByItemId.get(left.id);
+    const rightRank = rankByItemId.get(right.id);
+
+    if (leftRank === undefined || rightRank === undefined) {
+      return 0;
+    }
+
+    return leftRank - rightRank;
+  });
+}
+
+function areItemIdsEqual(left: number[], right: number[]) {
+  return left.length === right.length && left.every((itemId, index) => itemId === right[index]);
 }
