@@ -14,6 +14,7 @@
 - Use conventional pull request titles in the form `type(scope): summary` when a scope adds clarity, or `type: summary` when it does not.
 - Open pull requests as ready for review by default. Create draft pull requests only when the user explicitly asks for a draft.
 - Prefer standard conventional commit types like `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, and `build`.
+- After completing a meaningful unit of work, commit and push the branch without waiting for an extra reminder from the user.
 
 ## Database Migrations
 

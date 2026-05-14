@@ -33,13 +33,13 @@ beforeEach(async () => {
 });
 
 describe("reorderItems mutation", () => {
-  it("updates custom ranks for all provided items in the specified order", async () => {
+  it("moves an item relative to an anchor and rewrites only the affected rank slice", async () => {
     const [watchlist] = await db
       .insert(watchlists)
       .values({ name: "Test Watchlist", itemOrderMode: "custom" })
       .returning();
 
-    const [item1, item2, item3] = await db
+    const [item1, item2, item3, item4] = await db
       .insert(watchlistItems)
       .values([
         {
@@ -63,13 +63,21 @@ describe("reorderItems mutation", () => {
           mediaType: "movie",
           customRank: 3,
         },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "4",
+          title: "Item 4",
+          mediaType: "movie",
+          customRank: 4,
+        },
       ])
       .returning();
 
-    // Reorder: 3, 1, 2
     const result = await reorderItems({
       watchlistId: watchlist.id,
-      itemIds: [item3.id, item1.id, item2.id],
+      movedItemId: item1.id,
+      referenceItemId: item3.id,
+      position: "after",
     });
 
     expect(result.success).toBe(true);
@@ -81,15 +89,49 @@ describe("reorderItems mutation", () => {
       .orderBy(watchlistItems.customRank);
 
     expect(updatedItems).toEqual([
-      { id: item3.id, customRank: 1 },
-      { id: item1.id, customRank: 2 },
-      { id: item2.id, customRank: 3 },
+      { id: item2.id, customRank: 1 },
+      { id: item3.id, customRank: 2 },
+      { id: item1.id, customRank: 3 },
+      { id: item4.id, customRank: 4 },
     ]);
   });
 
-  it("fails if any item does not belong to the watchlist", async () => {
-    const [watchlist1] = await db.insert(watchlists).values({ name: "Watchlist 1" }).returning();
-    const [watchlist2] = await db.insert(watchlists).values({ name: "Watchlist 2" }).returning();
+  it("fails when the watchlist is not in custom mode", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Release Ordered", itemOrderMode: "release" })
+      .returning();
+
+    const [item1, item2] = await db
+      .insert(watchlistItems)
+      .values([
+        { watchlistId: watchlist.id, tmdbId: "1", title: "Item 1", mediaType: "movie" },
+        { watchlistId: watchlist.id, tmdbId: "2", title: "Item 2", mediaType: "movie" },
+      ])
+      .returning();
+
+    const result = await reorderItems({
+      watchlistId: watchlist.id,
+      movedItemId: item1.id,
+      referenceItemId: item2.id,
+      position: "before",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      message: "Reordering is only available in custom mode",
+    });
+  });
+
+  it("fails when either moved or reference item is outside the watchlist", async () => {
+    const [watchlist1] = await db
+      .insert(watchlists)
+      .values({ name: "Watchlist 1", itemOrderMode: "custom" })
+      .returning();
+    const [watchlist2] = await db
+      .insert(watchlists)
+      .values({ name: "Watchlist 2", itemOrderMode: "custom" })
+      .returning();
 
     const [item1] = await db
       .insert(watchlistItems)
@@ -102,20 +144,24 @@ describe("reorderItems mutation", () => {
 
     const result = await reorderItems({
       watchlistId: watchlist1.id,
-      itemIds: [item1.id, item2.id],
+      movedItemId: item1.id,
+      referenceItemId: item2.id,
+      position: "after",
     });
 
-    expect(result.success).toBe(false);
-    expect(result.message).toContain("do not belong to this watchlist");
+    expect(result).toEqual({
+      success: false,
+      message: "Some items do not belong to this watchlist",
+    });
   });
 
-  it("fails without changing ranks when the submitted order omits watchlist items", async () => {
+  it("fails without mutating ranks when the moved item and reference item are the same", async () => {
     const [watchlist] = await db
       .insert(watchlists)
-      .values({ name: "Full List Required", itemOrderMode: "custom" })
+      .values({ name: "Self Move", itemOrderMode: "custom" })
       .returning();
 
-    const [item1, item2, item3] = await db
+    const [item1, item2] = await db
       .insert(watchlistItems)
       .values([
         {
@@ -132,23 +178,20 @@ describe("reorderItems mutation", () => {
           mediaType: "movie",
           customRank: 2,
         },
-        {
-          watchlistId: watchlist.id,
-          tmdbId: "3",
-          title: "Item 3",
-          mediaType: "movie",
-          customRank: 3,
-        },
       ])
       .returning();
 
     const result = await reorderItems({
       watchlistId: watchlist.id,
-      itemIds: [item2.id, item1.id],
+      movedItemId: item1.id,
+      referenceItemId: item1.id,
+      position: "before",
     });
 
-    expect(result.success).toBe(false);
-    expect(result.message).toContain("full unfiltered watchlist");
+    expect(result).toEqual({
+      success: false,
+      message: "Moved item and reference item must differ",
+    });
 
     const unchangedItems = await db
       .select({ id: watchlistItems.id, customRank: watchlistItems.customRank })
@@ -159,7 +202,6 @@ describe("reorderItems mutation", () => {
     expect(unchangedItems).toEqual([
       { id: item1.id, customRank: 1 },
       { id: item2.id, customRank: 2 },
-      { id: item3.id, customRank: 3 },
     ]);
   });
 });

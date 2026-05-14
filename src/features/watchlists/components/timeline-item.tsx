@@ -6,6 +6,7 @@ import { useToggleWatchedItem } from "@/features/watchlists/detail/use-toggle-wa
 
 type TimelineItemProps = {
   item: WatchlistItem;
+  interactionDisabled?: boolean;
 };
 
 const getMediaConfig = (type: string) => {
@@ -109,8 +110,9 @@ const Content = ({
   );
 };
 
-export function TimelineItem({ item }: TimelineItemProps) {
+export function TimelineItem({ item, interactionDisabled = false }: TimelineItemProps) {
   const toggleMutation = useToggleWatchedItem(item);
+  const isDisabled = interactionDisabled || toggleMutation.isPending;
 
   return (
     <div
@@ -124,7 +126,7 @@ export function TimelineItem({ item }: TimelineItemProps) {
 
       <button
         onClick={() => toggleMutation.mutate()}
-        disabled={toggleMutation.isPending}
+        disabled={isDisabled}
         className={cn(
           "flex size-8 shrink-0 items-center justify-center rounded-full border-2 transition-all hover:scale-110 active:scale-95 disabled:pointer-events-none",
           item.isWatched

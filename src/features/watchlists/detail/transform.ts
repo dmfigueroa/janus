@@ -1,6 +1,7 @@
 import type { InfiniteData } from "@tanstack/react-query";
 import type { WatchlistItem } from "@/db/schema";
 import { calculateWatchlistProgress } from "@/features/watchlists/progress";
+import { reorderVisibleItemsByAnchor } from "@/features/watchlists/detail/reorder";
 import { compareItemsByOrderMode, type WatchlistItemOrderMode } from "@/features/watchlists/order";
 import type { WatchlistDetailPage } from "@/models/watchlist";
 
@@ -66,17 +67,32 @@ export function updateWatchlistDetailPagesAfterItemOrderMode({
 
 export function updateWatchlistDetailPagesAfterReorder({
   data,
-  itemIds,
+  movedItemId,
+  referenceItemId,
+  position,
 }: {
   data: InfiniteData<WatchlistDetailPage, number> | undefined;
-  itemIds: number[];
+  movedItemId: number;
+  referenceItemId: number;
+  position: "before" | "after";
 }) {
   if (!data) {
     return data;
   }
 
+  const reorderedIds = reorderVisibleItemsByAnchor({
+    items: getWatchlistItemsFromPages(data.pages),
+    movedItemId,
+    referenceItemId,
+    position,
+  });
+
+  if (!reorderedIds) {
+    return data;
+  }
+
   const items = sortWatchlistItemsByOrderMode(
-    updateWatchlistItemsCustomRanks(getWatchlistItemsFromPages(data.pages), itemIds),
+    updateWatchlistItemsCustomRanks(getWatchlistItemsFromPages(data.pages), reorderedIds),
     { itemOrderMode: "custom" },
   );
 

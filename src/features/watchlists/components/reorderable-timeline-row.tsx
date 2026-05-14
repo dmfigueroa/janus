@@ -1,88 +1,124 @@
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import type { WatchlistItem } from "@/db/schema";
-import { orderItemIdsAfterDrop, type DropPlacement } from "@/features/watchlists/detail/reorder";
 import { cn } from "@/utils/cn";
 import { TimelineItem } from "./timeline-item";
 
 type ReorderableTimelineRowProps = {
   item: WatchlistItem;
-  items: WatchlistItem[];
-  reorderEnabled: boolean;
-  draggedItemId: number | null;
-  onDragStart: (itemId: number) => void;
-  onDragEnd: () => void;
-  onReorder?: (itemIds: number[]) => void;
+  showHandleSlot: boolean;
+  showHandle: boolean;
+  interactionDisabled: boolean;
 };
 
 export function ReorderableTimelineRow({
   item,
-  items,
-  reorderEnabled,
-  draggedItemId,
-  onDragStart,
-  onDragEnd,
-  onReorder,
+  showHandleSlot,
+  showHandle,
+  interactionDisabled,
 }: ReorderableTimelineRowProps) {
-  function submitDrop(targetItemId: number, placement: DropPlacement) {
-    if (!reorderEnabled || draggedItemId === null) {
-      onDragEnd();
-      return;
-    }
-
-    const reorderedIds = orderItemIdsAfterDrop({
-      items,
-      draggedItemId,
-      targetItemId,
-      placement,
-    });
-
-    if (reorderedIds) {
-      onReorder?.(reorderedIds);
-    }
-
-    onDragEnd();
-  }
+  const {
+    attributes,
+    listeners,
+    setActivatorNodeRef,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: item.id,
+    disabled: !showHandle,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   return (
     <div
+      ref={setNodeRef}
       data-testid={`watchlist-timeline-row-${item.id}`}
-      onDragOver={(event) => {
-        if (!reorderEnabled) {
-          return;
-        }
-
-        event.preventDefault();
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        const bounds = event.currentTarget.getBoundingClientRect();
-        const placement =
-          bounds.height > 0 && event.clientY < bounds.top + bounds.height / 2 ? "before" : "after";
-        submitDrop(item.id, placement);
-      }}
-      className={cn(
-        "flex items-center gap-2 rounded-md",
-        draggedItemId === item.id && "opacity-50",
-      )}
+      style={style}
+      className={cn("rounded-xl", isDragging && "opacity-0")}
     >
-      <button
-        type="button"
-        aria-label={`Move ${item.title}`}
-        disabled={!reorderEnabled}
-        draggable={reorderEnabled}
-        onDragStart={() => onDragStart(item.id)}
-        onDragEnd={onDragEnd}
-        className={cn(
-          "flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors",
-          reorderEnabled
-            ? "cursor-grab hover:bg-secondary hover:text-foreground active:cursor-grabbing"
-            : "cursor-not-allowed opacity-35",
-        )}
-      >
-        <GripVertical className="size-4" />
-      </button>
+      <TimelineRowShell
+        item={item}
+        showHandleSlot={showHandleSlot}
+        showHandle={showHandle}
+        interactionDisabled={interactionDisabled}
+        dragging={isDragging}
+        handleProps={{
+          ...attributes,
+          ...listeners,
+          ref: setActivatorNodeRef,
+        }}
+      />
+    </div>
+  );
+}
+
+export function DragOverlayTimelineRow({
+  item,
+  interactionDisabled,
+}: {
+  item: WatchlistItem;
+  interactionDisabled: boolean;
+}) {
+  return (
+    <div className="rounded-xl bg-background/95 shadow-xl ring-1 ring-border">
+      <TimelineRowShell
+        item={item}
+        showHandleSlot
+        showHandle
+        interactionDisabled={interactionDisabled}
+        dragging
+      />
+    </div>
+  );
+}
+
+function TimelineRowShell({
+  item,
+  showHandleSlot,
+  showHandle,
+  interactionDisabled,
+  dragging,
+  handleProps,
+}: {
+  item: WatchlistItem;
+  showHandleSlot: boolean;
+  showHandle: boolean;
+  interactionDisabled: boolean;
+  dragging: boolean;
+  handleProps?: Record<string, unknown>;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-xl bg-background/80">
+      {showHandle ? (
+        <button
+          type="button"
+          aria-label={`Move ${item.title}`}
+          onMouseDown={(event) => {
+            // Prevent the handle from stealing focus and scrolling back into view after drop.
+            event.preventDefault();
+          }}
+          className={cn(
+            "flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors cursor-grab",
+            dragging
+              ? "bg-secondary text-foreground shadow-sm cursor-grabbing"
+              : "hover:bg-secondary hover:text-foreground active:cursor-grabbing",
+          )}
+          {...handleProps}
+        >
+          <GripVertical className="size-4" />
+        </button>
+      ) : showHandleSlot ? (
+        <div aria-hidden className="size-8 shrink-0" />
+      ) : null}
+
       <div className="min-w-0 flex-1">
-        <TimelineItem item={item} />
+        <TimelineItem item={item} interactionDisabled={interactionDisabled} />
       </div>
     </div>
   );
