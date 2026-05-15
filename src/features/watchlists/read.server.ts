@@ -8,10 +8,15 @@ import {
   getWatchlistDetail,
   type GetWatchlistDetailParams,
 } from "@/features/watchlists/detail/query.server";
+import {
+  getWatchlistHome,
+  type WatchlistHomeScreen,
+} from "@/features/watchlists/home/query.server";
 
 export type WatchlistListScreenSummary = WatchlistSummary;
 
 export type WatchlistDetailScreenParams = GetWatchlistDetailParams;
+export type WatchlistHomeScreenData = WatchlistHomeScreen;
 
 export const WatchlistsRead = {
   async listScreen({
@@ -26,5 +31,9 @@ export const WatchlistsRead = {
 
   async detailScreen(params: WatchlistDetailScreenParams): Promise<WatchlistDetailPage | null> {
     return getWatchlistDetail(params);
+  },
+
+  async homeScreen(): Promise<WatchlistHomeScreenData> {
+    return getWatchlistHome();
   },
 };
