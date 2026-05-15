@@ -242,3 +242,109 @@ describe("WatchlistsRead.listScreen", () => {
     });
   });
 });
+
+describe("WatchlistsRead.homeScreen", () => {
+  it("returns featured sections from next-unwatched items while keeping the full watchlist list", async () => {
+    const [movieList] = await db
+      .insert(watchlists)
+      .values({
+        name: "Movie Night",
+        createdAt: "2024-01-01 00:00:00",
+      })
+      .returning();
+    const [completedList] = await db
+      .insert(watchlists)
+      .values({
+        name: "Finished Queue",
+        createdAt: "2024-01-02 00:00:00",
+      })
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: movieList.id,
+        tmdbId: "movie-1",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Next Movie",
+        releaseDate: "2024-02-01",
+        isWatched: false,
+      },
+      {
+        watchlistId: completedList.id,
+        tmdbId: "movie-2",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Done Movie",
+        releaseDate: "2024-01-01",
+        isWatched: true,
+      },
+    ]);
+
+    const home = await WatchlistsRead.homeScreen();
+
+    expect(home.featuredSections).toHaveLength(1);
+    expect(home.featuredSections[0]).toMatchObject({
+      key: "movie",
+      title: "Movies",
+    });
+    expect(home.featuredSections[0]?.watchlists.map((watchlist) => watchlist.name)).toEqual([
+      "Movie Night",
+    ]);
+    expect(home.allWatchlists.map((watchlist) => watchlist.name)).toEqual([
+      "Movie Night",
+      "Finished Queue",
+    ]);
+  });
+
+  it("caps each media section at three watchlists and breaks stale ties by oldest created date", async () => {
+    const insertedLists = await db
+      .insert(watchlists)
+      .values([
+        {
+          name: "Newest Created",
+          createdAt: "2024-01-04 00:00:00",
+        },
+        {
+          name: "Third Created",
+          createdAt: "2024-01-03 00:00:00",
+        },
+        {
+          name: "Second Created",
+          createdAt: "2024-01-02 00:00:00",
+        },
+        {
+          name: "Oldest Created",
+          createdAt: "2024-01-01 00:00:00",
+        },
+      ])
+      .returning();
+
+    await db.insert(watchlistItems).values(
+      insertedLists.map((watchlist, index) => ({
+        watchlistId: watchlist.id,
+        tmdbId: `movie-${index + 1}`,
+        source: "tmdb" as const,
+        mediaType: "movie" as const,
+        title: `Movie ${index + 1}`,
+        releaseDate: `2024-01-0${index + 1}`,
+        isWatched: false,
+      })),
+    );
+
+    const home = await WatchlistsRead.homeScreen();
+
+    expect(home.featuredSections).toHaveLength(1);
+    expect(home.featuredSections[0]?.watchlists.map((watchlist) => watchlist.name)).toEqual([
+      "Oldest Created",
+      "Second Created",
+      "Third Created",
+    ]);
+    expect(home.allWatchlists.map((watchlist) => watchlist.name)).toEqual([
+      "Oldest Created",
+      "Second Created",
+      "Third Created",
+      "Newest Created",
+    ]);
+  });
+});
