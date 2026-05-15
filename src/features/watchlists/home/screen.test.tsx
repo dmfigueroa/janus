@@ -62,29 +62,6 @@ function watchlist(
   };
 }
 
-function nextUnwatchedFixture(): NonNullable<EnrichedWatchlist["stats"]["nextUnwatched"]> {
-  return {
-    id: 1,
-    watchlistId: 1,
-    tmdbId: "movie-1",
-    source: "tmdb",
-    mediaType: "movie",
-    title: "Next Movie",
-    parentId: null,
-    parentTitle: null,
-    season: null,
-    episode: null,
-    posterPath: null,
-    releaseDate: "2024-01-01",
-    voteAverage: null,
-    runtime: null,
-    customRank: null,
-    isWatched: false,
-    authors: null,
-    addedAt: "2024-01-01 00:00:00",
-  } as NonNullable<EnrichedWatchlist["stats"]["nextUnwatched"]>;
-}
-
 function homeData(overrides?: Partial<WatchlistHomeScreen>): WatchlistHomeScreen {
   const featuredMovie = watchlist({
     id: 1,
@@ -93,7 +70,26 @@ function homeData(overrides?: Partial<WatchlistHomeScreen>): WatchlistHomeScreen
       totalItems: 1,
       watchedItems: 0,
       progress: 0,
-      nextUnwatched: nextUnwatchedFixture(),
+      nextUnwatched: {
+        id: 1,
+        watchlistId: 1,
+        tmdbId: "movie-1",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Next Movie",
+        parentId: null,
+        parentTitle: null,
+        season: null,
+        episode: null,
+        posterPath: null,
+        releaseDate: "2024-01-01",
+        voteAverage: null,
+        runtime: null,
+        customRank: null,
+        isWatched: false,
+        authors: null,
+        addedAt: "2024-01-01 00:00:00",
+      },
       coverImage: null,
       coverMediaType: "movie",
     },

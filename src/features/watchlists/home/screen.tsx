@@ -74,15 +74,14 @@ export function WatchlistsHomeScreen({ initialData }: WatchlistsHomeScreenProps)
               {initialData.featuredSections.map((section) => (
                 <div key={section.key}>
                   <h3 className="mb-3 text-lg font-semibold text-foreground">{section.title}</h3>
-                  <div className="grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:justify-start sm:gap-6">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     {section.watchlists.map((watchlist) => (
-                      <div key={watchlist.id} className="w-full sm:w-[220px]">
-                        <WatchlistCard
-                          watchlist={watchlist}
-                          showDeleteButton={false}
-                          showUpNextBadge={false}
-                        />
-                      </div>
+                      <WatchlistCard
+                        key={watchlist.id}
+                        watchlist={watchlist}
+                        showDeleteButton={false}
+                        showUpNextBadge={false}
+                      />
                     ))}
                   </div>
                 </div>
