@@ -81,6 +81,7 @@ export function WatchlistsHomeScreen({ initialData }: WatchlistsHomeScreenProps)
                           watchlist={watchlist}
                           showDeleteButton={false}
                           showUpNextBadge={false}
+                          showSkipButton
                         />
                       </div>
                     ))}

@@ -1,6 +1,7 @@
 import { useRouter, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { deleteWatchlist } from "@/features/watchlists/delete/mutation";
+import { skipWatchlist } from "@/features/watchlists/skip/mutation";
 import { useState } from "react";
 import { cn } from "@/utils/cn";
 import { toast } from "sonner";
@@ -90,6 +91,7 @@ export function WatchlistCard({
   onToggle,
   showDeleteButton = true,
   showUpNextBadge = true,
+  showSkipButton = false,
 }: {
   watchlist: EnrichedWatchlist;
   selectionMode?: boolean;
@@ -97,10 +99,13 @@ export function WatchlistCard({
   onToggle?: () => void;
   showDeleteButton?: boolean;
   showUpNextBadge?: boolean;
+  showSkipButton?: boolean;
 }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
+  const [skipping, setSkipping] = useState(false);
   const deleteWatchlistFn = useServerFn(deleteWatchlist);
+  const skipWatchlistFn = useServerFn(skipWatchlist);
 
   const fallbackGradient = "bg-gradient-to-br from-zinc-800 to-zinc-900";
 
@@ -114,6 +119,22 @@ export function WatchlistCard({
       console.error("Failed to delete", error);
       toast.error("Failed to delete watchlist. Please try again.");
       setDeleting(false);
+    }
+  };
+
+  const handleSkip = async () => {
+    setSkipping(true);
+    try {
+      const result = await skipWatchlistFn({ data: { watchlistId: watchlist.id } });
+      if (!result.success) {
+        throw new Error("Failed to skip watchlist");
+      }
+      await router.invalidate?.();
+    } catch (error) {
+      console.error("Failed to skip watchlist", error);
+      toast.error("Failed to skip watchlist. Please try again.");
+    } finally {
+      setSkipping(false);
     }
   };
 
@@ -151,11 +172,33 @@ export function WatchlistCard({
         </div>
       )}
 
-      {showUpNextBadge && hasUnwatched && !selectionMode && (
-        <div className="absolute top-3 left-3 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-1 rounded-md shadow-lg z-20">
-          UP NEXT
+      {(showUpNextBadge || showSkipButton) && hasUnwatched && !selectionMode ? (
+        <div className="absolute left-3 right-3 top-3 z-20 flex items-start justify-between gap-2">
+          {showUpNextBadge ? (
+            <div className="bg-primary text-primary-foreground text-[10px] font-bold px-2 py-1 rounded-md shadow-lg">
+              UP NEXT
+            </div>
+          ) : (
+            <div />
+          )}
+
+          {showSkipButton ? (
+            <button
+              type="button"
+              className="rounded-md bg-black/60 px-2 py-1 text-[10px] font-bold text-white shadow-lg transition-colors hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-70"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                void handleSkip();
+              }}
+              disabled={skipping}
+              aria-label={`Skip ${watchlist.name}`}
+            >
+              Skip
+            </button>
+          ) : null}
         </div>
-      )}
+      ) : null}
     </div>
   );
 
