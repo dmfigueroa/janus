@@ -23,6 +23,7 @@ const HOME_SECTION_ORDER: Array<{ key: WatchlistHomeSectionKey; title: string }>
   { key: "book", title: "Books" },
   { key: "comic", title: "Comics" },
 ];
+const MAX_FEATURED_WATCHLISTS_PER_SECTION = 3;
 
 function compareOptionalTimestampsAsc(left: string | null, right: string | null) {
   if (left === right) {
@@ -95,7 +96,7 @@ export async function getWatchlistHome(): Promise<WatchlistHomeScreen> {
     }
 
     const existing = buckets.get(sectionKey) ?? [];
-    if (existing.length < 3) {
+    if (existing.length < MAX_FEATURED_WATCHLISTS_PER_SECTION) {
       existing.push(watchlist);
       buckets.set(sectionKey, existing);
     }

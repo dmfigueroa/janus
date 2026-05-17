@@ -173,13 +173,16 @@ export function WatchlistCard({
       )}
 
       {(showUpNextBadge || showSkipButton) && hasUnwatched && !selectionMode ? (
-        <div className="absolute left-3 right-3 top-3 z-20 flex items-start justify-between gap-2">
-          {showUpNextBadge ? (
+        <div
+          className={cn(
+            "absolute left-3 right-3 top-3 z-20 flex items-start gap-2",
+            showUpNextBadge ? "justify-between" : "justify-end",
+          )}
+        >
+          {showUpNextBadge && (
             <div className="bg-primary text-primary-foreground text-[10px] font-bold px-2 py-1 rounded-md shadow-lg">
               UP NEXT
             </div>
-          ) : (
-            <div />
           )}
 
           {showSkipButton ? (
