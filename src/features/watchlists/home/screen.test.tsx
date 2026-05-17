@@ -12,17 +12,20 @@ vi.mock("@/components/WatchlistCard", () => ({
     selectionMode = false,
     showDeleteButton = true,
     showUpNextBadge = true,
+    showSkipButton = false,
   }: {
     watchlist: EnrichedWatchlist;
     selectionMode?: boolean;
     showDeleteButton?: boolean;
     showUpNextBadge?: boolean;
+    showSkipButton?: boolean;
   }) => (
     <div data-testid={`watchlist-card-${watchlist.id}`}>
       <span>{watchlist.name}</span>
       <span>{selectionMode ? "selection" : "browse"}</span>
       <span>{showDeleteButton ? "delete" : "no-delete"}</span>
       <span>{showUpNextBadge ? "badge" : "no-badge"}</span>
+      <span>{showSkipButton ? "skip" : "no-skip"}</span>
     </div>
   ),
 }));
@@ -125,6 +128,8 @@ describe("WatchlistsHomeScreen", () => {
     expect(screen.getByRole("heading", { name: "Up Next by Media" })).not.toBeNull();
     expect(screen.getByRole("heading", { name: "Movies" })).not.toBeNull();
     expect(screen.getByRole("heading", { name: "All Watchlists" })).not.toBeNull();
+    expect(screen.getAllByTestId("watchlist-card-1")[0]?.textContent).toContain("skip");
+    expect(screen.getByTestId("watchlist-card-2").textContent).toContain("no-skip");
     expect(screen.queryByPlaceholderText("Find a list, movie, or show...")).toBeNull();
     expect(screen.queryByRole("button", { name: "Settings" })).toBeNull();
   });

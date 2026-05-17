@@ -15,6 +15,7 @@ export function WatchlistsHomeScreen({ initialData }: WatchlistsHomeScreenProps)
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const selectedIdSet = new Set(selectedIds);
 
   const toggleSelection = (id: number) => {
     setSelectedIds((prev) =>
@@ -81,6 +82,7 @@ export function WatchlistsHomeScreen({ initialData }: WatchlistsHomeScreenProps)
                           watchlist={watchlist}
                           showDeleteButton={false}
                           showUpNextBadge={false}
+                          showSkipButton
                         />
                       </div>
                     ))}
@@ -103,7 +105,7 @@ export function WatchlistsHomeScreen({ initialData }: WatchlistsHomeScreenProps)
                 <WatchlistCard
                   watchlist={watchlist}
                   selectionMode={selectionMode}
-                  isSelected={selectedIds.includes(watchlist.id)}
+                  isSelected={selectedIdSet.has(watchlist.id)}
                   onToggle={() => toggleSelection(watchlist.id)}
                 />
               </div>
