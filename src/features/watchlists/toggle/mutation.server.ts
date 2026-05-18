@@ -4,7 +4,11 @@ import type { ToggleWatchedInput } from "./mutation";
 import { markLastWatched } from "@/features/watchlists/repository.server";
 import { eq } from "drizzle-orm";
 
-export async function toggleWatchedMutation({ itemId, isWatched }: ToggleWatchedInput) {
+export async function toggleWatchedMutation({
+  itemId,
+  isWatched,
+  updateWatchlistRecency = true,
+}: ToggleWatchedInput) {
   const db = getDb();
   const [item] = await db
     .select({ watchlistId: watchlistItems.watchlistId })
@@ -17,7 +21,7 @@ export async function toggleWatchedMutation({ itemId, isWatched }: ToggleWatched
 
   await db.update(watchlistItems).set({ isWatched }).where(eq(watchlistItems.id, itemId));
 
-  if (isWatched) {
+  if (isWatched && updateWatchlistRecency) {
     await markLastWatched(item.watchlistId);
   }
 

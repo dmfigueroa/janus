@@ -160,6 +160,48 @@ describe("watchlist mutation contract", () => {
     });
   });
 
+  it("marks an item watched without updating watchlist recency when the write opts out", async () => {
+    const originalLastWatchedAt = "2024-01-10 00:00:00";
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({
+        name: "Quiet Toggle",
+        lastWatchedAt: originalLastWatchedAt,
+      })
+      .returning();
+
+    const [item] = await db
+      .insert(watchlistItems)
+      .values({
+        watchlistId: watchlist.id,
+        tmdbId: "quiet-toggle",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Quiet Toggle",
+        releaseDate: "2024-01-01",
+        isWatched: false,
+      })
+      .returning();
+
+    const result = await toggleWatchedMutation({
+      itemId: item.id,
+      isWatched: true,
+      updateWatchlistRecency: false,
+    });
+
+    const detail = await WatchlistsRead.detailScreen({
+      watchlistId: watchlist.id,
+      unwatchedOnly: false,
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(detail?.items[0]).toMatchObject({
+      id: item.id,
+      isWatched: true,
+    });
+    expect(detail?.watchlist.lastWatchedAt).toBe(originalLastWatchedAt);
+  });
+
   it("switches the active item order mode through the feature write boundary so detail reads use the persisted order", async () => {
     const [watchlist] = await db.insert(watchlists).values({ name: "Order Toggle" }).returning();
 

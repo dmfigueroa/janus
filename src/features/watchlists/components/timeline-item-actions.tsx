@@ -16,6 +16,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { WatchlistItem } from "@/db/schema";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/query";
+import { useToggleWatchedItem } from "@/features/watchlists/detail/use-toggle-watched-item";
 import { getWatchlistParentRemovalPreviewQuery } from "@/features/watchlists/remove/query";
 import { useRemoveWatchlistItemMutation } from "@/features/watchlists/remove/use-remove-watchlist-item";
 import { useRemoveWatchlistParentMutation } from "@/features/watchlists/remove/use-remove-watchlist-parent";
@@ -36,6 +37,7 @@ export function TimelineItemActions({
   const [removeParentOpen, setRemoveParentOpen] = useState(false);
   const previewFn = useServerFn(getWatchlistParentRemovalPreviewQuery);
   const labels = getRemovalLabels(item);
+  const quietWatchMutation = useToggleWatchedItem(item, { updateWatchlistRecency: false });
   const removeItemMutation = useRemoveWatchlistItemMutation({ item, activeFilters });
   const previewQuery = useQuery({
     queryKey: ["watchlists", "remove-parent-preview", item.watchlistId, item.parentId],
@@ -60,7 +62,10 @@ export function TimelineItemActions({
     preview: previewQuery.data,
   });
   const isBusy =
-    interactionDisabled || removeItemMutation.isPending || removeParentMutation.isPending;
+    interactionDisabled ||
+    quietWatchMutation.isPending ||
+    removeItemMutation.isPending ||
+    removeParentMutation.isPending;
 
   return (
     <>
@@ -75,12 +80,26 @@ export function TimelineItemActions({
             <MoreHorizontal size={16} />
           </button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-48 p-1">
+        <PopoverContent align="end" className="w-[min(20rem,calc(100vw-2rem))] p-1">
           <div className="flex flex-col gap-1">
+            {item.isWatched !== true ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-auto whitespace-normal text-left justify-start py-2"
+                onClick={() => {
+                  setMenuOpen(false);
+                  quietWatchMutation.mutate();
+                }}
+              >
+                Mark watched without updating list
+              </Button>
+            ) : null}
+
             <Button
               type="button"
               variant="ghost"
-              className="justify-start"
+              className="h-auto whitespace-normal text-left justify-start py-2"
               onClick={() => {
                 setMenuOpen(false);
                 setRemoveItemOpen(true);
@@ -93,7 +112,7 @@ export function TimelineItemActions({
               <Button
                 type="button"
                 variant="ghost"
-                className="justify-start"
+                className="h-auto whitespace-normal text-left justify-start py-2"
                 onClick={() => {
                   setMenuOpen(false);
                   setRemoveParentOpen(true);
