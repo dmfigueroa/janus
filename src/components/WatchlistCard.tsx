@@ -10,6 +10,7 @@ import { DeleteWatchlistButton } from "./DeleteWatchlistButton";
 import { Check } from "lucide-react";
 
 export type EnrichedWatchlist = WatchlistSummary;
+type WatchlistCardInfoVariant = "watchlist" | "up-next";
 
 const getImageUrl = (path: string | null) => {
   if (!path) return "";
@@ -57,29 +58,74 @@ const CoverImage = ({ watchlist }: { watchlist: EnrichedWatchlist }) => {
   );
 };
 
-const WatchlistInfo = ({ watchlist }: { watchlist: EnrichedWatchlist }) => {
+function formatUpNextSubtitleItem(watchlist: EnrichedWatchlist) {
+  const nextItem = watchlist.stats.nextUnwatched;
+  if (!nextItem) {
+    return null;
+  }
+
+  if (nextItem.mediaType === "episode" || nextItem.mediaType === "anime") {
+    if (nextItem.season !== null && nextItem.episode) {
+      return `S${nextItem.season}:E${nextItem.episode} • ${nextItem.title}`;
+    }
+
+    if (nextItem.episode) {
+      return `E${nextItem.episode} • ${nextItem.title}`;
+    }
+  }
+
+  if (nextItem.episode) {
+    return `${nextItem.episode} • ${nextItem.title}`;
+  }
+
+  return nextItem.title;
+}
+
+const WatchlistInfo = ({
+  watchlist,
+  infoVariant,
+}: {
+  watchlist: EnrichedWatchlist;
+  infoVariant: WatchlistCardInfoVariant;
+}) => {
   const stats = watchlist.stats;
+  const nextItem = stats.nextUnwatched;
+  const featuredTitle = nextItem?.parentTitle ?? nextItem?.title ?? watchlist.name;
+  const featuredSubtitle = nextItem?.parentTitle ? formatUpNextSubtitleItem(watchlist) : null;
 
   return (
     <div className="px-1">
-      <h3 className="font-bold text-lg text-foreground leading-tight truncate">{watchlist.name}</h3>
-      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 mb-1">
-        <span>{stats.totalItems} items</span>
-        <span>•</span>
-        <span className={cn(stats.progress === 100 ? "text-green-500" : "text-primary")}>
-          {stats.progress}%
-        </span>
-      </div>
+      {infoVariant === "up-next" ? (
+        <>
+          <h3 className="text-lg font-bold leading-tight text-foreground">{featuredTitle}</h3>
+          {featuredSubtitle ? (
+            <p className="mt-0.5 text-sm leading-snug text-muted-foreground">{featuredSubtitle}</p>
+          ) : null}
+        </>
+      ) : (
+        <>
+          <h3 className="font-bold text-lg text-foreground leading-tight truncate">
+            {watchlist.name}
+          </h3>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 mb-1">
+            <span>{stats.totalItems} items</span>
+            <span>•</span>
+            <span className={cn(stats.progress === 100 ? "text-green-500" : "text-primary")}>
+              {stats.progress}%
+            </span>
+          </div>
 
-      <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
-        <div
-          className={cn(
-            "h-full rounded-full transition-all duration-500",
-            stats.progress === 100 ? "bg-green-500" : "bg-primary",
-          )}
-          style={{ width: `${stats.progress}%` }}
-        />
-      </div>
+          <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all duration-500",
+                stats.progress === 100 ? "bg-green-500" : "bg-primary",
+              )}
+              style={{ width: `${stats.progress}%` }}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 };
@@ -92,6 +138,7 @@ export function WatchlistCard({
   showDeleteButton = true,
   showUpNextBadge = true,
   showSkipButton = false,
+  infoVariant = "watchlist",
 }: {
   watchlist: EnrichedWatchlist;
   selectionMode?: boolean;
@@ -100,6 +147,7 @@ export function WatchlistCard({
   showDeleteButton?: boolean;
   showUpNextBadge?: boolean;
   showSkipButton?: boolean;
+  infoVariant?: WatchlistCardInfoVariant;
 }) {
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
@@ -228,7 +276,7 @@ export function WatchlistCard({
         />
       )}
 
-      <WatchlistInfo watchlist={watchlist} />
+      <WatchlistInfo watchlist={watchlist} infoVariant={infoVariant} />
     </div>
   );
 }
