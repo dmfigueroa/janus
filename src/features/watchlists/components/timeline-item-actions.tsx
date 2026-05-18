@@ -80,13 +80,13 @@ export function TimelineItemActions({
             <MoreHorizontal size={16} />
           </button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-48 p-1">
+        <PopoverContent align="end" className="w-[min(20rem,calc(100vw-2rem))] p-1">
           <div className="flex flex-col gap-1">
             {item.isWatched !== true ? (
               <Button
                 type="button"
                 variant="ghost"
-                className="justify-start"
+                className="h-auto whitespace-normal text-left justify-start py-2"
                 onClick={() => {
                   setMenuOpen(false);
                   quietWatchMutation.mutate();
@@ -99,7 +99,7 @@ export function TimelineItemActions({
             <Button
               type="button"
               variant="ghost"
-              className="justify-start"
+              className="h-auto whitespace-normal text-left justify-start py-2"
               onClick={() => {
                 setMenuOpen(false);
                 setRemoveItemOpen(true);
@@ -112,7 +112,7 @@ export function TimelineItemActions({
               <Button
                 type="button"
                 variant="ghost"
-                className="justify-start"
+                className="h-auto whitespace-normal text-left justify-start py-2"
                 onClick={() => {
                   setMenuOpen(false);
                   setRemoveParentOpen(true);
