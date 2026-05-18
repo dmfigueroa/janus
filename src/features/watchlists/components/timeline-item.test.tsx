@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistItem } from "@/db/schema";
 import { TimelineItem } from "./timeline-item";
 
+const toggleWatchedMutate = vi.fn();
+const toggleWatchedWithoutRecencyMutate = vi.fn();
 const removeItemMutateAsync = vi.fn();
 const removeParentMutateAsync = vi.fn();
 const previewState = {
@@ -14,9 +16,12 @@ const previewState = {
 };
 
 vi.mock("@/features/watchlists/detail/use-toggle-watched-item", () => ({
-  useToggleWatchedItem: () => ({
+  useToggleWatchedItem: (_item: WatchlistItem, options?: { updateWatchlistRecency?: boolean }) => ({
     isPending: false,
-    mutate: vi.fn(),
+    mutate:
+      options?.updateWatchlistRecency === false
+        ? toggleWatchedWithoutRecencyMutate
+        : toggleWatchedMutate,
   }),
 }));
 
@@ -56,6 +61,8 @@ vi.mock("@tanstack/react-start", async () => {
 
 afterEach(() => {
   cleanup();
+  toggleWatchedMutate.mockReset();
+  toggleWatchedWithoutRecencyMutate.mockReset();
   removeItemMutateAsync.mockReset();
   removeParentMutateAsync.mockReset();
   previewState.data = undefined;
@@ -64,6 +71,53 @@ afterEach(() => {
 });
 
 describe("TimelineItem removal actions", () => {
+  it("offers a quiet watched action for unwatched items and runs it immediately", async () => {
+    render(
+      <TimelineItem
+        item={createItem({ id: 1, title: "Standalone Movie", mediaType: "movie", parentId: null })}
+        activeFilters={{
+          watchlistId: 1,
+          itemOrderMode: "release",
+          unwatchedOnly: false,
+          query: "",
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions for Standalone Movie" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark watched without updating list" }));
+
+    await waitFor(() => {
+      expect(toggleWatchedWithoutRecencyMutate).toHaveBeenCalledTimes(1);
+    });
+    expect(toggleWatchedMutate).not.toHaveBeenCalled();
+  });
+
+  it("hides the quiet watched action for items that are already watched", () => {
+    render(
+      <TimelineItem
+        item={createItem({
+          id: 1,
+          title: "Standalone Movie",
+          mediaType: "movie",
+          parentId: null,
+          isWatched: true,
+        })}
+        activeFilters={{
+          watchlistId: 1,
+          itemOrderMode: "release",
+          unwatchedOnly: false,
+          query: "",
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions for Standalone Movie" }));
+
+    expect(screen.queryByRole("button", { name: "Mark watched without updating list" })).toBeNull();
+  });
+
   it("shows only single-item removal for standalone items and confirms with the item title", async () => {
     removeItemMutateAsync.mockResolvedValue({ success: true });
 
@@ -148,12 +202,14 @@ function createItem({
   mediaType,
   parentId,
   parentTitle = null,
+  isWatched = false,
 }: {
   id: number;
   title: string;
   mediaType: WatchlistItem["mediaType"];
   parentId: string | null;
   parentTitle?: string | null;
+  isWatched?: boolean;
 }): WatchlistItem {
   return {
     id,
@@ -171,7 +227,7 @@ function createItem({
     voteAverage: null,
     runtime: null,
     customRank: null,
-    isWatched: false,
+    isWatched,
     authors: null,
     addedAt: "2024-01-01 00:00:00",
   };

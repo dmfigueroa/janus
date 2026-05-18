@@ -9,7 +9,14 @@ import {
 } from "@/features/watchlists/detail/cache";
 import { toggleWatched } from "@/features/watchlists/toggle/mutation";
 
-export function useToggleWatchedItem(item: WatchlistItem) {
+export function useToggleWatchedItem(
+  item: WatchlistItem,
+  {
+    updateWatchlistRecency = true,
+  }: {
+    updateWatchlistRecency?: boolean;
+  } = {},
+) {
   const queryClient = useQueryClient();
   const toggleWatchedFn = useServerFn(toggleWatched);
   const previousIsWatched = item.isWatched === true;
@@ -18,7 +25,13 @@ export function useToggleWatchedItem(item: WatchlistItem) {
   return useMutation({
     mutationKey: ["watchlists", "toggle-watched", item.watchlistId],
     mutationFn: async () => {
-      const result = await toggleWatchedFn({ data: { itemId: item.id, isWatched: nextIsWatched } });
+      const result = await toggleWatchedFn({
+        data: {
+          itemId: item.id,
+          isWatched: nextIsWatched,
+          updateWatchlistRecency,
+        },
+      });
       if (!result.success) {
         throw new Error(result.message);
       }

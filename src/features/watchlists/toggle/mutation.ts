@@ -5,6 +5,7 @@ import { toggleWatchedMutation } from "./mutation.server";
 export const toggleWatchedSchema = z.object({
   itemId: z.number(),
   isWatched: z.boolean(),
+  updateWatchlistRecency: z.boolean().optional(),
 });
 
 export type ToggleWatchedInput = z.infer<typeof toggleWatchedSchema>;
