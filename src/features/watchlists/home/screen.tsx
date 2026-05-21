@@ -1,15 +1,29 @@
 import { useState } from "react";
 import { CheckSquare } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { WatchlistCard } from "@/components/WatchlistCard";
 import { CreateWatchlistCard } from "@/components/CreateWatchlistCard";
 import { CreateWatchlistDialog } from "@/components/CreateWatchlistDialog";
 import { MergeWatchlistDialog } from "@/components/MergeWatchlistDialog";
 import type { WatchlistHomeScreen } from "@/features/watchlists/home/query.server";
+import { formatNextItemWithParentTitle } from "@/features/watchlists/next-item-label";
+import { cn } from "@/utils/cn";
 
 type WatchlistsHomeScreenProps = {
   initialData: WatchlistHomeScreen;
 };
+
+function formatIncomingWatchlistLabel(
+  watchlist: WatchlistHomeScreen["featuredSections"][number]["watchlists"][number],
+) {
+  const nextItem = watchlist.stats.nextUnwatched;
+  if (!nextItem) {
+    return null;
+  }
+
+  return formatNextItemWithParentTitle(nextItem);
+}
 
 export function WatchlistsHomeScreen({ initialData }: WatchlistsHomeScreenProps) {
   const [selectionMode, setSelectionMode] = useState(false);
@@ -99,6 +113,37 @@ export function WatchlistsHomeScreen({ initialData }: WatchlistsHomeScreenProps)
                       </div>
                     ))}
                   </div>
+                  {section.incomingWatchlists.length > 0 ? (
+                    <div className="mt-4 border-t border-border/60 pt-3">
+                      <p className="mb-2 text-sm font-medium text-muted-foreground">
+                        Coming up after these
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {section.incomingWatchlists.flatMap((watchlist) => {
+                          const label = formatIncomingWatchlistLabel(watchlist);
+                          if (!label) {
+                            return [];
+                          }
+
+                          return [
+                            <Link
+                              key={watchlist.id}
+                              to="/watchlists/$watchlistId"
+                              params={{ watchlistId: watchlist.id.toString() }}
+                              preload="viewport"
+                              className={cn(
+                                "inline-flex max-w-full items-center rounded-full border border-border/70",
+                                "bg-card/70 px-3 py-1.5 text-sm font-medium text-muted-foreground",
+                                "transition-colors hover:border-primary/40 hover:text-foreground",
+                              )}
+                            >
+                              <span className="truncate">{label}</span>
+                            </Link>,
+                          ];
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>

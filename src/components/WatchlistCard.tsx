@@ -6,6 +6,7 @@ import { useState } from "react";
 import { cn } from "@/utils/cn";
 import { toast } from "sonner";
 import type { WatchlistSummary } from "@/models/watchlist";
+import { formatNextItemDetail } from "@/features/watchlists/next-item-label";
 import { DeleteWatchlistButton } from "./DeleteWatchlistButton";
 import { Check } from "lucide-react";
 
@@ -64,21 +65,7 @@ function formatUpNextSubtitleItem(watchlist: EnrichedWatchlist) {
     return null;
   }
 
-  if (nextItem.mediaType === "episode" || nextItem.mediaType === "anime") {
-    if (nextItem.season !== null && nextItem.episode) {
-      return `S${nextItem.season}:E${nextItem.episode} • ${nextItem.title}`;
-    }
-
-    if (nextItem.episode) {
-      return `E${nextItem.episode} • ${nextItem.title}`;
-    }
-  }
-
-  if (nextItem.episode) {
-    return `${nextItem.episode} • ${nextItem.title}`;
-  }
-
-  return nextItem.title;
+  return formatNextItemDetail(nextItem);
 }
 
 const WatchlistInfo = ({
