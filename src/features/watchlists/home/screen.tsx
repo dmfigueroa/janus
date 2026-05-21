@@ -21,6 +21,18 @@ function formatIncomingWatchlistLabel(
     return null;
   }
 
+  if (nextItem.parentTitle) {
+    if (nextItem.season !== null && nextItem.episode) {
+      return `${nextItem.parentTitle} • S${nextItem.season}:E${nextItem.episode}`;
+    }
+
+    if (nextItem.episode) {
+      return `${nextItem.parentTitle} • ${nextItem.episode}`;
+    }
+
+    return nextItem.parentTitle;
+  }
+
   if (nextItem.mediaType === "episode" || nextItem.mediaType === "anime") {
     if (nextItem.season !== null && nextItem.episode) {
       return `S${nextItem.season}:E${nextItem.episode} • ${nextItem.title}`;

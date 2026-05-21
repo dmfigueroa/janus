@@ -211,6 +211,7 @@ describe("WatchlistsHomeScreen", () => {
           id: 4,
           watchlistId: 4,
           mediaType: "episode",
+          parentTitle: "Arrow",
           title: "Open House",
           season: 2,
           episode: "4",
@@ -241,7 +242,7 @@ describe("WatchlistsHomeScreen", () => {
     expect(section).not.toBeNull();
     expect(within(section!).getByText("Coming up after these")).not.toBeNull();
     expect(within(section!).getByRole("link", { name: "Arrival" })).not.toBeNull();
-    expect(within(section!).getByRole("link", { name: "S2:E4 • Open House" })).not.toBeNull();
+    expect(within(section!).getByRole("link", { name: "Arrow • S2:E4" })).not.toBeNull();
     expect(within(section!).getByTestId("watchlist-card-1")).not.toBeNull();
   });
 });
