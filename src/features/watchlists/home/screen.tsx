@@ -31,39 +31,50 @@ export function WatchlistsHomeScreen({ initialData }: WatchlistsHomeScreenProps)
   return (
     <div className="min-h-screen bg-background pb-24 font-sans text-foreground">
       <div className="container relative mx-auto min-h-screen">
-        <header className="flex items-center justify-between px-6 pb-4 pt-8">
-          <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-            {selectionMode ? `${selectedIds.length} Selected` : "My Lists"}
-          </h1>
-          <div className="flex gap-2">
-            {selectionMode ? (
-              <>
+        <header className="px-6 pb-4 pt-8">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
+              {selectionMode ? `${selectedIds.length} Selected` : "My Lists"}
+            </h1>
+            <div className="flex gap-2">
+              {selectionMode ? (
+                <>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setSelectionMode(false);
+                      setSelectedIds([]);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    disabled={selectedIds.length < 2}
+                    onClick={() => setMergeDialogOpen(true)}
+                  >
+                    Merge
+                  </Button>
+                </>
+              ) : (
                 <Button
+                  size="icon"
                   variant="ghost"
-                  onClick={() => {
-                    setSelectionMode(false);
-                    setSelectedIds([]);
-                  }}
+                  className="rounded-full bg-card text-muted-foreground hover:bg-secondary"
+                  onClick={() => setSelectionMode(true)}
+                  aria-label="Select watchlists"
+                  title="Select watchlists"
                 >
-                  Cancel
+                  <CheckSquare className="h-5 w-5" />
                 </Button>
-                <Button disabled={selectedIds.length < 2} onClick={() => setMergeDialogOpen(true)}>
-                  Merge
-                </Button>
-              </>
-            ) : (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="rounded-full bg-card text-muted-foreground hover:bg-secondary"
-                onClick={() => setSelectionMode(true)}
-                aria-label="Select watchlists"
-                title="Select watchlists"
-              >
-                <CheckSquare className="h-5 w-5" />
-              </Button>
-            )}
+              )}
+            </div>
           </div>
+
+          {!selectionMode ? (
+            <p className="mt-3 text-sm text-muted-foreground">
+              {initialData.totals.watchlists} watchlists, {initialData.totals.items} items
+            </p>
+          ) : null}
         </header>
 
         {!selectionMode && initialData.featuredSections.length > 0 ? (
