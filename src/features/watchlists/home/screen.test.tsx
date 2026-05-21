@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistHomeScreen } from "@/features/watchlists/home/query.server";
 import type { EnrichedWatchlist } from "@/components/WatchlistCard";
@@ -182,7 +183,7 @@ describe("WatchlistsHomeScreen", () => {
     expect(screen.getAllByText("selection")).toHaveLength(2);
   });
 
-  it("renders incoming watchlist chips from the section queue", () => {
+  it("renders incoming watchlist chips after the featured cards with explanatory copy", () => {
     const firstIncoming = watchlist({
       id: 3,
       name: "Incoming One",
@@ -234,7 +235,13 @@ describe("WatchlistsHomeScreen", () => {
       />,
     );
 
-    expect(screen.getByRole("link", { name: "Arrival" })).not.toBeNull();
-    expect(screen.getByRole("link", { name: "S2:E4 • Open House" })).not.toBeNull();
+    const sectionHeading = screen.getByRole("heading", { name: "Movies" });
+    const section = sectionHeading.parentElement;
+
+    expect(section).not.toBeNull();
+    expect(within(section!).getByText("Coming up after these")).not.toBeNull();
+    expect(within(section!).getByRole("link", { name: "Arrival" })).not.toBeNull();
+    expect(within(section!).getByRole("link", { name: "S2:E4 • Open House" })).not.toBeNull();
+    expect(within(section!).getByTestId("watchlist-card-1")).not.toBeNull();
   });
 });

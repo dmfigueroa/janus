@@ -113,32 +113,6 @@ export function WatchlistsHomeScreen({ initialData }: WatchlistsHomeScreenProps)
               {initialData.featuredSections.map((section) => (
                 <div key={section.key}>
                   <h3 className="mb-3 text-lg font-semibold text-foreground">{section.title}</h3>
-                  {section.incomingWatchlists.length > 0 ? (
-                    <div className="mb-4 flex flex-wrap gap-2">
-                      {section.incomingWatchlists.flatMap((watchlist) => {
-                        const label = formatIncomingWatchlistLabel(watchlist);
-                        if (!label) {
-                          return [];
-                        }
-
-                        return [
-                          <Link
-                            key={watchlist.id}
-                            to="/watchlists/$watchlistId"
-                            params={{ watchlistId: watchlist.id.toString() }}
-                            preload="viewport"
-                            className={cn(
-                              "inline-flex max-w-full items-center rounded-full border border-border/70",
-                              "bg-card/70 px-3 py-1.5 text-sm font-medium text-muted-foreground",
-                              "transition-colors hover:border-primary/40 hover:text-foreground",
-                            )}
-                          >
-                            <span className="truncate">{label}</span>
-                          </Link>,
-                        ];
-                      })}
-                    </div>
-                  ) : null}
                   <div className="grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:justify-start sm:gap-6">
                     {section.watchlists.map((watchlist) => (
                       <div key={watchlist.id} className="w-full sm:w-[220px]">
@@ -152,6 +126,37 @@ export function WatchlistsHomeScreen({ initialData }: WatchlistsHomeScreenProps)
                       </div>
                     ))}
                   </div>
+                  {section.incomingWatchlists.length > 0 ? (
+                    <div className="mt-4 border-t border-border/60 pt-3">
+                      <p className="mb-2 text-sm font-medium text-muted-foreground">
+                        Coming up after these
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {section.incomingWatchlists.flatMap((watchlist) => {
+                          const label = formatIncomingWatchlistLabel(watchlist);
+                          if (!label) {
+                            return [];
+                          }
+
+                          return [
+                            <Link
+                              key={watchlist.id}
+                              to="/watchlists/$watchlistId"
+                              params={{ watchlistId: watchlist.id.toString() }}
+                              preload="viewport"
+                              className={cn(
+                                "inline-flex max-w-full items-center rounded-full border border-border/70",
+                                "bg-card/70 px-3 py-1.5 text-sm font-medium text-muted-foreground",
+                                "transition-colors hover:border-primary/40 hover:text-foreground",
+                              )}
+                            >
+                              <span className="truncate">{label}</span>
+                            </Link>,
+                          ];
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
