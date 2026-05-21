@@ -7,6 +7,7 @@ import { CreateWatchlistCard } from "@/components/CreateWatchlistCard";
 import { CreateWatchlistDialog } from "@/components/CreateWatchlistDialog";
 import { MergeWatchlistDialog } from "@/components/MergeWatchlistDialog";
 import type { WatchlistHomeScreen } from "@/features/watchlists/home/query.server";
+import { formatNextItemWithParentTitle } from "@/features/watchlists/next-item-label";
 import { cn } from "@/utils/cn";
 
 type WatchlistsHomeScreenProps = {
@@ -21,33 +22,7 @@ function formatIncomingWatchlistLabel(
     return null;
   }
 
-  if (nextItem.parentTitle) {
-    if (nextItem.season !== null && nextItem.episode) {
-      return `${nextItem.parentTitle} • S${nextItem.season}:E${nextItem.episode}`;
-    }
-
-    if (nextItem.episode) {
-      return `${nextItem.parentTitle} • ${nextItem.episode}`;
-    }
-
-    return nextItem.parentTitle;
-  }
-
-  if (nextItem.mediaType === "episode" || nextItem.mediaType === "anime") {
-    if (nextItem.season !== null && nextItem.episode) {
-      return `S${nextItem.season}:E${nextItem.episode} • ${nextItem.title}`;
-    }
-
-    if (nextItem.episode) {
-      return `E${nextItem.episode} • ${nextItem.title}`;
-    }
-  }
-
-  if (nextItem.episode) {
-    return `${nextItem.episode} • ${nextItem.title}`;
-  }
-
-  return nextItem.title;
+  return formatNextItemWithParentTitle(nextItem);
 }
 
 export function WatchlistsHomeScreen({ initialData }: WatchlistsHomeScreenProps) {
