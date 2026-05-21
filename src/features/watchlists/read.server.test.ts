@@ -347,4 +347,55 @@ describe("WatchlistsRead.homeScreen", () => {
       "Newest Created",
     ]);
   });
+
+  it("exposes up to three incoming watchlists per section after the featured ones", async () => {
+    const insertedLists = await db
+      .insert(watchlists)
+      .values([
+        {
+          name: "Fifth Created",
+          createdAt: "2024-01-05 00:00:00",
+        },
+        {
+          name: "Fourth Created",
+          createdAt: "2024-01-04 00:00:00",
+        },
+        {
+          name: "Third Created",
+          createdAt: "2024-01-03 00:00:00",
+        },
+        {
+          name: "Second Created",
+          createdAt: "2024-01-02 00:00:00",
+        },
+        {
+          name: "Oldest Created",
+          createdAt: "2024-01-01 00:00:00",
+        },
+      ])
+      .returning();
+
+    await db.insert(watchlistItems).values(
+      insertedLists.map((watchlist, index) => ({
+        watchlistId: watchlist.id,
+        tmdbId: `movie-${index + 1}`,
+        source: "tmdb" as const,
+        mediaType: "movie" as const,
+        title: `Movie ${index + 1}`,
+        releaseDate: `2024-01-0${index + 1}`,
+        isWatched: false,
+      })),
+    );
+
+    const home = await WatchlistsRead.homeScreen();
+
+    expect(home.featuredSections[0]?.watchlists.map((watchlist) => watchlist.name)).toEqual([
+      "Oldest Created",
+      "Second Created",
+      "Third Created",
+    ]);
+    expect(home.featuredSections[0]?.incomingWatchlists.map((watchlist) => watchlist.name)).toEqual(
+      ["Fourth Created", "Fifth Created"],
+    );
+  });
 });

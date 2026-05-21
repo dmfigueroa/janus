@@ -9,6 +9,7 @@ export type WatchlistHomeSection = {
   key: WatchlistHomeSectionKey;
   title: string;
   watchlists: WatchlistSummary[];
+  incomingWatchlists: WatchlistSummary[];
 };
 
 export type WatchlistHomeTotals = {
@@ -102,10 +103,8 @@ export async function getWatchlistHome(): Promise<WatchlistHomeScreen> {
     }
 
     const existing = buckets.get(sectionKey) ?? [];
-    if (existing.length < MAX_FEATURED_WATCHLISTS_PER_SECTION) {
-      existing.push(watchlist);
-      buckets.set(sectionKey, existing);
-    }
+    existing.push(watchlist);
+    buckets.set(sectionKey, existing);
   }
 
   return {
@@ -119,7 +118,17 @@ export async function getWatchlistHome(): Promise<WatchlistHomeScreen> {
         return [];
       }
 
-      return [{ key, title, watchlists }];
+      return [
+        {
+          key,
+          title,
+          watchlists: watchlists.slice(0, MAX_FEATURED_WATCHLISTS_PER_SECTION),
+          incomingWatchlists: watchlists.slice(
+            MAX_FEATURED_WATCHLISTS_PER_SECTION,
+            MAX_FEATURED_WATCHLISTS_PER_SECTION * 2,
+          ),
+        },
+      ];
     }),
     allWatchlists,
   };
