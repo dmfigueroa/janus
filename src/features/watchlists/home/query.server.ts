@@ -11,7 +11,13 @@ export type WatchlistHomeSection = {
   watchlists: WatchlistSummary[];
 };
 
+export type WatchlistHomeTotals = {
+  watchlists: number;
+  items: number;
+};
+
 export type WatchlistHomeScreen = {
+  totals: WatchlistHomeTotals;
   featuredSections: WatchlistHomeSection[];
   allWatchlists: WatchlistSummary[];
 };
@@ -103,6 +109,10 @@ export async function getWatchlistHome(): Promise<WatchlistHomeScreen> {
   }
 
   return {
+    totals: {
+      watchlists: allWatchlists.length,
+      items: allWatchlists.reduce((total, watchlist) => total + watchlist.stats.totalItems, 0),
+    },
     featuredSections: HOME_SECTION_ORDER.flatMap(({ key, title }) => {
       const watchlists = buckets.get(key);
       if (!watchlists || watchlists.length === 0) {

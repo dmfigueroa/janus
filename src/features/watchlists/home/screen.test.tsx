@@ -107,6 +107,10 @@ function homeData(overrides?: Partial<WatchlistHomeScreen>): WatchlistHomeScreen
   const backlog = watchlist({ id: 2, name: "Backlog" });
 
   return {
+    totals: {
+      watchlists: 2,
+      items: 2,
+    },
     featuredSections: [
       {
         key: "movie",
@@ -128,6 +132,7 @@ describe("WatchlistsHomeScreen", () => {
     render(<WatchlistsHomeScreen initialData={homeData()} />);
 
     expect(screen.getByRole("heading", { name: "My Lists" })).not.toBeNull();
+    expect(screen.getByText("2 watchlists, 2 items")).not.toBeNull();
     expect(screen.getByRole("heading", { name: "Up Next by Media" })).not.toBeNull();
     expect(screen.getByRole("heading", { name: "Movies" })).not.toBeNull();
     expect(screen.getByRole("heading", { name: "All Watchlists" })).not.toBeNull();
@@ -145,6 +150,7 @@ describe("WatchlistsHomeScreen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Select watchlists" }));
 
     expect(screen.getByRole("heading", { name: "0 Selected" })).not.toBeNull();
+    expect(screen.queryByText("2 watchlists, 2 items")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Up Next by Media" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "All Watchlists" })).toBeNull();
     expect(screen.queryByText("Create Watchlist Card")).toBeNull();
