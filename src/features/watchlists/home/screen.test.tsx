@@ -6,6 +6,27 @@ import type { WatchlistHomeScreen } from "@/features/watchlists/home/query.serve
 import type { EnrichedWatchlist } from "@/components/WatchlistCard";
 import { WatchlistsHomeScreen } from "@/features/watchlists/home/screen";
 
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({
+    children,
+    params,
+    to,
+    ...props
+  }: {
+    children: React.ReactNode;
+    params: { watchlistId: string };
+    to: string;
+  }) => (
+    <a
+      href={to.replace("$watchlistId", params.watchlistId)}
+      data-watchlist-id={params.watchlistId}
+      {...props}
+    >
+      {children}
+    </a>
+  ),
+}));
+
 vi.mock("@/components/WatchlistCard", () => ({
   WatchlistCard: ({
     watchlist,
@@ -68,26 +89,28 @@ function watchlist(
   };
 }
 
-function nextUnwatchedFixture(): NonNullable<EnrichedWatchlist["stats"]["nextUnwatched"]> {
+function nextUnwatchedFixture(
+  overrides?: Partial<NonNullable<EnrichedWatchlist["stats"]["nextUnwatched"]>>,
+): NonNullable<EnrichedWatchlist["stats"]["nextUnwatched"]> {
   return {
-    id: 1,
-    watchlistId: 1,
-    tmdbId: "movie-1",
-    source: "tmdb",
-    mediaType: "movie",
-    title: "Next Movie",
-    parentId: null,
-    parentTitle: null,
-    season: null,
-    episode: null,
-    posterPath: null,
-    releaseDate: "2024-01-01",
-    voteAverage: null,
-    runtime: null,
-    customRank: null,
-    isWatched: false,
-    authors: null,
-    addedAt: "2024-01-01 00:00:00",
+    id: overrides?.id ?? 1,
+    watchlistId: overrides?.watchlistId ?? 1,
+    tmdbId: overrides?.tmdbId ?? "movie-1",
+    source: overrides?.source ?? "tmdb",
+    mediaType: overrides?.mediaType ?? "movie",
+    title: overrides?.title ?? "Next Movie",
+    parentId: overrides?.parentId ?? null,
+    parentTitle: overrides?.parentTitle ?? null,
+    season: overrides?.season ?? null,
+    episode: overrides?.episode ?? null,
+    posterPath: overrides?.posterPath ?? null,
+    releaseDate: overrides?.releaseDate ?? "2024-01-01",
+    voteAverage: overrides?.voteAverage ?? null,
+    runtime: overrides?.runtime ?? null,
+    customRank: overrides?.customRank ?? null,
+    isWatched: overrides?.isWatched ?? false,
+    authors: overrides?.authors ?? null,
+    addedAt: overrides?.addedAt ?? "2024-01-01 00:00:00",
   } as NonNullable<EnrichedWatchlist["stats"]["nextUnwatched"]>;
 }
 
@@ -116,6 +139,7 @@ function homeData(overrides?: Partial<WatchlistHomeScreen>): WatchlistHomeScreen
         key: "movie",
         title: "Movies",
         watchlists: [featuredMovie],
+        incomingWatchlists: [],
       },
     ],
     allWatchlists: [featuredMovie, backlog],
@@ -156,5 +180,61 @@ describe("WatchlistsHomeScreen", () => {
     expect(screen.queryByText("Create Watchlist Card")).toBeNull();
     expect(screen.queryByText("Create Watchlist Dialog")).toBeNull();
     expect(screen.getAllByText("selection")).toHaveLength(2);
+  });
+
+  it("renders incoming watchlist chips from the section queue", () => {
+    const firstIncoming = watchlist({
+      id: 3,
+      name: "Incoming One",
+      stats: {
+        totalItems: 1,
+        watchedItems: 0,
+        progress: 0,
+        nextUnwatched: nextUnwatchedFixture({
+          id: 3,
+          watchlistId: 3,
+          title: "Arrival",
+        }),
+        coverImage: null,
+        coverMediaType: "movie",
+      },
+    });
+    const secondIncoming = watchlist({
+      id: 4,
+      name: "Incoming Two",
+      stats: {
+        totalItems: 1,
+        watchedItems: 0,
+        progress: 0,
+        nextUnwatched: nextUnwatchedFixture({
+          id: 4,
+          watchlistId: 4,
+          mediaType: "episode",
+          title: "Open House",
+          season: 2,
+          episode: "4",
+        }),
+        coverImage: null,
+        coverMediaType: "episode",
+      },
+    });
+
+    render(
+      <WatchlistsHomeScreen
+        initialData={homeData({
+          featuredSections: [
+            {
+              key: "movie",
+              title: "Movies",
+              watchlists: [watchlist({ id: 1, name: "Movie Night" })],
+              incomingWatchlists: [firstIncoming, secondIncoming],
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Arrival" })).not.toBeNull();
+    expect(screen.getByRole("link", { name: "S2:E4 • Open House" })).not.toBeNull();
   });
 });
