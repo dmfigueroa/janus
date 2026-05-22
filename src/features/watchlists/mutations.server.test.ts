@@ -31,7 +31,6 @@ let createWatchlistMutation: typeof import("./create/mutation.server").createWat
 let deleteWatchlistMutation: typeof import("./delete/mutation.server").deleteWatchlistMutation;
 let mergeWatchlistsMutation: typeof import("./merge/mutation.server").mergeWatchlistsMutation;
 let toggleWatchedMutation: typeof import("./toggle/mutation.server").toggleWatchedMutation;
-let updateWatchlistItemOrderModeMutation: typeof import("./order-mode/mutation.server").updateWatchlistItemOrderModeMutation;
 let updateWatchlistMutation: typeof import("./update/mutation.server").updateWatchlistMutation;
 
 beforeAll(async () => {
@@ -46,7 +45,6 @@ beforeAll(async () => {
     deleteModule,
     mergeModule,
     toggleModule,
-    orderModeModule,
     updateModule,
   ] = await Promise.all([
     import("./read.server"),
@@ -55,7 +53,6 @@ beforeAll(async () => {
     import("./delete/mutation.server"),
     import("./merge/mutation.server"),
     import("./toggle/mutation.server"),
-    import("./order-mode/mutation.server"),
     import("./update/mutation.server"),
   ]);
 
@@ -65,7 +62,6 @@ beforeAll(async () => {
   deleteWatchlistMutation = deleteModule.deleteWatchlistMutation;
   mergeWatchlistsMutation = mergeModule.mergeWatchlistsMutation;
   toggleWatchedMutation = toggleModule.toggleWatchedMutation;
-  updateWatchlistItemOrderModeMutation = orderModeModule.updateWatchlistItemOrderModeMutation;
   updateWatchlistMutation = updateModule.updateWatchlistMutation;
 });
 
@@ -219,54 +215,6 @@ describe("watchlist mutation contract", () => {
       isWatched: true,
     });
     expect(detail?.watchlist.lastWatchedAt).toBe(originalLastWatchedAt);
-  });
-
-  it("switches the active item order mode through the feature write boundary so detail reads use the persisted order", async () => {
-    const [watchlist] = await db.insert(watchlists).values({ name: "Order Toggle" }).returning();
-
-    await db.insert(watchlistItems).values([
-      {
-        watchlistId: watchlist.id,
-        tmdbId: "release-first",
-        source: "tmdb",
-        mediaType: "movie",
-        title: "Release First",
-        releaseDate: "2024-01-01",
-        customRank: 2,
-      },
-      {
-        watchlistId: watchlist.id,
-        tmdbId: "custom-first",
-        source: "tmdb",
-        mediaType: "movie",
-        title: "Custom First",
-        releaseDate: "2024-02-01",
-        customRank: 1,
-      },
-    ]);
-
-    const result = await updateWatchlistItemOrderModeMutation({
-      watchlistId: watchlist.id,
-      itemOrderMode: "custom",
-    });
-
-    const detail = await WatchlistsRead.detailScreen({
-      watchlistId: watchlist.id,
-      unwatchedOnly: false,
-    });
-
-    expect(result).toEqual({ success: true });
-    expect(detail?.watchlist.itemOrderMode).toBe("custom");
-    expect(detail?.items.map((item) => item.title)).toEqual(["Custom First", "Release First"]);
-  });
-
-  it("returns a structured failure when updating item order mode for a missing watchlist", async () => {
-    const result = await updateWatchlistItemOrderModeMutation({
-      watchlistId: 999_999,
-      itemOrderMode: "custom",
-    });
-
-    expect(result).toEqual({ success: false, message: "Watchlist not found." });
   });
 
   it("updates a watchlist name, description, and item order mode through the feature write boundary", async () => {

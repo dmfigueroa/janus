@@ -9,10 +9,8 @@ import {
   watchlistDetailInfiniteQueryOptions,
   type WatchlistDetailQueryData,
 } from "@/features/watchlists/detail/query";
-import { useItemOrderModeMutation } from "@/features/watchlists/detail/use-item-order-mode-mutation";
 import { useReorderWatchlistItemsMutation } from "@/features/watchlists/detail/use-reorder-watchlist-items-mutation";
 import { canReorderWatchlistItems } from "@/features/watchlists/detail/reorder";
-import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
 
 interface WatchlistDetailScreenProps {
   initialData: WatchlistDetailQueryData;
@@ -21,9 +19,6 @@ interface WatchlistDetailScreenProps {
 export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProps) {
   const watchlistId = initialData.watchlist.id;
   const [showUnwatchedOnly, setShowUnwatchedOnly] = useState(true);
-  const [itemOrderMode, setItemOrderMode] = useState<WatchlistItemOrderMode>(
-    initialData.watchlist.itemOrderMode,
-  );
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
 
@@ -37,21 +32,20 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const filters = useMemo(
-    () => ({
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    ...watchlistDetailInfiniteQueryOptions({
       watchlistId,
-      itemOrderMode,
       query: debouncedSearchQuery || undefined,
       unwatchedOnly: showUnwatchedOnly,
     }),
-    [watchlistId, itemOrderMode, debouncedSearchQuery, showUnwatchedOnly],
-  );
-
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    ...watchlistDetailInfiniteQueryOptions(filters),
     queryFn: async ({ pageParam }) => {
       const detail = await getWatchlistDetailPageFn({
-        data: { ...filters, cursor: pageParam },
+        data: {
+          watchlistId,
+          query: debouncedSearchQuery || undefined,
+          unwatchedOnly: showUnwatchedOnly,
+          cursor: pageParam,
+        },
       });
 
       if (!detail) {
@@ -62,24 +56,25 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
     },
   });
 
-  const updateItemOrderModeMutation = useItemOrderModeMutation({
-    initialItemOrderMode: initialData.watchlist.itemOrderMode,
-    watchlistId,
-    onOptimisticChange: setItemOrderMode,
-    onRollback: setItemOrderMode,
-  });
+  const allItems = data?.pages.flatMap((page) => page.items) || [];
+  const latestWatchlist = data?.pages[data.pages.length - 1]?.watchlist || initialData.watchlist;
+  const latestItemOrderMode = latestWatchlist.itemOrderMode;
+
   const reorderItemsMutation = useReorderWatchlistItemsMutation({
     watchlistId,
-    activeFilters: filters,
+    activeFilters: {
+      watchlistId,
+      itemOrderMode: latestItemOrderMode,
+      query: debouncedSearchQuery || undefined,
+      unwatchedOnly: showUnwatchedOnly,
+    },
   });
   const isWatchedTogglePending =
     useIsMutating({ mutationKey: ["watchlists", "toggle-watched", watchlistId] }) > 0;
   const isReorderPending = reorderItemsMutation.isPending;
 
-  const allItems = data?.pages.flatMap((page) => page.items) || [];
-  const latestWatchlist = data?.pages[data.pages.length - 1]?.watchlist || initialData.watchlist;
   const canReorderItems = canReorderWatchlistItems({
-    itemOrderMode,
+    itemOrderMode: latestItemOrderMode,
     itemCount: allItems.length,
     isReorderPending,
     isWatchedTogglePending,
@@ -87,6 +82,16 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
 
   const totalItems = latestWatchlist.stats.totalItems;
   const watchedItems = latestWatchlist.stats.watchedItems;
+
+  const activeFilters = useMemo(
+    () => ({
+      watchlistId,
+      itemOrderMode: latestItemOrderMode,
+      query: debouncedSearchQuery || undefined,
+      unwatchedOnly: showUnwatchedOnly,
+    }),
+    [watchlistId, latestItemOrderMode, debouncedSearchQuery, showUnwatchedOnly],
+  );
 
   return (
     <div className="container mx-auto min-h-screen max-w-3xl px-4 py-6 md:px-8 pb-32">
@@ -96,18 +101,6 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
         watchedItems={watchedItems}
         showUnwatchedOnly={showUnwatchedOnly}
         onFilterChange={setShowUnwatchedOnly}
-        itemOrderMode={itemOrderMode}
-        onItemOrderModeChange={(nextItemOrderMode) => {
-          if (nextItemOrderMode === itemOrderMode) {
-            return;
-          }
-
-          updateItemOrderModeMutation.mutate({
-            previousItemOrderMode: itemOrderMode,
-            nextItemOrderMode,
-          });
-        }}
-        isUpdatingItemOrderMode={updateItemOrderModeMutation.isPending}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         interactionDisabled={isReorderPending}
@@ -116,8 +109,8 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
       <div className="mt-8">
         <WatchlistTimeline
           items={allItems}
-          activeFilters={filters}
-          itemOrderMode={itemOrderMode}
+          activeFilters={activeFilters}
+          itemOrderMode={latestItemOrderMode}
           hasMore={hasNextPage}
           isLoadingMore={isFetchingNextPage}
           onLoadMore={isReorderPending ? undefined : fetchNextPage}

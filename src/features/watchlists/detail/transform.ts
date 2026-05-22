@@ -45,31 +45,6 @@ export function updateWatchlistDetailPagesAfterToggle({
   };
 }
 
-export function updateWatchlistDetailPagesAfterItemOrderMode({
-  data,
-  nextItemOrderMode,
-}: {
-  data: InfiniteData<WatchlistDetailPage, number> | undefined;
-  nextItemOrderMode: WatchlistItemOrderMode;
-}) {
-  if (!data) {
-    return data;
-  }
-
-  const items = sortWatchlistItemsByOrderMode(getWatchlistItemsFromPages(data.pages), {
-    itemOrderMode: nextItemOrderMode,
-  });
-  const pages = updateWatchlistPagesItemOrderMode(data.pages, nextItemOrderMode);
-
-  return {
-    ...data,
-    pages: repartitionItemsAcrossPages({
-      pages,
-      items,
-    }),
-  };
-}
-
 export function updateWatchlistDetailPagesAfterReorder({
   data,
   movedItemId,
@@ -246,19 +221,6 @@ function updateWatchlistDetailPagesAfterRemoval({
       items: page.items.filter((item) => !shouldRemove(item)),
     })),
   };
-}
-
-function updateWatchlistPagesItemOrderMode(
-  pages: InfiniteData<WatchlistDetailPage, number>["pages"],
-  itemOrderMode: WatchlistItemOrderMode,
-) {
-  return pages.map((page) => ({
-    ...page,
-    watchlist: {
-      ...page.watchlist,
-      itemOrderMode,
-    },
-  }));
 }
 
 function getWatchlistItemsFromPages(pages: InfiniteData<WatchlistDetailPage, number>["pages"]) {

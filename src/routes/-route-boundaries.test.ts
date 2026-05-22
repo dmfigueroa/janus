@@ -108,11 +108,10 @@ describe("route module boundaries", () => {
       workspaceFile("src/features/watchlists/detail/screen.tsx"),
       "utf8",
     );
-    const itemOrderModeHook = readFileSync(
-      workspaceFile("src/features/watchlists/detail/use-item-order-mode-mutation.ts"),
+    const watchlistHeader = readFileSync(
+      workspaceFile("src/features/watchlists/components/watchlist-header.tsx"),
       "utf8",
     );
-
     expect(mediaDetailSheet).not.toMatch(/["']use client["']/);
     expect(mediaDetailSheet).toMatch(/useServerFn\(getWatchlistList\)/);
     expect(mediaDetailSheet).toMatch(/useServerFn\(addToWatchlist\)/);
@@ -133,18 +132,9 @@ describe("route module boundaries", () => {
     expect(toggleWatchedHook).not.toMatch(/from\s+["']@\/server\/watchlist["']/);
 
     expect(watchlistDetail).not.toMatch(/["']use client["']/);
-    expect(watchlistDetail).toMatch(
-      /from\s+["']@\/features\/watchlists\/detail\/use-item-order-mode-mutation["']/,
+    expect(watchlistHeader).toMatch(
+      /from\s+["']@\/features\/watchlists\/components\/WatchlistFormDialog["']/,
     );
-    expect(itemOrderModeHook).toMatch(
-      /from\s+["']@\/features\/watchlists\/order-mode\/mutation["']/,
-    );
-    expect(itemOrderModeHook).toMatch(/useServerFn\(updateWatchlistItemOrderMode\)/);
-    expect(itemOrderModeHook).toMatch(/optimisticallyUpdateWatchlistItemOrderMode\(/);
-    expect(itemOrderModeHook).toMatch(/rollbackWatchlistItemOrderMode\(/);
-    expect(itemOrderModeHook).toMatch(/from\s+["']@\/features\/watchlists\/cache["']/);
-    expect(itemOrderModeHook).toMatch(/invalidateWatchlistQueries\(/);
-    expect(itemOrderModeHook).not.toMatch(/await\s+updateWatchlistItemOrderMode\(/);
   });
 
   it("keeps server-only imports inside TanStack server function surfaces", () => {

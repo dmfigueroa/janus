@@ -70,17 +70,6 @@ export async function markLastWatched(watchlistId: number) {
     .where(eq(watchlists.id, watchlistId));
 }
 
-export async function updateWatchlistItemOrderMode({
-  itemOrderMode,
-  watchlistId,
-}: {
-  watchlistId: number;
-  itemOrderMode: WatchlistItemOrderMode;
-}) {
-  const db = getDb();
-  await db.update(watchlists).set({ itemOrderMode }).where(eq(watchlists.id, watchlistId));
-}
-
 export async function updateWatchlist({
   watchlistId,
   name,

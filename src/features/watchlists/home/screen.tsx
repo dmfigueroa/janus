@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { CheckSquare } from "lucide-react";
+import { CheckSquare, Plus } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { WatchlistCard } from "@/components/WatchlistCard";
-import { CreateWatchlistCard } from "@/components/CreateWatchlistCard";
-import { CreateWatchlistDialog } from "@/components/CreateWatchlistDialog";
+import { WatchlistFormDialog } from "@/features/watchlists/components/WatchlistFormDialog";
 import { MergeWatchlistDialog } from "@/components/MergeWatchlistDialog";
 import type { WatchlistHomeScreen } from "@/features/watchlists/home/query.server";
 import { formatNextItemWithParentTitle } from "@/features/watchlists/next-item-label";
@@ -170,13 +169,37 @@ export function WatchlistsHomeScreen({ initialData }: WatchlistsHomeScreenProps)
 
             {!selectionMode ? (
               <div className="w-full sm:w-[220px]">
-                <CreateWatchlistCard />
+                <WatchlistFormDialog
+                  mode="create"
+                  trigger={
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-2 cursor-pointer group">
+                      <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center group-hover:bg-primary transition-colors">
+                        <Plus className="w-6 h-6 text-muted-foreground group-hover:text-primary-foreground" />
+                      </div>
+                      <span className="text-muted-foreground font-medium group-hover:text-foreground">
+                        Create New List
+                      </span>
+                    </div>
+                  }
+                />
               </div>
             ) : null}
           </div>
         </section>
 
-        {!selectionMode ? <CreateWatchlistDialog /> : null}
+        {!selectionMode ? (
+          <WatchlistFormDialog
+            mode="create"
+            trigger={
+              <Button
+                size="icon"
+                className="h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90 text-primary-foreground fixed bottom-24 right-6 z-40 md:hidden"
+              >
+                <Plus className="w-7 h-7" />
+              </Button>
+            }
+          />
+        ) : null}
 
         <MergeWatchlistDialog
           open={mergeDialogOpen}
