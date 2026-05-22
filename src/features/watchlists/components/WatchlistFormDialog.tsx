@@ -22,11 +22,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
-interface WatchlistFormDialogProps {
-  mode: "create" | "edit";
-  watchlist?: Watchlist;
-  trigger: React.ReactNode;
-}
+type WatchlistFormDialogProps =
+  | { mode: "create"; watchlist?: never; trigger: React.ReactNode }
+  | { mode: "edit"; watchlist: Watchlist; trigger: React.ReactNode };
 
 export function WatchlistFormDialog({ mode, watchlist, trigger }: WatchlistFormDialogProps) {
   const [open, setOpen] = useState(false);
