@@ -20,48 +20,25 @@ export function useWatchlistForm({ mode, watchlist }: UseWatchlistFormOptions) {
   const createWatchlistFn = useServerFn(createWatchlist);
   const updateWatchlistFn = useServerFn(updateWatchlist);
 
-  const isCreate = mode === "create";
-  const title = isCreate ? "Create New List" : "Edit List";
-  const submitLabel = isCreate ? "Create List" : "Save Changes";
-  const descriptionLabel = isCreate
-    ? "Create a new watchlist to track your movies and shows."
-    : "Update your watchlist details.";
+  const labels = getWatchlistFormLabels(mode);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
 
-    const { name, description, itemOrderMode } = parseFormData(e.currentTarget);
-
     try {
-      if (isCreate) {
-        await createWatchlistFn({ data: { name, description, itemOrderMode } });
-        toast.success("Watchlist created successfully");
-      } else {
-        const result = await updateWatchlistFn({
-          data: {
-            watchlistId: watchlist.id,
-            name,
-            description,
-            itemOrderMode,
-          },
-        });
-
-        if (!result.success) {
-          throw new Error(result.message);
-        }
-
-        toast.success("Changes saved successfully");
-      }
-
+      const formData = parseFormData(e.currentTarget);
+      await submitWatchlist({
+        mode,
+        watchlist,
+        formData,
+        createFn: createWatchlistFn,
+        updateFn: updateWatchlistFn,
+      });
+      handleSubmitSuccess({ mode, router, queryClient });
       setOpen(false);
-      await router.invalidate?.();
-      invalidateWatchlistQueries(queryClient);
     } catch (error) {
-      console.error("Failed to save watchlist", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to save watchlist. Please try again.",
-      );
+      handleSubmitError(error);
     } finally {
       setLoading(false);
     }
@@ -71,12 +48,80 @@ export function useWatchlistForm({ mode, watchlist }: UseWatchlistFormOptions) {
     open,
     setOpen,
     loading,
-    title,
-    submitLabel,
-    descriptionLabel,
+    ...labels,
     onSubmit,
   };
 }
+
+// --- Presentation layer ---
+
+function getWatchlistFormLabels(mode: "create" | "edit") {
+  const isCreate = mode === "create";
+  return {
+    title: isCreate ? "Create New List" : "Edit List",
+    submitLabel: isCreate ? "Create List" : "Save Changes",
+    descriptionLabel: isCreate
+      ? "Create a new watchlist to track your movies and shows."
+      : "Update your watchlist details.",
+  };
+}
+
+// --- Submission layer ---
+
+type SubmitArgs = {
+  mode: "create" | "edit";
+  watchlist: Watchlist | undefined;
+  formData: ReturnType<typeof parseFormData>;
+  createFn: ReturnType<typeof useServerFn<typeof createWatchlist>>;
+  updateFn: ReturnType<typeof useServerFn<typeof updateWatchlist>>;
+};
+
+async function submitWatchlist({ mode, watchlist, formData, createFn, updateFn }: SubmitArgs) {
+  if (mode === "create") {
+    await createFn({ data: formData });
+    return;
+  }
+
+  if (!watchlist) {
+    throw new Error("Watchlist is required for edit mode");
+  }
+
+  const result = await updateFn({
+    data: {
+      watchlistId: watchlist.id,
+      ...formData,
+    },
+  });
+
+  if (!result.success) {
+    throw new Error(result.message);
+  }
+}
+
+// --- Side-effect layer ---
+
+type SuccessContext = {
+  mode: "create" | "edit";
+  router: ReturnType<typeof useRouter>;
+  queryClient: ReturnType<typeof useQueryClient>;
+};
+
+async function handleSubmitSuccess({ mode, router, queryClient }: SuccessContext) {
+  toast.success(
+    mode === "create" ? "Watchlist created successfully" : "Changes saved successfully",
+  );
+  await router.invalidate?.();
+  invalidateWatchlistQueries(queryClient);
+}
+
+function handleSubmitError(error: unknown) {
+  console.error("Failed to save watchlist", error);
+  toast.error(
+    error instanceof Error ? error.message : "Failed to save watchlist. Please try again.",
+  );
+}
+
+// --- Parsing layer ---
 
 function parseFormData(form: HTMLFormElement) {
   const data = new FormData(form);
