@@ -13,15 +13,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useState } from "react";
 import { useWatchlistForm } from "./useWatchlistForm";
 
 type WatchlistFormDialogProps =
   | { mode: "create"; watchlist?: never; trigger: React.ReactNode }
   | { mode: "edit"; watchlist: Watchlist; trigger: React.ReactNode };
 
+function getWatchlistFormLabels(mode: "create" | "edit") {
+  const isCreate = mode === "create";
+  return {
+    title: isCreate ? "Create New List" : "Edit List",
+    submitLabel: isCreate ? "Create List" : "Save Changes",
+    descriptionLabel: isCreate
+      ? "Create a new watchlist to track your movies and shows."
+      : "Update your watchlist details.",
+  };
+}
+
 export function WatchlistFormDialog({ mode, watchlist, trigger }: WatchlistFormDialogProps) {
-  const form = useWatchlistForm(mode === "create" ? { mode } : { mode, watchlist });
-  const { open, setOpen, loading, title, submitLabel, descriptionLabel, onSubmit } = form;
+  const [open, setOpen] = useState(false);
+  const form = useWatchlistForm(
+    mode === "create"
+      ? { mode, onSuccess: () => setOpen(false) }
+      : { mode, watchlist, onSuccess: () => setOpen(false) },
+  );
+  const { loading, onSubmit } = form;
+  const { title, submitLabel, descriptionLabel } = getWatchlistFormLabels(mode);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

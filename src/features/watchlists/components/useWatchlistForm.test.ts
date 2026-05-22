@@ -92,35 +92,10 @@ describe("useWatchlistForm", () => {
     updateWatchlistFnMock.mockResolvedValue({ success: true });
   });
 
-  it("returns create labels in create mode", () => {
+  it("returns initial state in create mode", () => {
     const { result } = renderHook(() => useWatchlistForm({ mode: "create" }));
 
-    expect(result.current.title).toBe("Create New List");
-    expect(result.current.submitLabel).toBe("Create List");
-    expect(result.current.descriptionLabel).toBe(
-      "Create a new watchlist to track your movies and shows.",
-    );
-    expect(result.current.open).toBe(false);
     expect(result.current.loading).toBe(false);
-  });
-
-  it("returns edit labels in edit mode", () => {
-    const watchlist = {
-      id: 1,
-      name: "My List",
-      description: null,
-      itemOrderMode: "release" as const,
-      createdAt: "2024-01-01",
-      updatedAt: null,
-      lastWatchedAt: null,
-      lastItemAddedAt: null,
-    };
-
-    const { result } = renderHook(() => useWatchlistForm({ mode: "edit", watchlist }));
-
-    expect(result.current.title).toBe("Edit List");
-    expect(result.current.submitLabel).toBe("Save Changes");
-    expect(result.current.descriptionLabel).toBe("Update your watchlist details.");
   });
 
   it("submits createWatchlist with parsed form data on success", async () => {
@@ -140,8 +115,22 @@ describe("useWatchlistForm", () => {
     expect(toastSuccessMock).toHaveBeenCalledWith("Watchlist created successfully");
     expect(invalidateMock).toHaveBeenCalled();
     expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["watchlists"] });
-    expect(result.current.open).toBe(false);
     expect(result.current.loading).toBe(false);
+  });
+
+  it("calls onSuccess after successful submission", async () => {
+    const onSuccess = vi.fn();
+    const { result } = renderHook(() => useWatchlistForm({ mode: "create", onSuccess }));
+
+    const event = createMockFormEvent({
+      name: "New List",
+      description: "A description",
+      itemOrderMode: "custom",
+    });
+
+    await result.current.onSubmit(event);
+
+    expect(onSuccess).toHaveBeenCalled();
   });
 
   it("submits updateWatchlist with parsed form data on success", async () => {
@@ -176,7 +165,6 @@ describe("useWatchlistForm", () => {
     });
     expect(toastSuccessMock).toHaveBeenCalledWith("Changes saved successfully");
     expect(invalidateMock).toHaveBeenCalled();
-    expect(result.current.open).toBe(false);
     expect(result.current.loading).toBe(false);
   });
 
@@ -206,7 +194,6 @@ describe("useWatchlistForm", () => {
 
     expect(toastErrorMock).toHaveBeenCalledWith("Name already exists");
     expect(result.current.loading).toBe(false);
-    expect(result.current.open).toBe(false);
   });
 
   it("shows generic error toast on unexpected exception", async () => {
@@ -224,7 +211,6 @@ describe("useWatchlistForm", () => {
 
     expect(toastErrorMock).toHaveBeenCalledWith("Network error");
     expect(result.current.loading).toBe(false);
-    expect(result.current.open).toBe(false);
   });
 
   it("shows fallback error toast when error is not an Error instance", async () => {

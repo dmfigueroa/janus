@@ -9,18 +9,15 @@ import { updateWatchlist } from "@/features/watchlists/update/mutation";
 import { invalidateWatchlistQueries } from "@/features/watchlists/cache";
 
 type UseWatchlistFormOptions =
-  | { mode: "create"; watchlist?: never }
-  | { mode: "edit"; watchlist: Watchlist };
+  | { mode: "create"; watchlist?: never; onSuccess?: () => void }
+  | { mode: "edit"; watchlist: Watchlist; onSuccess?: () => void };
 
-export function useWatchlistForm({ mode, watchlist }: UseWatchlistFormOptions) {
-  const [open, setOpen] = useState(false);
+export function useWatchlistForm({ mode, watchlist, onSuccess }: UseWatchlistFormOptions) {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const queryClient = useQueryClient();
   const createWatchlistFn = useServerFn(createWatchlist);
   const updateWatchlistFn = useServerFn(updateWatchlist);
-
-  const labels = getWatchlistFormLabels(mode);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -36,7 +33,7 @@ export function useWatchlistForm({ mode, watchlist }: UseWatchlistFormOptions) {
         updateFn: updateWatchlistFn,
       });
       handleSubmitSuccess({ mode, router, queryClient });
-      setOpen(false);
+      onSuccess?.();
     } catch (error) {
       handleSubmitError(error);
     } finally {
@@ -45,24 +42,8 @@ export function useWatchlistForm({ mode, watchlist }: UseWatchlistFormOptions) {
   };
 
   return {
-    open,
-    setOpen,
     loading,
-    ...labels,
     onSubmit,
-  };
-}
-
-// --- Presentation layer ---
-
-function getWatchlistFormLabels(mode: "create" | "edit") {
-  const isCreate = mode === "create";
-  return {
-    title: isCreate ? "Create New List" : "Edit List",
-    submitLabel: isCreate ? "Create List" : "Save Changes",
-    descriptionLabel: isCreate
-      ? "Create a new watchlist to track your movies and shows."
-      : "Update your watchlist details.",
   };
 }
 
