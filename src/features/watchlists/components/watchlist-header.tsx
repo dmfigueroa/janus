@@ -1,7 +1,7 @@
 import type { Watchlist } from "@/db/schema";
 import { WatchlistFormDialog } from "@/features/watchlists/components/WatchlistFormDialog";
 import { calculateWatchlistProgress } from "@/features/watchlists/progress";
-import { cn } from "@/utils/cn";
+import { ToggleButton } from "@/ui/toggle-button";
 import { Pencil, Search } from "lucide-react";
 
 interface WatchlistHeaderProps {
@@ -152,32 +152,5 @@ function WatchlistFilterToggle({
         Unwatched
       </ToggleButton>
     </div>
-  );
-}
-
-function ToggleButton({
-  active,
-  onClick,
-  disabled,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  disabled?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "rounded-md px-3 py-1.5 text-xs font-medium transition-all disabled:pointer-events-none disabled:opacity-60",
-        active
-          ? "bg-primary text-primary-foreground shadow-sm"
-          : "text-muted-foreground hover:bg-accent",
-      )}
-    >
-      {children}
-    </button>
   );
 }
