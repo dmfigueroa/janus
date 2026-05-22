@@ -49,7 +49,7 @@ describe("route module boundaries", () => {
       "utf8",
     );
 
-    expect(searchRoute).toMatch(/from\s+["']@\/features\/search\/SearchResults["']/);
+    expect(searchRoute).toMatch(/from\s+["']@\/features\/search\/screen["']/);
     expect(searchRoute).not.toMatch(/from\s+["']\.\.\/components\/SearchResults["']/);
 
     expect(searchResults).toMatch(/from\s+["']\.\/SearchMediaDetailSheet["']/);
