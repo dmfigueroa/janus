@@ -27,6 +27,12 @@ vi.mock("@/features/watchlists/update/mutation", () => ({
   updateWatchlist: updateWatchlistServerFn,
 }));
 
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({
+    invalidateQueries: vi.fn(),
+  }),
+}));
+
 vi.mock("@tanstack/react-router", () => ({
   useRouter: () => ({
     invalidate: invalidateMock,

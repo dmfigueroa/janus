@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import type { Watchlist } from "@/db/schema";
 import { createWatchlist } from "@/features/watchlists/create/mutation";
 import { updateWatchlist } from "@/features/watchlists/update/mutation";
+import { invalidateWatchlistQueries } from "@/features/watchlists/cache";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,6 +32,7 @@ export function WatchlistFormDialog({ mode, watchlist, trigger }: WatchlistFormD
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const createWatchlistFn = useServerFn(createWatchlist);
   const updateWatchlistFn = useServerFn(updateWatchlist);
 
@@ -71,6 +74,7 @@ export function WatchlistFormDialog({ mode, watchlist, trigger }: WatchlistFormD
 
       setOpen(false);
       await router.invalidate?.();
+      invalidateWatchlistQueries(queryClient);
     } catch (error) {
       console.error("Failed to save watchlist", error);
       toast.error(
