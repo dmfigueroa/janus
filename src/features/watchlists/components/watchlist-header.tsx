@@ -1,8 +1,8 @@
 import type { Watchlist } from "@/db/schema";
-import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
+import { WatchlistFormDialog } from "@/features/watchlists/components/WatchlistFormDialog";
 import { calculateWatchlistProgress } from "@/features/watchlists/progress";
-import { cn } from "@/utils/cn";
-import { Search } from "lucide-react";
+import { ToggleButton } from "@/ui/toggle-button";
+import { Pencil, Search } from "lucide-react";
 
 interface WatchlistHeaderProps {
   watchlist: Watchlist;
@@ -10,9 +10,6 @@ interface WatchlistHeaderProps {
   watchedItems: number;
   showUnwatchedOnly: boolean;
   onFilterChange: (showUnwatchedOnly: boolean) => void;
-  itemOrderMode: WatchlistItemOrderMode;
-  onItemOrderModeChange: (itemOrderMode: WatchlistItemOrderMode) => void;
-  isUpdatingItemOrderMode: boolean;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   interactionDisabled?: boolean;
@@ -28,16 +25,13 @@ export function WatchlistHeader({
   watchedItems,
   showUnwatchedOnly,
   onFilterChange,
-  itemOrderMode,
-  onItemOrderModeChange,
-  isUpdatingItemOrderMode,
   searchQuery,
   onSearchChange,
   interactionDisabled = false,
 }: WatchlistHeaderProps) {
   return (
     <header className="sticky top-0 z-40 bg-background/95 pb-4 pt-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:pb-6">
-      <WatchlistTitle name={watchlist.name} description={watchlist.description} />
+      <WatchlistTitle watchlist={watchlist} />
 
       <div className="space-y-4">
         <WatchlistProgress totalItems={totalItems} watchedItems={watchedItems} />
@@ -50,11 +44,6 @@ export function WatchlistHeader({
           />
 
           <div className="flex flex-col gap-2 self-start sm:self-auto sm:items-end">
-            <WatchlistOrderToggle
-              mode={itemOrderMode}
-              onChange={onItemOrderModeChange}
-              isUpdating={isUpdatingItemOrderMode || interactionDisabled}
-            />
             <WatchlistFilterToggle
               showUnwatchedOnly={showUnwatchedOnly}
               onChange={onFilterChange}
@@ -67,12 +56,27 @@ export function WatchlistHeader({
   );
 }
 
-function WatchlistTitle({ name, description }: { name: string; description: string | null }) {
+function WatchlistTitle({ watchlist }: { watchlist: Watchlist }) {
   return (
     <div className="mb-2 flex items-center justify-between">
-      <h1 className="text-xl font-bold tracking-tight md:text-2xl">{name}</h1>
-      {description && (
-        <p className="text-sm text-muted-foreground hidden md:block">{description}</p>
+      <div className="flex items-center gap-2">
+        <h1 className="text-xl font-bold tracking-tight md:text-2xl">{watchlist.name}</h1>
+        <WatchlistFormDialog
+          mode="edit"
+          watchlist={watchlist}
+          trigger={
+            <button
+              type="button"
+              aria-label="Edit watchlist"
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+          }
+        />
+      </div>
+      {watchlist.description && (
+        <p className="text-sm text-muted-foreground hidden md:block">{watchlist.description}</p>
       )}
     </div>
   );
@@ -130,35 +134,6 @@ function WatchlistSearch({
   );
 }
 
-function WatchlistOrderToggle({
-  mode,
-  onChange,
-  isUpdating,
-}: {
-  mode: WatchlistItemOrderMode;
-  onChange: (mode: WatchlistItemOrderMode) => void;
-  isUpdating: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-2 rounded-lg border bg-secondary/30 p-1">
-      <ToggleButton
-        active={mode === "release"}
-        onClick={() => onChange("release")}
-        disabled={isUpdating}
-      >
-        Release
-      </ToggleButton>
-      <ToggleButton
-        active={mode === "custom"}
-        onClick={() => onChange("custom")}
-        disabled={isUpdating}
-      >
-        Custom
-      </ToggleButton>
-    </div>
-  );
-}
-
 function WatchlistFilterToggle({
   showUnwatchedOnly,
   onChange,
@@ -177,32 +152,5 @@ function WatchlistFilterToggle({
         Unwatched
       </ToggleButton>
     </div>
-  );
-}
-
-function ToggleButton({
-  active,
-  onClick,
-  disabled,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  disabled?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={cn(
-        "rounded-md px-3 py-1.5 text-xs font-medium transition-all disabled:pointer-events-none disabled:opacity-60",
-        active
-          ? "bg-primary text-primary-foreground shadow-sm"
-          : "text-muted-foreground hover:bg-accent",
-      )}
-    >
-      {children}
-    </button>
   );
 }

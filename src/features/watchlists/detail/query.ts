@@ -96,9 +96,4 @@ export function watchlistDetailInfiniteQueryOptions(filters: WatchlistDetailQuer
   });
 }
 
-export {
-  optimisticallyToggleWatchedItem,
-  optimisticallyUpdateWatchlistItemOrderMode,
-  rollbackWatchlistItemOrderMode,
-  restoreWatchlistDetailSnapshot,
-} from "./cache";
+export { optimisticallyToggleWatchedItem, restoreWatchlistDetailSnapshot } from "./cache";

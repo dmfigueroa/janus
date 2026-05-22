@@ -5,6 +5,7 @@ import { createWatchlistMutation } from "./mutation.server";
 export const createWatchlistSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
+  itemOrderMode: z.enum(["release", "custom"]).optional(),
 });
 
 export type CreateWatchlistInput = z.infer<typeof createWatchlistSchema>;

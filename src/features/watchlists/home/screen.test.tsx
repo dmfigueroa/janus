@@ -55,12 +55,8 @@ vi.mock("@/components/WatchlistCard", () => ({
   ),
 }));
 
-vi.mock("@/components/CreateWatchlistCard", () => ({
-  CreateWatchlistCard: () => <div>Create Watchlist Card</div>,
-}));
-
-vi.mock("@/components/CreateWatchlistDialog", () => ({
-  CreateWatchlistDialog: () => <div>Create Watchlist Dialog</div>,
+vi.mock("@/features/watchlists/components/WatchlistFormDialog", () => ({
+  WatchlistFormDialog: ({ trigger }: { trigger: React.ReactNode }) => <div>{trigger}</div>,
 }));
 
 vi.mock("@/components/MergeWatchlistDialog", () => ({
@@ -178,8 +174,7 @@ describe("WatchlistsHomeScreen", () => {
     expect(screen.queryByText("2 watchlists, 2 items")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Up Next by Media" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "All Watchlists" })).toBeNull();
-    expect(screen.queryByText("Create Watchlist Card")).toBeNull();
-    expect(screen.queryByText("Create Watchlist Dialog")).toBeNull();
+    expect(screen.queryByText("Create New List")).toBeNull();
     expect(screen.getAllByText("selection")).toHaveLength(2);
   });
 

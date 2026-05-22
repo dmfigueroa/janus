@@ -31,7 +31,7 @@ let createWatchlistMutation: typeof import("./create/mutation.server").createWat
 let deleteWatchlistMutation: typeof import("./delete/mutation.server").deleteWatchlistMutation;
 let mergeWatchlistsMutation: typeof import("./merge/mutation.server").mergeWatchlistsMutation;
 let toggleWatchedMutation: typeof import("./toggle/mutation.server").toggleWatchedMutation;
-let updateWatchlistItemOrderModeMutation: typeof import("./order-mode/mutation.server").updateWatchlistItemOrderModeMutation;
+let updateWatchlistMutation: typeof import("./update/mutation.server").updateWatchlistMutation;
 
 beforeAll(async () => {
   testDb = await createIsolatedTestDb();
@@ -45,7 +45,7 @@ beforeAll(async () => {
     deleteModule,
     mergeModule,
     toggleModule,
-    orderModeModule,
+    updateModule,
   ] = await Promise.all([
     import("./read.server"),
     import("./add/mutation.server"),
@@ -53,7 +53,7 @@ beforeAll(async () => {
     import("./delete/mutation.server"),
     import("./merge/mutation.server"),
     import("./toggle/mutation.server"),
-    import("./order-mode/mutation.server"),
+    import("./update/mutation.server"),
   ]);
 
   WatchlistsRead = readModule.WatchlistsRead;
@@ -62,7 +62,7 @@ beforeAll(async () => {
   deleteWatchlistMutation = deleteModule.deleteWatchlistMutation;
   mergeWatchlistsMutation = mergeModule.mergeWatchlistsMutation;
   toggleWatchedMutation = toggleModule.toggleWatchedMutation;
-  updateWatchlistItemOrderModeMutation = orderModeModule.updateWatchlistItemOrderModeMutation;
+  updateWatchlistMutation = updateModule.updateWatchlistMutation;
 });
 
 afterAll(() => {
@@ -94,6 +94,21 @@ describe("watchlist mutation contract", () => {
         progress: 0,
         nextUnwatched: null,
       },
+    });
+  });
+
+  it("creates a watchlist with a custom item order mode when provided", async () => {
+    await createWatchlistMutation({
+      name: "Custom Order List",
+      itemOrderMode: "custom",
+    });
+
+    const summaries = await WatchlistsRead.listScreen();
+
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]).toMatchObject({
+      name: "Custom Order List",
+      itemOrderMode: "custom",
     });
   });
 
@@ -202,49 +217,54 @@ describe("watchlist mutation contract", () => {
     expect(detail?.watchlist.lastWatchedAt).toBe(originalLastWatchedAt);
   });
 
-  it("switches the active item order mode through the feature write boundary so detail reads use the persisted order", async () => {
-    const [watchlist] = await db.insert(watchlists).values({ name: "Order Toggle" }).returning();
+  it("updates a watchlist name, description, and item order mode through the feature write boundary", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Original Name", description: "Original desc" })
+      .returning();
 
-    await db.insert(watchlistItems).values([
-      {
-        watchlistId: watchlist.id,
-        tmdbId: "release-first",
-        source: "tmdb",
-        mediaType: "movie",
-        title: "Release First",
-        releaseDate: "2024-01-01",
-        customRank: 2,
-      },
-      {
-        watchlistId: watchlist.id,
-        tmdbId: "custom-first",
-        source: "tmdb",
-        mediaType: "movie",
-        title: "Custom First",
-        releaseDate: "2024-02-01",
-        customRank: 1,
-      },
-    ]);
-
-    const result = await updateWatchlistItemOrderModeMutation({
+    const result = await updateWatchlistMutation({
       watchlistId: watchlist.id,
+      name: "Updated Name",
+      description: "Updated desc",
       itemOrderMode: "custom",
-    });
-
-    const detail = await WatchlistsRead.detailScreen({
-      watchlistId: watchlist.id,
-      unwatchedOnly: false,
     });
 
     expect(result).toEqual({ success: true });
-    expect(detail?.watchlist.itemOrderMode).toBe("custom");
-    expect(detail?.items.map((item) => item.title)).toEqual(["Custom First", "Release First"]);
+
+    const detail = await WatchlistsRead.detailScreen({ watchlistId: watchlist.id });
+    expect(detail?.watchlist).toMatchObject({
+      name: "Updated Name",
+      description: "Updated desc",
+      itemOrderMode: "custom",
+    });
   });
 
-  it("returns a structured failure when updating item order mode for a missing watchlist", async () => {
-    const result = await updateWatchlistItemOrderModeMutation({
+  it("clears a watchlist description when an empty string is passed", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Named List", description: "Will be cleared" })
+      .returning();
+
+    const result = await updateWatchlistMutation({
+      watchlistId: watchlist.id,
+      name: "Named List",
+      description: "",
+      itemOrderMode: "release",
+    });
+
+    expect(result).toEqual({ success: true });
+
+    const detail = await WatchlistsRead.detailScreen({ watchlistId: watchlist.id });
+    expect(detail?.watchlist.description).toBeNull();
+  });
+
+  it("returns a structured failure when updating a missing watchlist", async () => {
+    const result = await updateWatchlistMutation({
       watchlistId: 999_999,
-      itemOrderMode: "custom",
+      name: "Ghost List",
+      description: null,
+      itemOrderMode: "release",
     });
 
     expect(result).toEqual({ success: false, message: "Watchlist not found." });

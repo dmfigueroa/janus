@@ -5,7 +5,6 @@ import type { WatchlistSummary } from "@/features/watchlists/list/query.server";
 import type { WatchlistDetailPage } from "@/models/watchlist";
 import {
   updateWatchlistDetailPagesAfterItemRemoval,
-  updateWatchlistDetailPagesAfterItemOrderMode,
   updateWatchlistDetailPagesAfterParentRemoval,
   updateWatchlistDetailPagesAfterReorder,
   updateWatchlistDetailPagesAfterToggle,
@@ -34,36 +33,6 @@ describe("watchlist detail page transforms", () => {
     expect(nextData?.pages[0]?.watchlist.stats.watchedItems).toBe(2);
     expect(nextData?.pages[0]?.watchlist.stats.progress).toBe(100);
     expect(nextData?.pages[0]?.items).toEqual([]);
-  });
-
-  it("updates item order mode and keeps the existing page sizes after sorting", () => {
-    const data = createDetailData({
-      pages: [
-        createPage({
-          items: [
-            createItem({ id: 2, title: "March", releaseDate: "2024-03-01" }),
-            createItem({ id: 1, title: "January", releaseDate: "2024-01-01" }),
-          ],
-        }),
-        createPage({
-          items: [createItem({ id: 3, title: "February", releaseDate: "2024-02-01" })],
-        }),
-      ],
-    });
-
-    const nextData = updateWatchlistDetailPagesAfterItemOrderMode({
-      data,
-      nextItemOrderMode: "release",
-    });
-
-    expect(nextData?.pages.map((page) => page.watchlist.itemOrderMode)).toEqual([
-      "release",
-      "release",
-    ]);
-    expect(nextData?.pages.map((page) => page.items.map((item) => item.title))).toEqual([
-      ["January", "February"],
-      ["March"],
-    ]);
   });
 
   it("reorders the active visible items around an anchor and preserves page sizes", () => {

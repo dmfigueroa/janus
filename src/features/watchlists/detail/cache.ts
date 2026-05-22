@@ -1,29 +1,20 @@
 import { type InfiniteData, type QueryClient, type QueryKey } from "@tanstack/react-query";
 import type { WatchlistItem } from "@/db/schema";
 import type { WatchlistDetailPage } from "@/models/watchlist";
-import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
 import {
   watchlistDetailQueryFamily,
-  watchlistDetailQueryKey,
-  normalizeFiltersFromDetailQueryKey,
   readFiltersFromDetailQueryKey,
 } from "@/features/watchlists/detail/query";
 import {
   updateWatchlistDetailPagesAfterItemRemoval,
   updateWatchlistDetailPagesAfterParentRemoval,
   updateWatchlistDetailPagesAfterToggle,
-  updateWatchlistDetailPagesAfterItemOrderMode,
   updateWatchlistDetailPagesAfterReorder,
 } from "@/features/watchlists/detail/transform";
 
 export type WatchlistDetailCacheSnapshot = Array<
   [QueryKey, InfiniteData<WatchlistDetailPage, number> | undefined]
 >;
-
-export type WatchlistDetailItemOrderModeSnapshot = {
-  previousEntries: WatchlistDetailCacheSnapshot;
-  createdKeys: QueryKey[];
-};
 
 export async function optimisticallyToggleWatchedItem({
   queryClient,
@@ -59,29 +50,6 @@ export async function optimisticallyToggleWatchedItem({
   }
 
   return snapshot;
-}
-
-export async function optimisticallyUpdateWatchlistItemOrderMode({
-  queryClient,
-  watchlistId,
-  nextItemOrderMode,
-}: {
-  queryClient: QueryClient;
-  watchlistId: number;
-  nextItemOrderMode: WatchlistItemOrderMode;
-}): Promise<WatchlistDetailItemOrderModeSnapshot> {
-  const previousEntries = await snapshotWatchlistDetailCache({
-    queryClient,
-    watchlistId,
-  });
-  const createdKeys = copyEntriesToItemOrderModeCache({
-    queryClient,
-    watchlistId,
-    previousEntries,
-    nextItemOrderMode,
-  });
-
-  return { previousEntries, createdKeys };
 }
 
 export async function optimisticallyRemoveWatchlistItem({
@@ -195,48 +163,6 @@ async function snapshotActiveWatchlistDetailCache({
   ] satisfies WatchlistDetailCacheSnapshot;
 }
 
-function copyEntriesToItemOrderModeCache({
-  queryClient,
-  watchlistId,
-  previousEntries,
-  nextItemOrderMode,
-}: {
-  queryClient: QueryClient;
-  watchlistId: number;
-  previousEntries: WatchlistDetailCacheSnapshot;
-  nextItemOrderMode: WatchlistItemOrderMode;
-}) {
-  const previousKeys = new Set(previousEntries.map(([cacheKey]) => JSON.stringify(cacheKey)));
-  const createdKeys: QueryKey[] = [];
-
-  for (const [cacheKey, previousData] of previousEntries) {
-    const filters = normalizeFiltersFromDetailQueryKey(cacheKey, watchlistId);
-
-    if (!filters) {
-      continue;
-    }
-
-    const nextKey = watchlistDetailQueryKey({
-      ...filters,
-      itemOrderMode: nextItemOrderMode,
-    });
-
-    queryClient.setQueryData(
-      nextKey,
-      updateWatchlistDetailPagesAfterItemOrderMode({
-        data: previousData,
-        nextItemOrderMode,
-      }),
-    );
-
-    if (!previousKeys.has(JSON.stringify(nextKey))) {
-      createdKeys.push(nextKey);
-    }
-  }
-
-  return createdKeys;
-}
-
 export async function optimisticallyReorderWatchlistItems({
   queryClient,
   watchlistId,
@@ -284,22 +210,6 @@ export function restoreWatchlistDetailSnapshot({
   snapshot: WatchlistDetailCacheSnapshot | undefined;
 }) {
   for (const [cacheKey, previousData] of snapshot ?? []) {
-    queryClient.setQueryData(cacheKey, previousData);
-  }
-}
-
-export function rollbackWatchlistItemOrderMode({
-  queryClient,
-  snapshot,
-}: {
-  queryClient: QueryClient;
-  snapshot: WatchlistDetailItemOrderModeSnapshot | undefined;
-}) {
-  for (const createdKey of snapshot?.createdKeys ?? []) {
-    queryClient.removeQueries({ queryKey: createdKey, exact: true });
-  }
-
-  for (const [cacheKey, previousData] of snapshot?.previousEntries ?? []) {
     queryClient.setQueryData(cacheKey, previousData);
   }
 }

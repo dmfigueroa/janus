@@ -7,12 +7,17 @@ import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
 export async function createWatchlist({
   description,
   name,
+  itemOrderMode,
 }: {
   name: string;
   description?: string;
+  itemOrderMode?: WatchlistItemOrderMode;
 }) {
   const db = getDb();
-  const [watchlist] = await db.insert(watchlists).values({ name, description }).returning();
+  const [watchlist] = await db
+    .insert(watchlists)
+    .values({ name, description, itemOrderMode })
+    .returning();
   return watchlist;
 }
 
@@ -65,15 +70,26 @@ export async function markLastWatched(watchlistId: number) {
     .where(eq(watchlists.id, watchlistId));
 }
 
-export async function updateWatchlistItemOrderMode({
-  itemOrderMode,
+export async function updateWatchlist({
   watchlistId,
+  name,
+  description,
+  itemOrderMode,
 }: {
   watchlistId: number;
+  name: string;
+  description?: string | null;
   itemOrderMode: WatchlistItemOrderMode;
 }) {
   const db = getDb();
-  await db.update(watchlists).set({ itemOrderMode }).where(eq(watchlists.id, watchlistId));
+  await db
+    .update(watchlists)
+    .set({
+      name,
+      description: description === "" ? null : description,
+      itemOrderMode,
+    })
+    .where(eq(watchlists.id, watchlistId));
 }
 
 export async function insertWatchlistItem(values: typeof watchlistItems.$inferInsert) {
