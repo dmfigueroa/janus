@@ -169,19 +169,22 @@ export function WatchlistsHomeScreen({ initialData }: WatchlistsHomeScreenProps)
 
             {!selectionMode ? (
               <div className="w-full sm:w-[220px]">
-                <WatchlistFormDialog
-                  mode="create"
-                  trigger={
-                    <div className="w-full h-full flex flex-col items-center justify-center gap-2 cursor-pointer group">
-                      <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center group-hover:bg-primary transition-colors">
-                        <Plus className="w-6 h-6 text-muted-foreground group-hover:text-primary-foreground" />
+                <div className="flex flex-col gap-2 h-full">
+                  <WatchlistFormDialog
+                    mode="create"
+                    trigger={
+                      <div className="aspect-[2/3] rounded-2xl border-2 border-dashed border-border hover:border-muted-foreground hover:bg-secondary/40 transition-colors flex flex-col items-center justify-center p-6 text-center cursor-pointer group">
+                        <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center group-hover:bg-primary transition-colors">
+                          <Plus className="w-6 h-6 text-muted-foreground group-hover:text-primary-foreground" />
+                        </div>
+                        <span className="text-muted-foreground font-medium group-hover:text-foreground mt-2">
+                          Create New List
+                        </span>
                       </div>
-                      <span className="text-muted-foreground font-medium group-hover:text-foreground">
-                        Create New List
-                      </span>
-                    </div>
-                  }
-                />
+                    }
+                  />
+                  <div className="px-1 opacity-0">.</div>
+                </div>
               </div>
             ) : null}
           </div>
