@@ -101,6 +101,21 @@ describe("watchlist mutation contract", () => {
     });
   });
 
+  it("creates a watchlist with a custom item order mode when provided", async () => {
+    await createWatchlistMutation({
+      name: "Custom Order List",
+      itemOrderMode: "custom",
+    });
+
+    const summaries = await WatchlistsRead.listScreen();
+
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]).toMatchObject({
+      name: "Custom Order List",
+      itemOrderMode: "custom",
+    });
+  });
+
   it("deletes a watchlist through the feature mutation boundary so it disappears from read flows", async () => {
     const [watchlist] = await db
       .insert(watchlists)
