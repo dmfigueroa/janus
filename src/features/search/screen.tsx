@@ -1,13 +1,10 @@
-import { useCallback } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { SearchInput } from "@/components/SearchInput";
 import { SearchResults } from "@/features/search/SearchResults";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { searchUnified } from "@/server/search";
 import { DEPRECATED_MEDIA_MESSAGE, isDeprecatedMediaType } from "@/server/media";
 import type { UnifiedMedia } from "@/server/media";
+import { useSearchResults } from "./useSearchResults";
+import { useSearchNavigation } from "./useSearchNavigation";
 
 interface SearchScreenProps {
   query: string;
@@ -23,67 +20,14 @@ interface SearchScreenProps {
 }
 
 export function SearchScreen({ query, type, initialData }: SearchScreenProps) {
-  const navigate = useNavigate();
-  const searchUnifiedFn = useServerFn(searchUnified);
-
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ["search", query, type],
-    queryFn: ({ pageParam }) => {
-      if (!query) {
-        return Promise.resolve({
-          results: [],
-          page: pageParam,
-          total_pages: 1,
-          total_results: 0,
-        });
-      }
-
-      if (isDeprecatedMediaType(type)) {
-        return Promise.resolve({
-          results: [],
-          page: pageParam,
-          total_pages: 1,
-          total_results: 0,
-          rejected: true,
-          message: DEPRECATED_MEDIA_MESSAGE,
-        });
-      }
-
-      return searchUnifiedFn({ data: { query, page: pageParam, type } });
-    },
-    initialPageParam: 1,
-    getNextPageParam: (lastPage) =>
-      lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined,
-    initialData: !!query ? { pages: [initialData], pageParams: [1] } : undefined,
+  const { allResults, fetchNextPage, hasNextPage, isFetchingNextPage } = useSearchResults({
+    query,
+    type,
+    initialData,
   });
-
-  const allResults = data?.pages.flatMap((page) => page.results) || [];
-
-  const handleSearch = useCallback(
-    (newQuery: string) => {
-      navigate({
-        to: "/search",
-        search: {
-          query: newQuery,
-          type,
-        },
-      });
-    },
-    [navigate, type],
-  );
-
-  const handleTabChange = useCallback(
-    (newType: string) => {
-      navigate({
-        to: "/search",
-        search: {
-          query,
-          type: newType as SearchScreenProps["type"],
-        },
-      });
-    },
-    [navigate, query],
-  );
+  const { handleSearch, handleTabChange } = useSearchNavigation(query, type);
+  const isDeprecated = isDeprecatedMediaType(type);
+  const activeTab = isDeprecated ? "movie" : type;
 
   return (
     <div className="container mx-auto min-h-screen px-4 py-8 md:px-8 pb-24">
@@ -101,11 +45,7 @@ export function SearchScreen({ query, type, initialData }: SearchScreenProps) {
 
         <SearchInput onSearch={handleSearch} defaultValue={query} isLoading={false} />
 
-        <Tabs
-          value={isDeprecatedMediaType(type) ? "movie" : type}
-          onValueChange={handleTabChange}
-          className="w-full max-w-3xl"
-        >
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full max-w-3xl">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="movie">Movies</TabsTrigger>
             <TabsTrigger value="tv">TV</TabsTrigger>
@@ -116,7 +56,7 @@ export function SearchScreen({ query, type, initialData }: SearchScreenProps) {
         </Tabs>
       </div>
 
-      {isDeprecatedMediaType(type) && query ? (
+      {isDeprecated && query ? (
         <div className="mx-auto mt-8 max-w-3xl rounded-md border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700">
           {DEPRECATED_MEDIA_MESSAGE} Please switch to Movies, TV, Games, Books, or Comics.
         </div>
