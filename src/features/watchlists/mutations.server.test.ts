@@ -32,6 +32,7 @@ let deleteWatchlistMutation: typeof import("./delete/mutation.server").deleteWat
 let mergeWatchlistsMutation: typeof import("./merge/mutation.server").mergeWatchlistsMutation;
 let toggleWatchedMutation: typeof import("./toggle/mutation.server").toggleWatchedMutation;
 let updateWatchlistItemOrderModeMutation: typeof import("./order-mode/mutation.server").updateWatchlistItemOrderModeMutation;
+let updateWatchlistMutation: typeof import("./update/mutation.server").updateWatchlistMutation;
 
 beforeAll(async () => {
   testDb = await createIsolatedTestDb();
@@ -46,6 +47,7 @@ beforeAll(async () => {
     mergeModule,
     toggleModule,
     orderModeModule,
+    updateModule,
   ] = await Promise.all([
     import("./read.server"),
     import("./add/mutation.server"),
@@ -54,6 +56,7 @@ beforeAll(async () => {
     import("./merge/mutation.server"),
     import("./toggle/mutation.server"),
     import("./order-mode/mutation.server"),
+    import("./update/mutation.server"),
   ]);
 
   WatchlistsRead = readModule.WatchlistsRead;
@@ -63,6 +66,7 @@ beforeAll(async () => {
   mergeWatchlistsMutation = mergeModule.mergeWatchlistsMutation;
   toggleWatchedMutation = toggleModule.toggleWatchedMutation;
   updateWatchlistItemOrderModeMutation = orderModeModule.updateWatchlistItemOrderModeMutation;
+  updateWatchlistMutation = updateModule.updateWatchlistMutation;
 });
 
 afterAll(() => {
@@ -245,6 +249,59 @@ describe("watchlist mutation contract", () => {
     const result = await updateWatchlistItemOrderModeMutation({
       watchlistId: 999_999,
       itemOrderMode: "custom",
+    });
+
+    expect(result).toEqual({ success: false, message: "Watchlist not found." });
+  });
+
+  it("updates a watchlist name, description, and item order mode through the feature write boundary", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Original Name", description: "Original desc" })
+      .returning();
+
+    const result = await updateWatchlistMutation({
+      watchlistId: watchlist.id,
+      name: "Updated Name",
+      description: "Updated desc",
+      itemOrderMode: "custom",
+    });
+
+    expect(result).toEqual({ success: true });
+
+    const detail = await WatchlistsRead.detailScreen({ watchlistId: watchlist.id });
+    expect(detail?.watchlist).toMatchObject({
+      name: "Updated Name",
+      description: "Updated desc",
+      itemOrderMode: "custom",
+    });
+  });
+
+  it("clears a watchlist description when an empty string is passed", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Named List", description: "Will be cleared" })
+      .returning();
+
+    const result = await updateWatchlistMutation({
+      watchlistId: watchlist.id,
+      name: "Named List",
+      description: "",
+      itemOrderMode: "release",
+    });
+
+    expect(result).toEqual({ success: true });
+
+    const detail = await WatchlistsRead.detailScreen({ watchlistId: watchlist.id });
+    expect(detail?.watchlist.description).toBeNull();
+  });
+
+  it("returns a structured failure when updating a missing watchlist", async () => {
+    const result = await updateWatchlistMutation({
+      watchlistId: 999_999,
+      name: "Ghost List",
+      description: null,
+      itemOrderMode: "release",
     });
 
     expect(result).toEqual({ success: false, message: "Watchlist not found." });
