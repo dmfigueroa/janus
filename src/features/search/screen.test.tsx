@@ -4,31 +4,26 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 
-const searchUnifiedFnMock = vi.fn();
-
-vi.mock("@tanstack/react-start", () => ({
-  useServerFn: () => searchUnifiedFnMock,
-  createServerFn: () => ({
-    inputValidator: () => ({ handler: () => vi.fn() }),
-    handler: () => vi.fn(),
-  }),
-}));
-
-vi.mock("@tanstack/react-router", () => ({
-  useNavigate: () => vi.fn(),
-}));
-
-vi.mock("@tanstack/react-query", () => ({
-  useInfiniteQuery: () => ({
-    data: mockInfiniteData,
+vi.mock("./useSearchResults", () => ({
+  useSearchResults: vi.fn(() => ({
+    allResults: [],
     fetchNextPage: vi.fn(),
     hasNextPage: false,
     isFetchingNextPage: false,
-  }),
+  })),
+}));
+
+vi.mock("./useSearchNavigation", () => ({
+  useSearchNavigation: vi.fn(() => ({
+    handleSearch: vi.fn(),
+    handleTabChange: vi.fn(),
+  })),
 }));
 
 vi.mock("@/components/SearchInput", () => ({
-  SearchInput: () => <input data-testid="search-input" />,
+  SearchInput: ({ defaultValue }: { defaultValue: string }) => (
+    <input data-testid="search-input" defaultValue={defaultValue} />
+  ),
 }));
 
 vi.mock("@/components/ui/tabs", () => ({
@@ -55,20 +50,15 @@ vi.mock("@/features/search/SearchResults", () => ({
   ),
 }));
 
-import { SearchScreen } from "./screen";
+vi.mock("@/server/media", () => ({
+  DEPRECATED_MEDIA_MESSAGE:
+    "Anime and manga categories are deprecated while we revisit provider data quality.",
+  isDeprecatedMediaType: (type: string) => type === "anime" || type === "manga",
+}));
 
-let mockInfiniteData:
-  | {
-      pages: Array<{
-        results: unknown[];
-        page: number;
-        total_pages: number;
-        total_results: number;
-        rejected?: boolean;
-        message?: string;
-      }>;
-    }
-  | undefined = undefined;
+import { SearchScreen } from "./screen";
+import { useSearchResults } from "./useSearchResults";
+import { useSearchNavigation } from "./useSearchNavigation";
 
 describe("SearchScreen behavior", () => {
   afterEach(() => {
@@ -76,8 +66,16 @@ describe("SearchScreen behavior", () => {
   });
 
   beforeEach(() => {
-    mockInfiniteData = undefined;
-    searchUnifiedFnMock.mockReset();
+    vi.mocked(useSearchResults).mockReturnValue({
+      allResults: [],
+      fetchNextPage: vi.fn(),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+    });
+    vi.mocked(useSearchNavigation).mockReturnValue({
+      handleSearch: vi.fn(),
+      handleTabChange: vi.fn(),
+    });
   });
 
   it("renders search input and tabs", () => {
@@ -93,9 +91,6 @@ describe("SearchScreen behavior", () => {
   });
 
   it("shows 'No results found' when query is empty", () => {
-    mockInfiniteData = {
-      pages: [{ results: [], page: 1, total_pages: 0, total_results: 0 }],
-    };
     render(
       <SearchScreen
         query=""
@@ -107,34 +102,26 @@ describe("SearchScreen behavior", () => {
   });
 
   it("renders results when query is present and data returns items", () => {
-    mockInfiniteData = {
-      pages: [
+    vi.mocked(useSearchResults).mockReturnValue({
+      allResults: [
         {
-          results: [{ id: "1", title: "Harry Potter" }],
-          page: 1,
-          total_pages: 1,
-          total_results: 1,
+          id: "1",
+          title: "Harry Potter",
+          mediaType: "book",
+          source: "google_books",
+          poster: null,
         },
       ],
-    };
+      fetchNextPage: vi.fn(),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+    });
+
     render(
       <SearchScreen
         query="harry potter"
         type="book"
-        initialData={{
-          results: [
-            {
-              id: "1",
-              title: "Harry Potter",
-              mediaType: "book",
-              source: "google_books",
-              poster: null,
-            },
-          ],
-          page: 1,
-          total_pages: 1,
-          total_results: 1,
-        }}
+        initialData={{ results: [], page: 1, total_pages: 1, total_results: 1 }}
       />,
     );
     expect(screen.getByTestId("has-results")).not.toBeNull();
@@ -142,19 +129,6 @@ describe("SearchScreen behavior", () => {
   });
 
   it("shows deprecated warning for anime/manga types", () => {
-    mockInfiniteData = {
-      pages: [
-        {
-          results: [],
-          page: 1,
-          total_pages: 1,
-          total_results: 0,
-          rejected: true,
-          message:
-            "Anime and manga categories are deprecated while we revisit provider data quality.",
-        },
-      ],
-    };
     render(
       <SearchScreen
         query="naruto"
