@@ -3,7 +3,7 @@ import { Check, Film, Tv, Gamepad2, Book, BookOpen } from "lucide-react";
 import type { WatchlistItem } from "@/db/schema";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/query";
 import { formatReleaseDate, formatRuntime } from "@/utils/datetime";
-import { tmdbImageUrl } from "@/utils/tmdb";
+import { buildMediaPosterUrl } from "@/utils/tmdb";
 import { useToggleWatchedItem } from "@/features/watchlists/detail/use-toggle-watched-item";
 import { TimelineItemActions } from "./timeline-item-actions";
 
@@ -34,7 +34,7 @@ const Poster = ({ mediaType, posterPath, title }: WatchlistItem) => {
   const config = getMediaConfig(mediaType);
   const Icon = config.icon;
 
-  const posterUrl = tmdbImageUrl(posterPath, "w200");
+  const posterUrl = buildMediaPosterUrl(posterPath, "w200");
 
   return (
     <div className="flex w-20 md:w-28 shrink-0 justify-center">
