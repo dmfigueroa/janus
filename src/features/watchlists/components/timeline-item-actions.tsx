@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { MoreHorizontal } from "lucide-react";
+import { ArrowRightFromLine, MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +16,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { WatchlistItem } from "@/db/schema";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/query";
+import { MoveItemDialog } from "@/features/watchlists/move/move-item-dialog";
 import { useToggleWatchedItem } from "@/features/watchlists/detail/use-toggle-watched-item";
 import { getWatchlistParentRemovalPreviewQuery } from "@/features/watchlists/remove/query";
 import { useRemoveWatchlistItemMutation } from "@/features/watchlists/remove/use-remove-watchlist-item";
@@ -35,6 +36,7 @@ export function TimelineItemActions({
   const [menuOpen, setMenuOpen] = useState(false);
   const [removeItemOpen, setRemoveItemOpen] = useState(false);
   const [removeParentOpen, setRemoveParentOpen] = useState(false);
+  const [moveItemOpen, setMoveItemOpen] = useState(false);
   const previewFn = useServerFn(getWatchlistParentRemovalPreviewQuery);
   const labels = getRemovalLabels(item);
   const quietWatchMutation = useToggleWatchedItem(item, { updateWatchlistRecency: false });
@@ -121,6 +123,19 @@ export function TimelineItemActions({
                 {labels.parent}
               </Button>
             ) : null}
+
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-auto whitespace-normal text-left justify-start py-2 gap-2"
+              onClick={() => {
+                setMenuOpen(false);
+                setMoveItemOpen(true);
+              }}
+            >
+              <ArrowRightFromLine size={14} />
+              Move to...
+            </Button>
           </div>
         </PopoverContent>
       </Popover>
@@ -179,6 +194,8 @@ export function TimelineItemActions({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <MoveItemDialog item={item} open={moveItemOpen} onOpenChange={setMoveItemOpen} />
     </>
   );
 }
