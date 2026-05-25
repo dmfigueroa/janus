@@ -39,6 +39,13 @@ vi.mock("@/features/watchlists/remove/use-remove-watchlist-parent", () => ({
   }),
 }));
 
+vi.mock("@/features/watchlists/move/use-move-watchlist-item", () => ({
+  useMoveWatchlistItemMutation: () => ({
+    isPending: false,
+    mutateAsync: vi.fn(),
+  }),
+}));
+
 vi.mock("@tanstack/react-query", async () => {
   const actual =
     await vi.importActual<typeof import("@tanstack/react-query")>("@tanstack/react-query");

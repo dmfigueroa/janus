@@ -38,6 +38,11 @@
 - For `createServerFn` and other TanStack response surfaces, expected user-facing failures must return structured error objects such as `{ success: false, message }` instead of throwing. Reserve throws for framework control flow like `redirect` / `notFound` or truly unexpected defects.
 - Avoid `any`. Prefer provider result types, local interfaces, explicit narrowing, or typed helper boundaries.
 
+## Naming
+
+- Write out full words. Avoid abbreviations like `tx` (use `transaction`), `itemToInsertValues` (use `extractItemFields` or `itemAsInsertValues`), `err` (use `error`), `cb` (use `callback`), etc.
+- Parameter and variable names should be readable without domain context. `item` is fine in a watchlist context; `tx` is not.
+
 <!-- intent-skills:start -->
 
 # Skill mappings - when working in these areas, load the linked skill file into context.
