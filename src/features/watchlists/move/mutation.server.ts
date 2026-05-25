@@ -15,22 +15,62 @@ export async function moveItemToWatchlistMutation({
 }): Promise<MoveItemResult> {
   const db = getDb();
 
+  let item: WatchlistItemRow;
+  let destination: { name: string };
+
+  try {
+    item = await fetchItemOrThrow(db, itemId);
+    destination = await fetchWatchlistOrThrow(db, destinationWatchlistId);
+    await ensureNoDuplicate(db, item, destinationWatchlistId);
+  } catch (e) {
+    if (e instanceof MoveItemError) {
+      return { success: false, message: e.message };
+    }
+    throw e;
+  }
+
+  await executeMove(db, itemId, item, destinationWatchlistId);
+
+  return {
+    success: true,
+    movedCount: 1,
+    message: `Moved ${item.title} to ${destination.name}.`,
+  };
+}
+
+type WatchlistItemRow = typeof watchlistItems.$inferSelect;
+
+async function fetchItemOrThrow(
+  db: ReturnType<typeof getDb>,
+  itemId: number,
+): Promise<WatchlistItemRow> {
   const item = await db.query.watchlistItems.findFirst({
     where: eq(watchlistItems.id, itemId),
   });
-
   if (!item) {
-    return { success: false, message: "Item not found." };
+    throw new MoveItemError("Item not found.");
   }
+  return item;
+}
 
-  const destination = await db.query.watchlists.findFirst({
-    where: eq(watchlists.id, destinationWatchlistId),
+async function fetchWatchlistOrThrow(
+  db: ReturnType<typeof getDb>,
+  watchlistId: number,
+): Promise<{ name: string }> {
+  const watchlist = await db.query.watchlists.findFirst({
+    where: eq(watchlists.id, watchlistId),
   });
-
-  if (!destination) {
-    return { success: false, message: "Destination watchlist not found." };
+  if (!watchlist) {
+    throw new MoveItemError("Destination watchlist not found.");
   }
+  return watchlist;
+}
 
+async function ensureNoDuplicate(
+  db: ReturnType<typeof getDb>,
+  item: WatchlistItemRow,
+  destinationWatchlistId: number,
+) {
   const duplicate = await db.query.watchlistItems.findFirst({
     where: and(
       eq(watchlistItems.watchlistId, destinationWatchlistId),
@@ -38,44 +78,36 @@ export async function moveItemToWatchlistMutation({
       eq(watchlistItems.mediaType, item.mediaType),
     ),
   });
-
   if (duplicate) {
-    return { success: false, message: `"${item.title}" is already in ${destination.name}.` };
+    throw new MoveItemError(`already in destination`);
   }
+}
 
-  await db.transaction((tx) => {
+function executeMove(
+  db: ReturnType<typeof getDb>,
+  itemId: number,
+  item: WatchlistItemRow,
+  destinationWatchlistId: number,
+) {
+  return db.transaction((tx) => {
     tx.delete(watchlistItems).where(eq(watchlistItems.id, itemId)).run();
-
     tx.insert(watchlistItems)
-      .values({
-        watchlistId: destinationWatchlistId,
-        tmdbId: item.tmdbId,
-        source: item.source,
-        mediaType: item.mediaType,
-        title: item.title,
-        parentId: item.parentId,
-        parentTitle: item.parentTitle,
-        season: item.season,
-        episode: item.episode,
-        posterPath: item.posterPath,
-        releaseDate: item.releaseDate,
-        voteAverage: item.voteAverage,
-        runtime: item.runtime,
-        isWatched: item.isWatched,
-        authors: item.authors,
-        addedAt: item.addedAt,
-      })
+      .values({ watchlistId: destinationWatchlistId, ...itemToInsertValues(item) })
       .run();
-
     tx.update(watchlists)
       .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
       .where(eq(watchlists.id, destinationWatchlistId))
       .run();
   });
+}
 
-  return {
-    success: true,
-    movedCount: 1,
-    message: `Moved ${item.title} to ${destination.name}.`,
-  };
+function itemToInsertValues(item: WatchlistItemRow) {
+  const { id: _id, watchlistId: _wl, ...rest } = item;
+  void _id;
+  void _wl;
+  return rest;
+}
+
+class MoveItemError {
+  constructor(public message: string) {}
 }
