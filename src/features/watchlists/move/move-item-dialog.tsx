@@ -28,40 +28,17 @@ type MoveItemDialogProps = {
 };
 
 export function MoveItemDialog({ item, activeFilters, open, onOpenChange }: MoveItemDialogProps) {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const listQuery = useWatchlistListQuery({ enabled: open });
+  const moveMutation = useMoveWatchlistItemMutation({ item, activeFilters });
+  const { selectedId, setSelectedId } = useSelectedWatchlistId(open);
 
-  useEffect(() => {
-    if (open) {
-      setSelectedId(null);
-    }
-  }, [open]);
-
-  const watchlistListFn = useServerFn(getWatchlistList);
-  const listQuery = useQuery<WatchlistSummary[], Error>({
-    queryKey: ["watchlists", "list", {}],
-    queryFn: () => watchlistListFn({ data: {} }),
-    staleTime: Infinity,
-    enabled: open,
-  });
-
-  const moveMutation = useMoveWatchlistItemMutation({
-    item,
-    activeFilters,
-  });
-
-  const otherWatchlists: WatchlistSummary[] = Array.isArray(listQuery.data)
+  const otherWatchlists = Array.isArray(listQuery.data)
     ? listQuery.data.filter((wl) => wl.id !== item.watchlistId)
     : [];
 
-  const handleMove = async () => {
+  const handleMove = () => {
     if (selectedId === null) return;
-
-    try {
-      await moveMutation.mutateAsync(selectedId);
-      onOpenChange(false);
-    } catch {
-      // Error toast handled by onError callback
-    }
+    moveMutation.mutate(selectedId, { onSuccess: () => onOpenChange(false) });
   };
 
   return (
@@ -100,6 +77,26 @@ export function MoveItemDialog({ item, activeFilters, open, onOpenChange }: Move
       </AlertDialogContent>
     </AlertDialog>
   );
+}
+
+function useWatchlistListQuery({ enabled }: { enabled: boolean }) {
+  const watchlistListFn = useServerFn(getWatchlistList);
+  return useQuery<WatchlistSummary[], Error>({
+    queryKey: ["watchlists", "list", {}],
+    queryFn: () => watchlistListFn({ data: {} }),
+    staleTime: Infinity,
+    enabled,
+  });
+}
+
+function useSelectedWatchlistId(open: boolean) {
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (open) setSelectedId(null);
+  }, [open]);
+
+  return { selectedId, setSelectedId };
 }
 
 function ItemPreview({ item }: { item: WatchlistItem }) {
