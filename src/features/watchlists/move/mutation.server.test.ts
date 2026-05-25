@@ -40,6 +40,67 @@ beforeEach(async () => {
 });
 
 describe("move watchlist item mutation", () => {
+  it("blocks move to the same watchlist — duplicate check prevents self-move", async () => {
+    const [watchlist] = await db.insert(watchlists).values({ name: "Queue" }).returning();
+
+    const [item] = await db
+      .insert(watchlistItems)
+      .values({
+        watchlistId: watchlist.id,
+        tmdbId: "movie-1",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "The Matrix",
+      })
+      .returning();
+
+    const result = await moveItemToWatchlistMutation({
+      itemId: item.id,
+      destinationWatchlistId: watchlist.id,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain("already");
+    const detail = await readWatchlistDetailScreen({
+      watchlistId: watchlist.id,
+      unwatchedOnly: false,
+    });
+    expect(detail?.items.map((i) => i.title)).toEqual(["The Matrix"]);
+  });
+
+  it("returns error when destination watchlist does not exist", async () => {
+    const [source] = await db.insert(watchlists).values({ name: "Queue" }).returning();
+
+    const [item] = await db
+      .insert(watchlistItems)
+      .values({
+        watchlistId: source.id,
+        tmdbId: "movie-1",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "The Matrix",
+      })
+      .returning();
+
+    const result = await moveItemToWatchlistMutation({
+      itemId: item.id,
+      destinationWatchlistId: 99999,
+    });
+
+    expect(result).toEqual({ success: false, message: "Destination watchlist not found." });
+  });
+
+  it("returns error when item does not exist", async () => {
+    const [watchlist] = await db.insert(watchlists).values({ name: "Queue" }).returning();
+
+    const result = await moveItemToWatchlistMutation({
+      itemId: 99999,
+      destinationWatchlistId: watchlist.id,
+    });
+
+    expect(result).toEqual({ success: false, message: "Item not found." });
+  });
+
   it("blocks move to destination that already has the item — returns error, source unchanged, destination unchanged", async () => {
     const [source, destination] = await db
       .insert(watchlists)
