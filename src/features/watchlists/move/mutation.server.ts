@@ -89,22 +89,24 @@ function executeMove(
   item: WatchlistItemRow,
   destinationWatchlistId: number,
 ) {
-  return db.transaction((tx) => {
-    tx.delete(watchlistItems).where(eq(watchlistItems.id, itemId)).run();
-    tx.insert(watchlistItems)
-      .values({ watchlistId: destinationWatchlistId, ...itemToInsertValues(item) })
+  return db.transaction((transaction) => {
+    transaction.delete(watchlistItems).where(eq(watchlistItems.id, itemId)).run();
+    transaction
+      .insert(watchlistItems)
+      .values({ watchlistId: destinationWatchlistId, ...itemFieldsForInsert(item) })
       .run();
-    tx.update(watchlists)
+    transaction
+      .update(watchlists)
       .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
       .where(eq(watchlists.id, destinationWatchlistId))
       .run();
   });
 }
 
-function itemToInsertValues(item: WatchlistItemRow) {
-  const { id: _id, watchlistId: _wl, ...rest } = item;
+function itemFieldsForInsert(item: WatchlistItemRow) {
+  const { id: _id, watchlistId: _watchlistId, ...rest } = item;
   void _id;
-  void _wl;
+  void _watchlistId;
   return rest;
 }
 
