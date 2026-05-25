@@ -43,7 +43,7 @@ export async function moveItemToWatchlistMutation({
     return { success: false, message: `"${item.title}" is already in ${destination.name}.` };
   }
 
-  db.transaction((tx) => {
+  await db.transaction((tx) => {
     tx.delete(watchlistItems).where(eq(watchlistItems.id, itemId)).run();
 
     tx.insert(watchlistItems)

@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Image } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { WatchlistItem } from "@/db/schema";
+import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/query";
 import type { WatchlistSummary } from "@/features/watchlists/list/query.server";
 import { getWatchlistList } from "@/features/watchlists/list/query";
 import { useMoveWatchlistItemMutation } from "./use-move-watchlist-item";
@@ -19,22 +20,31 @@ import {
 
 type MoveItemDialogProps = {
   item: WatchlistItem;
+  activeFilters: WatchlistDetailQueryFilters;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
-export function MoveItemDialog({ item, open, onOpenChange }: MoveItemDialogProps) {
+export function MoveItemDialog({ item, activeFilters, open, onOpenChange }: MoveItemDialogProps) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setSelectedId(null);
+    }
+  }, [open]);
+
   const watchlistListFn = useServerFn(getWatchlistList);
   const listQuery = useQuery<WatchlistSummary[], Error>({
     queryKey: ["watchlists", "list", {}],
     queryFn: () => watchlistListFn({ data: {} }),
     staleTime: Infinity,
+    enabled: open,
   });
 
   const moveMutation = useMoveWatchlistItemMutation({
     item,
-    activeFilters: { watchlistId: item.watchlistId, unwatchedOnly: false },
+    activeFilters,
   });
 
   const otherWatchlists: WatchlistSummary[] = Array.isArray(listQuery.data)

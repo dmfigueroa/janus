@@ -195,7 +195,12 @@ export function TimelineItemActions({
         </AlertDialogContent>
       </AlertDialog>
 
-      <MoveItemDialog item={item} open={moveItemOpen} onOpenChange={setMoveItemOpen} />
+      <MoveItemDialog
+        item={item}
+        activeFilters={activeFilters}
+        open={moveItemOpen}
+        onOpenChange={setMoveItemOpen}
+      />
     </>
   );
 }
