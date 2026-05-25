@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Image } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { WatchlistItem } from "@/db/schema";
+import { tmdbImageUrl } from "@/utils/tmdb";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/query";
 import type { WatchlistSummary } from "@/features/watchlists/list/query.server";
 import { getWatchlistList } from "@/features/watchlists/list/query";
@@ -76,7 +77,7 @@ export function MoveItemDialog({ item, activeFilters, open, onOpenChange }: Move
           <div className="flex items-center gap-3 rounded-lg border p-3">
             {item.posterPath ? (
               <img
-                src={`https://image.tmdb.org/t/p/w92${item.posterPath}`}
+                src={tmdbImageUrl(item.posterPath, "w92")}
                 alt=""
                 className="h-12 w-8 rounded object-cover shrink-0"
               />

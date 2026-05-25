@@ -13,10 +13,7 @@ import { Check } from "lucide-react";
 export type EnrichedWatchlist = WatchlistSummary;
 type WatchlistCardInfoVariant = "watchlist" | "up-next";
 
-const getImageUrl = (path: string | null) => {
-  if (!path) return "";
-  return path.startsWith("http") ? path : `https://image.tmdb.org/t/p/w500${path}`;
-};
+import { tmdbImageUrl } from "@/utils/tmdb";
 
 const CoverImage = ({ watchlist }: { watchlist: EnrichedWatchlist }) => {
   const stats = watchlist.stats;
@@ -28,7 +25,7 @@ const CoverImage = ({ watchlist }: { watchlist: EnrichedWatchlist }) => {
     );
   }
 
-  const coverImageUrl = getImageUrl(stats.coverImage);
+  const coverImageUrl = tmdbImageUrl(stats.coverImage, "w500");
   const isEpisodeCover = stats.coverMediaType === "episode";
 
   return (
