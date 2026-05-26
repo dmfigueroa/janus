@@ -1,6 +1,7 @@
 import { getDb } from "@/db/db.server";
 import { watchlistItems, watchlists } from "@/db/schema";
 import { compareReleaseDates } from "@/features/watchlists/order";
+import { markLastItemAddedInTransaction } from "@/features/watchlists/repository.server";
 import type { AddToWatchlistInsertionPosition } from "./mutation";
 import { and, asc, eq, sql } from "drizzle-orm";
 
@@ -64,10 +65,7 @@ export async function persistAddedItems({
         .all();
 
       if (inserted.length > 0) {
-        tx.update(watchlists)
-          .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
-          .where(eq(watchlists.id, watchlistId))
-          .run();
+        markLastItemAddedInTransaction(tx, watchlistId);
       }
 
       return { success: true, insertedCount: inserted.length };
@@ -127,10 +125,7 @@ export async function persistAddedItems({
         .run();
     }
 
-    tx.update(watchlists)
-      .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
-      .where(eq(watchlists.id, watchlistId))
-      .run();
+    markLastItemAddedInTransaction(tx, watchlistId);
 
     return { success: true, insertedCount: orderedPendingItems.length };
   });

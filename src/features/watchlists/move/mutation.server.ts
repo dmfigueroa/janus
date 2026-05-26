@@ -4,12 +4,13 @@ import {
   computeItemInsertionOrder,
   type InsertionPosition,
 } from "@/features/watchlists/order-insert.server";
+import {
+  markLastItemAddedInTransaction,
+  type WatchlistTransaction,
+} from "@/features/watchlists/repository.server";
 import { and, asc, eq, sql } from "drizzle-orm";
 
 type WatchlistItemRow = typeof watchlistItems.$inferSelect;
-
-type WatchlistDb = ReturnType<typeof getDb>;
-type WatchlistTransaction = Parameters<Parameters<WatchlistDb["transaction"]>[0]>[0];
 
 type MoveItemResult =
   | { success: true; movedCount: number; message: string }
@@ -135,11 +136,7 @@ function executeMove(
       executeMoveForReleaseMode(transaction, insertFields, destination.id);
     }
 
-    transaction
-      .update(watchlists)
-      .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
-      .where(eq(watchlists.id, destination.id))
-      .run();
+    markLastItemAddedInTransaction(transaction, destination.id);
   });
 }
 
