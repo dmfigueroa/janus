@@ -100,7 +100,6 @@ describe("move watchlist item mutation", () => {
 
     expect(result).toEqual({ success: false, message: "Item not found." });
   });
-
   it("blocks move to destination that already has the item — returns error, source unchanged, destination unchanged", async () => {
     const [source, destination] = await db
       .insert(watchlists)
