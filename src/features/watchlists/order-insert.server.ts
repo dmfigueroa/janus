@@ -23,12 +23,22 @@ export function computeItemInsertionOrder(
   }
 
   const sortedExisting = [...existingItems].sort((a, b) => {
-    if (a.customRank === null && b.customRank === null) {
-      return compareReleaseDates(a.releaseDate, b.releaseDate);
+    if (a.customRank !== null && b.customRank !== null) {
+      if (a.customRank !== b.customRank) {
+        return a.customRank - b.customRank;
+      }
+    } else if (a.customRank === null && b.customRank !== null) {
+      return 1;
+    } else if (a.customRank !== null && b.customRank === null) {
+      return -1;
     }
-    if (a.customRank === null) return 1;
-    if (b.customRank === null) return -1;
-    return a.customRank - b.customRank;
+
+    const releaseCompare = compareReleaseDates(a.releaseDate, b.releaseDate);
+    if (releaseCompare !== 0) {
+      return releaseCompare;
+    }
+
+    return (a.id ?? 0) - (b.id ?? 0);
   });
 
   const result: OrderedItem[] = [];
@@ -75,7 +85,7 @@ function findReleaseAdjacentInsertionIndex(
   let lastMatchingIndex = -1;
 
   for (const [index, item] of currentOrder.entries()) {
-    const itemReleaseDate = normalizeReleaseDate(item.releaseDate);
+    const itemReleaseDate = normalizeReleaseDate("releaseDate" in item ? item.releaseDate : null);
     if (!itemReleaseDate) {
       continue;
     }
@@ -94,8 +104,10 @@ function normalizeReleaseDate(releaseDate: string | null | undefined): string | 
 }
 
 function compareReleaseDates(left: string | null, right: string | null): number {
-  if (left === null && right === null) return 0;
-  if (left === null) return 1;
-  if (right === null) return -1;
-  return left.localeCompare(right);
+  const leftNorm = normalizeReleaseDate(left);
+  const rightNorm = normalizeReleaseDate(right);
+  if (leftNorm === null && rightNorm === null) return 0;
+  if (leftNorm === null) return 1;
+  if (rightNorm === null) return -1;
+  return leftNorm.localeCompare(rightNorm);
 }

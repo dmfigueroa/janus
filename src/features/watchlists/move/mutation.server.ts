@@ -100,7 +100,8 @@ function executeMove(
 
     transaction.delete(watchlistItems).where(eq(watchlistItems.id, item.id)).run();
 
-    if (destination.itemOrderMode === "custom" && position) {
+    if (destination.itemOrderMode === "custom") {
+      const effectivePosition = position ?? "end";
       const existingItems = transaction
         .select({
           id: watchlistItems.id,
@@ -128,12 +129,12 @@ function executeMove(
           releaseDate: insertFields.releaseDate,
           customRank: null,
         },
-        position,
+        effectivePosition,
         destination.itemOrderMode,
       );
 
       for (const orderedItem of orderedItems) {
-        if (orderedItem.id !== undefined) {
+        if (orderedItem.id !== undefined && orderedItem.newRank !== orderedItem.customRank) {
           transaction
             .update(watchlistItems)
             .set({ customRank: orderedItem.newRank })
