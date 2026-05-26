@@ -6,9 +6,18 @@ import {
 } from "@/features/watchlists/order-insert.server";
 import { and, asc, eq, sql } from "drizzle-orm";
 
+type WatchlistItemRow = typeof watchlistItems.$inferSelect;
+
+type WatchlistDb = ReturnType<typeof getDb>;
+type WatchlistTransaction = Parameters<Parameters<WatchlistDb["transaction"]>[0]>[0];
+
 type MoveItemResult =
   | { success: true; movedCount: number; message: string }
   | { success: false; message: string };
+
+class MoveItemError {
+  constructor(public message: string) {}
+}
 
 export async function moveItemToWatchlistMutation({
   itemId,
@@ -43,8 +52,6 @@ export async function moveItemToWatchlistMutation({
     message: `Moved ${item.title} to ${destination.name}.`,
   };
 }
-
-type WatchlistItemRow = typeof watchlistItems.$inferSelect;
 
 async function fetchItemOrThrow(
   db: ReturnType<typeof getDb>,
@@ -85,8 +92,30 @@ async function ensureNoDuplicate(
     ),
   });
   if (duplicate) {
-    throw new MoveItemError(`already in destination`);
+    throw new MoveItemError("already in destination");
   }
+}
+
+type ItemInsertFields = Omit<WatchlistItemRow, "id" | "watchlistId" | "customRank">;
+
+function extractItemFields(item: WatchlistItemRow): ItemInsertFields {
+  return {
+    tmdbId: item.tmdbId,
+    source: item.source,
+    mediaType: item.mediaType,
+    title: item.title,
+    parentId: item.parentId,
+    parentTitle: item.parentTitle,
+    season: item.season,
+    episode: item.episode,
+    posterPath: item.posterPath,
+    releaseDate: item.releaseDate,
+    voteAverage: item.voteAverage,
+    runtime: item.runtime,
+    isWatched: item.isWatched,
+    authors: item.authors,
+    addedAt: item.addedAt,
+  };
 }
 
 function executeMove(
@@ -96,74 +125,14 @@ function executeMove(
   position?: InsertionPosition,
 ) {
   return db.transaction((transaction) => {
-    const insertFields = itemFieldsForInsert(item, destination.itemOrderMode);
+    const insertFields = extractItemFields(item);
 
     transaction.delete(watchlistItems).where(eq(watchlistItems.id, item.id)).run();
 
     if (destination.itemOrderMode === "custom") {
-      const effectivePosition = position ?? "end";
-      const existingItems = transaction
-        .select({
-          id: watchlistItems.id,
-          tmdbId: watchlistItems.tmdbId,
-          mediaType: watchlistItems.mediaType,
-          releaseDate: watchlistItems.releaseDate,
-          customRank: watchlistItems.customRank,
-        })
-        .from(watchlistItems)
-        .where(eq(watchlistItems.watchlistId, destination.id))
-        .orderBy(
-          sql`CASE WHEN ${watchlistItems.customRank} IS NULL THEN 1 ELSE 0 END`,
-          asc(watchlistItems.customRank),
-          sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
-          asc(watchlistItems.releaseDate),
-          asc(watchlistItems.id),
-        )
-        .all();
-
-      const orderedItems = computeItemInsertionOrder(
-        existingItems,
-        {
-          tmdbId: insertFields.tmdbId,
-          mediaType: insertFields.mediaType,
-          releaseDate: insertFields.releaseDate,
-          customRank: null,
-        },
-        effectivePosition,
-        destination.itemOrderMode,
-      );
-
-      for (const orderedItem of orderedItems) {
-        if (orderedItem.id !== undefined && orderedItem.newRank !== orderedItem.customRank) {
-          transaction
-            .update(watchlistItems)
-            .set({ customRank: orderedItem.newRank })
-            .where(
-              and(
-                eq(watchlistItems.id, orderedItem.id),
-                eq(watchlistItems.watchlistId, destination.id),
-              ),
-            )
-            .run();
-        }
-      }
-
-      const insertedItem = orderedItems.find((o) => o.id === undefined);
-      if (insertedItem) {
-        transaction
-          .insert(watchlistItems)
-          .values({
-            watchlistId: destination.id,
-            ...insertFields,
-            customRank: insertedItem.newRank,
-          })
-          .run();
-      }
+      executeMoveForCustomMode(transaction, insertFields, destination.id, position ?? "end");
     } else {
-      transaction
-        .insert(watchlistItems)
-        .values({ watchlistId: destination.id, ...insertFields })
-        .run();
+      executeMoveForReleaseMode(transaction, insertFields, destination.id);
     }
 
     transaction
@@ -174,19 +143,75 @@ function executeMove(
   });
 }
 
-function itemFieldsForInsert(item: WatchlistItemRow, itemOrderMode: "release" | "custom") {
-  const { id: _id, watchlistId: _watchlistId, customRank: _customRank, ...rest } = item;
-  void _id;
-  void _watchlistId;
-  void _customRank;
+function executeMoveForCustomMode(
+  transaction: WatchlistTransaction,
+  insertFields: ItemInsertFields,
+  destinationId: number,
+  position: InsertionPosition,
+) {
+  const existingItems = transaction
+    .select({
+      id: watchlistItems.id,
+      tmdbId: watchlistItems.tmdbId,
+      mediaType: watchlistItems.mediaType,
+      releaseDate: watchlistItems.releaseDate,
+      customRank: watchlistItems.customRank,
+    })
+    .from(watchlistItems)
+    .where(eq(watchlistItems.watchlistId, destinationId))
+    .orderBy(
+      sql`CASE WHEN ${watchlistItems.customRank} IS NULL THEN 1 ELSE 0 END`,
+      asc(watchlistItems.customRank),
+      sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
+      asc(watchlistItems.releaseDate),
+      asc(watchlistItems.id),
+    )
+    .all();
 
-  if (itemOrderMode === "release") {
-    return { ...rest, customRank: null };
+  const orderedItems = computeItemInsertionOrder(
+    existingItems,
+    {
+      tmdbId: insertFields.tmdbId,
+      mediaType: insertFields.mediaType,
+      releaseDate: insertFields.releaseDate,
+      customRank: null,
+    },
+    position,
+    "custom",
+  );
+
+  for (const orderedItem of orderedItems) {
+    if (orderedItem.id !== undefined && orderedItem.newRank !== orderedItem.customRank) {
+      transaction
+        .update(watchlistItems)
+        .set({ customRank: orderedItem.newRank })
+        .where(
+          and(eq(watchlistItems.id, orderedItem.id), eq(watchlistItems.watchlistId, destinationId)),
+        )
+        .run();
+    }
   }
 
-  return rest;
+  const insertedItem = orderedItems.find((o) => o.id === undefined);
+  if (insertedItem) {
+    transaction
+      .insert(watchlistItems)
+      .values({
+        watchlistId: destinationId,
+        ...insertFields,
+        customRank: insertedItem.newRank,
+      })
+      .run();
+  }
 }
 
-class MoveItemError {
-  constructor(public message: string) {}
+function executeMoveForReleaseMode(
+  transaction: WatchlistTransaction,
+  insertFields: ItemInsertFields,
+  destinationId: number,
+) {
+  transaction
+    .insert(watchlistItems)
+    .values({ watchlistId: destinationId, ...insertFields })
+    .run();
 }
