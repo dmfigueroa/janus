@@ -43,6 +43,20 @@
 - Write out full words. Avoid abbreviations like `tx` (use `transaction`), `itemToInsertValues` (use `extractItemFields` or `itemAsInsertValues`), `err` (use `error`), `cb` (use `callback`), etc.
 - Parameter and variable names should be readable without domain context. `item` is fine in a watchlist context; `tx` is not.
 
+## GitHub Interactions
+
+- Never use WebFetch or curl to access GitHub API directly. Always use the `gh` CLI tool.
+- When fetching issues, always include the `--repo owner/project` flag. The correct format is:
+  ```
+  gh issue view <issue-number> --repo dmfigueroa/janus --json title,body,labels
+  ```
+  Without the `--repo` flag, the command fails for non-default repositories.
+
+## Task Clarity
+
+- Never infer context or make assumptions about a task when the requirements are unclear. If the ticket, issue, or user request is ambiguous, ask the user for clarification before proceeding.
+- When working on a GitHub issue, always fetch the full issue details first (including parent PRDs and blocking dependencies) to understand the complete scope before planning implementation.
+
 <!-- intent-skills:start -->
 
 # Skill mappings - when working in these areas, load the linked skill file into context.
