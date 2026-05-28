@@ -1,5 +1,34 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode, type KeyboardEvent } from "react";
 import type { WatchlistSummary } from "@/features/watchlists/list/query.server";
+import { Input } from "@/components/ui/input";
+
+function filterWatchlists(watchlists: WatchlistSummary[], query: string) {
+  if (!query) return watchlists;
+  const normalized = query.toLowerCase();
+  return watchlists.filter((wl) => wl.name.toLowerCase().includes(normalized));
+}
+
+function suppressEnterSubmit(event: KeyboardEvent) {
+  if (event.key === "Enter") event.preventDefault();
+}
+
+function WatchlistSelectorState({
+  isLoading,
+  isError,
+  isEmpty,
+  children,
+}: {
+  isLoading: boolean;
+  isError: boolean;
+  isEmpty: boolean;
+  children: ReactNode;
+}) {
+  if (isLoading) return <ListStateMessage>Loading watchlists...</ListStateMessage>;
+  if (isError)
+    return <ListStateMessage variant="error">Failed to load watchlists</ListStateMessage>;
+  if (isEmpty) return <ListStateMessage>No other watchlists available</ListStateMessage>;
+  return <>{children}</>;
+}
 
 type WatchlistSelectorProps = {
   watchlists: WatchlistSummary[];
@@ -16,30 +45,42 @@ export function WatchlistSelector({
   isError,
   onSelect,
 }: WatchlistSelectorProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const filteredWatchlists = filterWatchlists(watchlists, searchQuery);
+
   return (
     <div>
       <p className="mb-2 text-sm font-medium">Select destination</p>
-      {isLoading ? (
-        <ListStateMessage>Loading watchlists...</ListStateMessage>
-      ) : isError ? (
-        <ListStateMessage variant="error">Failed to load watchlists</ListStateMessage>
-      ) : watchlists.length === 0 ? (
-        <ListStateMessage>No other watchlists available</ListStateMessage>
-      ) : (
-        <div className="max-h-48 overflow-y-auto rounded-md border">
-          <div className="p-1">
-            {watchlists.map((wl) => (
-              <WatchlistOption
-                key={wl.id}
-                selected={selectedId === wl.id}
-                onClick={() => onSelect(wl.id)}
-                name={wl.name}
-                itemCount={wl.stats.totalItems}
-              />
-            ))}
+      <WatchlistSelectorState
+        isLoading={isLoading}
+        isError={isError}
+        isEmpty={watchlists.length === 0}
+      >
+        <Input
+          placeholder="Search watchlists..."
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          onKeyDown={suppressEnterSubmit}
+          className="mb-2"
+        />
+        {filteredWatchlists.length === 0 ? (
+          <ListStateMessage>No matching watchlists</ListStateMessage>
+        ) : (
+          <div className="max-h-48 overflow-y-auto rounded-md border">
+            <div className="p-1">
+              {filteredWatchlists.map((wl) => (
+                <WatchlistOption
+                  key={wl.id}
+                  selected={selectedId === wl.id}
+                  onClick={() => onSelect(wl.id)}
+                  name={wl.name}
+                  itemCount={wl.stats.totalItems}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </WatchlistSelectorState>
     </div>
   );
 }
