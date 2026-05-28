@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import type { WatchlistItem } from "@/db/schema";
-import type { InsertionPosition } from "@/features/watchlists/order-insert.server";
+import type { InsertionPosition } from "@/features/watchlists/insert-ordered-item.server";
 import { invalidateWatchlistQueries } from "@/features/watchlists/cache";
 import {
   optimisticallyRemoveWatchlistItem,

@@ -1,6 +1,6 @@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import type { InsertionPosition } from "@/features/watchlists/order-insert.server";
+import type { InsertionPosition } from "@/features/watchlists/insert-ordered-item.server";
 
 type PositionPickerProps = {
   value: InsertionPosition;

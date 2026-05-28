@@ -3,7 +3,7 @@ import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/q
 import { ItemPreview } from "@/features/watchlists/components/item-preview";
 import { useMoveWatchlistItemMutation } from "./use-move-watchlist-item";
 import { useWatchlistListQuery } from "./use-watchlist-list-query";
-import type { InsertionPosition } from "@/features/watchlists/order-insert.server";
+import type { InsertionPosition } from "@/features/watchlists/insert-ordered-item.server";
 import { WatchlistSelector } from "./watchlist-selector";
 import { PositionPicker } from "./position-picker";
 import { AutoOrderingNotice } from "./auto-ordering-notice";

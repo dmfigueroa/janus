@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import type { WatchlistItem } from "@/db/schema";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/query";
 import { MoveItemDialog } from "@/features/watchlists/move/move-item-dialog";
-import type { InsertionPosition } from "@/features/watchlists/order-insert.server";
+import type { InsertionPosition } from "@/features/watchlists/insert-ordered-item.server";
 import { useToggleWatchedItem } from "@/features/watchlists/detail/use-toggle-watched-item";
 import { getWatchlistParentRemovalPreviewQuery } from "@/features/watchlists/remove/query";
 import { useRemoveWatchlistItemMutation } from "@/features/watchlists/remove/use-remove-watchlist-item";

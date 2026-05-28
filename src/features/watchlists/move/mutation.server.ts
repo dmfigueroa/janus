@@ -5,7 +5,7 @@ import {
   insertItemWithCustomOrder,
   type InsertionPosition,
   type ItemInsertFields,
-} from "@/features/watchlists/order-insert.server";
+} from "@/features/watchlists/insert-ordered-item.server";
 import {
   markLastItemAddedInTransaction,
   type WatchlistTransaction,
