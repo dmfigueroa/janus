@@ -3,7 +3,7 @@ import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/q
 import { ItemPreview } from "@/features/watchlists/components/item-preview";
 import { useMoveWatchlistItemMutation } from "./use-move-watchlist-item";
 import { useWatchlistListQuery } from "./use-watchlist-list-query";
-import { useMoveDialogState } from "./use-move-dialog-state";
+import type { InsertionPosition } from "@/features/watchlists/order-insert.server";
 import { WatchlistSelector } from "./watchlist-selector";
 import { PositionPicker } from "./position-picker";
 import { AutoOrderingNotice } from "./auto-ordering-notice";
@@ -23,30 +23,37 @@ type MoveItemDialogProps = {
   activeFilters: WatchlistDetailQueryFilters;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  selectedWatchlistId: number | null;
+  onSelectedWatchlistIdChange: (id: number | null) => void;
+  selectedPosition: InsertionPosition;
+  onSelectedPositionChange: (position: InsertionPosition) => void;
 };
 
-export function MoveItemDialog({ item, activeFilters, open, onOpenChange }: MoveItemDialogProps) {
+export function MoveItemDialog({
+  item,
+  activeFilters,
+  open,
+  onOpenChange,
+  selectedWatchlistId,
+  onSelectedWatchlistIdChange,
+  selectedPosition,
+  onSelectedPositionChange,
+}: MoveItemDialogProps) {
   const listQuery = useWatchlistListQuery({ enabled: open });
   const moveMutation = useMoveWatchlistItemMutation({ item, activeFilters });
-  const {
-    selectedWatchlistId: selectedId,
-    setSelectedWatchlistId: setSelectedId,
-    selectedPosition,
-    setSelectedPosition,
-  } = useMoveDialogState(open);
 
   const otherWatchlists = Array.isArray(listQuery.data)
     ? listQuery.data.filter((wl) => wl.id !== item.watchlistId)
     : [];
 
-  const selectedWatchlist = otherWatchlists.find((wl) => wl.id === selectedId);
+  const selectedWatchlist = otherWatchlists.find((wl) => wl.id === selectedWatchlistId);
   const isCustomOrdered = selectedWatchlist?.itemOrderMode === "custom";
 
   const handleMove = () => {
-    if (selectedId === null) return;
+    if (selectedWatchlistId === null) return;
     moveMutation.mutate(
       {
-        destinationWatchlistId: selectedId,
+        destinationWatchlistId: selectedWatchlistId,
         position: isCustomOrdered ? selectedPosition : undefined,
       },
       { onSuccess: () => onOpenChange(false) },
@@ -67,21 +74,21 @@ export function MoveItemDialog({ item, activeFilters, open, onOpenChange }: Move
           <ItemPreview item={item} />
           <WatchlistSelector
             watchlists={otherWatchlists}
-            selectedId={selectedId}
+            selectedId={selectedWatchlistId}
             isLoading={listQuery.isLoading}
             isError={listQuery.isError}
-            onSelect={setSelectedId}
+            onSelect={onSelectedWatchlistIdChange}
           />
-          {selectedId !== null && isCustomOrdered && (
-            <PositionPicker value={selectedPosition} onChange={setSelectedPosition} />
+          {selectedWatchlistId !== null && isCustomOrdered && (
+            <PositionPicker value={selectedPosition} onChange={onSelectedPositionChange} />
           )}
-          {selectedId !== null && !isCustomOrdered && <AutoOrderingNotice />}
+          {selectedWatchlistId !== null && !isCustomOrdered && <AutoOrderingNotice />}
         </div>
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={moveMutation.isPending}>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            disabled={selectedId === null || moveMutation.isPending || listQuery.isLoading}
+            disabled={selectedWatchlistId === null || moveMutation.isPending || listQuery.isLoading}
             onClick={() => void handleMove()}
           >
             {moveMutation.isPending ? "Moving..." : "Move"}
