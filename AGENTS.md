@@ -20,7 +20,7 @@ Agents should commit and push work frequently without explicit user request, and
 
 ### On main branch (assigned a ticket)
 
-- Create a new branch with a conventional branch name (e.g., `feat/watchlists-write-boundary`, `fix/search-pagination`)
+- Do NOT commit directly to the main branch; instead, create a new branch with a conventional branch name (e.g., feat/watchlists-write-boundary, fix/search-pagination)
 - Implement the work on that branch with frequent commits/pushes
 - Open a PR when the work is ready for review
 
