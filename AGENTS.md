@@ -9,7 +9,7 @@
 
 ## Git Conventions
 
-Agents should commit and push work frequently without explicit user request, and create branches/PRs when working on main.
+Agents should commit and push work frequently without explicit user request, and create branches/PRs instead of working on main. Never push directly to `main`.
 
 ### On a feature branch
 
@@ -19,6 +19,8 @@ Agents should commit and push work frequently without explicit user request, and
 - Push immediately after committing
 
 ### On main branch (assigned a ticket)
+
+**Never commit or push directly to `main`.** Always work on a feature branch and open a PR.
 
 - Create a new branch with a conventional branch name (e.g., `feat/watchlists-write-boundary`, `fix/search-pagination`)
 - Implement the work on that branch with frequent commits/pushes
