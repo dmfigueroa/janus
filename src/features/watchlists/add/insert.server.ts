@@ -55,19 +55,16 @@ export async function persistAddedItems({
       return { success: false, message: "Watchlist not found." };
     }
 
+    let result: PersistAddedItemsResult;
+
     if (watchlist.itemOrderMode !== "custom") {
-      const result = insertWithReleaseDateOrder({ transaction, items });
-      if (result.success && result.insertedCount > 0) {
-        markLastItemAddedInTransaction(transaction, watchlistId);
-      }
-      return result;
-    }
-
-    if (!insertionPosition) {
+      result = insertWithReleaseDateOrder({ transaction, items });
+    } else if (!insertionPosition) {
       return { success: false, message: CUSTOM_ORDER_INSERTION_REQUIRED_MESSAGE };
+    } else {
+      result = insertWithCustomOrder({ transaction, watchlistId, items, insertionPosition });
     }
 
-    const result = insertWithCustomOrder({ transaction, watchlistId, items, insertionPosition });
     if (result.success && result.insertedCount > 0) {
       markLastItemAddedInTransaction(transaction, watchlistId);
     }
