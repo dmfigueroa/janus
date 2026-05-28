@@ -7,15 +7,22 @@ import {
 } from "@/features/watchlists/repository.server";
 import { toWatchlistItemKey } from "@/features/watchlists/item-key";
 import { CUSTOM_ORDER_INSERTION_REQUIRED_MESSAGE } from "./constants";
-import { buildFinalOrder, orderPendingItemsByReleaseDate } from "./order-insertion";
-import type {
-  PendingWatchlistItem,
-  PendingWatchlistItemWithIndex,
-  OrderedWatchlistItem,
-  PersistedWatchlistItem,
-} from "./types";
+import {
+  buildFinalOrder,
+  orderPendingItemsByReleaseDate,
+  type OrderedWatchlistItem,
+} from "./order-insertion";
 import type { AddToWatchlistInsertionPosition } from "./mutation";
 import { and, asc, eq } from "drizzle-orm";
+
+type PersistedWatchlistItem = Pick<
+  typeof watchlistItems.$inferSelect,
+  "id" | "tmdbId" | "mediaType" | "releaseDate" | "customRank"
+>;
+
+type PendingWatchlistItem = typeof watchlistItems.$inferInsert;
+
+type PendingWatchlistItemWithIndex = PendingWatchlistItem & { pendingIndex: number };
 
 type PersistAddedItemsResult =
   | { success: true; insertedCount: number }
@@ -150,7 +157,7 @@ function assignCustomRanks(ordered: OrderedWatchlistItem[]): {
     const rank = index + 1;
 
     if ("pendingIndex" in item) {
-      inserts.push({ item, rank });
+      inserts.push({ item: item as PendingWatchlistItemWithIndex, rank });
     } else {
       updates.push({ id: item.id, rank });
     }

@@ -1,19 +1,19 @@
 import { compareReleaseDates } from "@/features/watchlists/order";
-import type {
-  PersistedWatchlistItem,
-  PendingWatchlistItem,
-  PendingWatchlistItemWithIndex,
-  OrderedWatchlistItem,
-} from "./types";
 import type { AddToWatchlistInsertionPosition } from "./mutation";
+
+type HasReleaseDate = { releaseDate?: string | null };
+type ExistingItem = HasReleaseDate & { id: number };
+type PendingItem = HasReleaseDate & { pendingIndex: number };
+
+export type OrderedWatchlistItem = ExistingItem | PendingItem;
 
 export function buildFinalOrder({
   existingItems,
   pendingItems,
   insertionPosition,
 }: {
-  existingItems: PersistedWatchlistItem[];
-  pendingItems: PendingWatchlistItemWithIndex[];
+  existingItems: readonly ExistingItem[];
+  pendingItems: readonly PendingItem[];
   insertionPosition: AddToWatchlistInsertionPosition;
 }) {
   if (insertionPosition === "beginning") {
@@ -41,7 +41,7 @@ function normalizeReleaseDate(releaseDate: string | null | undefined) {
 
 function getReleaseAdjacentInsertionIndex(
   currentOrder: OrderedWatchlistItem[],
-  pendingItem: PendingWatchlistItemWithIndex,
+  pendingItem: PendingItem,
 ) {
   const pendingReleaseDate = normalizeReleaseDate(pendingItem.releaseDate);
   if (!pendingReleaseDate) {
@@ -64,9 +64,9 @@ function getReleaseAdjacentInsertionIndex(
   return lastMatchingIndex === -1 ? 0 : lastMatchingIndex + 1;
 }
 
-export function orderPendingItemsByReleaseDate(
-  items: PendingWatchlistItem[],
-): PendingWatchlistItemWithIndex[] {
+export function orderPendingItemsByReleaseDate<T extends HasReleaseDate>(
+  items: T[],
+): Array<T & { pendingIndex: number }> {
   return items
     .map((item, pendingIndex) => ({
       ...item,
