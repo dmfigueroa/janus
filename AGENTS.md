@@ -30,6 +30,7 @@
 - Do not extract route loaders into wrapper functions unless the extraction adds real value through reuse, deeper domain logic, or a stable shared boundary.
 - Shared route modules must not import `.server` modules directly. Routes are part of the shared module graph, and direct `.server` imports can leak server-only dependencies into the client bundle.
 - Avoid `index.ts` / `index.server.ts` barrels unless they provide a clear, durable navigation benefit.
+- Keep type definitions in the file that creates or derives them. Avoid standalone `types.ts` files that only re-export types from other modules. When a type is consumed across module boundaries, export it from the module that owns the derivation (e.g., the file that imports the DB schema) and import it where needed. Prefer minimal structural types in pure-algorithm modules over importing DB-derived types.
 - Prefer short, domain-based filenames and folders over thin wrapper modules.
 - Do not use `"use server"` or `"use client"` directives. Prefer framework-native boundaries such as `createServerFn`, route/module boundaries, and `.server` files where appropriate.
 - Remove `"use server"` and `"use client"` directives when you encounter them unless there is a documented, current framework requirement that makes one unavoidable.
@@ -42,6 +43,20 @@
 
 - Write out full words. Avoid abbreviations like `tx` (use `transaction`), `itemToInsertValues` (use `extractItemFields` or `itemAsInsertValues`), `err` (use `error`), `cb` (use `callback`), etc.
 - Parameter and variable names should be readable without domain context. `item` is fine in a watchlist context; `tx` is not.
+
+## GitHub Interactions
+
+- Never use WebFetch or curl to access GitHub API directly. Always use the `gh` CLI tool.
+- When fetching issues, always include the `--repo owner/project` flag. The correct format is:
+  ```
+  gh issue view <issue-number> --repo dmfigueroa/janus --json title,body,labels
+  ```
+  Without the `--repo` flag, the command fails for non-default repositories.
+
+## Task Clarity
+
+- Never infer context or make assumptions about a task when the requirements are unclear. If the ticket, issue, or user request is ambiguous, ask the user for clarification before proceeding.
+- When working on a GitHub issue, always fetch the full issue details first (including parent PRDs and blocking dependencies) to understand the complete scope before planning implementation.
 
 <!-- intent-skills:start -->
 

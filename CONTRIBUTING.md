@@ -96,8 +96,8 @@ src/features/watchlists/create/
 
 ## Naming Rules
 
-- Prefer short role-based filenames inside use-case folders:
-  `query.ts`, `query.server.ts`, `mutation.ts`, `mutation.server.ts`, `screen.tsx`, `schema.ts`, `types.ts`.
+- Name files by the responsibility they capture, not just their role. The filename should tell you the domain concept. For example, `insert-ordered-item.server.ts` is better than `mutation.server.ts` because it describes what the module does.
+- Prefer short role-based filenames (`query.ts`, `mutation.ts`, `schema.ts`) when the responsibility is a standard CRUD operation. Use descriptive names when the responsibility is a specific domain concept.
 - Use `.server.ts` for any file that touches the database, secrets, file system, or server-only SDKs.
 - Avoid `index.ts` and `index.server.ts` unless they provide clear, durable navigation value.
 - Keep tests next to the code they verify.

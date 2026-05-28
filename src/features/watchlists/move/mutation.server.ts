@@ -1,6 +1,19 @@
 import { getDb } from "@/db/db.server";
 import { watchlistItems, watchlists } from "@/db/schema";
-import { and, eq, sql } from "drizzle-orm";
+import { type WatchlistItemOrderMode } from "@/features/watchlists/order";
+import {
+  insertItemWithCustomOrder,
+  type InsertionPosition,
+  type ItemInsertFields,
+} from "@/features/watchlists/insert-ordered-item.server";
+import {
+  markLastItemAddedInTransaction,
+  type WatchlistTransaction,
+} from "@/features/watchlists/repository.server";
+import { and, eq } from "drizzle-orm";
+import { MoveItemError } from "@/features/watchlists/errors.server";
+
+type WatchlistItemRow = typeof watchlistItems.$inferSelect;
 
 type MoveItemResult =
   | { success: true; movedCount: number; message: string }
@@ -9,14 +22,16 @@ type MoveItemResult =
 export async function moveItemToWatchlistMutation({
   itemId,
   destinationWatchlistId,
+  position,
 }: {
   itemId: number;
   destinationWatchlistId: number;
+  position?: InsertionPosition;
 }): Promise<MoveItemResult> {
   const db = getDb();
 
   let item: WatchlistItemRow;
-  let destination: { name: string };
+  let destination: { id: number; name: string; itemOrderMode: WatchlistItemOrderMode };
 
   try {
     item = await fetchItemOrThrow(db, itemId);
@@ -29,7 +44,7 @@ export async function moveItemToWatchlistMutation({
     throw e;
   }
 
-  await executeMove(db, itemId, item, destinationWatchlistId);
+  await executeMove(db, item, destination, position);
 
   return {
     success: true,
@@ -37,8 +52,6 @@ export async function moveItemToWatchlistMutation({
     message: `Moved ${item.title} to ${destination.name}.`,
   };
 }
-
-type WatchlistItemRow = typeof watchlistItems.$inferSelect;
 
 async function fetchItemOrThrow(
   db: ReturnType<typeof getDb>,
@@ -56,7 +69,7 @@ async function fetchItemOrThrow(
 async function fetchWatchlistOrThrow(
   db: ReturnType<typeof getDb>,
   watchlistId: number,
-): Promise<{ name: string }> {
+): Promise<{ id: number; name: string; itemOrderMode: WatchlistItemOrderMode }> {
   const watchlist = await db.query.watchlists.findFirst({
     where: eq(watchlists.id, watchlistId),
   });
@@ -79,37 +92,65 @@ async function ensureNoDuplicate(
     ),
   });
   if (duplicate) {
-    throw new MoveItemError(`already in destination`);
+    throw new MoveItemError("already in destination");
   }
 }
 
 function executeMove(
   db: ReturnType<typeof getDb>,
-  itemId: number,
   item: WatchlistItemRow,
-  destinationWatchlistId: number,
+  destination: { id: number; itemOrderMode: WatchlistItemOrderMode },
+  position?: InsertionPosition,
 ) {
   return db.transaction((transaction) => {
-    transaction.delete(watchlistItems).where(eq(watchlistItems.id, itemId)).run();
-    transaction
-      .insert(watchlistItems)
-      .values({ watchlistId: destinationWatchlistId, ...itemFieldsForInsert(item) })
-      .run();
-    transaction
-      .update(watchlists)
-      .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
-      .where(eq(watchlists.id, destinationWatchlistId))
-      .run();
+    const insertFields: ItemInsertFields = {
+      tmdbId: item.tmdbId,
+      source: item.source,
+      mediaType: item.mediaType,
+      title: item.title,
+      parentId: item.parentId,
+      parentTitle: item.parentTitle,
+      season: item.season,
+      episode: item.episode,
+      posterPath: item.posterPath,
+      releaseDate: item.releaseDate,
+      voteAverage: item.voteAverage,
+      runtime: item.runtime,
+      isWatched: item.isWatched,
+      authors: item.authors,
+      addedAt: item.addedAt,
+    };
+
+    deleteItemFromSource(transaction, item.id);
+    insertItemIntoDestination(transaction, insertFields, destination, position);
+    markLastItemAddedInTransaction(transaction, destination.id);
   });
 }
 
-function itemFieldsForInsert(item: WatchlistItemRow) {
-  const { id: _id, watchlistId: _watchlistId, ...rest } = item;
-  void _id;
-  void _watchlistId;
-  return rest;
+function deleteItemFromSource(transaction: WatchlistTransaction, itemId: number) {
+  transaction.delete(watchlistItems).where(eq(watchlistItems.id, itemId)).run();
 }
 
-class MoveItemError {
-  constructor(public message: string) {}
+function insertItemIntoDestination(
+  transaction: WatchlistTransaction,
+  insertFields: ItemInsertFields,
+  destination: { id: number; itemOrderMode: WatchlistItemOrderMode },
+  position?: InsertionPosition,
+) {
+  if (destination.itemOrderMode === "custom") {
+    insertItemWithCustomOrder(transaction, insertFields, destination.id, position ?? "end");
+  } else {
+    insertItemForReleaseMode(transaction, insertFields, destination.id);
+  }
+}
+
+function insertItemForReleaseMode(
+  transaction: WatchlistTransaction,
+  insertFields: ItemInsertFields,
+  destinationId: number,
+) {
+  transaction
+    .insert(watchlistItems)
+    .values({ watchlistId: destinationId, ...insertFields })
+    .run();
 }

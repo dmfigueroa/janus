@@ -1,13 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
 import type { WatchlistItem } from "@/db/schema";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/query";
-import type { WatchlistSummary } from "@/features/watchlists/list/query.server";
-import { getWatchlistList } from "@/features/watchlists/list/query";
 import { ItemPreview } from "@/features/watchlists/components/item-preview";
 import { useMoveWatchlistItemMutation } from "./use-move-watchlist-item";
+import { useWatchlistListQuery } from "./use-watchlist-list-query";
+import type { InsertionPosition } from "@/features/watchlists/insert-ordered-item.server";
 import { WatchlistSelector } from "./watchlist-selector";
+import { PositionPicker } from "./position-picker";
+import { AutoOrderingNotice } from "./auto-ordering-notice";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,20 +23,39 @@ type MoveItemDialogProps = {
   activeFilters: WatchlistDetailQueryFilters;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  selectedWatchlistId: number | null;
+  onSelectedWatchlistIdChange: (id: number | null) => void;
+  selectedPosition: InsertionPosition;
+  onSelectedPositionChange: (position: InsertionPosition) => void;
 };
 
-export function MoveItemDialog({ item, activeFilters, open, onOpenChange }: MoveItemDialogProps) {
+export function MoveItemDialog({
+  item,
+  activeFilters,
+  open,
+  onOpenChange,
+  selectedWatchlistId,
+  onSelectedWatchlistIdChange,
+  selectedPosition,
+  onSelectedPositionChange,
+}: MoveItemDialogProps) {
   const listQuery = useWatchlistListQuery({ enabled: open });
   const moveMutation = useMoveWatchlistItemMutation({ item, activeFilters });
-  const { selectedId, setSelectedId } = useSelectedWatchlistId(open);
 
-  const otherWatchlists = Array.isArray(listQuery.data)
-    ? listQuery.data.filter((wl) => wl.id !== item.watchlistId)
-    : [];
+  const otherWatchlists = filterOtherWatchlists(listQuery.data, item.watchlistId);
+
+  const selectedWatchlist = otherWatchlists.find((wl) => wl.id === selectedWatchlistId);
+  const isCustomOrdered = selectedWatchlist?.itemOrderMode === "custom";
 
   const handleMove = () => {
-    if (selectedId === null) return;
-    moveMutation.mutate(selectedId, { onSuccess: () => onOpenChange(false) });
+    if (selectedWatchlistId === null) return;
+    moveMutation.mutate(
+      {
+        destinationWatchlistId: selectedWatchlistId,
+        position: isCustomOrdered ? selectedPosition : undefined,
+      },
+      { onSuccess: () => onOpenChange(false) },
+    );
   };
 
   return (
@@ -54,21 +72,22 @@ export function MoveItemDialog({ item, activeFilters, open, onOpenChange }: Move
           <ItemPreview item={item} />
           <WatchlistSelector
             watchlists={otherWatchlists}
-            selectedId={selectedId}
+            selectedId={selectedWatchlistId}
             isLoading={listQuery.isLoading}
             isError={listQuery.isError}
-            onSelect={setSelectedId}
+            onSelect={onSelectedWatchlistIdChange}
           />
+          {selectedWatchlistId !== null && isCustomOrdered && (
+            <PositionPicker value={selectedPosition} onChange={onSelectedPositionChange} />
+          )}
+          {selectedWatchlistId !== null && !isCustomOrdered && <AutoOrderingNotice />}
         </div>
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={moveMutation.isPending}>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            disabled={selectedId === null || moveMutation.isPending || listQuery.isLoading}
-            onClick={(e) => {
-              e.preventDefault();
-              void handleMove();
-            }}
+            disabled={selectedWatchlistId === null || moveMutation.isPending || listQuery.isLoading}
+            onClick={() => void handleMove()}
           >
             {moveMutation.isPending ? "Moving..." : "Move"}
           </AlertDialogAction>
@@ -78,22 +97,7 @@ export function MoveItemDialog({ item, activeFilters, open, onOpenChange }: Move
   );
 }
 
-function useWatchlistListQuery({ enabled }: { enabled: boolean }) {
-  const watchlistListFn = useServerFn(getWatchlistList);
-  return useQuery<WatchlistSummary[], Error>({
-    queryKey: ["watchlists", "list", {}],
-    queryFn: () => watchlistListFn({ data: {} }),
-    staleTime: Infinity,
-    enabled,
-  });
-}
-
-function useSelectedWatchlistId(open: boolean) {
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (open) setSelectedId(null);
-  }, [open]);
-
-  return { selectedId, setSelectedId };
+function filterOtherWatchlists(data: unknown, currentWatchlistId: number) {
+  if (!Array.isArray(data)) return [];
+  return data.filter((wl) => wl.id !== currentWatchlistId);
 }

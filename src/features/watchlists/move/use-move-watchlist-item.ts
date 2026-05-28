@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import type { WatchlistItem } from "@/db/schema";
+import type { InsertionPosition } from "@/features/watchlists/insert-ordered-item.server";
 import { invalidateWatchlistQueries } from "@/features/watchlists/cache";
 import {
   optimisticallyRemoveWatchlistItem,
@@ -27,11 +28,18 @@ export function useMoveWatchlistItemMutation({
 
   return useMutation({
     mutationKey: ["watchlists", "move-item", item.id],
-    mutationFn: async (destinationWatchlistId: number) => {
+    mutationFn: async ({
+      destinationWatchlistId,
+      position,
+    }: {
+      destinationWatchlistId: number;
+      position?: InsertionPosition;
+    }) => {
       const result = await moveItemToWatchlistFn({
         data: {
           itemId: item.id,
           destinationWatchlistId,
+          position,
         },
       });
 

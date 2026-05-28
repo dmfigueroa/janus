@@ -79,7 +79,8 @@ src/features/watchlists/
 Rules:
 
 - Use shallow use-case folders such as `list/`, `detail/`, `create/`, and `merge/`.
-- Use short role-based filenames because the folder already provides the business context.
+- Name files by the responsibility they capture, not just their role. The filename should tell you the domain concept. For example, `insert-ordered-item.server.ts` is better than `mutation.server.ts` because it describes what the module does.
+- Prefer short role-based filenames (`query.ts`, `mutation.ts`, `schema.ts`) when the responsibility is a standard CRUD operation. Use descriptive names when the responsibility is a specific domain concept.
 - Put UI shared across multiple use cases in `src/features/<feature>/components/*`.
 - Put UI used by only one use case in that use-case folder.
 - Collocate tests with the code they verify.

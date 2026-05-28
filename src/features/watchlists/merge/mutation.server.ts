@@ -1,12 +1,14 @@
 import { getDb } from "@/db/db.server";
 import { watchlistItems, watchlists } from "@/db/schema";
 import type { MergeWatchlistsInput } from "./mutation";
-import { hasCustomOrderMergeParticipant } from "@/features/watchlists/repository.server";
+import {
+  hasCustomOrderMergeParticipant,
+  markLastItemAddedInTransaction,
+  type WatchlistTransaction,
+} from "@/features/watchlists/repository.server";
 import { compareItemsByOrderMode } from "@/features/watchlists/order";
 import { eq, inArray, sql } from "drizzle-orm";
 
-type WatchlistDb = ReturnType<typeof getDb>;
-type WatchlistTransaction = Parameters<Parameters<WatchlistDb["transaction"]>[0]>[0];
 type MergeWatchlistsResult =
   | { success: true; targetId: number }
   | { success: false; message: string };
@@ -202,14 +204,6 @@ function mergeSourceItemsIntoTarget(
     .run();
 
   return result.changes > 0;
-}
-
-function markLastItemAddedInTransaction(transaction: WatchlistTransaction, watchlistId: number) {
-  transaction
-    .update(watchlists)
-    .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
-    .where(eq(watchlists.id, watchlistId))
-    .run();
 }
 
 function deleteMergedSources(transaction: WatchlistTransaction, sourceWatchlistIds: number[]) {

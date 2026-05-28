@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import type { Watchlist } from "@/db/schema";
+import { type WatchlistItemOrderMode } from "@/features/watchlists/order";
 import { createWatchlist } from "@/features/watchlists/create/mutation";
 import { updateWatchlist } from "@/features/watchlists/update/mutation";
 import { invalidateWatchlistQueries } from "@/features/watchlists/cache";
@@ -109,6 +110,6 @@ function parseFormData(form: HTMLFormElement) {
   return {
     name: data.get("name") as string,
     description: data.get("description") as string,
-    itemOrderMode: data.get("itemOrderMode") as "release" | "custom",
+    itemOrderMode: data.get("itemOrderMode") as WatchlistItemOrderMode,
   };
 }

@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import type { WatchlistItem } from "@/db/schema";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/query";
 import { MoveItemDialog } from "@/features/watchlists/move/move-item-dialog";
+import type { InsertionPosition } from "@/features/watchlists/insert-ordered-item.server";
 import { useToggleWatchedItem } from "@/features/watchlists/detail/use-toggle-watched-item";
 import { getWatchlistParentRemovalPreviewQuery } from "@/features/watchlists/remove/query";
 import { useRemoveWatchlistItemMutation } from "@/features/watchlists/remove/use-remove-watchlist-item";
@@ -37,6 +38,8 @@ export function TimelineItemActions({
   const [removeItemOpen, setRemoveItemOpen] = useState(false);
   const [removeParentOpen, setRemoveParentOpen] = useState(false);
   const [moveItemOpen, setMoveItemOpen] = useState(false);
+  const [selectedWatchlistId, setSelectedWatchlistId] = useState<number | null>(null);
+  const [selectedPosition, setSelectedPosition] = useState<InsertionPosition>("end");
   const previewFn = useServerFn(getWatchlistParentRemovalPreviewQuery);
   const labels = getRemovalLabels(item);
   const quietWatchMutation = useToggleWatchedItem(item, { updateWatchlistRecency: false });
@@ -130,6 +133,8 @@ export function TimelineItemActions({
               className="h-auto whitespace-normal text-left justify-start py-2 gap-2"
               onClick={() => {
                 setMenuOpen(false);
+                setSelectedWatchlistId(null);
+                setSelectedPosition("end");
                 setMoveItemOpen(true);
               }}
             >
@@ -200,6 +205,10 @@ export function TimelineItemActions({
         activeFilters={activeFilters}
         open={moveItemOpen}
         onOpenChange={setMoveItemOpen}
+        selectedWatchlistId={selectedWatchlistId}
+        onSelectedWatchlistIdChange={setSelectedWatchlistId}
+        selectedPosition={selectedPosition}
+        onSelectedPositionChange={setSelectedPosition}
       />
     </>
   );

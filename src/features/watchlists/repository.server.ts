@@ -4,6 +4,9 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import type { MergeWatchlistsInput } from "@/features/watchlists/merge/mutation";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
 
+type WatchlistDb = ReturnType<typeof getDb>;
+export type WatchlistTransaction = Parameters<Parameters<WatchlistDb["transaction"]>[0]>[0];
+
 export async function createWatchlist({
   description,
   name,
@@ -155,4 +158,15 @@ export async function getExistingComicsInWatchlist(watchlistId: number) {
       ),
     );
   return new Set(rows.map((row) => row.tmdbId));
+}
+
+export function markLastItemAddedInTransaction(
+  transaction: WatchlistTransaction,
+  watchlistId: number,
+) {
+  transaction
+    .update(watchlists)
+    .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
+    .where(eq(watchlists.id, watchlistId))
+    .run();
 }
