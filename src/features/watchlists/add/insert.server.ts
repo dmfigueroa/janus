@@ -43,8 +43,8 @@ export async function persistAddedItems({
 
   const db = getDb();
 
-  return db.transaction((tx) => {
-    const [watchlist] = tx
+  return db.transaction((transaction) => {
+    const [watchlist] = transaction
       .select({ itemOrderMode: watchlists.itemOrderMode })
       .from(watchlists)
       .where(eq(watchlists.id, watchlistId))
@@ -56,27 +56,27 @@ export async function persistAddedItems({
     }
 
     if (watchlist.itemOrderMode !== "custom") {
-      return insertWithReleaseDateOrder({ tx, watchlistId, items });
+      return insertWithReleaseDateOrder({ transaction, watchlistId, items });
     }
 
     if (!insertionPosition) {
       return { success: false, message: CUSTOM_ORDER_INSERTION_REQUIRED_MESSAGE };
     }
 
-    return insertWithCustomOrder({ tx, watchlistId, items, insertionPosition });
+    return insertWithCustomOrder({ transaction, watchlistId, items, insertionPosition });
   });
 }
 
 function insertWithReleaseDateOrder({
-  tx,
+  transaction,
   watchlistId,
   items,
 }: {
-  tx: WatchlistTransaction;
+  transaction: WatchlistTransaction;
   watchlistId: number;
   items: PendingWatchlistItem[];
 }): PersistAddedItemsResult {
-  const inserted = tx
+  const inserted = transaction
     .insert(watchlistItems)
     .values(items)
     .onConflictDoNothing()
@@ -84,24 +84,24 @@ function insertWithReleaseDateOrder({
     .all();
 
   if (inserted.length > 0) {
-    markLastItemAddedInTransaction(tx, watchlistId);
+    markLastItemAddedInTransaction(transaction, watchlistId);
   }
 
   return { success: true, insertedCount: inserted.length };
 }
 
 function insertWithCustomOrder({
-  tx,
+  transaction,
   watchlistId,
   items,
   insertionPosition,
 }: {
-  tx: WatchlistTransaction;
+  transaction: WatchlistTransaction;
   watchlistId: number;
   items: PendingWatchlistItem[];
   insertionPosition: AddToWatchlistInsertionPosition;
 }): PersistAddedItemsResult {
-  const existingItems = tx
+  const existingItems = transaction
     .select({
       id: watchlistItems.id,
       tmdbId: watchlistItems.tmdbId,
@@ -114,9 +114,37 @@ function insertWithCustomOrder({
     .orderBy(...customRankOrder, asc(watchlistItems.id))
     .all();
 
-  const dedupedItems = dedupePendingItems(items, existingItems);
-  if (dedupedItems.length === 0) {
+  const writes = computeCustomOrderInsertion({
+    existingItems,
+    pendingItems: items,
+    insertionPosition,
+  });
+
+  if (!writes) {
     return { success: true, insertedCount: 0 };
+  }
+
+  executeCustomOrderWrites({ transaction, watchlistId, writes });
+  markLastItemAddedInTransaction(transaction, watchlistId);
+
+  return { success: true, insertedCount: writes.inserts.length };
+}
+
+function computeCustomOrderInsertion({
+  existingItems,
+  pendingItems,
+  insertionPosition,
+}: {
+  existingItems: PersistedWatchlistItem[];
+  pendingItems: PendingWatchlistItem[];
+  insertionPosition: AddToWatchlistInsertionPosition;
+}): {
+  inserts: Array<{ item: PendingWatchlistItemWithIndex; rank: number }>;
+  updates: Array<{ id: number; rank: number }>;
+} | null {
+  const dedupedItems = dedupePendingItems(pendingItems, existingItems);
+  if (dedupedItems.length === 0) {
+    return null;
   }
 
   const orderedPendingItems = orderPendingItemsByReleaseDate(dedupedItems);
@@ -126,24 +154,35 @@ function insertWithCustomOrder({
     insertionPosition,
   });
 
-  const { inserts, updates } = assignCustomRanks(finalOrder);
+  return assignCustomRanks(finalOrder);
+}
 
-  for (const { item, rank } of inserts) {
-    tx.insert(watchlistItems)
+function executeCustomOrderWrites({
+  transaction,
+  watchlistId,
+  writes,
+}: {
+  transaction: WatchlistTransaction;
+  watchlistId: number;
+  writes: {
+    inserts: Array<{ item: PendingWatchlistItemWithIndex; rank: number }>;
+    updates: Array<{ id: number; rank: number }>;
+  };
+}): void {
+  for (const { item, rank } of writes.inserts) {
+    transaction
+      .insert(watchlistItems)
       .values({ ...item, customRank: rank })
       .run();
   }
 
-  for (const { id, rank } of updates) {
-    tx.update(watchlistItems)
+  for (const { id, rank } of writes.updates) {
+    transaction
+      .update(watchlistItems)
       .set({ customRank: rank })
       .where(and(eq(watchlistItems.id, id), eq(watchlistItems.watchlistId, watchlistId)))
       .run();
   }
-
-  markLastItemAddedInTransaction(tx, watchlistId);
-
-  return { success: true, insertedCount: orderedPendingItems.length };
 }
 
 function assignCustomRanks(ordered: OrderedWatchlistItem[]): {
