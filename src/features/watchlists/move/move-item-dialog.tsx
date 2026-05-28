@@ -42,9 +42,7 @@ export function MoveItemDialog({
   const listQuery = useWatchlistListQuery({ enabled: open });
   const moveMutation = useMoveWatchlistItemMutation({ item, activeFilters });
 
-  const otherWatchlists = Array.isArray(listQuery.data)
-    ? listQuery.data.filter((wl) => wl.id !== item.watchlistId)
-    : [];
+  const otherWatchlists = filterOtherWatchlists(listQuery.data, item.watchlistId);
 
   const selectedWatchlist = otherWatchlists.find((wl) => wl.id === selectedWatchlistId);
   const isCustomOrdered = selectedWatchlist?.itemOrderMode === "custom";
@@ -97,4 +95,9 @@ export function MoveItemDialog({
       </AlertDialogContent>
     </AlertDialog>
   );
+}
+
+function filterOtherWatchlists(data: unknown, currentWatchlistId: number) {
+  if (!Array.isArray(data)) return [];
+  return data.filter((wl) => wl.id !== currentWatchlistId);
 }
