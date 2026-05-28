@@ -56,24 +56,30 @@ export async function persistAddedItems({
     }
 
     if (watchlist.itemOrderMode !== "custom") {
-      return insertWithReleaseDateOrder({ transaction, watchlistId, items });
+      const result = insertWithReleaseDateOrder({ transaction, items });
+      if (result.success && result.insertedCount > 0) {
+        markLastItemAddedInTransaction(transaction, watchlistId);
+      }
+      return result;
     }
 
     if (!insertionPosition) {
       return { success: false, message: CUSTOM_ORDER_INSERTION_REQUIRED_MESSAGE };
     }
 
-    return insertWithCustomOrder({ transaction, watchlistId, items, insertionPosition });
+    const result = insertWithCustomOrder({ transaction, watchlistId, items, insertionPosition });
+    if (result.success && result.insertedCount > 0) {
+      markLastItemAddedInTransaction(transaction, watchlistId);
+    }
+    return result;
   });
 }
 
 function insertWithReleaseDateOrder({
   transaction,
-  watchlistId,
   items,
 }: {
   transaction: WatchlistTransaction;
-  watchlistId: number;
   items: PendingWatchlistItem[];
 }): PersistAddedItemsResult {
   const inserted = transaction
@@ -82,10 +88,6 @@ function insertWithReleaseDateOrder({
     .onConflictDoNothing()
     .returning({ id: watchlistItems.id })
     .all();
-
-  if (inserted.length > 0) {
-    markLastItemAddedInTransaction(transaction, watchlistId);
-  }
 
   return { success: true, insertedCount: inserted.length };
 }
@@ -125,7 +127,6 @@ function insertWithCustomOrder({
   }
 
   executeCustomOrderWrites({ transaction, watchlistId, writes });
-  markLastItemAddedInTransaction(transaction, watchlistId);
 
   return { success: true, insertedCount: writes.inserts.length };
 }
