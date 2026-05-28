@@ -4,7 +4,7 @@ Use this skill when the user asks to "refactor duplicate code", "apply DRY princ
 
 ## Process
 
-1. **Identify** - Exact copies, similar patterns, parallel hierarchies, naming patterns (data1/data2, handleXClick)
+1. **Identify** - Exact copies, similar patterns, parallel hierarchies, naming patterns (data1/data2, handleXClick), repeated type literals
 2. **Analyze** - Coupling, cohesion, frequency (Rule of Three: wait for 3+ occurrences), volatility
 3. **Refactor** - Choose technique below, extract incrementally, test after each step
 
@@ -22,6 +22,31 @@ function getFullName(person: { firstName: string; lastName: string }) {
   return `${person.firstName} ${person.lastName}`;
 }
 ```
+
+### Reuse/Infer Types - Replace repeated type literals
+
+```ts
+// Before - repeated literal types
+function fetchWatchlist(watchlistId: number): { id: number; itemOrderMode: "release" | "custom" };
+function createWatchlist(input: { itemOrderMode: "release" | "custom" });
+
+// After - use inferred or exported types
+import { watchlists } from "@/db/schema";
+type WatchlistItemOrderMode = (typeof watchlists.itemOrderMode)["enum"][number];
+
+function fetchWatchlist(
+  watchlistId: number,
+): Pick<typeof watchlists.$inferSelect, "id" | "itemOrderMode">;
+function createWatchlist(input: { itemOrderMode: WatchlistItemOrderMode });
+```
+
+When types are already defined in the schema or domain layer, prefer:
+
+- `typeof schema.$inferSelect["fieldName"]`
+- `typeof schema.field["enum"][number]`
+- Exported domain types over inline literals
+
+### Extract Function - Same logic in multiple places
 
 ### Extract Variable - Repeated expression
 
@@ -149,6 +174,7 @@ const MEDIA_ICONS: Record<MediaType, string> = {
 - Large switches in multiple places
 - Repeated null checks
 - Magic numbers
+- **Repeated type literals** (e.g., `"release" | "custom"`, `{ id: number; name: string }`) - always prefer exported/inferred types
 
 ### Rule of Three
 

@@ -1,24 +1,24 @@
 import { getDb } from "@/db/db.server";
 import { watchlistItems, watchlists } from "@/db/schema";
+import { type WatchlistItemOrderMode } from "@/features/watchlists/order";
 import {
   computeItemInsertionOrder,
   type InsertionPosition,
 } from "@/features/watchlists/order-insert.server";
+import { customRankOrder } from "@/features/watchlists/order.server";
 import {
   markLastItemAddedInTransaction,
   type WatchlistTransaction,
 } from "@/features/watchlists/repository.server";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
+import { MoveItemError } from "@/features/watchlists/errors.server";
+import { extractItemFields, type ItemInsertFields } from "@/features/watchlists/item-fields.server";
 
 type WatchlistItemRow = typeof watchlistItems.$inferSelect;
 
 type MoveItemResult =
   | { success: true; movedCount: number; message: string }
   | { success: false; message: string };
-
-class MoveItemError {
-  constructor(public message: string) {}
-}
 
 export async function moveItemToWatchlistMutation({
   itemId,
@@ -32,7 +32,7 @@ export async function moveItemToWatchlistMutation({
   const db = getDb();
 
   let item: WatchlistItemRow;
-  let destination: { id: number; name: string; itemOrderMode: "release" | "custom" };
+  let destination: { id: number; name: string; itemOrderMode: WatchlistItemOrderMode };
 
   try {
     item = await fetchItemOrThrow(db, itemId);
@@ -70,7 +70,7 @@ async function fetchItemOrThrow(
 async function fetchWatchlistOrThrow(
   db: ReturnType<typeof getDb>,
   watchlistId: number,
-): Promise<{ id: number; name: string; itemOrderMode: "release" | "custom" }> {
+): Promise<{ id: number; name: string; itemOrderMode: WatchlistItemOrderMode }> {
   const watchlist = await db.query.watchlists.findFirst({
     where: eq(watchlists.id, watchlistId),
   });
@@ -97,32 +97,10 @@ async function ensureNoDuplicate(
   }
 }
 
-type ItemInsertFields = Omit<WatchlistItemRow, "id" | "watchlistId" | "customRank">;
-
-function extractItemFields(item: WatchlistItemRow): ItemInsertFields {
-  return {
-    tmdbId: item.tmdbId,
-    source: item.source,
-    mediaType: item.mediaType,
-    title: item.title,
-    parentId: item.parentId,
-    parentTitle: item.parentTitle,
-    season: item.season,
-    episode: item.episode,
-    posterPath: item.posterPath,
-    releaseDate: item.releaseDate,
-    voteAverage: item.voteAverage,
-    runtime: item.runtime,
-    isWatched: item.isWatched,
-    authors: item.authors,
-    addedAt: item.addedAt,
-  };
-}
-
 function executeMove(
   db: ReturnType<typeof getDb>,
   item: WatchlistItemRow,
-  destination: { id: number; itemOrderMode: "release" | "custom" },
+  destination: { id: number; itemOrderMode: WatchlistItemOrderMode },
   position?: InsertionPosition,
 ) {
   return db.transaction((transaction) => {
@@ -140,13 +118,42 @@ function executeMove(
   });
 }
 
+function executeMoveForReleaseMode(
+  transaction: WatchlistTransaction,
+  insertFields: ItemInsertFields,
+  destinationId: number,
+) {
+  transaction
+    .insert(watchlistItems)
+    .values({ watchlistId: destinationId, ...insertFields })
+    .run();
+}
+
+type OrderedRankItem = {
+  id?: number;
+  tmdbId: string;
+  mediaType: string;
+  releaseDate: string | null;
+  customRank: number | null;
+  newRank: number;
+};
+
 function executeMoveForCustomMode(
   transaction: WatchlistTransaction,
   insertFields: ItemInsertFields,
   destinationId: number,
   position: InsertionPosition,
 ) {
-  const existingItems = transaction
+  const existingItems = queryExistingItemsForOrdering(transaction, destinationId);
+
+  const orderedItems = computeNewRanks(existingItems, insertFields, position);
+
+  persistRankUpdates(transaction, orderedItems, destinationId);
+  persistInsertedItem(transaction, orderedItems, destinationId, insertFields);
+}
+
+function queryExistingItemsForOrdering(transaction: WatchlistTransaction, destinationId: number) {
+  return transaction
     .select({
       id: watchlistItems.id,
       tmdbId: watchlistItems.tmdbId,
@@ -156,16 +163,22 @@ function executeMoveForCustomMode(
     })
     .from(watchlistItems)
     .where(eq(watchlistItems.watchlistId, destinationId))
-    .orderBy(
-      sql`CASE WHEN ${watchlistItems.customRank} IS NULL THEN 1 ELSE 0 END`,
-      asc(watchlistItems.customRank),
-      sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
-      asc(watchlistItems.releaseDate),
-      asc(watchlistItems.id),
-    )
+    .orderBy(...customRankOrder, asc(watchlistItems.id))
     .all();
+}
 
-  const orderedItems = computeItemInsertionOrder(
+function computeNewRanks(
+  existingItems: {
+    id: number;
+    tmdbId: string;
+    mediaType: string;
+    releaseDate: string | null;
+    customRank: number | null;
+  }[],
+  insertFields: ItemInsertFields,
+  position: InsertionPosition,
+): OrderedRankItem[] {
+  return computeItemInsertionOrder(
     existingItems,
     {
       tmdbId: insertFields.tmdbId,
@@ -176,7 +189,13 @@ function executeMoveForCustomMode(
     position,
     "custom",
   );
+}
 
+function persistRankUpdates(
+  transaction: WatchlistTransaction,
+  orderedItems: OrderedRankItem[],
+  destinationId: number,
+) {
   for (const orderedItem of orderedItems) {
     if (orderedItem.id !== undefined && orderedItem.newRank !== orderedItem.customRank) {
       transaction
@@ -188,7 +207,14 @@ function executeMoveForCustomMode(
         .run();
     }
   }
+}
 
+function persistInsertedItem(
+  transaction: WatchlistTransaction,
+  orderedItems: OrderedRankItem[],
+  destinationId: number,
+  insertFields: ItemInsertFields,
+) {
   const insertedItem = orderedItems.find((o) => o.id === undefined);
   if (insertedItem) {
     transaction
@@ -200,15 +226,4 @@ function executeMoveForCustomMode(
       })
       .run();
   }
-}
-
-function executeMoveForReleaseMode(
-  transaction: WatchlistTransaction,
-  insertFields: ItemInsertFields,
-  destinationId: number,
-) {
-  transaction
-    .insert(watchlistItems)
-    .values({ watchlistId: destinationId, ...insertFields })
-    .run();
 }

@@ -1,9 +1,10 @@
 import { getDb } from "@/db/db.server";
 import { watchlistItems, watchlists } from "@/db/schema";
 import { compareReleaseDates } from "@/features/watchlists/order";
+import { customRankOrder } from "@/features/watchlists/order.server";
 import { markLastItemAddedInTransaction } from "@/features/watchlists/repository.server";
 import type { AddToWatchlistInsertionPosition } from "./mutation";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 type PersistedWatchlistItem = Pick<
   typeof watchlistItems.$inferSelect,
@@ -85,13 +86,7 @@ export async function persistAddedItems({
       })
       .from(watchlistItems)
       .where(eq(watchlistItems.watchlistId, watchlistId))
-      .orderBy(
-        sql`CASE WHEN ${watchlistItems.customRank} IS NULL THEN 1 ELSE 0 END`,
-        asc(watchlistItems.customRank),
-        sql`CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END`,
-        asc(watchlistItems.releaseDate),
-        asc(watchlistItems.id),
-      )
+      .orderBy(...customRankOrder, asc(watchlistItems.id))
       .all();
 
     const dedupedItems = dedupePendingItems(items, existingItems);

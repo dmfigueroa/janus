@@ -1,6 +1,7 @@
+import type { Watchlist } from "@/db/schema";
 import type { WatchlistItem } from "@/db/schema";
 
-export type WatchlistItemOrderMode = "release" | "custom";
+export type WatchlistItemOrderMode = Watchlist["itemOrderMode"];
 
 export function compareReleaseDates(
   left: Pick<WatchlistItem, "id" | "releaseDate">,
