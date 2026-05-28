@@ -1,6 +1,16 @@
-import { useState, type ReactNode } from "react";
+import { useState, type ReactNode, type KeyboardEvent } from "react";
 import type { WatchlistSummary } from "@/features/watchlists/list/query.server";
 import { Input } from "@/components/ui/input";
+
+function filterWatchlists(watchlists: WatchlistSummary[], query: string) {
+  if (!query) return watchlists;
+  const normalized = query.toLowerCase();
+  return watchlists.filter((wl) => wl.name.toLowerCase().includes(normalized));
+}
+
+function suppressEnterSubmit(event: KeyboardEvent) {
+  if (event.key === "Enter") event.preventDefault();
+}
 
 type WatchlistSelectorProps = {
   watchlists: WatchlistSummary[];
@@ -18,12 +28,7 @@ export function WatchlistSelector({
   onSelect,
 }: WatchlistSelectorProps) {
   const [searchQuery, setSearchQuery] = useState("");
-
-  const normalizedQuery = searchQuery.toLowerCase();
-
-  const filteredWatchlists = searchQuery
-    ? watchlists.filter((wl) => wl.name.toLowerCase().includes(normalizedQuery))
-    : watchlists;
+  const filteredWatchlists = filterWatchlists(watchlists, searchQuery);
 
   return (
     <div>
@@ -40,9 +45,7 @@ export function WatchlistSelector({
             placeholder="Search watchlists..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") event.preventDefault();
-            }}
+            onKeyDown={suppressEnterSubmit}
             className="mb-2"
           />
           {filteredWatchlists.length === 0 ? (
