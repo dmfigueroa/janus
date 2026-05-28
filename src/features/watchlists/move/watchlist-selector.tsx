@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { WatchlistSummary } from "@/features/watchlists/list/query.server";
+import { Input } from "@/components/ui/input";
 
 type WatchlistSelectorProps = {
   watchlists: WatchlistSummary[];
@@ -16,6 +17,12 @@ export function WatchlistSelector({
   isError,
   onSelect,
 }: WatchlistSelectorProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredWatchlists = searchQuery
+    ? watchlists.filter((wl) => wl.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : watchlists;
+
   return (
     <div>
       <p className="mb-2 text-sm font-medium">Select destination</p>
@@ -26,19 +33,31 @@ export function WatchlistSelector({
       ) : watchlists.length === 0 ? (
         <ListStateMessage>No other watchlists available</ListStateMessage>
       ) : (
-        <div className="max-h-48 overflow-y-auto rounded-md border">
-          <div className="p-1">
-            {watchlists.map((wl) => (
-              <WatchlistOption
-                key={wl.id}
-                selected={selectedId === wl.id}
-                onClick={() => onSelect(wl.id)}
-                name={wl.name}
-                itemCount={wl.stats.totalItems}
-              />
-            ))}
-          </div>
-        </div>
+        <>
+          <Input
+            placeholder="Search watchlists..."
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="mb-2"
+          />
+          {filteredWatchlists.length === 0 ? (
+            <ListStateMessage>No matching watchlists</ListStateMessage>
+          ) : (
+            <div className="max-h-48 overflow-y-auto rounded-md border">
+              <div className="p-1">
+                {filteredWatchlists.map((wl) => (
+                  <WatchlistOption
+                    key={wl.id}
+                    selected={selectedId === wl.id}
+                    onClick={() => onSelect(wl.id)}
+                    name={wl.name}
+                    itemCount={wl.stats.totalItems}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
