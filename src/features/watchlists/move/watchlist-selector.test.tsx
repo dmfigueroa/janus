@@ -114,6 +114,29 @@ describe("WatchlistSelector", () => {
     expect(screen.getByText("Anime Collection")).not.toBeNull();
   });
 
+  it("prevents Enter key from triggering form submission", () => {
+    render(
+      <WatchlistSelector
+        watchlists={watchlists}
+        selectedId={null}
+        isLoading={false}
+        isError={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    const searchInput = screen.getByPlaceholderText("Search watchlists...") as HTMLInputElement;
+    const keyDownEvent = new KeyboardEvent("keydown", {
+      key: "Enter",
+      bubbles: true,
+      cancelable: true,
+    });
+    const preventDefaultSpy = vi.spyOn(keyDownEvent, "preventDefault");
+    searchInput.dispatchEvent(keyDownEvent);
+
+    expect(preventDefaultSpy).toHaveBeenCalled();
+  });
+
   it("preserves the selected watchlist even when hidden by search", () => {
     const onSelect = vi.fn();
     render(

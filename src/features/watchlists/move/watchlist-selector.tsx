@@ -19,8 +19,10 @@ export function WatchlistSelector({
 }: WatchlistSelectorProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
+  const normalizedQuery = searchQuery.toLowerCase();
+
   const filteredWatchlists = searchQuery
-    ? watchlists.filter((wl) => wl.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    ? watchlists.filter((wl) => wl.name.toLowerCase().includes(normalizedQuery))
     : watchlists;
 
   return (
@@ -38,6 +40,9 @@ export function WatchlistSelector({
             placeholder="Search watchlists..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.preventDefault();
+            }}
             className="mb-2"
           />
           {filteredWatchlists.length === 0 ? (
