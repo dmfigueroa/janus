@@ -26,7 +26,7 @@ Agents should commit and push work frequently without explicit user request, and
 
 ### Conventions
 
-- Use conventional branch names matching the ticket/work
+- Use conventional branch names matching the ticket/work (e.g., type/branch-description)
 - Use conventional commit messages: `type(scope): summary` when a scope adds clarity, or `type: summary` when it does not.
 - Use conventional pull request titles in the same format
 - Prefer standard conventional commit types: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `build`
