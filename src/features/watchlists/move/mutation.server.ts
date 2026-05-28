@@ -7,10 +7,11 @@ import {
 } from "@/features/watchlists/order-insert.server";
 import {
   markLastItemAddedInTransaction,
+  type WatchlistTransaction,
 } from "@/features/watchlists/repository.server";
 import { and, eq } from "drizzle-orm";
 import { MoveItemError } from "@/features/watchlists/errors.server";
-import { extractItemFields } from "@/features/watchlists/item-fields.server";
+import { extractItemFields, type ItemInsertFields } from "@/features/watchlists/item-fields.server";
 
 type WatchlistItemRow = typeof watchlistItems.$inferSelect;
 
@@ -104,18 +105,40 @@ function executeMove(
   return db.transaction((transaction) => {
     const insertFields = extractItemFields(item);
 
-    transaction.delete(watchlistItems).where(eq(watchlistItems.id, item.id)).run();
-
-    if (destination.itemOrderMode === "custom") {
-      insertItemWithCustomOrder(transaction, insertFields, destination.id, position ?? "end");
-    } else {
-      transaction
-        .insert(watchlistItems)
-        .values({ watchlistId: destination.id, ...insertFields })
-        .run();
-    }
-
+    deleteItemFromSource(transaction, item.id);
+    insertItemIntoDestination(transaction, insertFields, destination, position);
     markLastItemAddedInTransaction(transaction, destination.id);
   });
+}
+
+function deleteItemFromSource(
+  transaction: WatchlistTransaction,
+  itemId: number,
+) {
+  transaction.delete(watchlistItems).where(eq(watchlistItems.id, itemId)).run();
+}
+
+function insertItemIntoDestination(
+  transaction: WatchlistTransaction,
+  insertFields: ItemInsertFields,
+  destination: { id: number; itemOrderMode: WatchlistItemOrderMode },
+  position?: InsertionPosition,
+) {
+  if (destination.itemOrderMode === "custom") {
+    insertItemWithCustomOrder(transaction, insertFields, destination.id, position ?? "end");
+  } else {
+    insertItemForReleaseMode(transaction, insertFields, destination.id);
+  }
+}
+
+function insertItemForReleaseMode(
+  transaction: WatchlistTransaction,
+  insertFields: ItemInsertFields,
+  destinationId: number,
+) {
+  transaction
+    .insert(watchlistItems)
+    .values({ watchlistId: destinationId, ...insertFields })
+    .run();
 }
 
