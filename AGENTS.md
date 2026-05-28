@@ -60,6 +60,24 @@ Agents should commit and push work frequently without explicit user request, and
 - Write out full words. Avoid abbreviations like `tx` (use `transaction`), `itemToInsertValues` (use `extractItemFields` or `itemAsInsertValues`), `err` (use `error`), `cb` (use `callback`), etc.
 - Parameter and variable names should be readable without domain context. `item` is fine in a watchlist context; `tx` is not.
 
+## Code Style
+
+Prefer declarative and functional code over imperative code.
+
+### Prefer
+
+- Array methods (`map`, `filter`, `reduce`, `find`) over manual loops
+- Computed values over mutation
+- Pure functions over side effects
+- Declarative data transformations over imperative accumulation
+- Module-level constants and functions over class-based state where appropriate
+
+### Avoid
+
+- Manual `for`/`while` loops where array methods would be clearer
+- Mutating state in place
+- Procedural step-by-step logic when a functional pipeline reads better
+
 ## GitHub Interactions
 
 - Never use WebFetch or curl to access GitHub API directly. Always use the `gh` CLI tool.
