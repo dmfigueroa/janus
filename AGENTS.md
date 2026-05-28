@@ -9,12 +9,28 @@
 
 ## Git Conventions
 
-- Use conventional branch names for all new branches, such as `feat/watchlists-write-boundary`, `fix/search-pagination`, or `chore/update-deps`.
-- Use conventional commit messages for all commits in the form `type(scope): summary` when a scope adds clarity, or `type: summary` when it does not.
-- Use conventional pull request titles in the form `type(scope): summary` when a scope adds clarity, or `type: summary` when it does not.
-- Open pull requests as ready for review by default. Create draft pull requests only when the user explicitly asks for a draft.
-- Prefer standard conventional commit types like `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, and `build`.
-- After completing a meaningful unit of work, commit and push the branch without waiting for an extra reminder from the user.
+Agents should commit and push work frequently without explicit user request, and create branches/PRs when working on main.
+
+### On a feature branch
+
+- Commit and push after completing a meaningful unit of work (new feature, refactor, bug fix, etc.)
+- Do NOT wait for explicit user request to commit
+- One commit per logical change, not per edit
+- Push immediately after committing
+
+### On main branch (assigned a ticket)
+
+- Create a new branch with a conventional branch name (e.g., `feat/watchlists-write-boundary`, `fix/search-pagination`)
+- Implement the work on that branch with frequent commits/pushes
+- Open a PR when the work is ready for review
+
+### Conventions
+
+- Use conventional branch names matching the ticket/work
+- Use conventional commit messages: `type(scope): summary` when a scope adds clarity, or `type: summary` when it does not.
+- Use conventional pull request titles in the same format
+- Prefer standard conventional commit types: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `build`
+- Open PRs as ready for review by default. Create draft PRs only when explicitly requested.
 
 ## Database Migrations
 
