@@ -111,10 +111,7 @@ function executeMove(
   });
 }
 
-function deleteItemFromSource(
-  transaction: WatchlistTransaction,
-  itemId: number,
-) {
+function deleteItemFromSource(transaction: WatchlistTransaction, itemId: number) {
   transaction.delete(watchlistItems).where(eq(watchlistItems.id, itemId)).run();
 }
 
@@ -141,4 +138,3 @@ function insertItemForReleaseMode(
     .values({ watchlistId: destinationId, ...insertFields })
     .run();
 }
-
