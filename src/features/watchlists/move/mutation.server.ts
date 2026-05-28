@@ -2,17 +2,15 @@ import { getDb } from "@/db/db.server";
 import { watchlistItems, watchlists } from "@/db/schema";
 import { type WatchlistItemOrderMode } from "@/features/watchlists/order";
 import {
-  computeItemInsertionOrder,
+  insertItemWithCustomOrder,
   type InsertionPosition,
 } from "@/features/watchlists/order-insert.server";
-import { customRankOrder } from "@/features/watchlists/order.server";
 import {
   markLastItemAddedInTransaction,
-  type WatchlistTransaction,
 } from "@/features/watchlists/repository.server";
-import { and, asc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { MoveItemError } from "@/features/watchlists/errors.server";
-import { extractItemFields, type ItemInsertFields } from "@/features/watchlists/item-fields.server";
+import { extractItemFields } from "@/features/watchlists/item-fields.server";
 
 type WatchlistItemRow = typeof watchlistItems.$inferSelect;
 
@@ -109,121 +107,15 @@ function executeMove(
     transaction.delete(watchlistItems).where(eq(watchlistItems.id, item.id)).run();
 
     if (destination.itemOrderMode === "custom") {
-      executeMoveForCustomMode(transaction, insertFields, destination.id, position ?? "end");
+      insertItemWithCustomOrder(transaction, insertFields, destination.id, position ?? "end");
     } else {
-      executeMoveForReleaseMode(transaction, insertFields, destination.id);
+      transaction
+        .insert(watchlistItems)
+        .values({ watchlistId: destination.id, ...insertFields })
+        .run();
     }
 
     markLastItemAddedInTransaction(transaction, destination.id);
   });
 }
 
-function executeMoveForReleaseMode(
-  transaction: WatchlistTransaction,
-  insertFields: ItemInsertFields,
-  destinationId: number,
-) {
-  transaction
-    .insert(watchlistItems)
-    .values({ watchlistId: destinationId, ...insertFields })
-    .run();
-}
-
-type OrderedRankItem = {
-  id?: number;
-  tmdbId: string;
-  mediaType: string;
-  releaseDate: string | null;
-  customRank: number | null;
-  newRank: number;
-};
-
-function executeMoveForCustomMode(
-  transaction: WatchlistTransaction,
-  insertFields: ItemInsertFields,
-  destinationId: number,
-  position: InsertionPosition,
-) {
-  const existingItems = queryExistingItemsForOrdering(transaction, destinationId);
-
-  const orderedItems = computeNewRanks(existingItems, insertFields, position);
-
-  persistRankUpdates(transaction, orderedItems, destinationId);
-  persistInsertedItem(transaction, orderedItems, destinationId, insertFields);
-}
-
-function queryExistingItemsForOrdering(transaction: WatchlistTransaction, destinationId: number) {
-  return transaction
-    .select({
-      id: watchlistItems.id,
-      tmdbId: watchlistItems.tmdbId,
-      mediaType: watchlistItems.mediaType,
-      releaseDate: watchlistItems.releaseDate,
-      customRank: watchlistItems.customRank,
-    })
-    .from(watchlistItems)
-    .where(eq(watchlistItems.watchlistId, destinationId))
-    .orderBy(...customRankOrder, asc(watchlistItems.id))
-    .all();
-}
-
-function computeNewRanks(
-  existingItems: {
-    id: number;
-    tmdbId: string;
-    mediaType: string;
-    releaseDate: string | null;
-    customRank: number | null;
-  }[],
-  insertFields: ItemInsertFields,
-  position: InsertionPosition,
-): OrderedRankItem[] {
-  return computeItemInsertionOrder(
-    existingItems,
-    {
-      tmdbId: insertFields.tmdbId,
-      mediaType: insertFields.mediaType,
-      releaseDate: insertFields.releaseDate,
-      customRank: null,
-    },
-    position,
-    "custom",
-  );
-}
-
-function persistRankUpdates(
-  transaction: WatchlistTransaction,
-  orderedItems: OrderedRankItem[],
-  destinationId: number,
-) {
-  for (const orderedItem of orderedItems) {
-    if (orderedItem.id !== undefined && orderedItem.newRank !== orderedItem.customRank) {
-      transaction
-        .update(watchlistItems)
-        .set({ customRank: orderedItem.newRank })
-        .where(
-          and(eq(watchlistItems.id, orderedItem.id), eq(watchlistItems.watchlistId, destinationId)),
-        )
-        .run();
-    }
-  }
-}
-
-function persistInsertedItem(
-  transaction: WatchlistTransaction,
-  orderedItems: OrderedRankItem[],
-  destinationId: number,
-  insertFields: ItemInsertFields,
-) {
-  const insertedItem = orderedItems.find((o) => o.id === undefined);
-  if (insertedItem) {
-    transaction
-      .insert(watchlistItems)
-      .values({
-        watchlistId: destinationId,
-        ...insertFields,
-        customRank: insertedItem.newRank,
-      })
-      .run();
-  }
-}
