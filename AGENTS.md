@@ -9,7 +9,7 @@
 
 ## Git Conventions
 
-Agents should commit and push work frequently without explicit user request, and create branches/PRs when working on main.
+Agents should commit and push work frequently without explicit user request, and create branches/PRs instead of committing directly to main.
 
 ### On a feature branch
 
