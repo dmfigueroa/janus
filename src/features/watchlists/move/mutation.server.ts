@@ -4,6 +4,7 @@ import { type WatchlistItemOrderMode } from "@/features/watchlists/order";
 import {
   insertItemWithCustomOrder,
   type InsertionPosition,
+  type ItemInsertFields,
 } from "@/features/watchlists/order-insert.server";
 import {
   markLastItemAddedInTransaction,
@@ -11,7 +12,6 @@ import {
 } from "@/features/watchlists/repository.server";
 import { and, eq } from "drizzle-orm";
 import { MoveItemError } from "@/features/watchlists/errors.server";
-import { extractItemFields, type ItemInsertFields } from "@/features/watchlists/item-fields.server";
 
 type WatchlistItemRow = typeof watchlistItems.$inferSelect;
 
@@ -103,7 +103,23 @@ function executeMove(
   position?: InsertionPosition,
 ) {
   return db.transaction((transaction) => {
-    const insertFields = extractItemFields(item);
+    const insertFields: ItemInsertFields = {
+      tmdbId: item.tmdbId,
+      source: item.source,
+      mediaType: item.mediaType,
+      title: item.title,
+      parentId: item.parentId,
+      parentTitle: item.parentTitle,
+      season: item.season,
+      episode: item.episode,
+      posterPath: item.posterPath,
+      releaseDate: item.releaseDate,
+      voteAverage: item.voteAverage,
+      runtime: item.runtime,
+      isWatched: item.isWatched,
+      authors: item.authors,
+      addedAt: item.addedAt,
+    };
 
     deleteItemFromSource(transaction, item.id);
     insertItemIntoDestination(transaction, insertFields, destination, position);

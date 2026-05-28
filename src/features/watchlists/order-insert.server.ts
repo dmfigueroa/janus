@@ -1,11 +1,15 @@
 import { watchlistItems } from "@/db/schema";
 import { and, asc, eq } from "drizzle-orm";
-import type { ItemInsertFields } from "@/features/watchlists/item-fields.server";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/order";
 import { customRankOrder } from "@/features/watchlists/order.server";
 import type { WatchlistTransaction } from "@/features/watchlists/repository.server";
 
 export type InsertionPosition = "beginning" | "end" | "release-adjacent";
+
+export type ItemInsertFields = Omit<
+  typeof watchlistItems.$inferSelect,
+  "id" | "watchlistId" | "customRank"
+>;
 
 type ItemWithOrder = {
   id?: number;
