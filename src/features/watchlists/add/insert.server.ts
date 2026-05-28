@@ -1,34 +1,25 @@
 import { getDb } from "@/db/db.server";
 import { watchlistItems, watchlists } from "@/db/schema";
-import { compareReleaseDates } from "@/features/watchlists/order";
 import { customRankOrder } from "@/features/watchlists/order.server";
-import { markLastItemAddedInTransaction } from "@/features/watchlists/repository.server";
+import {
+  markLastItemAddedInTransaction,
+  type WatchlistTransaction,
+} from "@/features/watchlists/repository.server";
+import { toWatchlistItemKey } from "@/features/watchlists/item-key";
+import { CUSTOM_ORDER_INSERTION_REQUIRED_MESSAGE } from "./constants";
+import { buildFinalOrder, orderPendingItemsByReleaseDate } from "./order-insertion";
+import type {
+  PendingWatchlistItem,
+  PendingWatchlistItemWithIndex,
+  OrderedWatchlistItem,
+  PersistedWatchlistItem,
+} from "./types";
 import type { AddToWatchlistInsertionPosition } from "./mutation";
 import { and, asc, eq } from "drizzle-orm";
-
-type PersistedWatchlistItem = Pick<
-  typeof watchlistItems.$inferSelect,
-  "id" | "tmdbId" | "mediaType" | "releaseDate" | "customRank"
->;
-
-type PendingWatchlistItem = typeof watchlistItems.$inferInsert;
-
-type PendingWatchlistItemWithIndex = PendingWatchlistItem & {
-  pendingIndex: number;
-};
-
-type OrderedWatchlistItem = PersistedWatchlistItem | PendingWatchlistItemWithIndex;
 
 type PersistAddedItemsResult =
   | { success: true; insertedCount: number }
   | { success: false; message: string };
-
-const CUSTOM_ORDER_INSERTION_REQUIRED_MESSAGE =
-  "Choose where to insert this item in the custom order.";
-
-export function getCustomOrderInsertionRequiredMessage() {
-  return CUSTOM_ORDER_INSERTION_REQUIRED_MESSAGE;
-}
 
 export async function persistAddedItems({
   watchlistId,
@@ -58,72 +49,114 @@ export async function persistAddedItems({
     }
 
     if (watchlist.itemOrderMode !== "custom") {
-      const inserted = tx
-        .insert(watchlistItems)
-        .values(items)
-        .onConflictDoNothing()
-        .returning({ id: watchlistItems.id })
-        .all();
-
-      if (inserted.length > 0) {
-        markLastItemAddedInTransaction(tx, watchlistId);
-      }
-
-      return { success: true, insertedCount: inserted.length };
+      return insertWithReleaseDateOrder({ tx, watchlistId, items });
     }
 
     if (!insertionPosition) {
       return { success: false, message: CUSTOM_ORDER_INSERTION_REQUIRED_MESSAGE };
     }
 
-    const existingItems = tx
-      .select({
-        id: watchlistItems.id,
-        tmdbId: watchlistItems.tmdbId,
-        mediaType: watchlistItems.mediaType,
-        releaseDate: watchlistItems.releaseDate,
-        customRank: watchlistItems.customRank,
-      })
-      .from(watchlistItems)
-      .where(eq(watchlistItems.watchlistId, watchlistId))
-      .orderBy(...customRankOrder, asc(watchlistItems.id))
-      .all();
-
-    const dedupedItems = dedupePendingItems(items, existingItems);
-    if (dedupedItems.length === 0) {
-      return { success: true, insertedCount: 0 };
-    }
-
-    const orderedPendingItems = orderPendingItemsByReleaseDate(dedupedItems);
-    const finalOrder = buildFinalOrder({
-      existingItems,
-      pendingItems: orderedPendingItems,
-      insertionPosition,
-    });
-
-    for (const [index, item] of finalOrder.entries()) {
-      const nextRank = index + 1;
-
-      if ("pendingIndex" in item) {
-        tx.insert(watchlistItems)
-          .values({
-            ...item,
-            customRank: nextRank,
-          })
-          .run();
-        continue;
-      }
-
-      tx.update(watchlistItems)
-        .set({ customRank: nextRank })
-        .where(and(eq(watchlistItems.id, item.id), eq(watchlistItems.watchlistId, watchlistId)))
-        .run();
-    }
-
-    markLastItemAddedInTransaction(tx, watchlistId);
-
-    return { success: true, insertedCount: orderedPendingItems.length };
+    return insertWithCustomOrder({ tx, watchlistId, items, insertionPosition });
   });
+}
+
+function insertWithReleaseDateOrder({
+  tx,
+  watchlistId,
+  items,
+}: {
+  tx: WatchlistTransaction;
+  watchlistId: number;
+  items: PendingWatchlistItem[];
+}): PersistAddedItemsResult {
+  const inserted = tx
+    .insert(watchlistItems)
+    .values(items)
+    .onConflictDoNothing()
+    .returning({ id: watchlistItems.id })
+    .all();
+
+  if (inserted.length > 0) {
+    markLastItemAddedInTransaction(tx, watchlistId);
+  }
+
+  return { success: true, insertedCount: inserted.length };
+}
+
+function insertWithCustomOrder({
+  tx,
+  watchlistId,
+  items,
+  insertionPosition,
+}: {
+  tx: WatchlistTransaction;
+  watchlistId: number;
+  items: PendingWatchlistItem[];
+  insertionPosition: AddToWatchlistInsertionPosition;
+}): PersistAddedItemsResult {
+  const existingItems = tx
+    .select({
+      id: watchlistItems.id,
+      tmdbId: watchlistItems.tmdbId,
+      mediaType: watchlistItems.mediaType,
+      releaseDate: watchlistItems.releaseDate,
+      customRank: watchlistItems.customRank,
+    })
+    .from(watchlistItems)
+    .where(eq(watchlistItems.watchlistId, watchlistId))
+    .orderBy(...customRankOrder, asc(watchlistItems.id))
+    .all();
+
+  const dedupedItems = dedupePendingItems(items, existingItems);
+  if (dedupedItems.length === 0) {
+    return { success: true, insertedCount: 0 };
+  }
+
+  const orderedPendingItems = orderPendingItemsByReleaseDate(dedupedItems);
+  const finalOrder = buildFinalOrder({
+    existingItems,
+    pendingItems: orderedPendingItems,
+    insertionPosition,
+  });
+
+  const { inserts, updates } = assignCustomRanks(finalOrder);
+
+  for (const { item, rank } of inserts) {
+    tx.insert(watchlistItems)
+      .values({ ...item, customRank: rank })
+      .run();
+  }
+
+  for (const { id, rank } of updates) {
+    tx.update(watchlistItems)
+      .set({ customRank: rank })
+      .where(and(eq(watchlistItems.id, id), eq(watchlistItems.watchlistId, watchlistId)))
+      .run();
+  }
+
+  markLastItemAddedInTransaction(tx, watchlistId);
+
+  return { success: true, insertedCount: orderedPendingItems.length };
+}
+
+function assignCustomRanks(ordered: OrderedWatchlistItem[]): {
+  inserts: Array<{ item: PendingWatchlistItemWithIndex; rank: number }>;
+  updates: Array<{ id: number; rank: number }>;
+} {
+  const inserts: Array<{ item: PendingWatchlistItemWithIndex; rank: number }> = [];
+  const updates: Array<{ id: number; rank: number }> = [];
+
+  for (const [index, item] of ordered.entries()) {
+    const rank = index + 1;
+
+    if ("pendingIndex" in item) {
+      inserts.push({ item, rank });
+    } else {
+      updates.push({ id: item.id, rank });
+    }
+  }
+
+  return { inserts, updates };
 }
 
 function dedupePendingItems(
@@ -142,87 +175,4 @@ function dedupePendingItems(
     pendingKeys.add(itemKey);
     return true;
   });
-}
-
-function orderPendingItemsByReleaseDate(
-  items: PendingWatchlistItem[],
-): PendingWatchlistItemWithIndex[] {
-  return items
-    .map((item, pendingIndex) => ({
-      ...item,
-      pendingIndex,
-    }))
-    .sort((left, right) =>
-      compareReleaseDates(
-        {
-          id: left.pendingIndex,
-          releaseDate: left.releaseDate ?? null,
-        },
-        {
-          id: right.pendingIndex,
-          releaseDate: right.releaseDate ?? null,
-        },
-      ),
-    );
-}
-
-function buildFinalOrder({
-  existingItems,
-  pendingItems,
-  insertionPosition,
-}: {
-  existingItems: PersistedWatchlistItem[];
-  pendingItems: PendingWatchlistItemWithIndex[];
-  insertionPosition: AddToWatchlistInsertionPosition;
-}) {
-  if (insertionPosition === "beginning") {
-    return [...pendingItems, ...existingItems];
-  }
-
-  if (insertionPosition === "end") {
-    return [...existingItems, ...pendingItems];
-  }
-
-  const nextOrder: OrderedWatchlistItem[] = [...existingItems];
-
-  for (const pendingItem of pendingItems) {
-    const insertionIndex = getReleaseAdjacentInsertionIndex(nextOrder, pendingItem);
-    nextOrder.splice(insertionIndex, 0, pendingItem);
-  }
-
-  return nextOrder;
-}
-
-function getReleaseAdjacentInsertionIndex(
-  currentOrder: OrderedWatchlistItem[],
-  pendingItem: PendingWatchlistItemWithIndex,
-) {
-  const pendingReleaseDate = normalizeReleaseDate(pendingItem.releaseDate);
-  if (!pendingReleaseDate) {
-    return currentOrder.length;
-  }
-
-  let lastMatchingIndex = -1;
-
-  for (const [index, item] of currentOrder.entries()) {
-    const itemReleaseDate = normalizeReleaseDate(item.releaseDate);
-    if (!itemReleaseDate) {
-      continue;
-    }
-
-    if (itemReleaseDate <= pendingReleaseDate) {
-      lastMatchingIndex = index;
-    }
-  }
-
-  return lastMatchingIndex === -1 ? 0 : lastMatchingIndex + 1;
-}
-
-function normalizeReleaseDate(releaseDate: string | null | undefined) {
-  const normalized = releaseDate?.trim();
-  return normalized ? normalized : null;
-}
-
-function toWatchlistItemKey(item: Pick<PersistedWatchlistItem, "tmdbId" | "mediaType">) {
-  return `${item.tmdbId}::${item.mediaType}`;
 }
