@@ -468,8 +468,7 @@ describe("move watchlist parent mutation", () => {
       destinationWatchlistId: destination.id,
     });
 
-    expect(result.success).toBe(true);
-    expect(result.movedCount).toBe(3);
+    expect(result).toMatchObject({ success: true, movedCount: 3 });
 
     const sourceDetail = await readWatchlistDetailScreen({
       watchlistId: source.id,
@@ -628,8 +627,7 @@ describe("move watchlist parent mutation", () => {
       destinationWatchlistId: destination.id,
     });
 
-    expect(result.success).toBe(true);
-    expect(result.movedCount).toBe(1);
+    expect(result).toMatchObject({ success: true, movedCount: 1 });
 
     const sourceDetail = await readWatchlistDetailScreen({
       watchlistId: source.id,
