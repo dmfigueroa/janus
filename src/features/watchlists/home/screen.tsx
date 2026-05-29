@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button";
 import { WatchlistCard } from "@/components/WatchlistCard";
 import { WatchlistFormDialog } from "@/features/watchlists/components/WatchlistFormDialog";
 import { MergeWatchlistDialog } from "@/components/MergeWatchlistDialog";
-import type { WatchlistHomeScreen } from "@/features/watchlists/home/query.server";
+import type {
+  WatchlistHomeScreen,
+  WatchlistSummary,
+} from "@/features/watchlists/home/query.server";
 import { formatNextItemWithParentTitle } from "@/features/watchlists/next-item-label";
 import { cn } from "@/utils/cn";
 
@@ -112,13 +115,13 @@ export function WatchlistsHomeScreen({ initialData }: WatchlistsHomeScreenProps)
                       </div>
                     ))}
                   </div>
-                  {section.incomingWatchlists.length > 0 ? (
+                  {section.upcomingWatchlists.length > 0 ? (
                     <div className="mt-4 border-t border-border/60 pt-3">
                       <p className="mb-2 text-sm font-medium text-muted-foreground">
                         Coming up after these
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        {section.incomingWatchlists.flatMap((watchlist) => {
+                        {section.upcomingWatchlists.flatMap((watchlist: WatchlistSummary) => {
                           const label = formatIncomingWatchlistLabel(watchlist);
                           if (!label) {
                             return [];
