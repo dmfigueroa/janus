@@ -22,6 +22,7 @@ import { useToggleWatchedItem } from "@/features/watchlists/detail/use-toggle-wa
 import { getWatchlistParentRemovalPreviewQuery } from "@/features/watchlists/remove/query";
 import { useRemoveWatchlistItemMutation } from "@/features/watchlists/remove/use-remove-watchlist-item";
 import { useRemoveWatchlistParentMutation } from "@/features/watchlists/remove/use-remove-watchlist-parent";
+import { MoveParentDialog } from "@/features/watchlists/move/move-parent-dialog";
 
 type TimelineItemActionsProps = {
   item: WatchlistItem;
@@ -38,8 +39,11 @@ export function TimelineItemActions({
   const [removeItemOpen, setRemoveItemOpen] = useState(false);
   const [removeParentOpen, setRemoveParentOpen] = useState(false);
   const [moveItemOpen, setMoveItemOpen] = useState(false);
+  const [moveParentOpen, setMoveParentOpen] = useState(false);
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<number | null>(null);
+  const [selectedParentWatchlistId, setSelectedParentWatchlistId] = useState<number | null>(null);
   const [selectedPosition, setSelectedPosition] = useState<InsertionPosition>("end");
+  const [selectedParentPosition, setSelectedParentPosition] = useState<InsertionPosition>("end");
   const previewFn = useServerFn(getWatchlistParentRemovalPreviewQuery);
   const labels = getRemovalLabels(item);
   const quietWatchMutation = useToggleWatchedItem(item, { updateWatchlistRecency: false });
@@ -127,6 +131,23 @@ export function TimelineItemActions({
               </Button>
             ) : null}
 
+            {item.parentId ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-auto whitespace-normal text-left justify-start py-2 gap-2"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setSelectedParentWatchlistId(null);
+                  setSelectedParentPosition("end");
+                  setMoveParentOpen(true);
+                }}
+              >
+                <ArrowRightFromLine size={14} />
+                {labels.moveParent}
+              </Button>
+            ) : null}
+
             <Button
               type="button"
               variant="ghost"
@@ -210,6 +231,19 @@ export function TimelineItemActions({
         selectedPosition={selectedPosition}
         onSelectedPositionChange={setSelectedPosition}
       />
+
+      <MoveParentDialog
+        item={item}
+        activeFilters={activeFilters}
+        open={moveParentOpen}
+        onOpenChange={setMoveParentOpen}
+        selectedWatchlistId={selectedParentWatchlistId}
+        onSelectedWatchlistIdChange={setSelectedParentWatchlistId}
+        selectedPosition={selectedParentPosition}
+        onSelectedPositionChange={setSelectedParentPosition}
+        preview={previewQuery.data}
+        title={labels.moveParent}
+      />
     </>
   );
 }
@@ -219,6 +253,7 @@ function getRemovalLabels(item: Pick<WatchlistItem, "mediaType">) {
     return {
       item: "Remove episode",
       parent: "Remove show",
+      moveParent: "Move show",
     };
   }
 
@@ -226,12 +261,14 @@ function getRemovalLabels(item: Pick<WatchlistItem, "mediaType">) {
     return {
       item: "Remove issue",
       parent: "Remove volume",
+      moveParent: "Move volume",
     };
   }
 
   return {
     item: "Remove item",
     parent: "Remove group",
+    moveParent: "Move group",
   };
 }
 

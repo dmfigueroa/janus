@@ -154,3 +154,102 @@ function insertItemForReleaseMode(
     .values({ watchlistId: destinationId, ...insertFields })
     .run();
 }
+
+export async function moveParentAndChildrenToWatchlistMutation({
+  itemId,
+  destinationWatchlistId,
+  position,
+}: {
+  itemId: number;
+  destinationWatchlistId: number;
+  position?: InsertionPosition;
+}): Promise<MoveItemResult> {
+  const db = getDb();
+
+  let item: WatchlistItemRow;
+  let destination: { id: number; name: string; itemOrderMode: WatchlistItemOrderMode };
+
+  try {
+    item = await fetchItemOrThrow(db, itemId);
+    destination = await fetchWatchlistOrThrow(db, destinationWatchlistId);
+  } catch (e) {
+    if (e instanceof MoveItemError) {
+      return { success: false, message: e.message };
+    }
+    throw e;
+  }
+
+  if (!item.parentId) {
+    return { success: false, message: "Item has no parent group." };
+  }
+
+  const siblings = await db.query.watchlistItems.findMany({
+    where: and(
+      eq(watchlistItems.watchlistId, item.watchlistId),
+      eq(watchlistItems.parentId, item.parentId),
+    ),
+  });
+
+  const allGroupItems = siblings.length > 0 ? siblings : [item];
+
+  try {
+    await ensureNoDuplicatesForGroup(db, allGroupItems, destinationWatchlistId);
+  } catch (e) {
+    if (e instanceof MoveItemError) {
+      return { success: false, message: e.message };
+    }
+    throw e;
+  }
+
+  await executeGroupMove(db, allGroupItems, destination, position);
+
+  return {
+    success: true,
+    movedCount: allGroupItems.length,
+    message: `Moved ${allGroupItems.length > 1 ? `${allGroupItems.length} items` : item.title} to ${destination.name}.`,
+  };
+}
+
+async function ensureNoDuplicatesForGroup(
+  db: ReturnType<typeof getDb>,
+  items: WatchlistItemRow[],
+  destinationWatchlistId: number,
+) {
+  for (const item of items) {
+    await ensureNoDuplicate(db, item, destinationWatchlistId);
+  }
+}
+
+function executeGroupMove(
+  db: ReturnType<typeof getDb>,
+  items: WatchlistItemRow[],
+  destination: { id: number; itemOrderMode: WatchlistItemOrderMode },
+  position?: InsertionPosition,
+) {
+  return db.transaction((transaction) => {
+    for (const item of items) {
+      const insertFields: ItemInsertFields = {
+        tmdbId: item.tmdbId,
+        source: item.source,
+        mediaType: item.mediaType,
+        title: item.title,
+        parentId: item.parentId,
+        parentTitle: item.parentTitle,
+        season: item.season,
+        episode: item.episode,
+        posterPath: item.posterPath,
+        releaseDate: item.releaseDate,
+        voteAverage: item.voteAverage,
+        runtime: item.runtime,
+        isWatched: item.isWatched,
+        authors: item.authors,
+        addedAt: item.addedAt,
+      };
+
+      deleteItemFromSource(transaction, item.id);
+      insertItemIntoDestination(transaction, insertFields, destination, position);
+    }
+
+    markLastItemAddedInTransaction(transaction, destination.id);
+  });
+}
