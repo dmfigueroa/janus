@@ -3,13 +3,15 @@ import {
   type WatchlistSummary,
 } from "@/features/watchlists/list/query.server";
 
+export type { WatchlistSummary };
+
 export type WatchlistHomeSectionKey = "movie" | "tv" | "game" | "book" | "comic";
 
 export type WatchlistHomeSection = {
   key: WatchlistHomeSectionKey;
   title: string;
   watchlists: WatchlistSummary[];
-  incomingWatchlists: WatchlistSummary[];
+  upcomingWatchlists: WatchlistSummary[];
 };
 
 export type WatchlistHomeTotals = {
@@ -59,7 +61,7 @@ function compareWatchlistHomeRank(left: WatchlistSummary, right: WatchlistSummar
     return createdAtComparison;
   }
 
-  return left.id - right.id;
+  return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
 }
 
 function normalizeHomeSectionKey(mediaType: WatchlistSummary["stats"]["coverMediaType"]) {
@@ -123,7 +125,7 @@ export async function getWatchlistHome(): Promise<WatchlistHomeScreen> {
           key,
           title,
           watchlists: watchlists.slice(0, MAX_FEATURED_WATCHLISTS_PER_SECTION),
-          incomingWatchlists: watchlists.slice(
+          upcomingWatchlists: watchlists.slice(
             MAX_FEATURED_WATCHLISTS_PER_SECTION,
             MAX_FEATURED_WATCHLISTS_PER_SECTION * 2,
           ),

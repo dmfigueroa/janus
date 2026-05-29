@@ -3,6 +3,7 @@ import * as schema from "@/db/schema";
 import { createIsolatedTestDb, type IsolatedTestDb } from "@/test/isolated-db";
 import { watchlistListQueryKey } from "./list/query";
 import { WatchlistsRead } from "./read.server";
+import type { WatchlistSummary } from "@/features/watchlists/home/query.server";
 
 const dbState = vi.hoisted(() => ({
   db: undefined as IsolatedTestDb | undefined,
@@ -394,8 +395,10 @@ describe("WatchlistsRead.homeScreen", () => {
       "Second Created",
       "Third Created",
     ]);
-    expect(home.featuredSections[0]?.incomingWatchlists.map((watchlist) => watchlist.name)).toEqual(
-      ["Fourth Created", "Fifth Created"],
-    );
+    expect(
+      home.featuredSections[0]?.upcomingWatchlists.map(
+        (watchlist: WatchlistSummary) => watchlist.name,
+      ),
+    ).toEqual(["Fourth Created", "Fifth Created"]);
   });
 });

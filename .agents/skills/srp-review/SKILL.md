@@ -47,6 +47,10 @@ For each violation found:
 2. **Rationalize**: Explain why it violates SRP or hinders readability.
 3. **Propose**: Show a structural sketch of the refactored code.
 
+### 5. Verify Before Claiming
+
+When auditing a file, do not assume things that can be verified by reading the code. Before claiming a value, type, or behavior is null, default, optional, or absent — look it up. Check the schema, the type definition, or the surrounding code. If you cannot verify it from the code under review or adjacent files (e.g., DB schema, shared types), mark it as a hypothesis and state it explicitly rather than presenting it as fact.
+
 ## References
 
 - **SRP**: A class should have one reason to change (Uncle Bob).

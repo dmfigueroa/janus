@@ -136,7 +136,7 @@ function homeData(overrides?: Partial<WatchlistHomeScreen>): WatchlistHomeScreen
         key: "movie",
         title: "Movies",
         watchlists: [featuredMovie],
-        incomingWatchlists: [],
+        upcomingWatchlists: [],
       },
     ],
     allWatchlists: [featuredMovie, backlog],
@@ -224,7 +224,7 @@ describe("WatchlistsHomeScreen", () => {
               key: "movie",
               title: "Movies",
               watchlists: [watchlist({ id: 1, name: "Movie Night" })],
-              incomingWatchlists: [firstIncoming, secondIncoming],
+              upcomingWatchlists: [firstIncoming, secondIncoming],
             },
           ],
         })}
