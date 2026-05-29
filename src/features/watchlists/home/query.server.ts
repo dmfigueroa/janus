@@ -37,10 +37,10 @@ function compareOptionalTimestampsAsc(left: string | null, right: string | null)
     return 0;
   }
   if (left === null) {
-    return -1;
+    return 1;
   }
   if (right === null) {
-    return 1;
+    return -1;
   }
   return left.localeCompare(right);
 }
