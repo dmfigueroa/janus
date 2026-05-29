@@ -42,7 +42,7 @@ function compareOptionalTimestampsAsc(left: string | null, right: string | null)
   if (right === null) {
     return -1;
   }
-  return left.localeCompare(right);
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function compareWatchlistHomeRank(left: WatchlistSummary, right: WatchlistSummary) {
