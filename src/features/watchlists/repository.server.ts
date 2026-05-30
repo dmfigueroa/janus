@@ -19,7 +19,7 @@ export async function createWatchlist({
   const db = getDb();
   const [watchlist] = await db
     .insert(watchlists)
-    .values({ name, description, itemOrderMode })
+    .values({ name, description, itemOrderMode, lastWatchedAt: sql`CURRENT_TIMESTAMP` })
     .returning();
   return watchlist;
 }
