@@ -401,4 +401,46 @@ describe("WatchlistsRead.homeScreen", () => {
       ),
     ).toEqual(["Fourth Created", "Fifth Created"]);
   });
+
+  it("sorts null lastWatchedAt before non-null so never-watched lists surface on the home page", async () => {
+    const [neverWatched] = await db
+      .insert(watchlists)
+      .values({ name: "Never Watched" })
+      .returning();
+    const [watchedRecently] = await db
+      .insert(watchlists)
+      .values({
+        name: "Watched Recently",
+        lastWatchedAt: "2024-06-01 00:00:00",
+      })
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: neverWatched.id,
+        tmdbId: "movie-1",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Unwatched Movie",
+        releaseDate: "2024-01-01",
+        isWatched: false,
+      },
+      {
+        watchlistId: watchedRecently.id,
+        tmdbId: "movie-2",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Recent Movie",
+        releaseDate: "2024-02-01",
+        isWatched: false,
+      },
+    ]);
+
+    const home = await WatchlistsRead.homeScreen();
+
+    expect(home.allWatchlists.map((watchlist) => watchlist.name)).toEqual([
+      "Never Watched",
+      "Watched Recently",
+    ]);
+  });
 });

@@ -112,6 +112,17 @@ describe("watchlist mutation contract", () => {
     });
   });
 
+  it("sets lastWatchedAt on creation so the new list sorts after previously-watched lists, not at the null boundary", async () => {
+    await createWatchlistMutation({
+      name: "Fresh List",
+    });
+
+    const summaries = await WatchlistsRead.listScreen();
+
+    expect(summaries[0]?.lastWatchedAt).toBeTruthy();
+    expect(typeof summaries[0]?.lastWatchedAt).toBe("string");
+  });
+
   it("deletes a watchlist through the feature mutation boundary so it disappears from read flows", async () => {
     const [watchlist] = await db
       .insert(watchlists)

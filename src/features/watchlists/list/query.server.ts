@@ -147,7 +147,9 @@ function buildListOrderBy(orderBy: WatchlistListOrder, order: "asc" | "desc") {
   switch (orderBy) {
     case "lastWatched":
       return [
-        sql`CASE WHEN ${watchlists.lastWatchedAt} IS NULL THEN 1 ELSE 0 END`,
+        order === "desc"
+          ? sql`CASE WHEN ${watchlists.lastWatchedAt} IS NULL THEN 1 ELSE 0 END`
+          : sql`CASE WHEN ${watchlists.lastWatchedAt} IS NULL THEN 0 ELSE 1 END`,
         orderFn(watchlists.lastWatchedAt),
       ] as const;
     case "lastAdded":
