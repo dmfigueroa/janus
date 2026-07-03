@@ -33,6 +33,7 @@ Agents should commit and push work frequently without explicit user request, and
 - Use conventional pull request titles in the same format
 - Prefer standard conventional commit types: `feat`, `fix`, `refactor`, `chore`, `docs`, `test`, `build`
 - Open PRs as ready for review by default. Create draft PRs only when explicitly requested.
+- **Never use `--no-verify` or `--no-gpg-sign` or any flag that bypasses git hooks.** If a hook fails or times out, diagnose and fix the issue rather than skipping it. Hooks exist to catch problems before they reach CI.
 
 ## Database Migrations
 

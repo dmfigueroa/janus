@@ -14,6 +14,7 @@ let testDb: Awaited<ReturnType<typeof createIsolatedTestDb>>;
 let db: IsolatedTestDb;
 const { watchlists, watchlistItems } = schema;
 let moveItemToWatchlistMutation: typeof import("./mutation.server").moveItemToWatchlistMutation;
+let moveParentAndChildrenToWatchlistMutation: typeof import("./mutation.server").moveParentAndChildrenToWatchlistMutation;
 let readWatchlistDetailScreen: typeof import("../read.server").WatchlistsRead.detailScreen;
 
 beforeAll(async () => {
@@ -27,6 +28,7 @@ beforeAll(async () => {
   ]);
 
   moveItemToWatchlistMutation = moveModule.moveItemToWatchlistMutation;
+  moveParentAndChildrenToWatchlistMutation = moveModule.moveParentAndChildrenToWatchlistMutation;
   readWatchlistDetailScreen = readModule.WatchlistsRead.detailScreen;
 });
 
@@ -400,5 +402,274 @@ describe("move watchlist item mutation", () => {
       totalItems: 1,
       watchedItems: 1,
     });
+  });
+});
+
+describe("move watchlist parent mutation", () => {
+  it("moves a parent and all children to destination — all siblings present in destination, absent from source", async () => {
+    const [source, destination] = await db
+      .insert(watchlists)
+      .values([{ name: "Queue" }, { name: "Watched" }])
+      .returning();
+
+    const parentId = "tmdb:42";
+    const [parent] = await db
+      .insert(watchlistItems)
+      .values({
+        watchlistId: source.id,
+        tmdbId: "tv-42",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Breaking Bad",
+        parentId,
+        parentTitle: "Breaking Bad",
+        isWatched: false,
+      })
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: source.id,
+        tmdbId: "tv-42-s1e1",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Pilot",
+        parentId,
+        parentTitle: "Breaking Bad",
+        season: 1,
+        episode: "1",
+        isWatched: true,
+      },
+      {
+        watchlistId: source.id,
+        tmdbId: "tv-42-s1e2",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Cat's in the Bag",
+        parentId,
+        parentTitle: "Breaking Bad",
+        season: 1,
+        episode: "2",
+        isWatched: false,
+      },
+    ]);
+
+    await db.insert(watchlistItems).values({
+      watchlistId: source.id,
+      tmdbId: "movie-99",
+      source: "tmdb",
+      mediaType: "movie",
+      title: "Unrelated Movie",
+      isWatched: false,
+    });
+
+    const result = await moveParentAndChildrenToWatchlistMutation({
+      itemId: parent.id,
+      destinationWatchlistId: destination.id,
+    });
+
+    expect(result).toMatchObject({ success: true, movedCount: 3 });
+
+    const sourceDetail = await readWatchlistDetailScreen({
+      watchlistId: source.id,
+      unwatchedOnly: false,
+    });
+    expect(sourceDetail?.items.map((i) => i.title)).toEqual(["Unrelated Movie"]);
+
+    const destDetail = await readWatchlistDetailScreen({
+      watchlistId: destination.id,
+      unwatchedOnly: false,
+    });
+    const destTitles = destDetail?.items.map((i) => i.title) ?? [];
+    expect(destTitles).toContain("Breaking Bad");
+    expect(destTitles).toContain("Pilot");
+    expect(destTitles).toContain("Cat's in the Bag");
+    expect(destTitles.length).toBe(3);
+  });
+
+  it("rejects whole move if any sibling already exists in destination — source unchanged, destination unchanged", async () => {
+    const [source, destination] = await db
+      .insert(watchlists)
+      .values([{ name: "Queue" }, { name: "Watched" }])
+      .returning();
+
+    const parentId = "tmdb:42";
+    const [parent] = await db
+      .insert(watchlistItems)
+      .values({
+        watchlistId: source.id,
+        tmdbId: "tv-42",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Breaking Bad",
+        parentId,
+        parentTitle: "Breaking Bad",
+        isWatched: false,
+      })
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: source.id,
+        tmdbId: "tv-42-s1e1",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Pilot",
+        parentId,
+        parentTitle: "Breaking Bad",
+        season: 1,
+        episode: "1",
+        isWatched: true,
+      },
+      {
+        watchlistId: source.id,
+        tmdbId: "tv-42-s1e2",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Cat's in the Bag",
+        parentId,
+        parentTitle: "Breaking Bad",
+        season: 1,
+        episode: "2",
+        isWatched: false,
+      },
+    ]);
+
+    await db.insert(watchlistItems).values({
+      watchlistId: destination.id,
+      tmdbId: "tv-42-s1e1",
+      source: "tmdb",
+      mediaType: "episode",
+      title: "Pilot",
+      parentId,
+      parentTitle: "Breaking Bad",
+      season: 1,
+      episode: "1",
+      isWatched: false,
+    });
+
+    const result = await moveParentAndChildrenToWatchlistMutation({
+      itemId: parent.id,
+      destinationWatchlistId: destination.id,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain("already");
+
+    const sourceDetail = await readWatchlistDetailScreen({
+      watchlistId: source.id,
+      unwatchedOnly: false,
+    });
+    const sourceTitles = sourceDetail?.items.map((i) => i.title) ?? [];
+    expect(sourceTitles).toContain("Breaking Bad");
+    expect(sourceTitles).toContain("Pilot");
+    expect(sourceTitles).toContain("Cat's in the Bag");
+    expect(sourceTitles.length).toBe(3);
+
+    const destDetail = await readWatchlistDetailScreen({
+      watchlistId: destination.id,
+      unwatchedOnly: false,
+    });
+    const destTitles = destDetail?.items.map((i) => i.title) ?? [];
+    expect(destTitles).toEqual(["Pilot"]);
+    expect(destTitles.length).toBe(1);
+  });
+
+  it("does not affect single-item move — moving a child with the single-item mutation moves only that row", async () => {
+    const [source, destination] = await db
+      .insert(watchlists)
+      .values([{ name: "Queue" }, { name: "Watched" }])
+      .returning();
+
+    const parentId = "tmdb:42";
+    await db.insert(watchlistItems).values({
+      watchlistId: source.id,
+      tmdbId: "tv-42",
+      source: "tmdb",
+      mediaType: "episode",
+      title: "Breaking Bad",
+      parentId,
+      parentTitle: "Breaking Bad",
+      isWatched: false,
+    });
+
+    const [child] = await db
+      .insert(watchlistItems)
+      .values({
+        watchlistId: source.id,
+        tmdbId: "tv-42-s1e1",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Pilot",
+        parentId,
+        parentTitle: "Breaking Bad",
+        season: 1,
+        episode: "1",
+        isWatched: true,
+      })
+      .returning();
+
+    await db.insert(watchlistItems).values({
+      watchlistId: source.id,
+      tmdbId: "tv-42-s1e2",
+      source: "tmdb",
+      mediaType: "episode",
+      title: "Cat's in the Bag",
+      parentId,
+      parentTitle: "Breaking Bad",
+      season: 1,
+      episode: "2",
+      isWatched: false,
+    });
+
+    const result = await moveItemToWatchlistMutation({
+      itemId: child.id,
+      destinationWatchlistId: destination.id,
+    });
+
+    expect(result).toMatchObject({ success: true, movedCount: 1 });
+
+    const sourceDetail = await readWatchlistDetailScreen({
+      watchlistId: source.id,
+      unwatchedOnly: false,
+    });
+    const sourceTitles = sourceDetail?.items.map((i) => i.title) ?? [];
+    expect(sourceTitles).toContain("Breaking Bad");
+    expect(sourceTitles).toContain("Cat's in the Bag");
+    expect(sourceTitles).not.toContain("Pilot");
+    expect(sourceTitles.length).toBe(2);
+
+    const destDetail = await readWatchlistDetailScreen({
+      watchlistId: destination.id,
+      unwatchedOnly: false,
+    });
+    expect(destDetail?.items.map((i) => i.title)).toEqual(["Pilot"]);
+    expect(destDetail?.items.length).toBe(1);
+  });
+
+  it("returns error when moved item has no parentId", async () => {
+    const [source, destination] = await db
+      .insert(watchlists)
+      .values([{ name: "Queue" }, { name: "Watched" }])
+      .returning();
+
+    const [item] = await db
+      .insert(watchlistItems)
+      .values({
+        watchlistId: source.id,
+        tmdbId: "movie-1",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "The Matrix",
+      })
+      .returning();
+
+    const result = await moveParentAndChildrenToWatchlistMutation({
+      itemId: item.id,
+      destinationWatchlistId: destination.id,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.message).toBe("Item has no parent group.");
   });
 });

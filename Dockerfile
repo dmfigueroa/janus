@@ -1,10 +1,16 @@
-FROM node:24-bookworm AS base
+FROM node:24.18.0-bookworm AS base
 
 # Install dependencies only when needed
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm pkg delete scripts.prepare && npm ci
+# Nitro depends on native oxc bindings during vite build; install the Linux
+# variants explicitly so Docker builds stay deterministic across environments.
+RUN npm pkg delete scripts.prepare \
+  && npm ci \
+  && npm install --no-save \
+    @oxc-minify/binding-linux-x64-gnu@$(node -p "require('./node_modules/oxc-minify/package.json').version") \
+    @oxc-transform/binding-linux-x64-gnu@$(node -p "require('./node_modules/oxc-transform/package.json').version")
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -24,7 +30,7 @@ COPY package.json package-lock.json ./
 # We use the full image (base) to ensure we have build tools for better-sqlite3
 RUN npm pkg delete scripts.prepare && npm ci --omit=dev
 
-FROM node:24-bookworm-slim AS runner
+FROM node:24.18.0-bookworm-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production

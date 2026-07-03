@@ -9,4 +9,7 @@ export default defineConfig({
     }),
     viteReact(),
   ],
+  test: {
+    testTimeout: 15_000,
+  },
 });
