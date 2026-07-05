@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { WatchlistHomeScreen } from "@/features/watchlists/home/query.server";
+import type { WatchlistHomeQueryData } from "@/features/watchlists/home/query";
 import type { EnrichedWatchlist } from "@/components/WatchlistCard";
 import { WatchlistsHomeScreen } from "@/features/watchlists/home/screen";
 
@@ -111,7 +111,7 @@ function nextUnwatchedFixture(
   } as NonNullable<EnrichedWatchlist["stats"]["nextUnwatched"]>;
 }
 
-function homeData(overrides?: Partial<WatchlistHomeScreen>): WatchlistHomeScreen {
+function homeData(overrides?: Partial<WatchlistHomeQueryData>): WatchlistHomeQueryData {
   const featuredMovie = watchlist({
     id: 1,
     name: "Movie Night",
