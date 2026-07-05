@@ -8,7 +8,7 @@ When adding or moving code, ask these questions in order.
 
 1. Is this a URL or route concern?
    Put it in `src/routes/*`.
-   Examples: param parsing, `validateSearch`, redirects, `notFound`, `loaderDeps`, route cache priming.
+   Examples: param parsing, `validateSearch`, redirects, `notFound`, `loaderDeps`, route cache priming, route-level data loading, and straightforward page assembly from feature-owned components.
 2. Is this business logic or UI for one product area?
    Put it in `src/features/<feature>/*`.
 3. Is this UI reused across multiple use cases within one feature?
@@ -31,8 +31,10 @@ If the answer is no at every step, keep the code in the owning feature until a c
 ### New Route
 
 - Add the route file under `src/routes/*`.
-- Keep route-only logic in the route file.
-- Import the screen component and safe query or mutation surface from the owning feature.
+- Keep URL behavior and route-level page assembly in the route file.
+- Load data through safe feature query or mutation surfaces.
+- Compose feature-owned components directly when the route is mostly arranging already-focused pieces.
+- Create a feature `screen.tsx` only when the page composition is substantial enough to deserve its own module.
 
 Example:
 
@@ -48,7 +50,7 @@ src/features/watchlists/detail/query.server.ts
 - Create a shallow use-case folder under the owning feature.
 - Put the safe entrypoint in `query.ts`.
 - Put server-only logic in `query.server.ts`.
-- Put page-sized UI in `screen.tsx` when the route needs a non-trivial screen.
+- Put page-sized UI in `screen.tsx` when the page composition has its own meaningful responsibility beyond route-level assembly.
 - Collocate tests.
 
 Example:
