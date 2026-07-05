@@ -30,7 +30,7 @@ export function BottomNav() {
                 <item.icon
                   className={cn(
                     "w-6 h-6",
-                    isActive && "fill-current drop-shadow-[0_0_8px_hsl(var(--primary)/0.5)]",
+                    isActive && "drop-shadow-[0_0_8px_hsl(var(--primary)/0.5)]",
                   )}
                 />
                 <span className="text-[10px] font-medium tracking-wide">{item.label}</span>
