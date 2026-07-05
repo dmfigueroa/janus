@@ -9,7 +9,7 @@ The repo is in transition. Apply this structure to all new code, and move touche
 - Follow TanStack Start's client/server boundary model instead of older controller-style patterns.
 - Organize business code by feature so each area has one obvious home.
 - Preserve a Rails-like concern decomposition inside each feature without creating a deep generic service stack.
-- Keep routes thin and local to URL concerns.
+- Keep routes focused on URL behavior and route-level page assembly.
 - Keep shared code small and deliberate.
 
 ## Top-Level Structure
@@ -17,7 +17,7 @@ The repo is in transition. Apply this structure to all new code, and move touche
 ```text
 src/
   app/           # App shell, router setup, root document, nav, global chrome
-  routes/        # TanStack Start route entrypoints only
+  routes/        # TanStack Start route entrypoints and route-level page assembly
   ui/            # Reusable design-system primitives
   shared/        # Tiny set of cross-feature helpers/hooks/types
   db/            # Database schema, connection, migrations
@@ -30,7 +30,7 @@ src/
 - `src/app/*`
   App-level pieces such as `router.tsx`, the root shell, navigation, theme wiring, PWA wiring, and app-wide not-found/error presentation.
 - `src/routes/*`
-  File-based TanStack Start routes. Routes own params, search parsing, redirects, `notFound`, loader deps, and cache priming.
+  File-based TanStack Start routes. Routes own params, search parsing, redirects, `notFound`, loader deps, cache priming, and straightforward page assembly from feature-owned components.
 - `src/ui/*`
   Reusable design-system primitives. These should not import feature code.
 - `src/shared/*`
@@ -122,7 +122,7 @@ Rules:
 
 ## Route Responsibilities
 
-Keep route-only concerns in the route file:
+Routes own URL behavior and route-level page assembly:
 
 - param parsing
 - search validation and defaults
@@ -130,8 +130,19 @@ Keep route-only concerns in the route file:
 - `notFound`
 - `loaderDeps`
 - cache seeding and prefetch wiring
+- route-level data loading through safe feature query surfaces
+- composing feature-owned components into the page
+- route-local providers needed by that page
 
-Move business logic and page-sized UI into the owning feature use case.
+Routes may compose feature components directly when the route is mostly arranging already-focused pieces. Do not create a feature `screen.tsx` solely to keep a route file visually small.
+
+Move code out of the route when it introduces a separate reason to change, such as:
+
+- reusable page sections
+- complex JSX subtrees
+- domain-specific display logic
+- local workflow state that belongs behind a feature component or provider
+- business rules or data transformations
 
 ## Error Handling And Data Surfaces
 

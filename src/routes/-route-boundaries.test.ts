@@ -16,11 +16,19 @@ describe("route module boundaries", () => {
     expect(watchlistDetailRoute).not.toMatch(/from\s+["'][^"']+\.server["']/);
   });
 
-  it("loads the watchlist home screen through the feature-owned read surface", () => {
+  it("loads the watchlist home route through the feature-owned read surface", () => {
     const indexRoute = readFileSync(workspaceFile("src/routes/index.tsx"), "utf8");
 
     expect(indexRoute).toMatch(/from\s+["']@\/features\/watchlists\/home\/query["']/);
-    expect(indexRoute).toMatch(/from\s+["']@\/features\/watchlists\/home\/screen["']/);
+    expect(indexRoute).toMatch(
+      /from\s+["']@\/features\/watchlists\/home\/all-watchlists-section["']/,
+    );
+    expect(indexRoute).toMatch(
+      /from\s+["']@\/features\/watchlists\/home\/featured-media-sections["']/,
+    );
+    expect(indexRoute).toMatch(
+      /from\s+["']@\/features\/watchlists\/home\/watchlist-merge-selection-context["']/,
+    );
     expect(indexRoute).not.toMatch(/from\s+["']@\/controllers\/watchlists["']/);
   });
 
