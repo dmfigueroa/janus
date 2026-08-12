@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistItem } from "@/db/schema";
+import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/query";
 import { TimelineItem } from "./timeline-item";
 
 const toggleWatchedMutate = vi.fn();
@@ -13,6 +14,32 @@ const previewState = {
   data: undefined as { count: number; watchedCount: number } | undefined,
   isLoading: false,
   isError: false,
+};
+const activeFilters: WatchlistDetailQueryFilters = {
+  watchlistId: 1,
+  itemOrderMode: "release",
+  unwatchedOnly: false,
+  query: "",
+};
+const baseItem: WatchlistItem = {
+  id: 1,
+  watchlistId: 1,
+  tmdbId: "1",
+  source: "tmdb",
+  mediaType: "movie",
+  title: "Standalone Movie",
+  parentId: null,
+  parentTitle: null,
+  season: null,
+  episode: null,
+  posterPath: null,
+  releaseDate: "2024-01-01",
+  voteAverage: null,
+  runtime: null,
+  customRank: null,
+  isWatched: false,
+  authors: null,
+  addedAt: "2024-01-01 00:00:00",
 };
 
 vi.mock("@/features/watchlists/detail/use-toggle-watched-item", () => ({
@@ -88,19 +115,9 @@ afterEach(() => {
   previewState.isError = false;
 });
 
-describe("TimelineItem removal actions", () => {
+describe("TimelineItem watched actions", () => {
   it("offers a quiet watched action for unwatched items and runs it immediately", async () => {
-    render(
-      <TimelineItem
-        item={createItem({ id: 1, title: "Standalone Movie", mediaType: "movie", parentId: null })}
-        activeFilters={{
-          watchlistId: 1,
-          itemOrderMode: "release",
-          unwatchedOnly: false,
-          query: "",
-        }}
-      />,
-    );
+    renderTimelineItem();
 
     fireEvent.click(screen.getByRole("button", { name: "More actions for Standalone Movie" }));
 
@@ -113,43 +130,18 @@ describe("TimelineItem removal actions", () => {
   });
 
   it("hides the quiet watched action for items that are already watched", () => {
-    render(
-      <TimelineItem
-        item={createItem({
-          id: 1,
-          title: "Standalone Movie",
-          mediaType: "movie",
-          parentId: null,
-          isWatched: true,
-        })}
-        activeFilters={{
-          watchlistId: 1,
-          itemOrderMode: "release",
-          unwatchedOnly: false,
-          query: "",
-        }}
-      />,
-    );
+    renderTimelineItem({ isWatched: true });
 
     fireEvent.click(screen.getByRole("button", { name: "More actions for Standalone Movie" }));
 
     expect(screen.queryByRole("button", { name: "Mark watched without updating list" })).toBeNull();
   });
+});
 
-  it("shows only single-item removal for standalone items and confirms with the item title", async () => {
+describe("TimelineItem removal actions", () => {
+  it("confirms standalone item removal with its title", async () => {
     removeItemMutateAsync.mockResolvedValue({ success: true });
-
-    render(
-      <TimelineItem
-        item={createItem({ id: 1, title: "Standalone Movie", mediaType: "movie", parentId: null })}
-        activeFilters={{
-          watchlistId: 1,
-          itemOrderMode: "release",
-          unwatchedOnly: false,
-          query: "",
-        }}
-      />,
-    );
+    renderTimelineItem();
 
     fireEvent.click(screen.getByRole("button", { name: "More actions for Standalone Movie" }));
 
@@ -170,27 +162,16 @@ describe("TimelineItem removal actions", () => {
     });
   });
 
-  it("shows parent removal for grouped episodes and includes preview counts in the confirmation", async () => {
+  it("includes grouped-item preview counts in parent removal", async () => {
     previewState.data = { count: 3, watchedCount: 1 };
     removeParentMutateAsync.mockResolvedValue({ success: true });
-
-    render(
-      <TimelineItem
-        item={createItem({
-          id: 2,
-          title: "Pilot",
-          mediaType: "episode",
-          parentId: "tmdb:42",
-          parentTitle: "Great Show",
-        })}
-        activeFilters={{
-          watchlistId: 1,
-          itemOrderMode: "release",
-          unwatchedOnly: false,
-          query: "",
-        }}
-      />,
-    );
+    renderTimelineItem({
+      id: 2,
+      title: "Pilot",
+      mediaType: "episode",
+      parentId: "tmdb:42",
+      parentTitle: "Great Show",
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "More actions for Pilot" }));
 
@@ -214,39 +195,6 @@ describe("TimelineItem removal actions", () => {
   });
 });
 
-function createItem({
-  id,
-  title,
-  mediaType,
-  parentId,
-  parentTitle = null,
-  isWatched = false,
-}: {
-  id: number;
-  title: string;
-  mediaType: WatchlistItem["mediaType"];
-  parentId: string | null;
-  parentTitle?: string | null;
-  isWatched?: boolean;
-}): WatchlistItem {
-  return {
-    id,
-    watchlistId: 1,
-    tmdbId: String(id),
-    source: mediaType === "comic" ? "comicvine" : "tmdb",
-    mediaType,
-    title,
-    parentId,
-    parentTitle,
-    season: null,
-    episode: null,
-    posterPath: null,
-    releaseDate: "2024-01-01",
-    voteAverage: null,
-    runtime: null,
-    customRank: null,
-    isWatched,
-    authors: null,
-    addedAt: "2024-01-01 00:00:00",
-  };
+function renderTimelineItem(overrides: Partial<WatchlistItem> = {}) {
+  render(<TimelineItem item={{ ...baseItem, ...overrides }} activeFilters={activeFilters} />);
 }
