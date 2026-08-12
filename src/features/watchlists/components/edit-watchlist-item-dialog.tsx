@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import type { WatchlistItem } from "@/db/schema";
 import {
   type EditWatchlistItemValues,
@@ -21,22 +21,6 @@ type EditWatchlistItemDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
-
-function useEditWatchlistItemForm(item: WatchlistItem, open: boolean) {
-  const [values, setValues] = useState<EditWatchlistItemValues>(() => getInitialValues(item));
-
-  useEffect(() => {
-    if (open) {
-      setValues(getInitialValues(item));
-    }
-  }, [item, open]);
-
-  return {
-    values,
-    setTitle: (title: string) => setValues((current) => ({ ...current, title })),
-    setReleaseDate: (releaseDate: string) => setValues((current) => ({ ...current, releaseDate })),
-  };
-}
 
 function getInitialValues(item: WatchlistItem): EditWatchlistItemValues {
   return {
@@ -84,25 +68,18 @@ function EditWatchlistItemFields({
   );
 }
 
-export function EditWatchlistItemDialog({
+function EditWatchlistItemForm({
   item,
-  open,
   onOpenChange,
-}: EditWatchlistItemDialogProps) {
-  const form = useEditWatchlistItemForm(item, open);
+}: Pick<EditWatchlistItemDialogProps, "item" | "onOpenChange">) {
+  const [values, setValues] = useState<EditWatchlistItemValues>(() => getInitialValues(item));
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const mutation = useEditWatchlistItemMutation(item);
-
-  useEffect(() => {
-    if (open) {
-      setErrorMessage(null);
-    }
-  }, [item, open]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage(null);
-    mutation.mutate(form.values, {
+    mutation.mutate(values, {
       onSuccess: (result) => {
         if (result.success) {
           onOpenChange(false);
@@ -115,23 +92,41 @@ export function EditWatchlistItemDialog({
   };
 
   return (
+    <form onSubmit={handleSubmit}>
+      <DialogHeader>
+        <DialogTitle>Edit watchlist item</DialogTitle>
+        <DialogDescription>Update this item’s title and release date.</DialogDescription>
+      </DialogHeader>
+      <EditWatchlistItemFields
+        item={item}
+        values={values}
+        setTitle={(title) => setValues((current) => ({ ...current, title }))}
+        setReleaseDate={(releaseDate) => setValues((current) => ({ ...current, releaseDate }))}
+        errorMessage={errorMessage}
+      />
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending ? "Saving..." : "Save"}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+export function EditWatchlistItemDialog({
+  item,
+  open,
+  onOpenChange,
+}: EditWatchlistItemDialogProps) {
+  const formKey = `${item.id}:${item.title}:${item.releaseDate ?? ""}:${open}`;
+
+  return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle>Edit watchlist item</DialogTitle>
-            <DialogDescription>Update this item’s title and release date.</DialogDescription>
-          </DialogHeader>
-          <EditWatchlistItemFields item={item} {...form} errorMessage={errorMessage} />
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? "Saving..." : "Save"}
-            </Button>
-          </DialogFooter>
-        </form>
+        <EditWatchlistItemForm key={formKey} item={item} onOpenChange={onOpenChange} />
       </DialogContent>
     </Dialog>
   );
