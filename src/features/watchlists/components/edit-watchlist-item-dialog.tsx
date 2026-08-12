@@ -1,3 +1,5 @@
+import { format, parse } from "date-fns";
+import { CalendarIcon } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import type { WatchlistItem } from "@/db/schema";
 import {
@@ -15,6 +17,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type EditWatchlistItemDialogProps = {
   item: WatchlistItem;
@@ -56,12 +60,43 @@ function EditWatchlistItemFields({
       </div>
       <div className="grid gap-2">
         <Label htmlFor={`edit-release-date-${item.id}`}>Release date</Label>
-        <Input
-          id={`edit-release-date-${item.id}`}
-          type="date"
-          value={values.releaseDate}
-          onChange={(event) => setReleaseDate(event.target.value)}
-        />
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              id={`edit-release-date-${item.id}`}
+              type="button"
+              variant="outline"
+              className="justify-start text-left font-normal"
+            >
+              <CalendarIcon />
+              {values.releaseDate
+                ? format(parse(values.releaseDate, "yyyy-MM-dd", new Date()), "PPP")
+                : "Select date"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={
+                values.releaseDate ? parse(values.releaseDate, "yyyy-MM-dd", new Date()) : undefined
+              }
+              defaultMonth={
+                values.releaseDate ? parse(values.releaseDate, "yyyy-MM-dd", new Date()) : undefined
+              }
+              onSelect={(date) => setReleaseDate(date ? format(date, "yyyy-MM-dd") : "")}
+            />
+            {values.releaseDate ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="m-2 w-[calc(100%-1rem)]"
+                onClick={() => setReleaseDate("")}
+              >
+                Clear date
+              </Button>
+            ) : null}
+          </PopoverContent>
+        </Popover>
       </div>
       {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
     </div>
