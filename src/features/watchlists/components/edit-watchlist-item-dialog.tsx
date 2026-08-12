@@ -1,5 +1,3 @@
-import { format, parse } from "date-fns";
-import { CalendarIcon } from "lucide-react";
 import { useState, type ChangeEvent, type FormEvent } from "react";
 import type { WatchlistItem } from "@/db/schema";
 import {
@@ -17,8 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ReleaseDateField } from "@/features/watchlists/components/release-date-field";
 
 type EditWatchlistItemDialogProps = {
   item: WatchlistItem;
@@ -48,23 +45,10 @@ function EditWatchlistItemFields({
 }) {
   const titleInputId = `edit-title-${item.id}`;
   const releaseDateInputId = `edit-release-date-${item.id}`;
-  const parsedReleaseDate = values.releaseDate
-    ? parse(values.releaseDate, "yyyy-MM-dd", new Date())
-    : undefined;
-  const formattedReleaseDate = parsedReleaseDate ? format(parsedReleaseDate, "PPP") : "Select date";
-  const hasReleaseDate = values.releaseDate.length > 0;
   const titleIsInvalid = values.title.trim().length === 0;
 
   const handleTitleChange = (event: ChangeEvent<HTMLInputElement>) => {
     setTitle(event.target.value);
-  };
-
-  const handleReleaseDateChange = (date: Date | undefined) => {
-    setReleaseDate(date ? format(date, "yyyy-MM-dd") : "");
-  };
-
-  const handleClearReleaseDate = () => {
-    setReleaseDate("");
   };
 
   return (
@@ -81,37 +65,11 @@ function EditWatchlistItemFields({
       </div>
       <div className="grid gap-2">
         <Label htmlFor={releaseDateInputId}>Release date</Label>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              id={releaseDateInputId}
-              type="button"
-              variant="outline"
-              className="justify-start text-left font-normal"
-            >
-              <CalendarIcon />
-              {formattedReleaseDate}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={parsedReleaseDate}
-              defaultMonth={parsedReleaseDate}
-              onSelect={handleReleaseDateChange}
-            />
-            {hasReleaseDate ? (
-              <Button
-                type="button"
-                variant="ghost"
-                className="m-2 w-[calc(100%-1rem)]"
-                onClick={handleClearReleaseDate}
-              >
-                Clear date
-              </Button>
-            ) : null}
-          </PopoverContent>
-        </Popover>
+        <ReleaseDateField
+          inputId={releaseDateInputId}
+          releaseDate={values.releaseDate}
+          setReleaseDate={setReleaseDate}
+        />
       </div>
       {errorMessage ? <p className="text-sm text-destructive">{errorMessage}</p> : null}
     </div>
