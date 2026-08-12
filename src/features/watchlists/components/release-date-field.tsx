@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { format, isValid, parse } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,8 +21,56 @@ function parseReleaseDate(releaseDate: string): Date | undefined {
   return isValid(parsedReleaseDate) ? parsedReleaseDate : undefined;
 }
 
-function formatDateInput(date: Date | undefined): string {
+function formatReleaseDate(date: Date | undefined): string {
   return date ? format(date, "yyyy-MM-dd") : "";
+}
+
+const numericDateFormatter = new Intl.DateTimeFormat(undefined, {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+const numericDateParts = numericDateFormatter
+  .formatToParts(new Date(2001, 10, 22))
+  .map((part) => part.type)
+  .filter((part): part is "year" | "month" | "day" => /^(?:year|month|day)$/.test(part));
+const dateSeparator = numericDateFormatter
+  .formatToParts(new Date(2001, 10, 22))
+  .find((part) => part.type === "literal")?.value;
+const datePlaceholder = numericDateParts
+  .map((part) => ({ year: "YYYY", month: "MM", day: "DD" })[part])
+  .join(dateSeparator ?? "/");
+
+function formatDateInput(releaseDate: string): string {
+  const parsedReleaseDate = parseReleaseDate(releaseDate);
+  return parsedReleaseDate ? numericDateFormatter.format(parsedReleaseDate) : releaseDate;
+}
+
+function parseCompleteDateInput(dateInput: string): string | undefined {
+  const values = dateInput.split(/\D+/);
+  if (values.length !== numericDateParts.length) {
+    return undefined;
+  }
+
+  const dateValues = Object.fromEntries(
+    numericDateParts.map((part, index) => [part, Number(values[index])]),
+  );
+  const date = new Date(dateValues.year, dateValues.month - 1, dateValues.day);
+  const enteredParts = [dateValues.year, dateValues.month - 1, dateValues.day];
+  const parsedParts = [date.getFullYear(), date.getMonth(), date.getDate()];
+  const isValidDate = parsedParts.every((part, index) => part === enteredParts[index]);
+
+  return isValidDate ? formatReleaseDate(date) : undefined;
+}
+
+function parseDateInput(dateInput: string): string | undefined {
+  return /^\d{4}$/.test(dateInput) ? dateInput : parseCompleteDateInput(dateInput);
+}
+
+function getDateInputValidationMessage(dateInput: string, releaseDate: string | undefined): string {
+  return dateInput.length > 0 && !releaseDate
+    ? `Enter a valid date as ${datePlaceholder} or YYYY.`
+    : "";
 }
 
 const releaseDateStartMonth = new Date(1440, 0);
@@ -33,30 +81,45 @@ export function ReleaseDateField({
   inputName,
   initialReleaseDate,
 }: ReleaseDateFieldProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
   const [releaseDate, setReleaseDate] = useState(initialReleaseDate);
+  const [dateInput, setDateInput] = useState(() => formatDateInput(initialReleaseDate));
   const parsedReleaseDate = parseReleaseDate(releaseDate);
   const hasReleaseDate = releaseDate.length > 0;
 
   const handleReleaseDateChange = (date: Date | undefined) => {
-    setReleaseDate(formatDateInput(date));
+    const nextReleaseDate = formatReleaseDate(date);
+    setReleaseDate(nextReleaseDate);
+    setDateInput(formatDateInput(nextReleaseDate));
+    inputRef.current?.setCustomValidity("");
+  };
+
+  const handleDateInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const nextDateInput = event.target.value;
+    const nextReleaseDate = parseDateInput(nextDateInput);
+    setDateInput(nextDateInput);
+    setReleaseDate(nextReleaseDate ?? nextDateInput);
+    event.target.setCustomValidity(getDateInputValidationMessage(nextDateInput, nextReleaseDate));
   };
 
   const handleClearReleaseDate = () => {
     setReleaseDate("");
+    setDateInput("");
+    inputRef.current?.setCustomValidity("");
   };
 
   return (
     <div className="relative">
+      <input type="hidden" name={inputName} value={releaseDate} readOnly />
       <Input
+        ref={inputRef}
         id={inputId}
-        name={inputName}
-        value={releaseDate}
-        placeholder="YYYY or YYYY-MM-DD"
-        pattern="(?:\d{4}|\d{4}-\d{2}-\d{2})"
-        title="Enter a year (YYYY) or complete date (YYYY-MM-DD)"
+        value={dateInput}
+        placeholder={`${datePlaceholder} or YYYY`}
+        title={`Enter a date as ${datePlaceholder} or YYYY`}
         inputMode="numeric"
         className="pr-10"
-        onChange={(event) => setReleaseDate(event.target.value)}
+        onChange={handleDateInputChange}
       />
       <Popover>
         <PopoverTrigger asChild>
