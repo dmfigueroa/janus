@@ -32,6 +32,9 @@ function formatDateInput(date: Date | undefined): string {
   return date ? format(date, "yyyy-MM-dd") : "";
 }
 
+const releaseDateStartMonth = new Date(1800, 0);
+const releaseDateEndMonth = new Date(new Date().getFullYear() + 10, 11);
+
 export function ReleaseDateField({
   inputId,
   inputName,
@@ -69,6 +72,10 @@ export function ReleaseDateField({
           mode="single"
           selected={parsedReleaseDate}
           defaultMonth={parsedReleaseDate}
+          captionLayout="dropdown"
+          startMonth={releaseDateStartMonth}
+          endMonth={releaseDateEndMonth}
+          navLayout="after"
           onSelect={handleReleaseDateChange}
         />
         {hasReleaseDate ? (
