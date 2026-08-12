@@ -18,7 +18,12 @@ export function EditWatchlistItemDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <EditWatchlistItemForm key={formKey} item={item} onOpenChange={onOpenChange} />
+        <EditWatchlistItemForm
+          key={formKey}
+          item={item}
+          onSaved={() => onOpenChange(false)}
+          onCanceled={() => onOpenChange(false)}
+        />
       </DialogContent>
     </Dialog>
   );

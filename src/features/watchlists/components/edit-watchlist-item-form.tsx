@@ -9,7 +9,8 @@ import { useEditWatchlistItemMutation } from "@/features/watchlists/edit/use-edi
 
 type EditWatchlistItemFormProps = {
   item: WatchlistItem;
-  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+  onCanceled: () => void;
 };
 
 function SaveButton({ isSaving }: { isSaving: boolean }) {
@@ -20,14 +21,14 @@ function SaveButton({ isSaving }: { isSaving: boolean }) {
   );
 }
 
-export function EditWatchlistItemForm({ item, onOpenChange }: EditWatchlistItemFormProps) {
+export function EditWatchlistItemForm({ item, onSaved, onCanceled }: EditWatchlistItemFormProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const mutation = useEditWatchlistItemMutation(item);
   const titleInputId = `edit-title-${item.id}`;
   const releaseDateInputId = `edit-release-date-${item.id}`;
 
   const handleCancel = () => {
-    onOpenChange(false);
+    onCanceled();
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -43,7 +44,7 @@ export function EditWatchlistItemForm({ item, onOpenChange }: EditWatchlistItemF
       {
         onSuccess: (result) => {
           if (result.success) {
-            onOpenChange(false);
+            onSaved();
           } else {
             setErrorMessage(result.message);
           }
