@@ -54,9 +54,9 @@ Agents should commit and push work frequently without explicit user request, and
 - Do not use `"use server"` or `"use client"` directives. Prefer framework-native boundaries such as `createServerFn`, route/module boundaries, and `.server` files where appropriate.
 - Remove `"use server"` and `"use client"` directives when you encounter them unless there is a documented, current framework requirement that makes one unavoidable.
 - In React components, call TanStack Start server functions through `useServerFn(serverFn)` instead of invoking server functions directly from event handlers, mutations, or query functions.
+- Encapsulate every `useQuery` and `useMutation` call in a feature-owned custom hook. Components should consume the hook's data and actions rather than define query or mutation configuration inline.
 - Keep feature-owned query keys and query options in the feature module, and include every loader/search/filter input that affects returned data in the query key.
 - For `createServerFn` and other TanStack response surfaces, expected user-facing failures must return structured error objects such as `{ success: false, message }` instead of throwing. Reserve throws for framework control flow like `redirect` / `notFound` or truly unexpected defects.
-- Avoid `any`. Prefer provider result types, local interfaces, explicit narrowing, or typed helper boundaries.
 
 ## Naming
 
@@ -64,6 +64,8 @@ Agents should commit and push work frequently without explicit user request, and
 - Parameter and variable names should be readable without domain context. `item` is fine in a watchlist context; `tx` is not.
 
 ## Code Style
+
+Keep JSX declarative and rendering-only. Trivial expressions such as string concatenation and one-line ternaries may stay in JSX, but move more complex parsing, transformation, and branching into component logic or a child component. Components over 50 lines must be placed in their own adjacent file.
 
 Prefer declarative and functional code over imperative code.
 

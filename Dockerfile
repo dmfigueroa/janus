@@ -4,13 +4,9 @@ FROM node:24.18.0-bookworm AS base
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-# Nitro depends on native oxc bindings during vite build; install the Linux
-# variants explicitly so Docker builds stay deterministic across environments.
+# npm ci installs the Linux native oxc bindings from package-lock.json.
 RUN npm pkg delete scripts.prepare \
-  && npm ci \
-  && npm install --no-save \
-    @oxc-minify/binding-linux-x64-gnu@$(node -p "require('./node_modules/oxc-minify/package.json').version") \
-    @oxc-transform/binding-linux-x64-gnu@$(node -p "require('./node_modules/oxc-transform/package.json').version")
+  && npm ci
 
 # Rebuild the source code only when needed
 FROM base AS builder
