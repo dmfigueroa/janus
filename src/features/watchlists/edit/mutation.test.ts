@@ -4,7 +4,10 @@ import { editWatchlistItemSchema } from "./mutation";
 describe("edit watchlist item validation", () => {
   const baseInput = { watchlistId: 1, itemId: 2, title: "Movie" };
 
-  it("accepts complete calendar dates and an explicitly cleared date", () => {
+  it("accepts year-only dates, complete calendar dates, and an explicitly cleared date", () => {
+    expect(editWatchlistItemSchema.safeParse({ ...baseInput, releaseDate: "2025" }).success).toBe(
+      true,
+    );
     expect(
       editWatchlistItemSchema.safeParse({ ...baseInput, releaseDate: "2025-02-03" }).success,
     ).toBe(true);
@@ -13,8 +16,8 @@ describe("edit watchlist item validation", () => {
     );
   });
 
-  it("rejects year-only and impossible calendar dates", () => {
-    expect(editWatchlistItemSchema.safeParse({ ...baseInput, releaseDate: "2025" }).success).toBe(
+  it("rejects malformed and impossible calendar dates", () => {
+    expect(editWatchlistItemSchema.safeParse({ ...baseInput, releaseDate: "25" }).success).toBe(
       false,
     );
     expect(

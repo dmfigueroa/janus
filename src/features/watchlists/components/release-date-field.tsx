@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { format, parse } from "date-fns";
+import { format, isValid, parse } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -12,19 +12,20 @@ type ReleaseDateFieldProps = {
 };
 
 function parseReleaseDate(releaseDate: string): Date | undefined {
-  if (!releaseDate) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) {
     return undefined;
   }
 
-  return parse(releaseDate, "yyyy-MM-dd", new Date());
+  const parsedReleaseDate = parse(releaseDate, "yyyy-MM-dd", new Date());
+  return isValid(parsedReleaseDate) ? parsedReleaseDate : undefined;
 }
 
-function formatReleaseDate(releaseDate: Date | undefined): string {
-  if (!releaseDate) {
-    return "Select date";
+function formatReleaseDate(releaseDate: string, parsedReleaseDate: Date | undefined): string {
+  if (/^\d{4}$/.test(releaseDate)) {
+    return releaseDate;
   }
 
-  return format(releaseDate, "PPP");
+  return parsedReleaseDate ? format(parsedReleaseDate, "PPP") : "Select date";
 }
 
 function formatDateInput(date: Date | undefined): string {
@@ -38,7 +39,7 @@ export function ReleaseDateField({
 }: ReleaseDateFieldProps) {
   const [releaseDate, setReleaseDate] = useState(initialReleaseDate);
   const parsedReleaseDate = parseReleaseDate(releaseDate);
-  const formattedReleaseDate = formatReleaseDate(parsedReleaseDate);
+  const formattedReleaseDate = formatReleaseDate(releaseDate, parsedReleaseDate);
   const hasReleaseDate = releaseDate.length > 0;
 
   const handleReleaseDateChange = (date: Date | undefined) => {

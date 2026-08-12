@@ -15,11 +15,16 @@ const completeCalendarDate = z
     );
   }, "Release date must be a valid calendar date.");
 
+const releaseDate = z.union([
+  z.string().regex(/^\d{4}$/, "Release date must be YYYY or YYYY-MM-DD."),
+  completeCalendarDate,
+]);
+
 export const editWatchlistItemSchema = z.object({
   watchlistId: z.number(),
   itemId: z.number(),
   title: z.string().trim().min(1, "Title is required."),
-  releaseDate: z.union([completeCalendarDate, z.null()]),
+  releaseDate: z.union([releaseDate, z.null()]),
 });
 
 export type EditWatchlistItemInput = z.infer<typeof editWatchlistItemSchema>;
