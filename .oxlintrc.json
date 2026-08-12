@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["unicorn", "typescript", "oxc"],
+  "plugins": ["react", "unicorn", "typescript", "oxc"],
   "categories": {},
   "rules": {
     "complexity": ["error", 3],
@@ -54,6 +54,14 @@
     "no-unused-labels": "warn",
     "no-unused-private-class-members": "warn",
     "no-unused-vars": "warn",
+    "no-param-reassign": "error",
+    "no-plusplus": "warn",
+    "no-var": "error",
+    "typescript/no-explicit-any": "error",
+    "react/exhaustive-deps": "warn",
+    "react/jsx-key": "error",
+    "react/no-direct-mutation-state": "error",
+    "react/rules-of-hooks": "error",
     "no-useless-backreference": "warn",
     "no-useless-catch": "warn",
     "no-useless-escape": "warn",
