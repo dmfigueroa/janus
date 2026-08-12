@@ -53,6 +53,10 @@ vi.mock("@/features/watchlists/move/use-move-watchlist-parent", () => ({
   }),
 }));
 
+vi.mock("./edit-watchlist-item-dialog", () => ({
+  EditWatchlistItemDialog: () => null,
+}));
+
 vi.mock("@tanstack/react-query", async () => {
   const actual =
     await vi.importActual<typeof import("@tanstack/react-query")>("@tanstack/react-query");

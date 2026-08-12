@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { ArrowRightFromLine, MoreHorizontal } from "lucide-react";
+import { EditWatchlistItemDialog } from "./edit-watchlist-item-dialog";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +41,7 @@ export function TimelineItemActions({
   const [removeParentOpen, setRemoveParentOpen] = useState(false);
   const [moveItemOpen, setMoveItemOpen] = useState(false);
   const [moveParentOpen, setMoveParentOpen] = useState(false);
+  const [editItemOpen, setEditItemOpen] = useState(false);
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<number | null>(null);
   const [selectedParentWatchlistId, setSelectedParentWatchlistId] = useState<number | null>(null);
   const [selectedPosition, setSelectedPosition] = useState<InsertionPosition>("end");
@@ -111,6 +113,18 @@ export function TimelineItemActions({
               className="h-auto whitespace-normal text-left justify-start py-2"
               onClick={() => {
                 setMenuOpen(false);
+                setEditItemOpen(true);
+              }}
+            >
+              Edit
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-auto whitespace-normal text-left justify-start py-2"
+              onClick={() => {
+                setMenuOpen(false);
                 setRemoveItemOpen(true);
               }}
             >
@@ -165,6 +179,8 @@ export function TimelineItemActions({
           </div>
         </PopoverContent>
       </Popover>
+
+      <EditWatchlistItemDialog item={item} open={editItemOpen} onOpenChange={setEditItemOpen} />
 
       <AlertDialog open={removeItemOpen} onOpenChange={setRemoveItemOpen}>
         <AlertDialogContent>
