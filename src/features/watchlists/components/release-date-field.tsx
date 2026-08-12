@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { format, parse } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,8 +7,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 
 type ReleaseDateFieldProps = {
   inputId: string;
-  releaseDate: string;
-  setReleaseDate: (releaseDate: string) => void;
+  inputName: string;
+  initialReleaseDate: string;
 };
 
 function parseReleaseDate(releaseDate: string): Date | undefined {
@@ -30,7 +31,12 @@ function formatDateInput(date: Date | undefined): string {
   return date ? format(date, "yyyy-MM-dd") : "";
 }
 
-export function ReleaseDateField({ inputId, releaseDate, setReleaseDate }: ReleaseDateFieldProps) {
+export function ReleaseDateField({
+  inputId,
+  inputName,
+  initialReleaseDate,
+}: ReleaseDateFieldProps) {
+  const [releaseDate, setReleaseDate] = useState(initialReleaseDate);
   const parsedReleaseDate = parseReleaseDate(releaseDate);
   const formattedReleaseDate = formatReleaseDate(parsedReleaseDate);
   const hasReleaseDate = releaseDate.length > 0;
@@ -45,6 +51,7 @@ export function ReleaseDateField({ inputId, releaseDate, setReleaseDate }: Relea
 
   return (
     <Popover>
+      <input type="hidden" name={inputName} value={releaseDate} readOnly />
       <PopoverTrigger asChild>
         <Button
           id={inputId}
