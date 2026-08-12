@@ -66,7 +66,7 @@ Agents should commit and push work frequently without explicit user request, and
 
 ## Code Style
 
-Keep JSX declarative and rendering-only: calculate parsed or derived data, normalize values, and define event handlers in component logic before `return`. JSX should only compose elements and bind prepared values and handlers.
+Keep JSX declarative and rendering-only. Trivial expressions such as string concatenation and one-line ternaries may stay in JSX, but move more complex parsing, transformation, and branching into component logic or a child component. Keep JSX return complexity at most 2; move logic that raises a component above complexity 3 into another component. Components over 50 lines must be placed in their own adjacent file.
 
 Prefer declarative and functional code over imperative code.
 

@@ -3,6 +3,7 @@
   "plugins": ["unicorn", "typescript", "oxc"],
   "categories": {},
   "rules": {
+    "complexity": ["warn", 3],
     "constructor-super": "warn",
     "for-direction": "warn",
     "no-async-promise-executor": "warn",
@@ -31,6 +32,7 @@
     "no-import-assign": "warn",
     "no-invalid-regexp": "warn",
     "no-irregular-whitespace": "warn",
+    "max-lines-per-function": ["warn", { "max": 50, "skipBlankLines": true, "skipComments": true }],
     "no-loss-of-precision": "warn",
     "no-new-native-nonconstructor": "warn",
     "no-nonoctal-decimal-escape": "warn",
