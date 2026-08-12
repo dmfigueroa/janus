@@ -24,8 +24,6 @@ function SaveButton({ isSaving }: { isSaving: boolean }) {
 export function EditWatchlistItemForm({ item, onSaved, onCanceled }: EditWatchlistItemFormProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const mutation = useEditWatchlistItemMutation(item);
-  const titleInputId = `edit-title-${item.id}`;
-  const releaseDateInputId = `edit-release-date-${item.id}`;
 
   const handleCancel = () => {
     onCanceled();
@@ -62,13 +60,13 @@ export function EditWatchlistItemForm({ item, onSaved, onCanceled }: EditWatchli
       </DialogHeader>
       <div className="grid gap-4 py-4">
         <div className="grid gap-2">
-          <Label htmlFor={titleInputId}>Title</Label>
-          <Input id={titleInputId} name="title" defaultValue={item.title} required />
+          <Label htmlFor={`edit-title-${item.id}`}>Title</Label>
+          <Input id={`edit-title-${item.id}`} name="title" defaultValue={item.title} required />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor={releaseDateInputId}>Release date</Label>
+          <Label htmlFor={`edit-release-date-${item.id}`}>Release date</Label>
           <ReleaseDateField
-            inputId={releaseDateInputId}
+            inputId={`edit-release-date-${item.id}`}
             inputName="releaseDate"
             initialReleaseDate={item.releaseDate ?? ""}
           />
