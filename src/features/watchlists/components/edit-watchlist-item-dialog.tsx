@@ -1,6 +1,6 @@
 import { format, parse } from "date-fns";
 import { CalendarIcon } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useState, type ChangeEvent, type FormEvent } from "react";
 import type { WatchlistItem } from "@/db/schema";
 import {
   type EditWatchlistItemValues,
@@ -46,51 +46,66 @@ function EditWatchlistItemFields({
   setReleaseDate: (releaseDate: string) => void;
   errorMessage: string | null;
 }) {
+  const titleInputId = `edit-title-${item.id}`;
+  const releaseDateInputId = `edit-release-date-${item.id}`;
+  const parsedReleaseDate = values.releaseDate
+    ? parse(values.releaseDate, "yyyy-MM-dd", new Date())
+    : undefined;
+  const formattedReleaseDate = parsedReleaseDate ? format(parsedReleaseDate, "PPP") : "Select date";
+  const hasReleaseDate = values.releaseDate.length > 0;
+  const titleIsInvalid = values.title.trim().length === 0;
+
+  const handleTitleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setTitle(event.target.value);
+  };
+
+  const handleReleaseDateChange = (date: Date | undefined) => {
+    setReleaseDate(date ? format(date, "yyyy-MM-dd") : "");
+  };
+
+  const handleClearReleaseDate = () => {
+    setReleaseDate("");
+  };
+
   return (
     <div className="grid gap-4 py-4">
       <div className="grid gap-2">
-        <Label htmlFor={`edit-title-${item.id}`}>Title</Label>
+        <Label htmlFor={titleInputId}>Title</Label>
         <Input
-          id={`edit-title-${item.id}`}
+          id={titleInputId}
           value={values.title}
-          onChange={(event) => setTitle(event.target.value)}
+          onChange={handleTitleChange}
           required
-          aria-invalid={values.title.trim().length === 0}
+          aria-invalid={titleIsInvalid}
         />
       </div>
       <div className="grid gap-2">
-        <Label htmlFor={`edit-release-date-${item.id}`}>Release date</Label>
+        <Label htmlFor={releaseDateInputId}>Release date</Label>
         <Popover>
           <PopoverTrigger asChild>
             <Button
-              id={`edit-release-date-${item.id}`}
+              id={releaseDateInputId}
               type="button"
               variant="outline"
               className="justify-start text-left font-normal"
             >
               <CalendarIcon />
-              {values.releaseDate
-                ? format(parse(values.releaseDate, "yyyy-MM-dd", new Date()), "PPP")
-                : "Select date"}
+              {formattedReleaseDate}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
             <Calendar
               mode="single"
-              selected={
-                values.releaseDate ? parse(values.releaseDate, "yyyy-MM-dd", new Date()) : undefined
-              }
-              defaultMonth={
-                values.releaseDate ? parse(values.releaseDate, "yyyy-MM-dd", new Date()) : undefined
-              }
-              onSelect={(date) => setReleaseDate(date ? format(date, "yyyy-MM-dd") : "")}
+              selected={parsedReleaseDate}
+              defaultMonth={parsedReleaseDate}
+              onSelect={handleReleaseDateChange}
             />
-            {values.releaseDate ? (
+            {hasReleaseDate ? (
               <Button
                 type="button"
                 variant="ghost"
                 className="m-2 w-[calc(100%-1rem)]"
-                onClick={() => setReleaseDate("")}
+                onClick={handleClearReleaseDate}
               >
                 Clear date
               </Button>
@@ -110,6 +125,19 @@ function EditWatchlistItemForm({
   const [values, setValues] = useState<EditWatchlistItemValues>(() => getInitialValues(item));
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const mutation = useEditWatchlistItemMutation(item);
+  const isSaving = mutation.isPending;
+
+  const handleTitleChange = (nextTitle: string) => {
+    setValues((current) => ({ ...current, title: nextTitle }));
+  };
+
+  const handleReleaseDateChange = (nextReleaseDate: string) => {
+    setValues((current) => ({ ...current, releaseDate: nextReleaseDate }));
+  };
+
+  const handleCancel = () => {
+    onOpenChange(false);
+  };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -135,16 +163,16 @@ function EditWatchlistItemForm({
       <EditWatchlistItemFields
         item={item}
         values={values}
-        setTitle={(title) => setValues((current) => ({ ...current, title }))}
-        setReleaseDate={(releaseDate) => setValues((current) => ({ ...current, releaseDate }))}
+        setTitle={handleTitleChange}
+        setReleaseDate={handleReleaseDateChange}
         errorMessage={errorMessage}
       />
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+        <Button type="button" variant="outline" onClick={handleCancel}>
           Cancel
         </Button>
-        <Button type="submit" disabled={mutation.isPending}>
-          {mutation.isPending ? "Saving..." : "Save"}
+        <Button type="submit" disabled={isSaving}>
+          {isSaving ? "Saving..." : "Save"}
         </Button>
       </DialogFooter>
     </form>

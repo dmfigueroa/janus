@@ -66,6 +66,8 @@ Agents should commit and push work frequently without explicit user request, and
 
 ## Code Style
 
+Keep JSX declarative and rendering-only: calculate parsed or derived data, normalize values, and define event handlers in component logic before `return`. JSX should only compose elements and bind prepared values and handlers.
+
 Prefer declarative and functional code over imperative code.
 
 ### Prefer
