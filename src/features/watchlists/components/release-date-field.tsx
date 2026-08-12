@@ -3,6 +3,7 @@ import { format, isValid, parse } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
+import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type ReleaseDateFieldProps = {
@@ -20,14 +21,6 @@ function parseReleaseDate(releaseDate: string): Date | undefined {
   return isValid(parsedReleaseDate) ? parsedReleaseDate : undefined;
 }
 
-function formatReleaseDate(releaseDate: string, parsedReleaseDate: Date | undefined): string {
-  if (/^\d{4}$/.test(releaseDate)) {
-    return releaseDate;
-  }
-
-  return parsedReleaseDate ? format(parsedReleaseDate, "PPP") : "Select date";
-}
-
 function formatDateInput(date: Date | undefined): string {
   return date ? format(date, "yyyy-MM-dd") : "";
 }
@@ -42,7 +35,6 @@ export function ReleaseDateField({
 }: ReleaseDateFieldProps) {
   const [releaseDate, setReleaseDate] = useState(initialReleaseDate);
   const parsedReleaseDate = parseReleaseDate(releaseDate);
-  const formattedReleaseDate = formatReleaseDate(releaseDate, parsedReleaseDate);
   const hasReleaseDate = releaseDate.length > 0;
 
   const handleReleaseDateChange = (date: Date | undefined) => {
@@ -54,41 +46,57 @@ export function ReleaseDateField({
   };
 
   return (
-    <Popover>
-      <input type="hidden" name={inputName} value={releaseDate} readOnly />
-      <PopoverTrigger asChild>
-        <Button
-          id={inputId}
-          type="button"
-          variant="outline"
-          className="justify-start text-left font-normal"
-        >
-          <CalendarIcon />
-          {formattedReleaseDate}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={parsedReleaseDate}
-          defaultMonth={parsedReleaseDate}
-          captionLayout="dropdown"
-          startMonth={releaseDateStartMonth}
-          endMonth={releaseDateEndMonth}
-          navLayout="after"
-          onSelect={handleReleaseDateChange}
-        />
-        {hasReleaseDate ? (
+    <div className="relative">
+      <Input
+        id={inputId}
+        name={inputName}
+        value={releaseDate}
+        placeholder="YYYY or YYYY-MM-DD"
+        pattern="(?:\d{4}|\d{4}-\d{2}-\d{2})"
+        title="Enter a year (YYYY) or complete date (YYYY-MM-DD)"
+        inputMode="numeric"
+        className="pr-10"
+        onChange={(event) => setReleaseDate(event.target.value)}
+      />
+      <Popover>
+        <PopoverTrigger asChild>
           <Button
             type="button"
             variant="ghost"
-            className="m-2 w-[calc(100%-1rem)]"
-            onClick={handleClearReleaseDate}
+            size="icon"
+            className="absolute right-0 top-0 shadow-none"
+            aria-label="Open date picker"
           >
-            Clear date
+            <CalendarIcon />
           </Button>
-        ) : null}
-      </PopoverContent>
-    </Popover>
+        </PopoverTrigger>
+        <PopoverContent
+          className="max-h-[var(--radix-popover-content-available-height)] w-auto overflow-y-auto p-0"
+          align="end"
+          collisionPadding={8}
+        >
+          <Calendar
+            mode="single"
+            selected={parsedReleaseDate}
+            defaultMonth={parsedReleaseDate}
+            captionLayout="dropdown"
+            startMonth={releaseDateStartMonth}
+            endMonth={releaseDateEndMonth}
+            navLayout="after"
+            onSelect={handleReleaseDateChange}
+          />
+          {hasReleaseDate ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="m-2 w-[calc(100%-1rem)]"
+              onClick={handleClearReleaseDate}
+            >
+              Clear date
+            </Button>
+          ) : null}
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }

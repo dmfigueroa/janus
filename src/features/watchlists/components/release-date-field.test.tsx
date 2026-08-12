@@ -10,12 +10,23 @@ describe("ReleaseDateField", () => {
   });
 
   it("displays and preserves a year-only release date", () => {
-    const { container } = render(
+    render(
       <ReleaseDateField inputId="release-date" inputName="releaseDate" initialReleaseDate="2025" />,
     );
 
-    expect(screen.getByRole("button", { name: /2025/i })).not.toBeNull();
-    expect(container.querySelector('input[name="releaseDate"]')).toHaveProperty("value", "2025");
+    expect(screen.getByRole("textbox")).toHaveProperty("value", "2025");
+  });
+
+  it("accepts a release date from the keyboard", () => {
+    render(
+      <ReleaseDateField inputId="release-date" inputName="releaseDate" initialReleaseDate="" />,
+    );
+
+    const dateInput = screen.getByRole("textbox");
+    fireEvent.change(dateInput, { target: { value: "1950-10-16" } });
+
+    expect(dateInput).toHaveProperty("value", "1950-10-16");
+    expect(dateInput).toHaveProperty("name", "releaseDate");
   });
 
   it("allows direct navigation back to the invention of the printing press", () => {
@@ -23,10 +34,11 @@ describe("ReleaseDateField", () => {
       <ReleaseDateField inputId="release-date" inputName="releaseDate" initialReleaseDate="" />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /select date/i }));
+    fireEvent.click(screen.getByRole("button", { name: /open date picker/i }));
 
     const yearDropdown = screen.getByRole("combobox", { name: /year/i });
     expect(yearDropdown.querySelector('option[value="1440"]')).not.toBeNull();
     expect(yearDropdown.querySelector('option[value="1439"]')).toBeNull();
+    expect(screen.getByRole("dialog").classList.contains("overflow-y-auto")).toBe(true);
   });
 });
