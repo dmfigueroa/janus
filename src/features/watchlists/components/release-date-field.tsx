@@ -32,7 +32,7 @@ function formatDateInput(date: Date | undefined): string {
   return date ? format(date, "yyyy-MM-dd") : "";
 }
 
-const releaseDateStartMonth = new Date(1800, 0);
+const releaseDateStartMonth = new Date(1440, 0);
 const releaseDateEndMonth = new Date(new Date().getFullYear() + 10, 11);
 
 export function ReleaseDateField({

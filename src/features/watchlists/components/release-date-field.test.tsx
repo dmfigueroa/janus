@@ -18,7 +18,7 @@ describe("ReleaseDateField", () => {
     expect(container.querySelector('input[name="releaseDate"]')).toHaveProperty("value", "2025");
   });
 
-  it("allows direct navigation to a historical year", () => {
+  it("allows direct navigation back to the invention of the printing press", () => {
     render(
       <ReleaseDateField inputId="release-date" inputName="releaseDate" initialReleaseDate="" />,
     );
@@ -26,6 +26,7 @@ describe("ReleaseDateField", () => {
     fireEvent.click(screen.getByRole("button", { name: /select date/i }));
 
     const yearDropdown = screen.getByRole("combobox", { name: /year/i });
-    expect(yearDropdown.querySelector('option[value="1950"]')).not.toBeNull();
+    expect(yearDropdown.querySelector('option[value="1440"]')).not.toBeNull();
+    expect(yearDropdown.querySelector('option[value="1439"]')).toBeNull();
   });
 });
