@@ -57,7 +57,6 @@ Agents should commit and push work frequently without explicit user request, and
 - Encapsulate every `useQuery` and `useMutation` call in a feature-owned custom hook. Components should consume the hook's data and actions rather than define query or mutation configuration inline.
 - Keep feature-owned query keys and query options in the feature module, and include every loader/search/filter input that affects returned data in the query key.
 - For `createServerFn` and other TanStack response surfaces, expected user-facing failures must return structured error objects such as `{ success: false, message }` instead of throwing. Reserve throws for framework control flow like `redirect` / `notFound` or truly unexpected defects.
-- Avoid `any`. Prefer provider result types, local interfaces, explicit narrowing, or typed helper boundaries.
 
 ## Naming
 
@@ -66,7 +65,7 @@ Agents should commit and push work frequently without explicit user request, and
 
 ## Code Style
 
-Keep JSX declarative and rendering-only. Trivial expressions such as string concatenation and one-line ternaries may stay in JSX, but move more complex parsing, transformation, and branching into component logic or a child component. Keep JSX return complexity at most 2; move logic that raises a component above complexity 3 into another component. Components over 50 lines must be placed in their own adjacent file.
+Keep JSX declarative and rendering-only. Trivial expressions such as string concatenation and one-line ternaries may stay in JSX, but move more complex parsing, transformation, and branching into component logic or a child component. Components over 50 lines must be placed in their own adjacent file.
 
 Prefer declarative and functional code over imperative code.
 
