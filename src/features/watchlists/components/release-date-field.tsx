@@ -1,5 +1,5 @@
 import { useRef, useState, type ChangeEvent } from "react";
-import { format, isValid, parse } from "date-fns";
+import { format, isMatch, parse } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -13,54 +13,39 @@ type ReleaseDateFieldProps = {
 };
 
 function parseReleaseDate(releaseDate: string): Date | undefined {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) {
-    return undefined;
-  }
-
-  const parsedReleaseDate = parse(releaseDate, "yyyy-MM-dd", new Date());
-  return isValid(parsedReleaseDate) ? parsedReleaseDate : undefined;
+  return isMatch(releaseDate, "yyyy-MM-dd")
+    ? parse(releaseDate, "yyyy-MM-dd", new Date())
+    : undefined;
 }
 
 function formatReleaseDate(date: Date | undefined): string {
   return date ? format(date, "yyyy-MM-dd") : "";
 }
 
-const numericDateFormatter = new Intl.DateTimeFormat(undefined, {
+const dateFormatTokens = new Map([
+  ["year", "yyyy"],
+  ["month", "MM"],
+  ["day", "dd"],
+]);
+const dateInputParts = new Intl.DateTimeFormat(undefined, {
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
-});
-const numericDateParts = numericDateFormatter
+})
   .formatToParts(new Date(2001, 10, 22))
-  .map((part) => part.type)
-  .filter((part): part is "year" | "month" | "day" => /^(?:year|month|day)$/.test(part));
-const dateSeparator = numericDateFormatter
-  .formatToParts(new Date(2001, 10, 22))
-  .find((part) => part.type === "literal")?.value;
-const datePlaceholder = numericDateParts
-  .map((part) => ({ year: "YYYY", month: "MM", day: "DD" })[part])
-  .join(dateSeparator ?? "/");
+  .map((part) => dateFormatTokens.get(part.type) ?? part.value);
+const dateInputFormat = dateInputParts.join("");
+const datePlaceholder = dateInputFormat.replace("yyyy", "YYYY").replace("dd", "DD");
 
 function formatDateInput(releaseDate: string): string {
   const parsedReleaseDate = parseReleaseDate(releaseDate);
-  return parsedReleaseDate ? numericDateFormatter.format(parsedReleaseDate) : releaseDate;
+  return parsedReleaseDate ? format(parsedReleaseDate, dateInputFormat) : releaseDate;
 }
 
 function parseCompleteDateInput(dateInput: string): string | undefined {
-  const values = dateInput.split(/\D+/);
-  if (values.length !== numericDateParts.length) {
-    return undefined;
-  }
-
-  const dateValues = Object.fromEntries(
-    numericDateParts.map((part, index) => [part, Number(values[index])]),
-  );
-  const date = new Date(dateValues.year, dateValues.month - 1, dateValues.day);
-  const enteredParts = [dateValues.year, dateValues.month - 1, dateValues.day];
-  const parsedParts = [date.getFullYear(), date.getMonth(), date.getDate()];
-  const isValidDate = parsedParts.every((part, index) => part === enteredParts[index]);
-
-  return isValidDate ? formatReleaseDate(date) : undefined;
+  return isMatch(dateInput, dateInputFormat)
+    ? formatReleaseDate(parse(dateInput, dateInputFormat, new Date()))
+    : undefined;
 }
 
 function parseDateInput(dateInput: string): string | undefined {
