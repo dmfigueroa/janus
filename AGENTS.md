@@ -43,7 +43,7 @@ Agents should commit and push work frequently without explicit user request, and
 ## Route And Feature Boundaries
 
 - Put business code under `src/features/*`, app shell code under `src/app/*`, design-system primitives under `src/ui/*`, and external adapters under `src/integrations/*`.
-- Use shallow feature use-case folders with short role names such as `detail/query.ts`, `detail/query.server.ts`, and `detail/screen.tsx`.
+- Use shallow feature use-case folders with responsibility-based PascalCase names such as `detail/WatchlistDetail.ts`, `detail/WatchlistDetail.server.ts`, and `detail/WatchlistDetailScreen.tsx`.
 - Prefer current TanStack Start guidance over older local patterns when the two disagree.
 - Keep small route-specific loader logic in the route file. Param parsing, route defaults, redirects, and `notFound` handling usually belong in the route.
 - Do not extract route loaders into wrapper functions unless the extraction adds real value through reuse, deeper domain logic, or a stable shared boundary.
