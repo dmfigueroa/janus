@@ -49,38 +49,38 @@ Features are the primary unit of ownership.
 ```text
 src/features/watchlists/
   components/
-    watchlist-card.tsx
-    watchlist-selector.tsx
+    WatchlistCard.tsx
+    WatchlistSelector.tsx
 
   list/
-    query.ts
-    query.server.ts
-    screen.tsx
-    query.test.ts
+    WatchlistList.ts
+    WatchlistList.server.ts
+    WatchlistListScreen.tsx
+    WatchlistList.test.ts
 
   detail/
-    query.ts
-    query.server.ts
-    screen.tsx
-    optimistic.ts
-    query.test.ts
+    WatchlistDetail.ts
+    WatchlistDetail.server.ts
+    WatchlistDetailScreen.tsx
+    OptimisticWatchlist.ts
+    WatchlistDetail.test.ts
 
   create/
-    mutation.ts
-    mutation.server.ts
-    schema.ts
+    CreateWatchlist.ts
+    CreateWatchlist.server.ts
+    CreateWatchlistSchema.ts
 
   merge/
-    mutation.ts
-    mutation.server.ts
-    schema.ts
+    MergeWatchlists.ts
+    MergeWatchlists.server.ts
+    MergeWatchlistsSchema.ts
 ```
 
 Rules:
 
 - Use shallow use-case folders such as `list/`, `detail/`, `create/`, and `merge/`.
-- Name files by the responsibility they capture, not just their role. The filename should tell you the domain concept. For example, `insert-ordered-item.server.ts` is better than `mutation.server.ts` because it describes what the module does.
-- Prefer short role-based filenames (`query.ts`, `mutation.ts`, `schema.ts`) when the responsibility is a standard CRUD operation. Use descriptive names when the responsibility is a specific domain concept.
+- Name files by the responsibility they capture, not just their role. The filename should tell you the domain concept. For example, `InsertOrderedItem.server.ts` is better than `Mutation.server.ts` because it describes what the module does.
+- Use responsibility-based PascalCase filenames. Do not use generic role-only names such as `Query.ts`, `Mutation.ts`, `Schema.ts`, or `Screen.tsx`.
 - Put UI shared across multiple use cases in `src/features/<feature>/components/*`.
 - Put UI used by only one use case in that use-case folder.
 - Collocate tests with the code they verify.
@@ -91,24 +91,24 @@ TanStack Start is isomorphic by default. Make server boundaries obvious.
 
 Client-safe files include:
 
-- `query.ts`
-- `mutation.ts`
-- `screen.tsx`
-- `schema.ts`
-- `types.ts`
+- `WatchlistDetail.ts`
+- `CreateWatchlist.ts`
+- `WatchlistDetailScreen.tsx`
+- `CreateWatchlistSchema.ts`
+- `WatchlistTypes.ts`
 - pure helpers without server-only imports
 
 Server-only files use the `.server.ts` suffix, for example:
 
-- `query.server.ts`
-- `mutation.server.ts`
-- `tmdb/search.server.ts`
+- `WatchlistDetail.server.ts`
+- `CreateWatchlist.server.ts`
+- `tmdb/SearchMovies.server.ts`
 
 Rules:
 
 - Routes, `src/ui/*`, `src/shared/*`, and other client-safe modules must not import `.server.ts` files directly.
 - React components must call TanStack Start server functions through `useServerFn(serverFn)`.
-- `query.ts` and `mutation.ts` are the safe entrypoints that expose `createServerFn` boundaries.
+- Safe responsibility-based modules such as `WatchlistDetail.ts` and `CreateWatchlist.ts` expose `createServerFn` boundaries.
 - `.server.ts` files may import `src/db/*`, `src/integrations/*`, and other server-only modules.
 - Do not use `"use server"` or `"use client"` directives unless there is a documented framework requirement.
 
@@ -134,7 +134,7 @@ Routes own URL behavior and route-level page assembly:
 - composing feature-owned components into the page
 - route-local providers needed by that page
 
-Routes may compose feature components directly when the route is mostly arranging already-focused pieces. Do not create a feature `screen.tsx` solely to keep a route file visually small.
+Routes may compose feature components directly when the route is mostly arranging already-focused pieces. Do not create a feature screen module solely to keep a route file visually small.
 
 Move code out of the route when it introduces a separate reason to change, such as:
 

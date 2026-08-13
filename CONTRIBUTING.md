@@ -34,50 +34,50 @@ If the answer is no at every step, keep the code in the owning feature until a c
 - Keep URL behavior and route-level page assembly in the route file.
 - Load data through safe feature query or mutation surfaces.
 - Compose feature-owned components directly when the route is mostly arranging already-focused pieces.
-- Create a feature `screen.tsx` only when the page composition is substantial enough to deserve its own module.
+- Create a feature screen module only when the page composition is substantial enough to deserve its own module.
 
 Example:
 
 ```text
 src/routes/watchlists/$watchlistId.tsx
-src/features/watchlists/detail/screen.tsx
-src/features/watchlists/detail/query.ts
-src/features/watchlists/detail/query.server.ts
+src/features/watchlists/detail/WatchlistDetailScreen.tsx
+src/features/watchlists/detail/WatchlistDetail.ts
+src/features/watchlists/detail/WatchlistDetail.server.ts
 ```
 
 ### New Read Use Case
 
 - Create a shallow use-case folder under the owning feature.
-- Put the safe entrypoint in `query.ts`.
-- Put server-only logic in `query.server.ts`.
-- Put page-sized UI in `screen.tsx` when the page composition has its own meaningful responsibility beyond route-level assembly.
+- Give the safe entrypoint a responsibility-based name such as `MediaSearch.ts`.
+- Put server-only logic in the matching `.server.ts` file, such as `MediaSearch.server.ts`.
+- Put page-sized UI in a responsibility-based file such as `SearchResultsScreen.tsx` when the page composition has its own meaningful responsibility beyond route-level assembly.
 - Collocate tests.
 
 Example:
 
 ```text
 src/features/search/search/
-  query.ts
-  query.server.ts
-  screen.tsx
-  schema.ts
-  query.test.ts
+  MediaSearch.ts
+  MediaSearch.server.ts
+  SearchResultsScreen.tsx
+  MediaSearchSchema.ts
+  MediaSearch.test.ts
 ```
 
 ### New Write Use Case
 
 - Create a shallow use-case folder under the owning feature.
-- Put the safe entrypoint in `mutation.ts`.
-- Put server-only logic in `mutation.server.ts`.
-- Put validation in `schema.ts` if it has meaningful reuse or size.
+- Give the safe entrypoint a responsibility-based name such as `CreateWatchlist.ts`.
+- Put server-only logic in the matching `.server.ts` file, such as `CreateWatchlist.server.ts`.
+- Put validation in a responsibility-based schema file such as `CreateWatchlistSchema.ts` if it has meaningful reuse or size.
 
 Example:
 
 ```text
 src/features/watchlists/create/
-  mutation.ts
-  mutation.server.ts
-  schema.ts
+  CreateWatchlist.ts
+  CreateWatchlist.server.ts
+  CreateWatchlistSchema.ts
 ```
 
 ### UI Shared Inside One Feature
@@ -98,8 +98,12 @@ src/features/watchlists/create/
 
 ## Naming Rules
 
-- Name files by the responsibility they capture, not just their role. The filename should tell you the domain concept. For example, `insert-ordered-item.server.ts` is better than `mutation.server.ts` because it describes what the module does.
-- Prefer short role-based filenames (`query.ts`, `mutation.ts`, `schema.ts`) when the responsibility is a standard CRUD operation. Use descriptive names when the responsibility is a specific domain concept.
+- Name files by the responsibility they capture, not just their role. The filename should tell you the domain concept. For example, `InsertOrderedItem.server.ts` is better than `Mutation.server.ts` because it describes what the module does.
+- Use PascalCase for TypeScript filenames, including component and non-component modules. For example, use `ModelUpdater.ts` and `WatchlistSelector.tsx`.
+- Hooks may instead use lower camelCase beginning with `use`, such as `useSearchResults.ts`.
+- Keep suffixes lowercase, such as `ModelUpdater.server.ts` and `ModelUpdater.test.ts`.
+- TanStack route filenames under `src/routes/*` are exempt because their names define routes.
+- Do not use generic role-only filenames such as `Query.ts`, `Mutation.ts`, `Schema.ts`, `Screen.tsx`, or `Types.ts`. Name the file after its specific responsibility.
 - Use `.server.ts` for any file that touches the database, secrets, file system, or server-only SDKs.
 - Avoid `index.ts` and `index.server.ts` unless they provide clear, durable navigation value.
 - Keep tests next to the code they verify.
