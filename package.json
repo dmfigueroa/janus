@@ -8,8 +8,7 @@
     "preview": "vite preview",
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",
-    "lint": "npm run lint:filenames && oxlint .",
-    "lint:filenames": "node scripts/check-typescript-filenames.mjs",
+    "lint": "oxlint .",
     "format": "oxfmt . --write",
     "format:check": "oxfmt . --check",
     "typecheck": "tsc --noEmit",
@@ -89,7 +88,6 @@
   },
   "lint-staged": {
     "*.{js,ts,jsx,tsx,mjs,cjs}": [
-      "node scripts/check-typescript-filenames.mjs",
       "oxlint --fix",
       "oxfmt --write"
     ],

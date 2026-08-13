@@ -124,6 +124,36 @@
   },
   "overrides": [
     {
+      "files": ["**/*.ts", "**/*.tsx"],
+      "rules": {
+        "unicorn/filename-case": [
+          "error",
+          {
+            "case": "pascalCase",
+            "multipleFileExtensions": true
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/use*.ts", "**/use*.tsx"],
+      "rules": {
+        "unicorn/filename-case": [
+          "error",
+          {
+            "case": "camelCase",
+            "multipleFileExtensions": true
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/routes/**"],
+      "rules": {
+        "unicorn/filename-case": "off"
+      }
+    },
+    {
       "files": ["src/components/ui/**"],
       "rules": {
         "complexity": "off",
