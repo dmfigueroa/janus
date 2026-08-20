@@ -6,11 +6,11 @@ import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import type { Watchlist } from "@/db/Schema";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
-import { createWatchlist } from "@/features/watchlists/create/Mutation";
-import { updateWatchlist } from "@/features/watchlists/update/Mutation";
+import { createWatchlist as createWatchlistServerFn } from "@/features/watchlists/create/Mutation";
+import { updateWatchlist as updateWatchlistServerFn } from "@/features/watchlists/update/Mutation";
 import { invalidateWatchlistQueries } from "@/features/watchlists/Cache";
 
-type UseWatchlistFormOptions =
+export type UseWatchlistFormOptions =
   | { mode: "create"; watchlist?: never; onSuccess?: () => void; open?: boolean }
   | { mode: "edit"; watchlist: Watchlist; onSuccess?: () => void; open?: boolean };
 
@@ -28,8 +28,9 @@ export function useWatchlistForm({
 }: UseWatchlistFormOptions) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const createWatchlistFn = useServerFn(createWatchlist);
-  const updateWatchlistFn = useServerFn(updateWatchlist);
+  const createWatchlistFn = useServerFn(createWatchlistServerFn);
+  const updateWatchlistFn = useServerFn(updateWatchlistServerFn);
+
   const form = useForm<WatchlistFormValues>({
     defaultValues: getDefaultValues(watchlist),
   });
@@ -42,7 +43,7 @@ export function useWatchlistForm({
 
   const onSubmit: SubmitHandler<WatchlistFormValues> = async (formData) => {
     try {
-      await submitWatchlist({
+      await saveWatchlist({
         mode,
         watchlist,
         formData,
@@ -63,33 +64,24 @@ export function useWatchlistForm({
   };
 }
 
-// --- Submission layer ---
-
 type SubmitArgs = {
   mode: "create" | "edit";
   watchlist: Watchlist | undefined;
   formData: WatchlistFormValues;
-  createFn: ReturnType<typeof useServerFn<typeof createWatchlist>>;
-  updateFn: ReturnType<typeof useServerFn<typeof updateWatchlist>>;
+  createFn: ReturnType<typeof useServerFn<typeof createWatchlistServerFn>>;
+  updateFn: ReturnType<typeof useServerFn<typeof updateWatchlistServerFn>>;
 };
 
-async function submitWatchlist({ mode, watchlist, formData, createFn, updateFn }: SubmitArgs) {
+async function saveWatchlist({ mode, watchlist, formData, createFn, updateFn }: SubmitArgs) {
   if (mode === "create") {
-    await submitNewWatchlist(createFn, formData);
+    await createFn({ data: formData });
     return;
   }
 
-  await submitWatchlistUpdate(updateFn, watchlist, formData);
+  await updateWatchlist(updateFn, watchlist, formData);
 }
 
-async function submitNewWatchlist(
-  createFn: SubmitArgs["createFn"],
-  formData: SubmitArgs["formData"],
-) {
-  await createFn({ data: formData });
-}
-
-async function submitWatchlistUpdate(
+async function updateWatchlist(
   updateFn: SubmitArgs["updateFn"],
   watchlist: Watchlist | undefined,
   formData: SubmitArgs["formData"],
@@ -110,35 +102,39 @@ async function submitWatchlistUpdate(
   }
 }
 
-// --- Side-effect layer ---
-
-type SuccessContext = {
+async function handleSubmitSuccess({
+  mode,
+  router,
+  queryClient,
+}: {
   mode: "create" | "edit";
   router: ReturnType<typeof useRouter>;
   queryClient: ReturnType<typeof useQueryClient>;
-};
-
-async function handleSubmitSuccess({ mode, router, queryClient }: SuccessContext) {
+}) {
   toast.success(
     mode === "create" ? "Watchlist created successfully" : "Changes saved successfully",
   );
+
   await router.invalidate?.();
   invalidateWatchlistQueries(queryClient);
 }
 
 function handleSubmitError(error: unknown) {
   console.error("Failed to save watchlist", error);
+
   toast.error(
     error instanceof Error ? error.message : "Failed to save watchlist. Please try again.",
   );
 }
 
 function getDefaultValues(watchlist: Watchlist | undefined): WatchlistFormValues {
-  return watchlist
-    ? {
-        name: watchlist.name,
-        description: watchlist.description ?? "",
-        itemOrderMode: watchlist.itemOrderMode,
-      }
-    : { name: "", description: "", itemOrderMode: "release" };
+  if (!watchlist) {
+    return { name: "", description: "", itemOrderMode: "release" };
+  }
+
+  return {
+    name: watchlist.name,
+    description: watchlist.description ?? "",
+    itemOrderMode: watchlist.itemOrderMode,
+  };
 }

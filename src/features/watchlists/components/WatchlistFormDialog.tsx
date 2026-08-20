@@ -1,4 +1,3 @@
-import type { Watchlist } from "@/db/Schema";
 import {
   Button,
   Dialog,
@@ -12,11 +11,13 @@ import {
 import { X } from "lucide-react";
 import { useController, type Control } from "react-hook-form";
 import { useState } from "react";
-import { useWatchlistForm, type WatchlistFormValues } from "./useWatchlistForm";
+import {
+  useWatchlistForm,
+  type UseWatchlistFormOptions,
+  type WatchlistFormValues,
+} from "./useWatchlistForm";
 
-type WatchlistFormDialogProps =
-  | { mode: "create"; watchlist?: never; trigger: React.ReactNode }
-  | { mode: "edit"; watchlist: Watchlist; trigger: React.ReactNode };
+type WatchlistFormDialogProps = UseWatchlistFormOptions & { trigger: React.ReactNode };
 
 const watchlistFormLabels = {
   create: {
@@ -31,12 +32,14 @@ const watchlistFormLabels = {
   },
 };
 
-export function WatchlistFormDialog({ mode, watchlist, trigger }: WatchlistFormDialogProps) {
+export function WatchlistFormDialog({ trigger, ...formOptions }: WatchlistFormDialogProps) {
   const [open, setOpen] = useState(false);
-  const { loading, onSubmit, register, control, formState } = useWatchlistForm(
-    getFormOptions(mode, watchlist, open, () => setOpen(false)),
-  );
-  const labels = watchlistFormLabels[mode];
+  const { loading, onSubmit, register, control, formState } = useWatchlistForm({
+    ...formOptions,
+    open,
+    onSuccess: () => setOpen(false),
+  });
+  const labels = watchlistFormLabels[formOptions.mode];
 
   return (
     <Dialog.Root open={open} onOpenChange={({ open: nextOpen }) => setOpen(nextOpen)}>
@@ -120,17 +123,4 @@ function WatchlistOrderField({ control }: { control: Control<WatchlistFormValues
       </RadioGroup.Item>
     </RadioGroup.Root>
   );
-}
-
-function getFormOptions(
-  mode: "create" | "edit",
-  watchlist: Watchlist | undefined,
-  open: boolean,
-  onSuccess: () => void,
-): Parameters<typeof useWatchlistForm>[0] {
-  if (mode === "create") {
-    return { mode, open, onSuccess };
-  }
-
-  return { mode, open, onSuccess, watchlist: watchlist as Watchlist };
 }
