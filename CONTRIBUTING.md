@@ -51,9 +51,7 @@ src/features/watchlists/detail/WatchlistDetail.server.ts
 - Give the safe entrypoint a responsibility-based name such as `MediaSearch.ts`.
 - Put server-only logic in the matching `.server.ts` file, such as `MediaSearch.server.ts`.
 - Put page-sized UI in a responsibility-based file such as `SearchResultsScreen.tsx` when the page composition has its own meaningful responsibility beyond route-level assembly.
-- Collocate tests.
-
-Example:
+  Example:
 
 ```text
 src/features/search/search/
@@ -106,7 +104,6 @@ src/features/watchlists/create/
 - Do not use generic role-only filenames such as `Query.ts`, `Mutation.ts`, `Schema.ts`, `Screen.tsx`, or `Types.ts`. Name the file after its specific responsibility.
 - Use `.server.ts` for any file that touches the database, secrets, file system, or server-only SDKs.
 - Avoid `index.ts` and `index.server.ts` unless they provide clear, durable navigation value.
-- Keep tests next to the code they verify.
 
 ## TanStack Start Rules
 

@@ -11,7 +11,11 @@ export async function editWatchlistItemMutation(
   const db = getDb();
   const result = await db
     .update(watchlistItems)
-    .set({ title: input.title.trim(), releaseDate: input.releaseDate })
+    .set({
+      title: input.title.trim(),
+      releaseDate: input.releaseDate,
+      posterPath: input.posterPath,
+    })
     .where(
       and(eq(watchlistItems.id, input.itemId), eq(watchlistItems.watchlistId, input.watchlistId)),
     )

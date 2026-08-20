@@ -7,6 +7,7 @@ import { editWatchlistItem } from "./Mutation";
 export type EditWatchlistItemValues = {
   title: string;
   releaseDate: string;
+  posterPath: string | null;
 };
 
 export function useEditWatchlistItemMutation(item: WatchlistItem) {
@@ -22,6 +23,7 @@ export function useEditWatchlistItemMutation(item: WatchlistItem) {
           itemId: item.id,
           title: values.title,
           releaseDate: values.releaseDate || null,
+          posterPath: values.posterPath,
         },
       }),
     onSuccess: (result) => {
