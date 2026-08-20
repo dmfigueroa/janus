@@ -16,6 +16,7 @@ export default defineConfig({
     viteReact(),
   ],
   test: {
+    setupFiles: ["./test/Setup.ts"],
     testTimeout: 15_000,
   },
 });

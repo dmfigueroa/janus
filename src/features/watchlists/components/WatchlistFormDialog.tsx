@@ -1,24 +1,23 @@
-import type { Watchlist } from "@/db/Schema";
-import { Button } from "@/components/ui/Button";
 import {
+  Button,
   Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/Dialog";
-import { Input } from "@/components/ui/Input";
-import { Label } from "@/components/ui/Label";
-import { Textarea } from "@/components/ui/Textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/RadioGroup";
+  Field,
+  Input,
+  Portal,
+  RadioGroup,
+  Stack,
+  Textarea,
+} from "@chakra-ui/react";
+import { X } from "lucide-react";
+import { useController, type Control } from "react-hook-form";
 import { useState } from "react";
-import { useWatchlistForm } from "./useWatchlistForm";
+import {
+  useWatchlistForm,
+  type UseWatchlistFormOptions,
+  type WatchlistFormValues,
+} from "./useWatchlistForm";
 
-type WatchlistFormDialogProps =
-  | { mode: "create"; watchlist?: never; trigger: React.ReactNode }
-  | { mode: "edit"; watchlist: Watchlist; trigger: React.ReactNode };
+type WatchlistFormDialogProps = UseWatchlistFormOptions & { trigger: React.ReactNode };
 
 const watchlistFormLabels = {
   create: {
@@ -33,102 +32,95 @@ const watchlistFormLabels = {
   },
 };
 
-export function WatchlistFormDialog({ mode, watchlist, trigger }: WatchlistFormDialogProps) {
+export function WatchlistFormDialog({ trigger, ...formOptions }: WatchlistFormDialogProps) {
   const [open, setOpen] = useState(false);
-  const form = useWatchlistForm(getWatchlistFormOptions(mode, watchlist, () => setOpen(false)));
-  const { loading, onSubmit } = form;
-  const labels = watchlistFormLabels[mode];
+  const { loading, onSubmit, register, control, formState } = useWatchlistForm({
+    ...formOptions,
+    open,
+    onSuccess: () => setOpen(false),
+  });
+  const labels = watchlistFormLabels[formOptions.mode];
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] bg-popover border-border text-popover-foreground">
-        <form onSubmit={onSubmit}>
-          <DialogHeader>
-            <DialogTitle>{labels.title}</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              {labels.descriptionLabel}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                name="name"
-                placeholder="e.g., Marvel Cinematic Universe"
-                defaultValue={getWatchlistName(watchlist)}
-                required
-                className="bg-input border-border focus-visible:ring-ring"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                placeholder="Optional description..."
-                defaultValue={getWatchlistDescription(watchlist)}
-                className="bg-input border-border focus-visible:ring-ring"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Order</Label>
-              <RadioGroup
-                name="itemOrderMode"
-                defaultValue={getWatchlistOrderMode(watchlist)}
-                className="flex flex-col gap-2"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="release" id="release" />
-                  <Label htmlFor="release" className="cursor-pointer font-normal">
-                    Release order
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="custom" id="custom" />
-                  <Label htmlFor="custom" className="cursor-pointer font-normal">
-                    Custom order
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-            >
-              {loading ? "Saving..." : labels.submitLabel}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <Dialog.Root open={open} onOpenChange={({ open: nextOpen }) => setOpen(nextOpen)}>
+      <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
+      <Portal>
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content maxW="sm">
+            <Dialog.CloseTrigger aria-label="Close dialog">
+              <X size={16} />
+            </Dialog.CloseTrigger>
+            <form onSubmit={onSubmit}>
+              <Dialog.Header flexDirection="column" alignItems="flex-start" gap={1}>
+                <Dialog.Title>{labels.title}</Dialog.Title>
+                <Dialog.Description color="fg.muted">{labels.descriptionLabel}</Dialog.Description>
+              </Dialog.Header>
+              <Dialog.Body>
+                <Stack gap={4}>
+                  <Field.Root required invalid={Boolean(formState.errors.name)}>
+                    <Field.Label htmlFor="name">Name</Field.Label>
+                    <Input
+                      id="name"
+                      focusRingColor="pink.500"
+                      placeholder="e.g., Marvel Cinematic Universe"
+                      {...register("name", {
+                        validate: (value) => value.trim().length > 0 || "Name is required",
+                      })}
+                    />
+                    <Field.ErrorText>{formState.errors.name?.message}</Field.ErrorText>
+                  </Field.Root>
+                  <Field.Root>
+                    <Field.Label htmlFor="description">Description</Field.Label>
+                    <Textarea
+                      id="description"
+                      focusRingColor="pink.500"
+                      placeholder="Optional description..."
+                      {...register("description")}
+                    />
+                  </Field.Root>
+                  <Field.Root>
+                    <Field.Label>Order</Field.Label>
+                    <WatchlistOrderField control={control} />
+                  </Field.Root>
+                </Stack>
+              </Dialog.Body>
+              <Dialog.Footer>
+                <Button type="submit" disabled={loading} colorPalette="pink">
+                  {loading ? "Saving..." : labels.submitLabel}
+                </Button>
+              </Dialog.Footer>
+            </form>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Portal>
+    </Dialog.Root>
   );
 }
 
-function getWatchlistFormOptions(
-  mode: "create" | "edit",
-  watchlist: Watchlist | undefined,
-  onSuccess: () => void,
-): Parameters<typeof useWatchlistForm>[0] {
-  if (mode === "create") {
-    return { mode, onSuccess };
-  }
+function WatchlistOrderField({ control }: { control: Control<WatchlistFormValues> }) {
+  const { field } = useController({ control, name: "itemOrderMode" });
 
-  return { mode, watchlist: watchlist as Watchlist, onSuccess };
-}
-
-function getWatchlistName(watchlist: Watchlist | undefined) {
-  return watchlist?.name ?? "";
-}
-
-function getWatchlistDescription(watchlist: Watchlist | undefined) {
-  return watchlist?.description ?? "";
-}
-
-function getWatchlistOrderMode(watchlist: Watchlist | undefined) {
-  return watchlist?.itemOrderMode ?? "release";
+  return (
+    <RadioGroup.Root
+      name={field.name}
+      value={field.value}
+      onValueChange={({ value }) => field.onChange(value)}
+      colorPalette="pink"
+      display="flex"
+      flexDir="column"
+      gap={2}
+    >
+      <RadioGroup.Item value="release">
+        <RadioGroup.ItemHiddenInput ref={field.ref} />
+        <RadioGroup.ItemControl borderWidth="2px" />
+        <RadioGroup.ItemText>Release order</RadioGroup.ItemText>
+      </RadioGroup.Item>
+      <RadioGroup.Item value="custom">
+        <RadioGroup.ItemHiddenInput />
+        <RadioGroup.ItemControl borderWidth="2px" />
+        <RadioGroup.ItemText>Custom order</RadioGroup.ItemText>
+      </RadioGroup.Item>
+    </RadioGroup.Root>
+  );
 }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@test/utils/Render";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WatchlistFormDialog } from "@/features/watchlists/components/WatchlistFormDialog";
 import type { Watchlist } from "@/db/Schema";
@@ -58,20 +58,6 @@ vi.mock("sonner", () => ({
   },
 }));
 
-vi.mock("@/components/ui/Dialog", () => ({
-  Dialog: ({ children, open }: { children: React.ReactNode; open?: boolean }) => (
-    <div data-testid="dialog" data-open={open}>
-      {children}
-    </div>
-  ),
-  DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DialogTitle: ({ children }: { children: React.ReactNode }) => <h1>{children}</h1>,
-  DialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DialogDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
-  DialogTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
-
 function watchlistFixture(overrides?: Partial<Watchlist>): Watchlist {
   return {
     id: overrides?.id ?? 1,
@@ -85,17 +71,21 @@ function watchlistFixture(overrides?: Partial<Watchlist>): Watchlist {
   };
 }
 
+async function openDialog() {
+  fireEvent.click(screen.getByRole("button", { name: "Open" }));
+  await waitFor(() => expect(screen.getByRole("dialog")).not.toBeNull());
+}
+
+async function closeDialog() {
+  fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+}
+
 describe("WatchlistFormDialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createWatchlistFnMock.mockResolvedValue({ id: 99, name: "New List" });
     updateWatchlistFnMock.mockResolvedValue({ success: true });
-
-    globalThis.ResizeObserver = vi.fn(() => ({
-      observe: vi.fn(),
-      disconnect: vi.fn(),
-      unobserve: vi.fn(),
-    })) as unknown as typeof ResizeObserver;
   });
 
   afterEach(() => {
@@ -103,27 +93,46 @@ describe("WatchlistFormDialog", () => {
   });
 
   describe("create mode", () => {
-    it("renders with create title and empty form fields", () => {
+    it("opens the dialog from its trigger", async () => {
       render(<WatchlistFormDialog mode="create" trigger={<button>Open</button>} />);
-      fireEvent.click(screen.getByRole("button", { name: "Open" }));
+
+      await openDialog();
+    });
+
+    it("discards unsaved changes when closed and reopened", async () => {
+      render(<WatchlistFormDialog mode="create" trigger={<button>Open</button>} />);
+
+      await openDialog();
+      fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Unsaved List" } });
+      await closeDialog();
+      await openDialog();
+
+      expect(screen.getByLabelText("Name")).toHaveProperty("value", "");
+    });
+
+    it("renders with create title and empty form fields", async () => {
+      render(<WatchlistFormDialog mode="create" trigger={<button>Open</button>} />);
+      await openDialog();
 
       expect(screen.getByRole("heading", { name: "Create New List" })).not.toBeNull();
       expect(screen.getByRole("button", { name: "Create List" })).not.toBeNull();
       expect(screen.getByLabelText("Name")).toHaveProperty("value", "");
       expect(screen.getByLabelText("Description")).toHaveProperty("value", "");
-      expect(screen.getByLabelText("Release order").getAttribute("data-state")).toBe("checked");
-      expect(screen.getByLabelText("Custom order").getAttribute("data-state")).toBe("unchecked");
+      expect(screen.getByLabelText("Release order")).toHaveProperty("checked", true);
+      expect(screen.getByLabelText("Custom order")).toHaveProperty("checked", false);
     });
 
     it("submits createWatchlist with form values and shows success", async () => {
       render(<WatchlistFormDialog mode="create" trigger={<button>Open</button>} />);
-      fireEvent.click(screen.getByRole("button", { name: "Open" }));
+      await openDialog();
 
       fireEvent.change(screen.getByLabelText("Name"), { target: { value: "New List" } });
       fireEvent.change(screen.getByLabelText("Description"), {
         target: { value: "A description" },
       });
-      fireEvent.click(screen.getByLabelText("Custom order"));
+      const customOrderRadio = screen.getByRole("radio", { name: "Custom order" });
+      customOrderRadio.click();
+      await waitFor(() => expect(customOrderRadio).toHaveProperty("checked", true));
       fireEvent.click(screen.getByRole("button", { name: "Create List" }));
 
       await waitFor(() => {
@@ -139,7 +148,7 @@ describe("WatchlistFormDialog", () => {
   });
 
   describe("edit mode", () => {
-    it("renders with edit title and pre-filled form fields", () => {
+    it("renders with edit title and pre-filled form fields", async () => {
       render(
         <WatchlistFormDialog
           mode="edit"
@@ -151,14 +160,14 @@ describe("WatchlistFormDialog", () => {
           trigger={<button>Open</button>}
         />,
       );
-      fireEvent.click(screen.getByRole("button", { name: "Open" }));
+      await openDialog();
 
       expect(screen.getByRole("heading", { name: "Edit List" })).not.toBeNull();
       expect(screen.getByRole("button", { name: "Save Changes" })).not.toBeNull();
       expect(screen.getByLabelText("Name")).toHaveProperty("value", "Existing List");
       expect(screen.getByLabelText("Description")).toHaveProperty("value", "Existing desc");
-      expect(screen.getByLabelText("Release order").getAttribute("data-state")).toBe("unchecked");
-      expect(screen.getByLabelText("Custom order").getAttribute("data-state")).toBe("checked");
+      expect(screen.getByLabelText("Release order")).toHaveProperty("checked", false);
+      expect(screen.getByLabelText("Custom order")).toHaveProperty("checked", true);
     });
 
     it("submits updateWatchlist with form values and shows success", async () => {
@@ -174,11 +183,13 @@ describe("WatchlistFormDialog", () => {
           trigger={<button>Open</button>}
         />,
       );
-      fireEvent.click(screen.getByRole("button", { name: "Open" }));
+      await openDialog();
 
       fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Updated List" } });
       fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Updated desc" } });
-      fireEvent.click(screen.getByLabelText("Release order"));
+      const releaseOrderRadio = screen.getByRole("radio", { name: "Release order" });
+      releaseOrderRadio.click();
+      await waitFor(() => expect(releaseOrderRadio).toHaveProperty("checked", true));
       fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
       await waitFor(() => {
@@ -210,7 +221,7 @@ describe("WatchlistFormDialog", () => {
           trigger={<button>Open</button>}
         />,
       );
-      fireEvent.click(screen.getByRole("button", { name: "Open" }));
+      await openDialog();
 
       fireEvent.change(screen.getByLabelText("Description"), { target: { value: "" } });
       fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));

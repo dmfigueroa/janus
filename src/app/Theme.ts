@@ -1,7 +1,9 @@
 import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
 
 const janusConfig = defineConfig({
-  preflight: false,
+  // Keep Chakra's reset inert during the Tailwind migration. `false` creates an empty reset
+  // layer that Emotion serializes next to the base layer as invalid `@layer reset@layer base`.
+  preflight: { scope: ".chakra-preflight" },
   globalCss: {
     "html, body": {
       minHeight: "100%",
@@ -15,14 +17,6 @@ const janusConfig = defineConfig({
     "::selection": {
       background: "colorPalette.solid",
       color: "colorPalette.contrast",
-    },
-    "@media (prefers-reduced-motion: reduce)": {
-      "& *, & *::before, & *::after": {
-        animationDuration: "0.01ms !important",
-        animationIterationCount: "1 !important",
-        scrollBehavior: "auto !important",
-        transitionDuration: "0.01ms !important",
-      },
     },
   },
   theme: {
@@ -103,6 +97,9 @@ const janusConfig = defineConfig({
         },
         "status.error": {
           value: "#dc2626",
+        },
+        "gray.focusRing": {
+          value: "{colors.pink.500}",
         },
       },
     },
