@@ -16,16 +16,12 @@ export const toaster = createToaster({
 });
 
 export function Toaster() {
-  return (
-    <ChakraToaster toaster={toaster} width={{ base: "calc(100vw - 2rem)", md: "24rem" }}>
-      {ToastMessage}
-    </ChakraToaster>
-  );
+  return <ChakraToaster toaster={toaster}>{ToastMessage}</ChakraToaster>;
 }
 
 function ToastMessage(toast: ToastMessage) {
   return (
-    <Toast.Root key={toast.id} data-toast-id={toast.id}>
+    <Toast.Root key={toast.id}>
       <Toast.Indicator />
       <Toast.Title flex="1" minW="0">
         {toast.title}
