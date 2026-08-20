@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useWatchlistForm } from "@/features/watchlists/components/useWatchlistForm";
 
@@ -70,21 +70,6 @@ vi.mock("@tanstack/react-start", () => ({
   },
 }));
 
-function createMockFormEvent(formValues: Record<string, string>) {
-  const form = document.createElement("form");
-  for (const [key, value] of Object.entries(formValues)) {
-    const input = document.createElement("input");
-    input.name = key;
-    input.value = value;
-    form.appendChild(input);
-  }
-
-  return {
-    preventDefault: vi.fn(),
-    currentTarget: form,
-  } as unknown as React.FormEvent<HTMLFormElement>;
-}
-
 describe("useWatchlistForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -101,13 +86,13 @@ describe("useWatchlistForm", () => {
   it("submits createWatchlist with parsed form data on success", async () => {
     const { result } = renderHook(() => useWatchlistForm({ mode: "create" }));
 
-    const event = createMockFormEvent({
-      name: "New List",
-      description: "A description",
-      itemOrderMode: "custom",
+    act(() => {
+      result.current.setValue("name", "New List");
+      result.current.setValue("description", "A description");
+      result.current.setValue("itemOrderMode", "custom");
     });
 
-    await result.current.onSubmit(event);
+    await result.current.onSubmit();
 
     expect(createWatchlistFnMock).toHaveBeenCalledWith({
       data: { name: "New List", description: "A description", itemOrderMode: "custom" },
@@ -122,13 +107,13 @@ describe("useWatchlistForm", () => {
     const onSuccess = vi.fn();
     const { result } = renderHook(() => useWatchlistForm({ mode: "create", onSuccess }));
 
-    const event = createMockFormEvent({
-      name: "New List",
-      description: "A description",
-      itemOrderMode: "custom",
+    act(() => {
+      result.current.setValue("name", "New List");
+      result.current.setValue("description", "A description");
+      result.current.setValue("itemOrderMode", "custom");
     });
 
-    await result.current.onSubmit(event);
+    await result.current.onSubmit();
 
     expect(onSuccess).toHaveBeenCalled();
   });
@@ -147,13 +132,13 @@ describe("useWatchlistForm", () => {
 
     const { result } = renderHook(() => useWatchlistForm({ mode: "edit", watchlist }));
 
-    const event = createMockFormEvent({
-      name: "Updated List",
-      description: "Updated desc",
-      itemOrderMode: "custom",
+    act(() => {
+      result.current.setValue("name", "Updated List");
+      result.current.setValue("description", "Updated desc");
+      result.current.setValue("itemOrderMode", "custom");
     });
 
-    await result.current.onSubmit(event);
+    await result.current.onSubmit();
 
     expect(updateWatchlistFnMock).toHaveBeenCalledWith({
       data: {
@@ -184,13 +169,13 @@ describe("useWatchlistForm", () => {
 
     const { result } = renderHook(() => useWatchlistForm({ mode: "edit", watchlist }));
 
-    const event = createMockFormEvent({
-      name: "Updated List",
-      description: "",
-      itemOrderMode: "release",
+    act(() => {
+      result.current.setValue("name", "Updated List");
+      result.current.setValue("description", "");
+      result.current.setValue("itemOrderMode", "release");
     });
 
-    await result.current.onSubmit(event);
+    await result.current.onSubmit();
 
     expect(toastErrorMock).toHaveBeenCalledWith("Name already exists");
     expect(result.current.loading).toBe(false);
@@ -201,13 +186,13 @@ describe("useWatchlistForm", () => {
 
     const { result } = renderHook(() => useWatchlistForm({ mode: "create" }));
 
-    const event = createMockFormEvent({
-      name: "New List",
-      description: "",
-      itemOrderMode: "release",
+    act(() => {
+      result.current.setValue("name", "New List");
+      result.current.setValue("description", "");
+      result.current.setValue("itemOrderMode", "release");
     });
 
-    await result.current.onSubmit(event);
+    await result.current.onSubmit();
 
     expect(toastErrorMock).toHaveBeenCalledWith("Network error");
     expect(result.current.loading).toBe(false);
@@ -218,13 +203,13 @@ describe("useWatchlistForm", () => {
 
     const { result } = renderHook(() => useWatchlistForm({ mode: "create" }));
 
-    const event = createMockFormEvent({
-      name: "New List",
-      description: "",
-      itemOrderMode: "release",
+    act(() => {
+      result.current.setValue("name", "New List");
+      result.current.setValue("description", "");
+      result.current.setValue("itemOrderMode", "release");
     });
 
-    await result.current.onSubmit(event);
+    await result.current.onSubmit();
 
     expect(toastErrorMock).toHaveBeenCalledWith("Failed to save watchlist. Please try again.");
     expect(result.current.loading).toBe(false);

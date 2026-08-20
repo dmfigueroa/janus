@@ -1,8 +1,9 @@
 import type { Watchlist } from "@/db/Schema";
 import { Button, Dialog, Field, Input, RadioGroup, Stack, Textarea } from "@chakra-ui/react";
 import { X } from "lucide-react";
+import { useController, type Control } from "react-hook-form";
 import { useState } from "react";
-import { useWatchlistForm } from "./useWatchlistForm";
+import { useWatchlistForm, type WatchlistFormValues } from "./useWatchlistForm";
 
 type WatchlistFormDialogProps =
   | { mode: "create"; watchlist?: never; trigger: React.ReactNode }
@@ -23,8 +24,9 @@ const watchlistFormLabels = {
 
 export function WatchlistFormDialog({ mode, watchlist, trigger }: WatchlistFormDialogProps) {
   const [open, setOpen] = useState(false);
-  const form = useWatchlistForm(getWatchlistFormOptions(mode, watchlist, () => setOpen(false)));
-  const { loading, onSubmit } = form;
+  const { loading, onSubmit, register, control, formState } = useWatchlistForm(
+    getFormOptions(mode, watchlist, open, () => setOpen(false)),
+  );
   const labels = watchlistFormLabels[mode];
 
   return (
@@ -32,57 +34,37 @@ export function WatchlistFormDialog({ mode, watchlist, trigger }: WatchlistFormD
       <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
       <Dialog.Backdrop />
       <Dialog.Positioner>
-        <Dialog.Content maxW={{ base: "calc(100vw - 2rem)", sm: "425px" }}>
+        <Dialog.Content maxW="sm">
           <Dialog.CloseTrigger aria-label="Close dialog">
             <X size={16} />
           </Dialog.CloseTrigger>
-          <form key={open ? "open" : "closed"} onSubmit={onSubmit}>
+          <form onSubmit={onSubmit}>
             <Dialog.Header flexDirection="column" alignItems="flex-start" gap={1}>
               <Dialog.Title>{labels.title}</Dialog.Title>
               <Dialog.Description color="fg.muted">{labels.descriptionLabel}</Dialog.Description>
             </Dialog.Header>
             <Dialog.Body>
               <Stack gap={4}>
-                <Field.Root required>
+                <Field.Root required invalid={Boolean(formState.errors.name)}>
                   <Field.Label htmlFor="name">Name</Field.Label>
                   <Input
                     id="name"
-                    name="name"
                     placeholder="e.g., Marvel Cinematic Universe"
-                    defaultValue={getWatchlistName(watchlist)}
-                    required
+                    {...register("name", { required: "Name is required" })}
                   />
+                  <Field.ErrorText>{formState.errors.name?.message}</Field.ErrorText>
                 </Field.Root>
                 <Field.Root>
                   <Field.Label htmlFor="description">Description</Field.Label>
                   <Textarea
                     id="description"
-                    name="description"
                     placeholder="Optional description..."
-                    defaultValue={getWatchlistDescription(watchlist)}
+                    {...register("description")}
                   />
                 </Field.Root>
                 <Field.Root>
                   <Field.Label>Order</Field.Label>
-                  <RadioGroup.Root
-                    name="itemOrderMode"
-                    defaultValue={getWatchlistOrderMode(watchlist)}
-                    colorPalette="pink"
-                    display="flex"
-                    flexDir="column"
-                    gap={2}
-                  >
-                    <RadioGroup.Item value="release">
-                      <RadioGroup.ItemHiddenInput />
-                      <RadioGroup.ItemControl borderWidth="2px" />
-                      <RadioGroup.ItemText>Release order</RadioGroup.ItemText>
-                    </RadioGroup.Item>
-                    <RadioGroup.Item value="custom">
-                      <RadioGroup.ItemHiddenInput />
-                      <RadioGroup.ItemControl borderWidth="2px" />
-                      <RadioGroup.ItemText>Custom order</RadioGroup.ItemText>
-                    </RadioGroup.Item>
-                  </RadioGroup.Root>
+                  <WatchlistOrderField control={control} />
                 </Field.Root>
               </Stack>
             </Dialog.Body>
@@ -98,26 +80,42 @@ export function WatchlistFormDialog({ mode, watchlist, trigger }: WatchlistFormD
   );
 }
 
-function getWatchlistFormOptions(
+function WatchlistOrderField({ control }: { control: Control<WatchlistFormValues> }) {
+  const { field } = useController({ control, name: "itemOrderMode" });
+
+  return (
+    <RadioGroup.Root
+      name={field.name}
+      value={field.value}
+      onValueChange={({ value }) => field.onChange(value)}
+      colorPalette="pink"
+      display="flex"
+      flexDir="column"
+      gap={2}
+    >
+      <RadioGroup.Item value="release">
+        <RadioGroup.ItemHiddenInput ref={field.ref} />
+        <RadioGroup.ItemControl borderWidth="2px" />
+        <RadioGroup.ItemText>Release order</RadioGroup.ItemText>
+      </RadioGroup.Item>
+      <RadioGroup.Item value="custom">
+        <RadioGroup.ItemHiddenInput />
+        <RadioGroup.ItemControl borderWidth="2px" />
+        <RadioGroup.ItemText>Custom order</RadioGroup.ItemText>
+      </RadioGroup.Item>
+    </RadioGroup.Root>
+  );
+}
+
+function getFormOptions(
   mode: "create" | "edit",
   watchlist: Watchlist | undefined,
+  open: boolean,
   onSuccess: () => void,
 ): Parameters<typeof useWatchlistForm>[0] {
   if (mode === "create") {
-    return { mode, onSuccess };
+    return { mode, open, onSuccess };
   }
 
-  return { mode, watchlist: watchlist as Watchlist, onSuccess };
-}
-
-function getWatchlistName(watchlist: Watchlist | undefined) {
-  return watchlist?.name ?? "";
-}
-
-function getWatchlistDescription(watchlist: Watchlist | undefined) {
-  return watchlist?.description ?? "";
-}
-
-function getWatchlistOrderMode(watchlist: Watchlist | undefined) {
-  return watchlist?.itemOrderMode ?? "release";
+  return { mode, open, onSuccess, watchlist: watchlist as Watchlist };
 }

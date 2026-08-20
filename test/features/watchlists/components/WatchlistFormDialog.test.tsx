@@ -59,7 +59,11 @@ vi.mock("sonner", () => ({
   },
 }));
 
-const RadioContext = createContext<{ defaultValue?: string; name?: string }>({});
+const RadioContext = createContext<{
+  value?: string;
+  name?: string;
+  onValueChange?: (details: { value: string }) => void;
+}>({});
 const DialogContext = createContext<{ onOpenChange: (open: boolean) => void }>({
   onOpenChange: () => undefined,
 });
@@ -115,33 +119,37 @@ vi.mock("@chakra-ui/react", () => ({
     Label: ({ children, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) => (
       <label {...props}>{children}</label>
     ),
+    ErrorText: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
   },
   Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
   Textarea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...props} />,
   RadioGroup: {
     Root: ({
       children,
-      defaultValue,
+      value,
       name,
+      onValueChange,
     }: {
       children: React.ReactNode;
-      defaultValue?: string;
+      value?: string;
       name?: string;
+      onValueChange?: (details: { value: string }) => void;
     }) => (
-      <RadioContext.Provider value={{ defaultValue, name }}>
+      <RadioContext.Provider value={{ value, name, onValueChange }}>
         <div>{children}</div>
       </RadioContext.Provider>
     ),
     Item: ({ children, value }: { children: React.ReactNode; value: string }) => {
       const context = useContext(RadioContext);
       return (
-        <label data-state={context.defaultValue === value ? "checked" : "unchecked"}>
+        <label data-state={context.value === value ? "checked" : "unchecked"}>
           {React.Children.map(children, (child) =>
             React.isValidElement(child)
               ? React.cloneElement(child as React.ReactElement<Record<string, unknown>>, {
                   name: context.name,
                   value,
-                  defaultChecked: context.defaultValue === value,
+                  checked: context.value === value,
+                  onChange: () => context.onValueChange?.({ value }),
                 })
               : child,
           )}

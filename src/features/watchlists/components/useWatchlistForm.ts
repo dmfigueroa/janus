@@ -1,31 +1,47 @@
-import { useState } from "react";
+import { useEffect } from "react";
+import { useForm, type SubmitHandler } from "react-hook-form";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import type { Watchlist } from "@/db/Schema";
-import { type WatchlistItemOrderMode } from "@/features/watchlists/Order";
+import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
 import { createWatchlist } from "@/features/watchlists/create/Mutation";
 import { updateWatchlist } from "@/features/watchlists/update/Mutation";
 import { invalidateWatchlistQueries } from "@/features/watchlists/Cache";
 
 type UseWatchlistFormOptions =
-  | { mode: "create"; watchlist?: never; onSuccess?: () => void }
-  | { mode: "edit"; watchlist: Watchlist; onSuccess?: () => void };
+  | { mode: "create"; watchlist?: never; onSuccess?: () => void; open?: boolean }
+  | { mode: "edit"; watchlist: Watchlist; onSuccess?: () => void; open?: boolean };
 
-export function useWatchlistForm({ mode, watchlist, onSuccess }: UseWatchlistFormOptions) {
-  const [loading, setLoading] = useState(false);
+export type WatchlistFormValues = {
+  name: string;
+  description: string;
+  itemOrderMode: WatchlistItemOrderMode;
+};
+
+export function useWatchlistForm({
+  mode,
+  watchlist,
+  onSuccess,
+  open = false,
+}: UseWatchlistFormOptions) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const createWatchlistFn = useServerFn(createWatchlist);
   const updateWatchlistFn = useServerFn(updateWatchlist);
+  const form = useForm<WatchlistFormValues>({
+    defaultValues: getDefaultValues(watchlist),
+  });
 
-  const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
+  useEffect(() => {
+    if (open) {
+      form.reset(getDefaultValues(watchlist));
+    }
+  }, [form, open, watchlist]);
 
+  const onSubmit: SubmitHandler<WatchlistFormValues> = async (formData) => {
     try {
-      const formData = parseFormData(e.currentTarget);
       await submitWatchlist({
         mode,
         watchlist,
@@ -37,14 +53,13 @@ export function useWatchlistForm({ mode, watchlist, onSuccess }: UseWatchlistFor
       onSuccess?.();
     } catch (error) {
       handleSubmitError(error);
-    } finally {
-      setLoading(false);
     }
   };
 
   return {
-    loading,
-    onSubmit,
+    ...form,
+    loading: form.formState.isSubmitting,
+    onSubmit: form.handleSubmit(onSubmit),
   };
 }
 
@@ -53,7 +68,7 @@ export function useWatchlistForm({ mode, watchlist, onSuccess }: UseWatchlistFor
 type SubmitArgs = {
   mode: "create" | "edit";
   watchlist: Watchlist | undefined;
-  formData: ReturnType<typeof parseFormData>;
+  formData: WatchlistFormValues;
   createFn: ReturnType<typeof useServerFn<typeof createWatchlist>>;
   updateFn: ReturnType<typeof useServerFn<typeof updateWatchlist>>;
 };
@@ -118,13 +133,12 @@ function handleSubmitError(error: unknown) {
   );
 }
 
-// --- Parsing layer ---
-
-function parseFormData(form: HTMLFormElement) {
-  const data = new FormData(form);
-  return {
-    name: data.get("name") as string,
-    description: data.get("description") as string,
-    itemOrderMode: data.get("itemOrderMode") as WatchlistItemOrderMode,
-  };
+function getDefaultValues(watchlist: Watchlist | undefined): WatchlistFormValues {
+  return watchlist
+    ? {
+        name: watchlist.name,
+        description: watchlist.description ?? "",
+        itemOrderMode: watchlist.itemOrderMode,
+      }
+    : { name: "", description: "", itemOrderMode: "release" };
 }
