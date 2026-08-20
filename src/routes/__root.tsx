@@ -14,8 +14,9 @@ import { PwaUpdatePrompt } from "@/components/PwaUpdatePrompt";
 
 import appCss from "../styles.css?url";
 
-import { ThemeProvider } from "next-themes";
 import { NotFound } from "@/components/NotFound";
+import { Provider } from "@/app/Provider";
+import { Toaster as ChakraToaster } from "@/app/Toaster";
 
 function getManifestCrossOrigin(useCredentials: boolean) {
   if (useCredentials) return "use-credentials" as const;
@@ -80,11 +81,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <Provider>
           <QueryClientProvider client={queryClient}>
             <PwaUpdatePrompt />
             {children}
             <Toaster />
+            <ChakraToaster />
             <TanStackDevtools
               config={{
                 position: "bottom-right",
@@ -98,7 +100,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             />
             <BottomNav />
           </QueryClientProvider>
-        </ThemeProvider>
+        </Provider>
         <Scripts />
       </body>
     </html>

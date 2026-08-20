@@ -1,21 +1,28 @@
 import { Link } from "@tanstack/react-router";
-import { Button } from "@/components/ui/Button";
+import { Button, HStack, Stack, Text } from "@chakra-ui/react";
 
 export function NotFound() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 p-4 text-center">
-      <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-6xl">404</h1>
-      <p className="text-lg text-muted-foreground">
+    <Stack minH="50vh" align="center" justify="center" gap={4} p={4} textAlign="center">
+      <Text
+        as="h1"
+        fontSize={{ base: "4xl", sm: "6xl" }}
+        fontWeight="extrabold"
+        letterSpacing="display"
+      >
+        404
+      </Text>
+      <Text fontSize="lg" color="fg.muted">
         Oops! The page you're looking for differs from reality.
-      </p>
-      <div className="flex gap-2 mt-4">
-        <Button asChild variant="default">
+      </Text>
+      <HStack gap={2} mt={4}>
+        <Button asChild colorPalette="pink">
           <Link to="/">Go Home</Link>
         </Button>
-        <Button asChild variant="secondary">
+        <Button asChild variant="subtle">
           <Link to="..">Go Back</Link>
         </Button>
-      </div>
-    </div>
+      </HStack>
+    </Stack>
   );
 }

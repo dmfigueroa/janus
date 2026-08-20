@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { ThemeProvider } from "next-themes";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Toaster } from "@/components/ui/Sonner";
+import { Provider } from "@/app/Provider";
+import { Toaster } from "@/app/Toaster";
 import { loadPwaRegistration } from "@/lib/PwaRegistration";
 import { PwaUpdatePrompt } from "@/components/PwaUpdatePrompt";
 
@@ -32,11 +32,15 @@ function createServiceWorkerRegistration(
 }
 
 function renderPrompt() {
-  render(
-    <ThemeProvider attribute="class">
+  render(PwaPromptTestHarness());
+}
+
+function PwaPromptTestHarness() {
+  return (
+    <Provider>
       <PwaUpdatePrompt />
       <Toaster />
-    </ThemeProvider>,
+    </Provider>
   );
 }
 
@@ -194,10 +198,10 @@ describe("PwaUpdatePrompt", () => {
     renderPrompt();
 
     const title = await screen.findByText("Update available");
-    const toastElement = title.closest("[data-sonner-toast]");
+    const toastElement = title.closest('[data-scope="toast"]');
 
     expect(toastElement).not.toBeNull();
-    expect(toastElement?.getAttribute("data-dismissible")).toBe("false");
+    expect(toastElement?.querySelector("button[aria-label='Close']")).toBeNull();
   });
 
   it("keeps update-check failures silent for users", async () => {

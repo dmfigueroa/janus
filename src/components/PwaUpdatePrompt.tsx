@@ -1,8 +1,6 @@
-"use client";
-
-import { type MouseEvent, useEffect, useRef } from "react";
-import { toast } from "sonner";
+import { useEffect, useRef } from "react";
 import { loadPwaRegistration } from "@/lib/PwaRegistration";
+import { toaster } from "@/app/Toaster";
 
 const UPDATE_TOAST_ID = "pwa-update-available";
 
@@ -13,9 +11,7 @@ export function PwaUpdatePrompt() {
   const updateServiceWorkerRef = useRef<UpdateServiceWorker | null>(null);
 
   useEffect(() => {
-    const activateWaitingUpdate = (event: MouseEvent<HTMLButtonElement>) => {
-      event.preventDefault();
-
+    const activateWaitingUpdate = () => {
       const updateServiceWorker = updateServiceWorkerRef.current;
 
       if (!updateServiceWorker) {
@@ -34,10 +30,11 @@ export function PwaUpdatePrompt() {
 
       hasPromptedRef.current = true;
 
-      toast("Update available", {
+      toaster.create({
         id: UPDATE_TOAST_ID,
+        title: "Update available",
         duration: Number.POSITIVE_INFINITY,
-        dismissible: false,
+        closable: false,
         action: {
           label: "Update",
           onClick: activateWaitingUpdate,
@@ -72,7 +69,7 @@ export function PwaUpdatePrompt() {
       });
 
     return () => {
-      toast.dismiss(UPDATE_TOAST_ID);
+      toaster.remove(UPDATE_TOAST_ID);
     };
   }, []);
 
