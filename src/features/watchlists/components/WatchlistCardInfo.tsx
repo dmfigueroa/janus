@@ -1,6 +1,6 @@
+import { Box, Flex, Heading, Text } from "@chakra-ui/react";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query";
 import { formatNextItemDetail } from "@/features/watchlists/NextItemLabel";
-import { cn } from "@/utils/Cn";
 
 export type WatchlistCardInfoVariant = "watchlist" | "up-next";
 
@@ -33,10 +33,12 @@ function UpNextCardInfo({ watchlist }: { watchlist: WatchlistSummary }) {
   const featuredSubtitle = nextItem?.parentTitle ? formatUpNextSubtitleItem(watchlist) : null;
 
   return (
-    <div className="px-1">
-      <h3 className="text-lg font-bold leading-tight text-foreground">{featuredTitle}</h3>
+    <Box px={1}>
+      <Heading as="h3" size="lg" fontWeight="bold" lineHeight="tight">
+        {featuredTitle}
+      </Heading>
       <FeaturedSubtitle subtitle={featuredSubtitle} />
-    </div>
+    </Box>
   );
 }
 
@@ -60,7 +62,11 @@ function FeaturedSubtitle({ subtitle }: { subtitle: string | null }) {
     return null;
   }
 
-  return <p className="mt-0.5 text-sm leading-snug text-muted-foreground">{subtitle}</p>;
+  return (
+    <Text mt={0.5} fontSize="sm" lineHeight="snug" color="fg.muted">
+      {subtitle}
+    </Text>
+  );
 }
 
 function StandardCardInfo({ watchlist }: { watchlist: WatchlistSummary }) {
@@ -68,23 +74,25 @@ function StandardCardInfo({ watchlist }: { watchlist: WatchlistSummary }) {
   const complete = stats.progress === 100;
 
   return (
-    <div className="px-1">
-      <h3 className="font-bold text-lg text-foreground leading-tight truncate">{watchlist.name}</h3>
-      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 mb-1">
-        <span>{stats.totalItems} items</span>
-        <span>•</span>
-        <span className={cn(complete ? "text-green-500" : "text-primary")}>{stats.progress}%</span>
-      </div>
+    <Box px={1}>
+      <Heading as="h3" size="lg" fontWeight="bold" lineHeight="tight" truncate>
+        {watchlist.name}
+      </Heading>
+      <Flex align="center" gap={2} mt={0.5} mb={1} fontSize="xs" color="fg.muted">
+        <Text>{stats.totalItems} items</Text>
+        <Text aria-hidden="true">•</Text>
+        <Text color={complete ? "green.500" : "accent.solid"}>{stats.progress}%</Text>
+      </Flex>
 
-      <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
-        <div
-          className={cn(
-            "h-full rounded-full transition-all duration-500",
-            complete ? "bg-green-500" : "bg-primary",
-          )}
-          style={{ width: `${stats.progress}%` }}
+      <Box h={1} w="full" bg="bg.subtle" rounded="full" overflow="hidden">
+        <Box
+          h="full"
+          w={`${stats.progress}%`}
+          bg={complete ? "green.500" : "accent.solid"}
+          rounded="full"
+          transition="width 500ms"
         />
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

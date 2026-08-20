@@ -1,5 +1,5 @@
+import { Button, Flex, Heading, IconButton, Text } from "@chakra-ui/react";
 import { CheckSquare } from "lucide-react";
-import { Button } from "@/components/ui/Button";
 import type { getWatchlistHome } from "@/features/watchlists/home/WatchlistHome";
 import { useWatchlistMergeSelectionContext } from "@/features/watchlists/home/WatchlistMergeSelectionContext";
 
@@ -12,16 +12,16 @@ export function HomeHeader({ totals }: HomeHeaderProps) {
   const selectedCount = mergeSelection.selectedIds.length;
 
   return (
-    <header className="px-6 pb-4 pt-8">
-      <div className="flex items-center justify-between">
+    <Flex as="header" direction="column" px={6} pt={8} pb={4} gap={3}>
+      <Flex align="center" justify="space-between">
         <HeaderTitle selectionMode={mergeSelection.selectionMode} selectedCount={selectedCount} />
-        <div className="flex gap-2">
+        <Flex gap={2}>
           <HeaderActions mergeSelection={mergeSelection} selectedCount={selectedCount} />
-        </div>
-      </div>
+        </Flex>
+      </Flex>
 
       <WatchlistTotals totals={totals} hidden={mergeSelection.selectionMode} />
-    </header>
+    </Flex>
   );
 }
 
@@ -33,9 +33,9 @@ function HeaderTitle({
   selectedCount: number;
 }) {
   return (
-    <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
+    <Heading as="h1" size="3xl" fontWeight="extrabold" letterSpacing="tight">
       {selectionMode ? `${selectedCount} Selected` : "My Lists"}
-    </h1>
+    </Heading>
   );
 }
 
@@ -60,24 +60,27 @@ function HeaderActions({
   }
 
   return (
-    <Button
-      size="icon"
+    <IconButton
+      size="sm"
       variant="ghost"
-      className="rounded-full bg-card text-muted-foreground hover:bg-secondary"
+      rounded="full"
+      bg="bg.surface"
+      color="fg.muted"
+      _hover={{ bg: "bg.subtle" }}
       onClick={mergeSelection.enterSelectionMode}
       aria-label="Select watchlists"
       title="Select watchlists"
     >
-      <CheckSquare className="h-5 w-5" />
-    </Button>
+      <CheckSquare size={20} />
+    </IconButton>
   );
 }
 
 function WatchlistTotals({ totals, hidden }: HomeHeaderProps & { hidden: boolean }) {
   if (hidden) return null;
   return (
-    <p className="mt-3 text-sm text-muted-foreground">
+    <Text fontSize="sm" color="fg.muted">
       {totals.watchlists} watchlists, {totals.items} items
-    </p>
+    </Text>
   );
 }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@test/utils/Render";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EnrichedWatchlist } from "@/components/WatchlistCard";
@@ -265,5 +265,24 @@ describe("WatchlistCard", () => {
 
     expect(screen.getByRole("heading", { name: "Saga" })).not.toBeNull();
     expect(screen.getByText("Issue 12 • The Trial")).not.toBeNull();
+  });
+
+  it("lets keyboard users select a watchlist from selection mode", () => {
+    const onToggle = vi.fn();
+
+    render(
+      <WatchlistCard
+        watchlist={createWatchlist({ id: 1, name: "Movie Night" })}
+        selectionMode
+        onToggle={onToggle}
+      />,
+    );
+
+    const selectionButton = screen.getByRole("button", { name: "Select Movie Night" });
+    selectionButton.focus();
+    fireEvent.click(selectionButton);
+
+    expect(document.activeElement).toBe(selectionButton);
+    expect(onToggle).toHaveBeenCalledOnce();
   });
 });

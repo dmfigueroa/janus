@@ -1,25 +1,48 @@
+import { Button, Box, Text } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { WatchlistFormDialog } from "@/features/watchlists/components/WatchlistFormDialog";
 
 export function CreateWatchlistTile() {
   return (
-    <div className="w-full sm:w-[220px]">
-      <div className="flex h-full flex-col gap-2">
+    <Box w="full" maxW={{ md: "220px" }}>
+      <Box display="flex" h="full" flexDirection="column" gap={2}>
         <WatchlistFormDialog
           mode="create"
           trigger={
-            <div className="group flex aspect-[2/3] cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border p-6 text-center transition-colors hover:border-muted-foreground hover:bg-secondary/40">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary transition-colors group-hover:bg-primary">
-                <Plus className="h-6 w-6 text-muted-foreground group-hover:text-primary-foreground" />
-              </div>
-              <span className="mt-2 font-medium text-muted-foreground group-hover:text-foreground">
-                Create New List
-              </span>
-            </div>
+            <Button
+              type="button"
+              variant="outline"
+              w="full"
+              aspectRatio="2 / 3"
+              flexDirection="column"
+              justifyContent="center"
+              gap={2}
+              rounded="card"
+              borderWidth="2px"
+              borderStyle="dashed"
+              color="fg.muted"
+              _hover={{ borderColor: "fg.muted", bg: "bg.subtle", color: "fg.default" }}
+            >
+              <Box
+                display="flex"
+                h={12}
+                w={12}
+                alignItems="center"
+                justifyContent="center"
+                rounded="full"
+                bg="bg.subtle"
+                _groupHover={{ bg: "accent.solid" }}
+              >
+                <Plus size={24} />
+              </Box>
+              <Text fontWeight="medium">Create New List</Text>
+            </Button>
           }
         />
-        <div className="px-1 opacity-0">.</div>
-      </div>
-    </div>
+        <Box px={1} opacity={0}>
+          .
+        </Box>
+      </Box>
+    </Box>
   );
 }

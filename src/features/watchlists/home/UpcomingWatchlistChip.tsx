@@ -1,7 +1,7 @@
+import { Link as ChakraLink, Text } from "@chakra-ui/react";
 import { Link } from "@tanstack/react-router";
 import type { getWatchlistHome } from "@/features/watchlists/home/WatchlistHome";
 import { formatNextItemWithParentTitle } from "@/features/watchlists/NextItemLabel";
-import { cn } from "@/utils/Cn";
 
 type UpcomingWatchlist = Awaited<
   ReturnType<typeof getWatchlistHome>
@@ -27,17 +27,30 @@ export function UpcomingWatchlistChip({ watchlist }: UpcomingWatchlistChipProps)
   }
 
   return (
-    <Link
-      to="/watchlists/$watchlistId"
-      params={{ watchlistId: watchlist.id.toString() }}
-      preload="viewport"
-      className={cn(
-        "inline-flex max-w-full items-center rounded-full border border-border/70",
-        "bg-card/70 px-3 py-1.5 text-sm font-medium text-muted-foreground",
-        "transition-colors hover:border-primary/40 hover:text-foreground",
-      )}
+    <ChakraLink
+      asChild
+      display="inline-flex"
+      maxW="full"
+      alignItems="center"
+      rounded="full"
+      borderWidth="1px"
+      borderColor="border.default"
+      bg="bg.surface"
+      px={3}
+      py={1.5}
+      fontSize="sm"
+      fontWeight="medium"
+      color="fg.muted"
+      transition="border-color 150ms, color 150ms"
+      _hover={{ borderColor: "accent.solid", color: "fg.default" }}
     >
-      <span className="truncate">{label}</span>
-    </Link>
+      <Link
+        to="/watchlists/$watchlistId"
+        params={{ watchlistId: watchlist.id.toString() }}
+        preload="viewport"
+      >
+        <Text truncate>{label}</Text>
+      </Link>
+    </ChakraLink>
   );
 }

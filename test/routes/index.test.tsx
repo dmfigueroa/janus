@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@test/utils/Render";
 import { within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EnrichedWatchlist } from "@/components/WatchlistCard";

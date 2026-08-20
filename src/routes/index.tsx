@@ -1,3 +1,4 @@
+import { Box, Container } from "@chakra-ui/react";
 import { createFileRoute } from "@tanstack/react-router";
 import { AllWatchlistsSection } from "@/features/watchlists/home/AllWatchlistsSection";
 import { CreateWatchlistFloatingButton } from "@/features/watchlists/home/CreateWatchlistFloatingButton";
@@ -37,8 +38,8 @@ function WatchlistsHomeLayout({ initialData }: WatchlistsHomeRouteContentProps) 
   const mergeSelection = useWatchlistMergeSelectionContext();
 
   return (
-    <div className="min-h-screen bg-background pb-24 font-sans text-foreground">
-      <div className="container relative mx-auto min-h-screen">
+    <Box minH="100vh" pb={24}>
+      <Container position="relative" minH="100vh" maxW="7xl">
         <HomeHeader totals={initialData.totals} />
 
         {!mergeSelection.selectionMode ? (
@@ -50,7 +51,7 @@ function WatchlistsHomeLayout({ initialData }: WatchlistsHomeRouteContentProps) 
         {!mergeSelection.selectionMode ? <CreateWatchlistFloatingButton /> : null}
 
         <WatchlistMergeDialog allWatchlists={initialData.allWatchlists} />
-      </div>
-    </div>
+      </Container>
+    </Box>
   );
 }
