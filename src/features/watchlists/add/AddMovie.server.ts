@@ -5,6 +5,14 @@ import { persistAddedItems } from "./Insert.server";
 import { rejectAdd, type WatchlistWriteResult } from "./Shared.server";
 
 const TMDB_MOVIE_FETCH_FAILURE_MESSAGE = "Failed to fetch movie details from TMDB.";
+const MOVIE_ALREADY_IN_WATCHLIST_RESULT = {
+  success: true,
+  message: "Already in watchlist",
+} as const satisfies WatchlistWriteResult;
+const MOVIE_ADDED_RESULT = {
+  success: true,
+  message: "Added to watchlist",
+} as const satisfies WatchlistWriteResult;
 
 export async function addMovieToWatchlist(
   watchlistId: number,
@@ -13,40 +21,37 @@ export async function addMovieToWatchlist(
 ): Promise<WatchlistWriteResult> {
   const existing = await repository.getExistingMovieInWatchlist(watchlistId, tmdbId);
   if (existing.length > 0) {
-    return alreadyInWatchlistResult();
+    return MOVIE_ALREADY_IN_WATCHLIST_RESULT;
   }
 
-  return addFetchedMovie(watchlistId, tmdbId, insertionPosition);
-}
-
-async function addFetchedMovie(
-  watchlistId: number,
-  tmdbId: number,
-  insertionPosition?: AddToWatchlistInsertionPosition,
-): Promise<WatchlistWriteResult> {
   const details = await fetchMovieDetails(tmdbId);
   if (!details) {
     return rejectAdd(TMDB_MOVIE_FETCH_FAILURE_MESSAGE);
   }
 
+  return persistMovie(watchlistId, tmdbId, details, insertionPosition);
+}
+
+async function persistMovie(
+  watchlistId: number,
+  tmdbId: number,
+  details: Awaited<ReturnType<typeof getMovieDetails>>,
+  insertionPosition?: AddToWatchlistInsertionPosition,
+): Promise<WatchlistWriteResult> {
   const result = await persistAddedItems({
     watchlistId,
     insertionPosition,
     items: [mapToWatchlistMovie(details, watchlistId, tmdbId)],
   });
-  return finishMovieAddition(result);
-}
-
-function finishMovieAddition(result: Awaited<ReturnType<typeof persistAddedItems>>) {
   if (!result.success) {
     return result;
   }
 
   if (result.insertedCount === 0) {
-    return alreadyInWatchlistResult();
+    return MOVIE_ALREADY_IN_WATCHLIST_RESULT;
   }
 
-  return successResult();
+  return MOVIE_ADDED_RESULT;
 }
 
 // --- Implementation Details ---
@@ -81,12 +86,4 @@ function getMovieTitle(details: Awaited<ReturnType<typeof getMovieDetails>>) {
   if (details.title) return details.title;
   if (details.name) return details.name;
   return "Unknown";
-}
-
-function alreadyInWatchlistResult(): WatchlistWriteResult {
-  return { success: true, message: "Already in watchlist" };
-}
-
-function successResult(): WatchlistWriteResult {
-  return { success: true, message: "Added to watchlist" };
 }

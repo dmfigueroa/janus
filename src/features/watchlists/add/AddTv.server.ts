@@ -62,15 +62,11 @@ async function addNewEpisodes(
     insertionPosition,
     items: newEpisodes,
   });
-  return finishEpisodeAddition(result);
-}
-
-function finishEpisodeAddition(result: Awaited<ReturnType<typeof persistAddedItems>>) {
   if (!result.success) {
     return result;
   }
 
-  return successResult(result.insertedCount);
+  return episodesAddedResult(result.insertedCount);
 }
 
 // --- Implementation Details ---
@@ -145,7 +141,7 @@ async function filterNewEpisodes(
   return episodes.filter((e) => !existingIds.has(e.tmdbId ?? ""));
 }
 
-function successResult(count: number): WatchlistWriteResult {
+function episodesAddedResult(count: number): WatchlistWriteResult {
   const label = count === 1 ? "new episode" : "new episodes";
   return {
     success: true,

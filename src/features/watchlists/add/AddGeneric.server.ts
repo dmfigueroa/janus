@@ -10,25 +10,8 @@ export async function addGenericItemToWatchlist(
   const result = await persistAddedItems({
     watchlistId,
     insertionPosition,
-    items: [
-      {
-        watchlistId,
-        tmdbId: media.id,
-        source: media.source,
-        mediaType: media.mediaType,
-        title: media.title,
-        posterPath: media.poster,
-        releaseDate: media.releaseDate || media.year,
-        voteAverage: media.rating,
-        runtime: 0,
-        authors: media.authors,
-      },
-    ],
+    items: [mapToWatchlistItem(watchlistId, media)],
   });
-  return finishGenericAddition(result);
-}
-
-function finishGenericAddition(result: Awaited<ReturnType<typeof persistAddedItems>>) {
   if (!result.success) {
     return result;
   }
@@ -38,4 +21,19 @@ function finishGenericAddition(result: Awaited<ReturnType<typeof persistAddedIte
   }
 
   return { success: true, message: "Added to watchlist" };
+}
+
+function mapToWatchlistItem(watchlistId: number, media: GenericMedia) {
+  return {
+    watchlistId,
+    tmdbId: media.id,
+    source: media.source,
+    mediaType: media.mediaType,
+    title: media.title,
+    posterPath: media.poster,
+    releaseDate: media.releaseDate || media.year,
+    voteAverage: media.rating,
+    runtime: 0,
+    authors: media.authors,
+  };
 }

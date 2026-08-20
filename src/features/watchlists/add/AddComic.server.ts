@@ -67,20 +67,13 @@ async function persistComicIssues(
     insertionPosition,
     items,
   });
-  return finishComicAddition(result, existingIssueIds.size);
-}
-
-function finishComicAddition(
-  result: Awaited<ReturnType<typeof persistAddedItems>>,
-  existingIssueCount: number,
-) {
   if (!result.success) {
     return result;
   }
 
   return {
     success: true,
-    message: getSuccessMessage(result.insertedCount, existingIssueCount),
+    message: getIssuesAddedMessage(result.insertedCount, existingIssueIds.size),
   };
 }
 
@@ -127,7 +120,7 @@ function getNoNewIssuesMessage(existingCount: number) {
     : "No issues found for this volume";
 }
 
-function getSuccessMessage(newCount: number, existingCount: number) {
+function getIssuesAddedMessage(newCount: number, existingCount: number) {
   const suffix = existingCount > 0 ? "new issues" : "issues";
   return `Added ${newCount} ${suffix} to watchlist`;
 }
