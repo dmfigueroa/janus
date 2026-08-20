@@ -8,6 +8,7 @@
     "preview": "vite preview",
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",
+    "test:lint-plugin": "vitest run tools/oxlint/ComponentRendering.test.tsx",
     "lint": "oxlint .",
     "format": "oxfmt . --write",
     "format:check": "oxfmt . --check",
@@ -87,7 +88,11 @@
     "pre-commit": "npm run format:check && npm run typecheck && npm run test && npx lint-staged --concurrent 1"
   },
   "lint-staged": {
-    "*.{js,ts,jsx,tsx,mjs,cjs}": [
+    "*.tsx": [
+      "oxlint --fix --config tools/oxlint/StagedTsx.oxlintrc.json",
+      "oxfmt --write"
+    ],
+    "*.{js,ts,jsx,mjs,cjs}": [
       "oxlint --fix",
       "oxfmt --write"
     ],

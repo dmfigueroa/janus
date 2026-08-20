@@ -1,0 +1,9 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../.oxlintrc.json"],
+  "jsPlugins": ["./ComponentRendering.js"],
+  "rules": {
+    "component-rendering/component-owned-jsx": "error",
+    "component-rendering/no-call-expression-children": "error"
+  }
+}
