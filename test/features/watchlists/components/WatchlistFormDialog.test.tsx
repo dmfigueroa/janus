@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
+/* oxlint-disable component-rendering/component-owned-jsx, component-rendering/no-call-expression-children */
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import React, { createContext, useContext } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WatchlistFormDialog } from "@/features/watchlists/components/WatchlistFormDialog";
 import type { Watchlist } from "@/db/Schema";
@@ -58,18 +60,101 @@ vi.mock("sonner", () => ({
   },
 }));
 
-vi.mock("@/components/ui/Dialog", () => ({
-  Dialog: ({ children, open }: { children: React.ReactNode; open?: boolean }) => (
-    <div data-testid="dialog" data-open={open}>
-      {children}
-    </div>
+const RadioContext = createContext<{ defaultValue?: string; name?: string }>({});
+const DialogContext = createContext<{ onOpenChange: (open: boolean) => void }>({
+  onOpenChange: () => undefined,
+});
+
+vi.mock("@chakra-ui/react", () => ({
+  Stack: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Button: ({
+    children,
+    colorPalette: _colorPalette,
+    ...props
+  }: React.ButtonHTMLAttributes<HTMLButtonElement> & { colorPalette?: string }) => (
+    <button {...props}>{children}</button>
   ),
-  DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DialogTitle: ({ children }: { children: React.ReactNode }) => <h1>{children}</h1>,
-  DialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DialogDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
-  DialogTrigger: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  Dialog: {
+    Root: ({
+      children,
+      open,
+      onOpenChange,
+    }: {
+      children: React.ReactNode;
+      open?: boolean;
+      onOpenChange: (details: { open: boolean }) => void;
+    }) => (
+      <DialogContext.Provider
+        value={{ onOpenChange: (nextOpen) => onOpenChange({ open: nextOpen }) }}
+      >
+        <div data-testid="chakra-dialog" data-open={open}>
+          {children}
+        </div>
+      </DialogContext.Provider>
+    ),
+    Trigger: ({ children }: { children: React.ReactElement }) => {
+      const context = useContext(DialogContext);
+      return React.cloneElement(children as React.ReactElement<{ onClick?: () => void }>, {
+        onClick: () => context.onOpenChange(true),
+      });
+    },
+    Backdrop: () => null,
+    Positioner: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Content: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Header: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Title: ({ children }: { children: React.ReactNode }) => <h1>{children}</h1>,
+    Description: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
+    Body: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Footer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    CloseTrigger: (props: React.ButtonHTMLAttributes<HTMLButtonElement>) => {
+      const context = useContext(DialogContext);
+      return <button {...props} onClick={() => context.onOpenChange(false)} />;
+    },
+  },
+  Field: {
+    Root: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Label: ({ children, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) => (
+      <label {...props}>{children}</label>
+    ),
+  },
+  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
+  Textarea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...props} />,
+  RadioGroup: {
+    Root: ({
+      children,
+      defaultValue,
+      name,
+    }: {
+      children: React.ReactNode;
+      defaultValue?: string;
+      name?: string;
+    }) => (
+      <RadioContext.Provider value={{ defaultValue, name }}>
+        <div>{children}</div>
+      </RadioContext.Provider>
+    ),
+    Item: ({ children, value }: { children: React.ReactNode; value: string }) => {
+      const context = useContext(RadioContext);
+      return (
+        <label data-state={context.defaultValue === value ? "checked" : "unchecked"}>
+          {React.Children.map(children, (child) =>
+            React.isValidElement(child)
+              ? React.cloneElement(child as React.ReactElement<Record<string, unknown>>, {
+                  name: context.name,
+                  value,
+                  defaultChecked: context.defaultValue === value,
+                })
+              : child,
+          )}
+        </label>
+      );
+    },
+    ItemHiddenInput: (props: React.InputHTMLAttributes<HTMLInputElement>) => (
+      <input type="radio" {...props} />
+    ),
+    ItemControl: () => null,
+    ItemText: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
+  },
 }));
 
 function watchlistFixture(overrides?: Partial<Watchlist>): Watchlist {
@@ -103,6 +188,23 @@ describe("WatchlistFormDialog", () => {
   });
 
   describe("create mode", () => {
+    it("renders through the Chakra dialog seam", () => {
+      render(<WatchlistFormDialog mode="create" trigger={<button>Open</button>} />);
+
+      expect(screen.getByTestId("chakra-dialog")).not.toBeNull();
+    });
+
+    it("discards unsaved changes when closed and reopened", () => {
+      render(<WatchlistFormDialog mode="create" trigger={<button>Open</button>} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Open" }));
+      fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Unsaved List" } });
+      fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+      fireEvent.click(screen.getByRole("button", { name: "Open" }));
+
+      expect(screen.getByLabelText("Name")).toHaveProperty("value", "");
+    });
+
     it("renders with create title and empty form fields", () => {
       render(<WatchlistFormDialog mode="create" trigger={<button>Open</button>} />);
       fireEvent.click(screen.getByRole("button", { name: "Open" }));
@@ -111,8 +213,8 @@ describe("WatchlistFormDialog", () => {
       expect(screen.getByRole("button", { name: "Create List" })).not.toBeNull();
       expect(screen.getByLabelText("Name")).toHaveProperty("value", "");
       expect(screen.getByLabelText("Description")).toHaveProperty("value", "");
-      expect(screen.getByLabelText("Release order").getAttribute("data-state")).toBe("checked");
-      expect(screen.getByLabelText("Custom order").getAttribute("data-state")).toBe("unchecked");
+      expect(screen.getByLabelText("Release order")).toHaveProperty("checked", true);
+      expect(screen.getByLabelText("Custom order")).toHaveProperty("checked", false);
     });
 
     it("submits createWatchlist with form values and shows success", async () => {
@@ -157,8 +259,8 @@ describe("WatchlistFormDialog", () => {
       expect(screen.getByRole("button", { name: "Save Changes" })).not.toBeNull();
       expect(screen.getByLabelText("Name")).toHaveProperty("value", "Existing List");
       expect(screen.getByLabelText("Description")).toHaveProperty("value", "Existing desc");
-      expect(screen.getByLabelText("Release order").getAttribute("data-state")).toBe("unchecked");
-      expect(screen.getByLabelText("Custom order").getAttribute("data-state")).toBe("checked");
+      expect(screen.getByLabelText("Release order")).toHaveProperty("checked", false);
+      expect(screen.getByLabelText("Custom order")).toHaveProperty("checked", true);
     });
 
     it("submits updateWatchlist with form values and shows success", async () => {

@@ -1,18 +1,6 @@
 import type { Watchlist } from "@/db/Schema";
-import { Button } from "@/components/ui/Button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/Dialog";
-import { Input } from "@/components/ui/Input";
-import { Label } from "@/components/ui/Label";
-import { Textarea } from "@/components/ui/Textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/RadioGroup";
+import { Button, Dialog, Field, Input, RadioGroup, Stack, Textarea } from "@chakra-ui/react";
+import { X } from "lucide-react";
 import { useState } from "react";
 import { useWatchlistForm } from "./useWatchlistForm";
 
@@ -40,72 +28,72 @@ export function WatchlistFormDialog({ mode, watchlist, trigger }: WatchlistFormD
   const labels = watchlistFormLabels[mode];
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] bg-popover border-border text-popover-foreground">
-        <form onSubmit={onSubmit}>
-          <DialogHeader>
-            <DialogTitle>{labels.title}</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              {labels.descriptionLabel}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                name="name"
-                placeholder="e.g., Marvel Cinematic Universe"
-                defaultValue={getWatchlistName(watchlist)}
-                required
-                className="bg-input border-border focus-visible:ring-ring"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                name="description"
-                placeholder="Optional description..."
-                defaultValue={getWatchlistDescription(watchlist)}
-                className="bg-input border-border focus-visible:ring-ring"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Order</Label>
-              <RadioGroup
-                name="itemOrderMode"
-                defaultValue={getWatchlistOrderMode(watchlist)}
-                className="flex flex-col gap-2"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="release" id="release" />
-                  <Label htmlFor="release" className="cursor-pointer font-normal">
-                    Release order
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="custom" id="custom" />
-                  <Label htmlFor="custom" className="cursor-pointer font-normal">
-                    Custom order
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-            >
-              {loading ? "Saving..." : labels.submitLabel}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <Dialog.Root open={open} onOpenChange={({ open: nextOpen }) => setOpen(nextOpen)}>
+      <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
+      <Dialog.Backdrop />
+      <Dialog.Positioner>
+        <Dialog.Content maxW={{ base: "calc(100vw - 2rem)", sm: "425px" }}>
+          <Dialog.CloseTrigger aria-label="Close dialog">
+            <X size={16} />
+          </Dialog.CloseTrigger>
+          <form key={open ? "open" : "closed"} onSubmit={onSubmit}>
+            <Dialog.Header>
+              <Dialog.Title>{labels.title}</Dialog.Title>
+              <Dialog.Description color="fg.muted">{labels.descriptionLabel}</Dialog.Description>
+            </Dialog.Header>
+            <Dialog.Body>
+              <Stack gap={4}>
+                <Field.Root required>
+                  <Field.Label htmlFor="name">Name</Field.Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    placeholder="e.g., Marvel Cinematic Universe"
+                    defaultValue={getWatchlistName(watchlist)}
+                    required
+                  />
+                </Field.Root>
+                <Field.Root>
+                  <Field.Label htmlFor="description">Description</Field.Label>
+                  <Textarea
+                    id="description"
+                    name="description"
+                    placeholder="Optional description..."
+                    defaultValue={getWatchlistDescription(watchlist)}
+                  />
+                </Field.Root>
+                <Field.Root>
+                  <Field.Label>Order</Field.Label>
+                  <RadioGroup.Root
+                    name="itemOrderMode"
+                    defaultValue={getWatchlistOrderMode(watchlist)}
+                    display="flex"
+                    flexDir="column"
+                    gap={2}
+                  >
+                    <RadioGroup.Item value="release">
+                      <RadioGroup.ItemHiddenInput />
+                      <RadioGroup.ItemControl />
+                      <RadioGroup.ItemText>Release order</RadioGroup.ItemText>
+                    </RadioGroup.Item>
+                    <RadioGroup.Item value="custom">
+                      <RadioGroup.ItemHiddenInput />
+                      <RadioGroup.ItemControl />
+                      <RadioGroup.ItemText>Custom order</RadioGroup.ItemText>
+                    </RadioGroup.Item>
+                  </RadioGroup.Root>
+                </Field.Root>
+              </Stack>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <Button type="submit" disabled={loading} colorPalette="pink">
+                {loading ? "Saving..." : labels.submitLabel}
+              </Button>
+            </Dialog.Footer>
+          </form>
+        </Dialog.Content>
+      </Dialog.Positioner>
+    </Dialog.Root>
   );
 }
 
