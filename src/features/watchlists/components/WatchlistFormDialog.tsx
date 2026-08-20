@@ -37,7 +37,7 @@ export function WatchlistFormDialog({ mode, watchlist, trigger }: WatchlistFormD
             <X size={16} />
           </Dialog.CloseTrigger>
           <form key={open ? "open" : "closed"} onSubmit={onSubmit}>
-            <Dialog.Header>
+            <Dialog.Header flexDirection="column" alignItems="flex-start" gap={1}>
               <Dialog.Title>{labels.title}</Dialog.Title>
               <Dialog.Description color="fg.muted">{labels.descriptionLabel}</Dialog.Description>
             </Dialog.Header>
@@ -67,18 +67,19 @@ export function WatchlistFormDialog({ mode, watchlist, trigger }: WatchlistFormD
                   <RadioGroup.Root
                     name="itemOrderMode"
                     defaultValue={getWatchlistOrderMode(watchlist)}
+                    colorPalette="pink"
                     display="flex"
                     flexDir="column"
                     gap={2}
                   >
                     <RadioGroup.Item value="release">
                       <RadioGroup.ItemHiddenInput />
-                      <RadioGroup.ItemControl />
+                      <RadioGroup.ItemControl borderWidth="2px" />
                       <RadioGroup.ItemText>Release order</RadioGroup.ItemText>
                     </RadioGroup.Item>
                     <RadioGroup.Item value="custom">
                       <RadioGroup.ItemHiddenInput />
-                      <RadioGroup.ItemControl />
+                      <RadioGroup.ItemControl borderWidth="2px" />
                       <RadioGroup.ItemText>Custom order</RadioGroup.ItemText>
                     </RadioGroup.Item>
                   </RadioGroup.Root>
