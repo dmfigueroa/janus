@@ -7,6 +7,16 @@
 - When adding files, moving modules, or introducing new boundaries, read those docs first and follow them.
 - Apply the target structure to new code and touched areas. Do not do broad drive-by reorganizations unless the user asks for them.
 
+## Running Commands
+
+- Prefer the repository's devcontainer because it provides the supported Node.js version and native build tools.
+- Start or create it with `devcontainer up --workspace-folder . --docker-path podman`.
+- Run project commands with `devcontainer exec --workspace-folder . --docker-path podman <command>`, for example `devcontainer exec --workspace-folder . --docker-path podman npm run lint`.
+- When using Podman directly, locate the container with `podman ps -a --filter "label=devcontainer.local_folder=$(pwd)"` and confirm it belongs to the current checkout before using it.
+- Start the selected container if needed, then run commands with `podman exec --workdir /workspaces/janus <container> <command>`.
+- Never use an unrelated Toolbox or development container. Native Node modules such as `better-sqlite3` must run with the same Node.js ABI used when `npm install` compiled them.
+- Host execution is supported only with Node.js 24.12 or later and the native compiler toolchain required by `better-sqlite3`.
+
 ## Git Conventions
 
 Agents should commit and push work frequently without explicit user request, and create branches/PRs instead of working on main. Never push directly to `main`.

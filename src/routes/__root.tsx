@@ -7,7 +7,7 @@ import {
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { pwaInfo } from "virtual:pwa-info";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/Sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BottomNav } from "@/components/BottomNav";
 import { PwaUpdatePrompt } from "@/components/PwaUpdatePrompt";
@@ -16,6 +16,22 @@ import appCss from "../styles.css?url";
 
 import { ThemeProvider } from "next-themes";
 import { NotFound } from "@/components/NotFound";
+
+function getManifestCrossOrigin(useCredentials: boolean) {
+  if (useCredentials) return "use-credentials" as const;
+  return undefined;
+}
+
+function getManifestLinks(manifest: NonNullable<typeof pwaInfo>["webManifest"] | undefined) {
+  if (!manifest) return [];
+  return [
+    {
+      rel: "manifest" as const,
+      href: manifest.href,
+      crossOrigin: getManifestCrossOrigin(manifest.useCredentials),
+    },
+  ];
+}
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
@@ -46,17 +62,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
-      ...(pwaInfo?.webManifest
-        ? [
-            {
-              rel: "manifest" as const,
-              href: pwaInfo.webManifest.href,
-              crossOrigin: pwaInfo.webManifest.useCredentials
-                ? ("use-credentials" as const)
-                : undefined,
-            },
-          ]
-        : []),
+      ...getManifestLinks(pwaInfo?.webManifest),
     ],
   }),
 

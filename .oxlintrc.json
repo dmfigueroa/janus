@@ -154,7 +154,27 @@
       }
     },
     {
+      "files": [
+        "drizzle.config.ts",
+        "vite.config.ts",
+        "vitest.config.ts",
+        "src/routeTree.gen.ts",
+        "src/router.tsx"
+      ],
+      "rules": {
+        "unicorn/filename-case": "off"
+      }
+    },
+    {
       "files": ["src/components/ui/**"],
+      "rules": {
+        "complexity": "off",
+        "max-lines": "off",
+        "max-lines-per-function": "off"
+      }
+    },
+    {
+      "files": ["**/*.test.{ts,tsx}"],
       "rules": {
         "complexity": "off",
         "max-lines": "off",

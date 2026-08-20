@@ -27,25 +27,70 @@
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v22 or later)
+- [Podman](https://podman.io/)
+- [Dev Container CLI](https://github.com/devcontainers/cli)
 
-### Installation
+The recommended development environment is defined by `.devcontainer/devcontainer.json`. It builds
+with Podman and installs the supported Node.js version and native build tools needed by dependencies
+such as `better-sqlite3`.
 
-1.  Clone the repository:
+### Create The Dev Container
 
-    ```bash
-    git clone https://github.com/yourusername/janus.git
-    cd janus
-    ```
+1. Clone the repository:
 
-2.  Install dependencies:
+   ```bash
+   git clone https://github.com/dmfigueroa/janus.git
+   cd janus
+   ```
 
-    ```bash
-    npm install
-    ```
+2. Build and start the development container with Podman:
 
-3.  Set up environment variables:
-    Create a `.env` file in the root directory (if required by your TMDB helper, though checking the code, it might be hardcoded or using a default for now. _Note: Ensure you have a valid TMDB API Key if strictly required_).
+   ```bash
+   devcontainer up --workspace-folder . --docker-path podman
+   ```
+
+3. Install dependencies inside the devcontainer:
+
+   ```bash
+   devcontainer exec --workspace-folder . --docker-path podman npm install
+   ```
+
+4. Create `.env` in the repository root. `TMDB_API_KEY` is needed for TMDB search; the other provider
+   keys enable their corresponding integrations:
+
+   ```dotenv
+   TMDB_API_KEY=
+   RAWG_API_KEY=
+   COMICVINE_API_KEY=
+   GOOGLE_BOOKS_API_KEY=
+   DATABASE_URL=sqlite.db
+   ```
+
+### Run Commands With Podman
+
+To run commands with Podman directly, locate the generated container by its workspace label instead
+of relying on its random container name:
+
+```bash
+JANUS_CONTAINER="$(podman ps -a \
+  --filter "label=devcontainer.local_folder=$(pwd)" \
+  --format '{{.Names}}')"
+podman start "$JANUS_CONTAINER"
+podman exec --workdir /workspaces/janus "$JANUS_CONTAINER" npm test
+```
+
+Run `podman ps -a --filter "label=devcontainer.local_folder=$(pwd)"` to confirm that the selected
+container belongs to this checkout. Do not use an unrelated Toolbox or development container: native
+Node modules must be executed with the same Node.js ABI used when `npm install` compiled them.
+
+### Host Installation
+
+Running directly on the host is also supported with Node.js 24.12 or later and the native compiler
+toolchain required by `better-sqlite3`:
+
+```bash
+npm install
+```
 
 ### Running Locally
 
@@ -95,8 +140,8 @@ This will compile the application. You can preview the production build locally 
 npm run preview
 ```
 
-**Docker**:
-The project is designed to be containerized. Ensure your `Dockerfile` (pending creation if not present) handles the build output and serves it using a Node.js runtime.
+The Dockerfile under `.devcontainer/` is for development only; it is not a production deployment
+image.
 
 ## 📂 Project Structure
 

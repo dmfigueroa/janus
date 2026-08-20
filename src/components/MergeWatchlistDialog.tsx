@@ -1,24 +1,10 @@
 import { useEffect, useState } from "react";
+import { Dialog } from "@/components/ui/Dialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { mergeWatchlists } from "@/features/watchlists/merge/mutation";
+  MergeWatchlistDialogContent,
+  type MergeDestinationMode,
+} from "@/features/watchlists/merge/MergeWatchlistDialogContent";
+import { mergeWatchlists } from "@/features/watchlists/merge/Mutation";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -32,6 +18,34 @@ interface MergeWatchlistDialogProps {
   onSuccess?: () => void;
 }
 
+function isArrayIndex(index: number, length: number) {
+  return index >= 0 && index < length;
+}
+
+function validateNewWatchlistName(name: string) {
+  if (name.trim()) return true;
+  toast.error("Please enter a name for the new watchlist");
+  return false;
+}
+
+function validateTargetWatchlist(targetId: string) {
+  if (targetId) return true;
+  toast.error("Please select a target watchlist");
+  return false;
+}
+
+function reorderWatchlistIds(currentIds: number[], watchlistId: number, direction: "up" | "down") {
+  const currentIndex = currentIds.indexOf(watchlistId);
+  const nextIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+  if (![currentIndex, nextIndex].every((index) => isArrayIndex(index, currentIds.length))) {
+    return currentIds;
+  }
+
+  const nextIds = [...currentIds];
+  [nextIds[currentIndex], nextIds[nextIndex]] = [nextIds[nextIndex], nextIds[currentIndex]];
+  return nextIds;
+}
+
 export function MergeWatchlistDialog({
   open,
   onOpenChange,
@@ -39,7 +53,7 @@ export function MergeWatchlistDialog({
   allWatchlists,
   onSuccess,
 }: MergeWatchlistDialogProps) {
-  const [mode, setMode] = useState<"new" | "existing">("new");
+  const [mode, setMode] = useState<MergeDestinationMode>("new");
   const [newName, setNewName] = useState("");
   const [targetId, setTargetId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,193 +73,83 @@ export function MergeWatchlistDialog({
   }, [selectedWatchlistIds, open]);
 
   const moveSelectedWatchlist = (watchlistId: number, direction: "up" | "down") => {
-    setOrderedSourceWatchlistIds((currentIds) => {
-      const currentIndex = currentIds.indexOf(watchlistId);
-
-      if (currentIndex === -1) {
-        return currentIds;
-      }
-
-      const nextIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
-
-      if (nextIndex < 0 || nextIndex >= currentIds.length) {
-        return currentIds;
-      }
-
-      const nextIds = [...currentIds];
-      [nextIds[currentIndex], nextIds[nextIndex]] = [nextIds[nextIndex], nextIds[currentIndex]];
-      return nextIds;
-    });
+    setOrderedSourceWatchlistIds((currentIds) =>
+      reorderWatchlistIds(currentIds, watchlistId, direction),
+    );
   };
 
-  const handleMerge = async () => {
-    try {
-      setIsSubmitting(true);
-      if (mode === "new") {
-        if (!newName.trim()) {
-          toast.error("Please enter a name for the new watchlist");
-          return;
-        }
-        const result = await mergeWatchlistsFn({
-          data: {
-            sourceWatchlistIds: orderedSourceWatchlistIds,
-            newWatchlistName: newName,
-          },
-        });
+  const mergeIntoNewWatchlist = async () => {
+    if (!validateNewWatchlistName(newName)) return false;
+    const result = await mergeWatchlistsFn({
+      data: {
+        sourceWatchlistIds: orderedSourceWatchlistIds,
+        newWatchlistName: newName,
+      },
+    });
+    if (!result.success) toast.error(result.message);
+    return result.success;
+  };
 
-        if (!result.success) {
-          toast.error(result.message);
-          return;
-        }
-      } else {
-        if (!targetId) {
-          toast.error("Please select a target watchlist");
-          return;
-        }
-        const result = await mergeWatchlistsFn({
-          data: {
-            sourceWatchlistIds: orderedSourceWatchlistIds,
-            targetWatchlistId: parseInt(targetId, 10),
-          },
-        });
+  const mergeIntoExistingWatchlist = async () => {
+    if (!validateTargetWatchlist(targetId)) return false;
+    const result = await mergeWatchlistsFn({
+      data: {
+        sourceWatchlistIds: orderedSourceWatchlistIds,
+        targetWatchlistId: parseInt(targetId, 10),
+      },
+    });
+    if (!result.success) toast.error(result.message);
+    return result.success;
+  };
 
-        if (!result.success) {
-          toast.error(result.message);
-          return;
-        }
-      }
+  const submitMerge = () => {
+    if (mode === "new") return mergeIntoNewWatchlist();
+    return mergeIntoExistingWatchlist();
+  };
 
-      toast.success("Watchlists merged successfully");
-      await router.invalidate?.();
-      onSuccess?.();
-      onOpenChange(false);
-      // Reset state
-      setNewName("");
-      setTargetId("");
-      setMode("new");
-      setOrderedSourceWatchlistIds(selectedWatchlistIds);
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to merge watchlists");
-    } finally {
-      setIsSubmitting(false);
-    }
+  const completeMerge = async () => {
+    toast.success("Watchlists merged successfully");
+    await router.invalidate?.();
+    onSuccess?.();
+    onOpenChange(false);
+    // Reset state
+    setNewName("");
+    setTargetId("");
+    setMode("new");
+    setOrderedSourceWatchlistIds(selectedWatchlistIds);
+  };
+
+  const handleMerge = () => {
+    setIsSubmitting(true);
+    void submitMerge()
+      .then((success) => {
+        if (success) return completeMerge();
+        return undefined;
+      })
+      .catch((error) => {
+        console.error(error);
+        toast.error("Failed to merge watchlists");
+      })
+      .finally(() => setIsSubmitting(false));
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Merge Watchlists</DialogTitle>
-          <DialogDescription>
-            Merge {selectedWatchlistIds.length} lists. All items will be combined into the target
-            list.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
-          <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Merge order</p>
-              <p className="text-xs text-muted-foreground">
-                {hasCustomOrderedSelection
-                  ? "This order sets the final custom ranking when any selected list uses custom order."
-                  : "This order is kept for the selected lists and release ordering still applies within each list."}
-              </p>
-            </div>
-
-            <ol className="mt-3 space-y-2">
-              {selectedWatchlists.map((watchlist, index) => (
-                <li
-                  key={watchlist.id}
-                  data-testid={`merge-order-item-${watchlist.id}`}
-                  className="flex items-center justify-between gap-3 rounded-md border bg-background px-3 py-2"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{watchlist.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {watchlist.itemOrderMode === "custom" ? "Custom order" : "Release order"}
-                    </p>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => moveSelectedWatchlist(watchlist.id, "up")}
-                      disabled={isSubmitting || index === 0}
-                      aria-label={`Move ${watchlist.name} up`}
-                    >
-                      Up
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => moveSelectedWatchlist(watchlist.id, "down")}
-                      disabled={isSubmitting || index === selectedWatchlists.length - 1}
-                      aria-label={`Move ${watchlist.name} down`}
-                    >
-                      Down
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </div>
-
-          <RadioGroup value={mode} onValueChange={(v) => setMode(v as "new" | "existing")}>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="new" id="r-new" />
-              <Label htmlFor="r-new">Create a new watchlist</Label>
-            </div>
-            {mode === "new" && (
-              <div className="ml-6">
-                <Input
-                  placeholder="New Watchlist Name"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                />
-              </div>
-            )}
-
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="existing" id="r-existing" />
-              <Label htmlFor="r-existing">Merge into existing watchlist</Label>
-            </div>
-            {mode === "existing" && (
-              <div className="ml-6 space-y-2">
-                <Select value={targetId} onValueChange={setTargetId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select target watchlist" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {selectedWatchlists.map((list) => (
-                      <SelectItem key={list.id} value={list.id.toString()}>
-                        {list.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  The selected list will be kept. Other selected lists will be removed after
-                  merging.
-                </p>
-              </div>
-            )}
-          </RadioGroup>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-            Cancel
-          </Button>
-          <Button onClick={handleMerge} disabled={isSubmitting}>
-            {isSubmitting ? "Merging..." : "Merge"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
+      <MergeWatchlistDialogContent
+        selectedCount={selectedWatchlistIds.length}
+        selectedWatchlists={selectedWatchlists}
+        hasCustomOrderedSelection={hasCustomOrderedSelection}
+        isSubmitting={isSubmitting}
+        mode={mode}
+        newName={newName}
+        targetId={targetId}
+        onMove={moveSelectedWatchlist}
+        onModeChange={setMode}
+        onNewNameChange={setNewName}
+        onTargetChange={setTargetId}
+        onCancel={() => onOpenChange(false)}
+        onMerge={handleMerge}
+      />
     </Dialog>
   );
 }

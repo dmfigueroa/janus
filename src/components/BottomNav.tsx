@@ -1,6 +1,6 @@
 import { Search, List as ListIcon } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { cn } from "@/utils/cn";
+import { cn } from "@/utils/Cn";
 
 export function BottomNav() {
   const navItems = [

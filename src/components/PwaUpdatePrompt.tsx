@@ -2,7 +2,7 @@
 
 import { type MouseEvent, useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { loadPwaRegistration } from "@/lib/pwa-registration";
+import { loadPwaRegistration } from "@/lib/PwaRegistration";
 
 const UPDATE_TOAST_ID = "pwa-update-available";
 

@@ -1,26 +1,15 @@
 import { useEffect, useState } from "react";
-import type { UnifiedMedia } from "@/server/media";
-import DOMPurify from "dompurify";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Star, Calendar, Info } from "lucide-react";
+import type { UnifiedMedia } from "@/server/Media";
+import { Sheet, SheetContent } from "@/components/ui/Sheet";
 import {
   addToWatchlist,
   type AddToWatchlistInsertionPosition,
-} from "@/features/watchlists/add/mutation";
-import { getWatchlistList, watchlistListQueryKey } from "@/features/watchlists/list/query";
+} from "@/features/watchlists/add/Mutation";
+import { getWatchlistList, watchlistListQueryKey } from "@/features/watchlists/list/Query";
 import { toast } from "sonner";
-import { WatchlistSelector } from "@/components/watchlist/WatchlistSelector";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { SearchMediaSummary, SearchMediaWatchlistControls } from "./SearchMediaDetailContent";
 
 interface SearchMediaDetailSheetProps {
   media: UnifiedMedia | null;
@@ -29,6 +18,46 @@ interface SearchMediaDetailSheetProps {
 }
 
 const watchlistSelectorFilters = { orderBy: "lastAdded" } as const;
+
+function requiresCustomInsertion(
+  watchlists: Awaited<ReturnType<typeof getWatchlistList>> | undefined,
+  selectedWatchlistId: string,
+) {
+  if (!watchlists) return false;
+  return (
+    watchlists.find((watchlist) => watchlist.id.toString() === selectedWatchlistId)
+      ?.itemOrderMode === "custom"
+  );
+}
+
+function getInsertionPosition(
+  required: boolean,
+  insertionPosition: AddToWatchlistInsertionPosition | "",
+) {
+  if (!required) return undefined;
+  return insertionPosition || undefined;
+}
+
+function getAddFailureMessage(data: { message?: string } | undefined) {
+  return data?.message || "Failed to add to watchlist";
+}
+
+function validateSelectedWatchlist(selectedWatchlistId: string) {
+  if (selectedWatchlistId) return true;
+  toast.error("Please select a watchlist");
+  return false;
+}
+
+function validateInsertionPosition(
+  required: boolean,
+  insertionPosition: AddToWatchlistInsertionPosition | "",
+) {
+  if (required && !insertionPosition) {
+    toast.error("Choose where to insert this item in the custom order.");
+    return false;
+  }
+  return true;
+}
 
 export function SearchMediaDetailSheet({ media, isOpen, onClose }: SearchMediaDetailSheetProps) {
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string>("");
@@ -44,10 +73,7 @@ export function SearchMediaDetailSheet({ media, isOpen, onClose }: SearchMediaDe
     enabled: isOpen,
   });
 
-  const selectedWatchlist = watchlists?.find((watchlist) => {
-    return watchlist.id.toString() === selectedWatchlistId;
-  });
-  const requiresInsertionChoice = selectedWatchlist?.itemOrderMode === "custom";
+  const requiresInsertionChoice = requiresCustomInsertion(watchlists, selectedWatchlistId);
 
   useEffect(() => {
     setInsertionPosition("");
@@ -60,8 +86,7 @@ export function SearchMediaDetailSheet({ media, isOpen, onClose }: SearchMediaDe
         data: {
           watchlistId: Number.parseInt(selectedWatchlistId, 10),
           media,
-          insertionPosition:
-            requiresInsertionChoice && insertionPosition ? insertionPosition : undefined,
+          insertionPosition: getInsertionPosition(requiresInsertionChoice, insertionPosition),
         },
       });
     },
@@ -70,7 +95,7 @@ export function SearchMediaDetailSheet({ media, isOpen, onClose }: SearchMediaDe
         toast.success(data.message);
         onClose();
       } else {
-        toast.error(data?.message || "Failed to add to watchlist");
+        toast.error(getAddFailureMessage(data));
       }
     },
     onError: (error) => {
@@ -81,28 +106,9 @@ export function SearchMediaDetailSheet({ media, isOpen, onClose }: SearchMediaDe
 
   if (!media) return null;
 
-  const {
-    title,
-    year,
-    poster: posterUrl,
-    backdrop: backdropUrl,
-    rating,
-    overview,
-    mediaType,
-  } = media;
-
-  const displayRating = rating ? rating.toFixed(1) : "N/A";
-
   const handleAddToWatchlist = () => {
-    if (!selectedWatchlistId) {
-      toast.error("Please select a watchlist");
-      return;
-    }
-
-    if (requiresInsertionChoice && !insertionPosition) {
-      toast.error("Choose where to insert this item in the custom order.");
-      return;
-    }
+    if (!validateSelectedWatchlist(selectedWatchlistId)) return;
+    if (!validateInsertionPosition(requiresInsertionChoice, insertionPosition)) return;
 
     addToWatchlistMutation.mutate();
   };
@@ -110,123 +116,18 @@ export function SearchMediaDetailSheet({ media, isOpen, onClose }: SearchMediaDe
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="sm:max-w-md md:max-w-lg lg:max-w-xl overflow-y-auto no-scrollbar">
-        <SheetHeader className="text-left space-y-4">
-          {backdropUrl && (
-            <div className="relative -mx-6 -mt-6 mb-4 aspect-video w-[calc(100%+3rem)] overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent z-10" />
-              <img
-                src={backdropUrl}
-                alt={title}
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-          )}
-          <div className="flex gap-4 items-start">
-            {posterUrl && !backdropUrl && (
-              <img
-                src={posterUrl}
-                alt={title}
-                className="w-24 rounded-md shadow-md"
-                referrerPolicy="no-referrer"
-              />
-            )}
-            <div className="space-y-1">
-              <SheetTitle className="text-2xl font-bold">{title}</SheetTitle>
-              <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <Calendar className="size-3.5" /> {year || "TBA"}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Star className="size-3.5 text-yellow-500 fill-yellow-500" /> {displayRating}
-                </span>
-                <span className="capitalize border px-1.5 py-0.5 rounded text-xs">
-                  {mediaType === "tv" ? "TV Series" : mediaType}
-                </span>
-              </div>
-            </div>
-          </div>
-          <SheetDescription className="text-base leading-relaxed text-foreground/90" asChild>
-            <div
-              dangerouslySetInnerHTML={{
-                __html: DOMPurify.sanitize(overview || "No description available."),
-              }}
-            />
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="mt-8 space-y-4">
-          <h4 className="text-sm font-medium text-muted-foreground">Add to Watchlist</h4>
-          <div className="flex gap-3">
-            <WatchlistSelector
-              watchlists={watchlists}
-              selectedWatchlistId={selectedWatchlistId}
-              onSelect={setSelectedWatchlistId}
-              disabled={!watchlists || watchlists.length === 0}
-              className="flex-1"
-            />
-            <Button
-              onClick={handleAddToWatchlist}
-              disabled={!selectedWatchlistId || addToWatchlistMutation.isPending}
-              className="min-w-[100px]"
-            >
-              {addToWatchlistMutation.isPending ? "Adding..." : "Add"}
-            </Button>
-          </div>
-          {requiresInsertionChoice && (
-            <div className="space-y-3 rounded-md border bg-secondary/20 p-4">
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Insert in custom order</p>
-                <p className="text-xs text-muted-foreground">
-                  Choose where this item should land in the watchlist&apos;s manual sequence.
-                </p>
-              </div>
-              <RadioGroup
-                value={insertionPosition}
-                onValueChange={(value) => {
-                  setInsertionPosition(value as AddToWatchlistInsertionPosition);
-                }}
-              >
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem id="watchlist-insert-beginning" value="beginning" />
-                  <Label htmlFor="watchlist-insert-beginning">Beginning</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem id="watchlist-insert-end" value="end" />
-                  <Label htmlFor="watchlist-insert-end">End</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem id="watchlist-insert-release-adjacent" value="release-adjacent" />
-                  <Label htmlFor="watchlist-insert-release-adjacent">Release-adjacent</Label>
-                </div>
-              </RadioGroup>
-            </div>
-          )}
-          {(mediaType === "tv" ||
-            mediaType === "anime" ||
-            mediaType === "comic" ||
-            mediaType === "manga") && (
-            <div className="flex items-start gap-2 text-xs text-muted-foreground bg-secondary/50 p-3 rounded-md">
-              <Info className="size-4 shrink-0 mt-0.5" />
-              <p>
-                Adding{" "}
-                {mediaType === "tv"
-                  ? "a TV show"
-                  : mediaType === "anime"
-                    ? "an anime"
-                    : mediaType === "comic"
-                      ? "a comic"
-                      : "a manga"}{" "}
-                will automatically add{" "}
-                <strong>
-                  all available{" "}
-                  {mediaType === "tv" || mediaType === "anime" ? "episodes" : "issues/volumes"}
-                </strong>{" "}
-                to your watchlist. This allows you to track your progress step by step.
-              </p>
-            </div>
-          )}
-        </div>
+        <SearchMediaSummary media={media} />
+        <SearchMediaWatchlistControls
+          mediaType={media.mediaType}
+          watchlists={watchlists}
+          selectedWatchlistId={selectedWatchlistId}
+          insertionPosition={insertionPosition}
+          requiresInsertionChoice={requiresInsertionChoice}
+          isAdding={addToWatchlistMutation.isPending}
+          onWatchlistSelect={setSelectedWatchlistId}
+          onInsertionPositionChange={setInsertionPosition}
+          onAdd={handleAddToWatchlist}
+        />
       </SheetContent>
     </Sheet>
   );
