@@ -16,7 +16,7 @@ export function NotFound() {
         Oops! The page you're looking for differs from reality.
       </Text>
       <HStack gap={2} mt={4}>
-        <Button asChild colorPalette="pink">
+        <Button asChild bg="accent.solid" color="accent.contrast" _hover={{ opacity: 0.9 }}>
           <Link to="/">Go Home</Link>
         </Button>
         <Button asChild variant="subtle">
