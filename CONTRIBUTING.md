@@ -115,6 +115,13 @@ src/features/watchlists/create/
 - `createServerFn` surfaces should return structured expected failures instead of throwing.
 - Do not use `"use server"` or `"use client"` directives unless a documented framework requirement leaves no alternative.
 
+## JSX Rendering Rules
+
+- JSX must be created in the direct return tree of a named PascalCase component. Do not store JSX in variables or return it from rendering helpers and callbacks.
+- JSX children must be values, elements, or conditional expressions rather than function calls. Compute scalar display values before the return and extract rendered subtrees into components.
+- When reducing cyclomatic complexity in a component, extract a meaningful named component instead of moving render decisions into a value-returning helper.
+- These rules run on staged TSX files. Touching a legacy TSX file requires resolving its component-rendering violations without forcing a repository-wide migration.
+
 ## Agent Workflow
 
 - Read `ARCHITECTURE.md` before adding new modules or moving existing ones.
