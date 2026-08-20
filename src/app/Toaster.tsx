@@ -12,7 +12,7 @@ export function Toaster() {
 
 function ToastMessage(toast: ToastMessage) {
   return (
-    <Toast.Root key={toast.id}>
+    <Toast.Root key={toast.id} width="fit-content" alignItems="center" gap="4">
       <Toast.Indicator />
       <Toast.Title>{toast.title}</Toast.Title>
       <Toast.Description>{toast.description}</Toast.Description>
