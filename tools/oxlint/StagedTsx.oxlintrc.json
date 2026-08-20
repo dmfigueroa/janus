@@ -5,5 +5,13 @@
   "rules": {
     "component-rendering/component-owned-jsx": "error",
     "component-rendering/no-call-expression-children": "error"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["**/__root.tsx"],
+      "rules": {
+        "unicorn/filename-case": "off"
+      }
+    }
+  ]
 }
