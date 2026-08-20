@@ -4,10 +4,7 @@ type ToastMessage = Parameters<
   NonNullable<React.ComponentProps<typeof ChakraToaster>["children"]>
 >[0];
 
-export const toaster = createToaster({
-  placement: "bottom-end",
-  pauseOnPageIdle: true,
-});
+export const toaster = createToaster({});
 
 export function Toaster() {
   return <ChakraToaster toaster={toaster}>{ToastMessage}</ChakraToaster>;
@@ -30,7 +27,11 @@ function ToastAction({ action }: { action: ToastMessage["action"] }) {
     return null;
   }
 
-  return <Toast.ActionTrigger>{action.label}</Toast.ActionTrigger>;
+  return (
+    <Toast.ActionTrigger bg="accent.solid" color="accent.contrast">
+      {action.label}
+    </Toast.ActionTrigger>
+  );
 }
 
 function ToastClose({ closable }: { closable: boolean }) {
