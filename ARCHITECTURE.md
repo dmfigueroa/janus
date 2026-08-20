@@ -83,7 +83,6 @@ Rules:
 - Use responsibility-based PascalCase filenames. Do not use generic role-only names such as `Query.ts`, `Mutation.ts`, `Schema.ts`, or `Screen.tsx`.
 - Put UI shared across multiple use cases in `src/features/<feature>/components/*`.
 - Put UI used by only one use case in that use-case folder.
-- Collocate tests with the code they verify.
 
 ## Safe And Server-Only Files
 
