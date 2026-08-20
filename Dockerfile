@@ -16,7 +16,7 @@ COPY . .
 ENV NITRO_PRESET=node-server
 RUN npm run build
 # Compile migration script using esbuild (bundled with vite, or npx)
-RUN npx esbuild src/db/migrate.ts --bundle --platform=node --format=esm --outfile=.output/server/migrate.mjs --external:better-sqlite3 --external:drizzle-orm
+RUN npx esbuild src/db/Migrate.ts --bundle --platform=node --format=esm --outfile=.output/server/migrate.mjs --external:better-sqlite3 --external:drizzle-orm
 
 # Production image, copy all the files and run next
 FROM base AS prod-deps
