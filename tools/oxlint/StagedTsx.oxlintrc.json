@@ -4,8 +4,7 @@
   "jsPlugins": ["./ComponentRendering.js"],
   "rules": {
     "component-rendering/component-owned-jsx": "error",
-    "component-rendering/no-call-expression-children": "error",
-    "unicorn/filename-case": "off"
+    "component-rendering/no-call-expression-children": "error"
   },
   "overrides": [
     {
