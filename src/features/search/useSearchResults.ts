@@ -1,9 +1,9 @@
 import { useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { searchUnified } from "@/server/search";
-import { DEPRECATED_MEDIA_MESSAGE, isDeprecatedMediaType } from "@/server/media";
-import type { UnifiedMedia } from "@/server/media";
+import { searchUnified } from "@/server/Search";
+import { DEPRECATED_MEDIA_MESSAGE, isDeprecatedMediaType } from "@/server/Media";
+import type { UnifiedMedia } from "@/server/Media";
 
 type SearchPage = {
   results: UnifiedMedia[];
@@ -16,8 +16,18 @@ type SearchPage = {
 
 interface UseSearchResultsOptions {
   query: string;
-  type: "movie" | "tv" | "game" | "book" | "comic" | "anime" | "manga";
+  type: UnifiedMedia["mediaType"];
   initialData: SearchPage;
+}
+
+function getInitialData(query: string, initialData: SearchPage) {
+  if (!query) return undefined;
+  return { pages: [initialData], pageParams: [1] };
+}
+
+function flattenResults(data: { pages: SearchPage[] } | undefined) {
+  if (!data) return [];
+  return data.pages.flatMap((page) => page.results);
 }
 
 export function useSearchResults({ query, type, initialData }: UseSearchResultsOptions) {
@@ -44,10 +54,10 @@ export function useSearchResults({ query, type, initialData }: UseSearchResultsO
     initialPageParam: 1,
     getNextPageParam: (lastPage) =>
       lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined,
-    initialData: !!query ? { pages: [initialData], pageParams: [1] } : undefined,
+    initialData: getInitialData(query, initialData),
   });
 
-  const allResults = data?.pages.flatMap((page) => page.results) || [];
+  const allResults = flattenResults(data);
 
   return {
     allResults,
@@ -59,7 +69,7 @@ export function useSearchResults({ query, type, initialData }: UseSearchResultsO
 
 function emptyPage(page: number): SearchPage {
   return {
-    results: [] as UnifiedMedia[],
+    results: [],
     page,
     total_pages: 1,
     total_results: 0,
@@ -68,7 +78,7 @@ function emptyPage(page: number): SearchPage {
 
 function deprecatedPage(page: number): SearchPage {
   return {
-    results: [] as UnifiedMedia[],
+    results: [],
     page,
     total_pages: 1,
     total_results: 0,

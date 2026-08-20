@@ -8,13 +8,32 @@ interface UseIntersectionObserverProps {
   enabled?: boolean;
 }
 
-export function useIntersectionObserver({
-  threshold = 0,
-  root = null,
-  rootMargin = "0%",
-  onIntersect,
-  enabled = true,
-}: UseIntersectionObserverProps = {}) {
+function invokeIntersect(callback: (() => void) | undefined) {
+  if (callback) callback();
+}
+
+function withDefault<T>(value: T | undefined, fallback: T) {
+  if (value === undefined) return fallback;
+  return value;
+}
+
+function createObserver(
+  onIntersectRef: React.RefObject<(() => void) | undefined>,
+  options: IntersectionObserverInit,
+) {
+  return new IntersectionObserver(([entry]) => {
+    if (entry.isIntersecting) invokeIntersect(onIntersectRef.current);
+  }, options);
+}
+
+export function useIntersectionObserver(observerProps: UseIntersectionObserverProps = {}) {
+  const { threshold, root, rootMargin, onIntersect, enabled } = {
+    ...observerProps,
+    threshold: withDefault(observerProps.threshold, 0),
+    root: withDefault(observerProps.root, null),
+    rootMargin: withDefault(observerProps.rootMargin, "0%"),
+    enabled: withDefault(observerProps.enabled, true),
+  };
   const ref = useRef<HTMLDivElement | null>(null);
   const onIntersectRef = useRef(onIntersect);
 
@@ -28,18 +47,7 @@ export function useIntersectionObserver({
     const node = ref.current;
     if (!node) return;
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          onIntersectRef.current?.();
-        }
-      },
-      {
-        threshold,
-        root,
-        rootMargin,
-      },
-    );
+    const observer = createObserver(onIntersectRef, { threshold, root, rootMargin });
 
     observer.observe(node);
 

@@ -13,7 +13,7 @@
     "format:check": "oxfmt . --check",
     "typecheck": "tsc --noEmit",
     "prepare": "simple-git-hooks",
-    "migrate": "npx -y tsx --env-file=.env src/db/migrate.ts"
+    "migrate": "npx -y tsx --env-file=.env src/db/Migrate.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

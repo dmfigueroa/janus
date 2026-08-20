@@ -1,8 +1,8 @@
-import { SearchScreen } from "@/features/search/screen";
-import { searchUnified } from "../server/search";
+import { SearchScreen } from "@/features/search/Screen";
+import { searchUnified } from "../server/Search";
 import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
-import { isDeprecatedMediaType } from "../server/media";
+import { isDeprecatedMediaType } from "../server/Media";
 
 const searchSchema = z.object({
   query: z.string().optional().default(""),

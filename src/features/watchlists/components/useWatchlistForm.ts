@@ -3,11 +3,11 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import type { Watchlist } from "@/db/schema";
-import { type WatchlistItemOrderMode } from "@/features/watchlists/order";
-import { createWatchlist } from "@/features/watchlists/create/mutation";
-import { updateWatchlist } from "@/features/watchlists/update/mutation";
-import { invalidateWatchlistQueries } from "@/features/watchlists/cache";
+import type { Watchlist } from "@/db/Schema";
+import { type WatchlistItemOrderMode } from "@/features/watchlists/Order";
+import { createWatchlist } from "@/features/watchlists/create/Mutation";
+import { updateWatchlist } from "@/features/watchlists/update/Mutation";
+import { invalidateWatchlistQueries } from "@/features/watchlists/Cache";
 
 type UseWatchlistFormOptions =
   | { mode: "create"; watchlist?: never; onSuccess?: () => void }
@@ -60,10 +60,25 @@ type SubmitArgs = {
 
 async function submitWatchlist({ mode, watchlist, formData, createFn, updateFn }: SubmitArgs) {
   if (mode === "create") {
-    await createFn({ data: formData });
+    await submitNewWatchlist(createFn, formData);
     return;
   }
 
+  await submitWatchlistUpdate(updateFn, watchlist, formData);
+}
+
+async function submitNewWatchlist(
+  createFn: SubmitArgs["createFn"],
+  formData: SubmitArgs["formData"],
+) {
+  await createFn({ data: formData });
+}
+
+async function submitWatchlistUpdate(
+  updateFn: SubmitArgs["updateFn"],
+  watchlist: Watchlist | undefined,
+  formData: SubmitArgs["formData"],
+) {
   if (!watchlist) {
     throw new Error("Watchlist is required for edit mode");
   }

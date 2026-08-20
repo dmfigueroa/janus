@@ -1,5 +1,5 @@
-import { Input } from "./ui/input";
-import { Button } from "./ui/button";
+import { Input } from "./ui/Input";
+import { Button } from "./ui/Button";
 import { SearchIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
