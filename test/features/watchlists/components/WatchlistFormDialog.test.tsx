@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import React, { createContext, useContext } from "react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@test/utils/Render";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WatchlistFormDialog } from "@/features/watchlists/components/WatchlistFormDialog";
 import type { Watchlist } from "@/db/Schema";
@@ -59,112 +58,6 @@ vi.mock("sonner", () => ({
   },
 }));
 
-const RadioContext = createContext<{
-  value?: string;
-  name?: string;
-  onValueChange?: (details: { value: string }) => void;
-}>({});
-const DialogContext = createContext<{ onOpenChange: (open: boolean) => void }>({
-  onOpenChange: () => undefined,
-});
-
-vi.mock("@chakra-ui/react", () => ({
-  Portal: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  Stack: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Button: ({
-    children,
-    colorPalette: _colorPalette,
-    ...props
-  }: React.ButtonHTMLAttributes<HTMLButtonElement> & { colorPalette?: string }) => (
-    <button {...props}>{children}</button>
-  ),
-  Dialog: {
-    Root: ({
-      children,
-      open,
-      onOpenChange,
-    }: {
-      children: React.ReactNode;
-      open?: boolean;
-      onOpenChange: (details: { open: boolean }) => void;
-    }) => (
-      <DialogContext.Provider
-        value={{ onOpenChange: (nextOpen) => onOpenChange({ open: nextOpen }) }}
-      >
-        <div data-testid="chakra-dialog" data-open={open}>
-          {children}
-        </div>
-      </DialogContext.Provider>
-    ),
-    Trigger: ({ children }: { children: React.ReactElement }) => {
-      const context = useContext(DialogContext);
-      return React.cloneElement(children as React.ReactElement<{ onClick?: () => void }>, {
-        onClick: () => context.onOpenChange(true),
-      });
-    },
-    Backdrop: () => null,
-    Positioner: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Content: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Header: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Title: ({ children }: { children: React.ReactNode }) => <h1>{children}</h1>,
-    Description: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
-    Body: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Footer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    CloseTrigger: (props: React.ButtonHTMLAttributes<HTMLButtonElement>) => {
-      const context = useContext(DialogContext);
-      return <button {...props} onClick={() => context.onOpenChange(false)} />;
-    },
-  },
-  Field: {
-    Root: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Label: ({ children, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) => (
-      <label {...props}>{children}</label>
-    ),
-    ErrorText: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
-  },
-  Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
-  Textarea: (props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...props} />,
-  RadioGroup: {
-    Root: ({
-      children,
-      value,
-      name,
-      onValueChange,
-    }: {
-      children: React.ReactNode;
-      value?: string;
-      name?: string;
-      onValueChange?: (details: { value: string }) => void;
-    }) => (
-      <RadioContext.Provider value={{ value, name, onValueChange }}>
-        <div>{children}</div>
-      </RadioContext.Provider>
-    ),
-    Item: ({ children, value }: { children: React.ReactNode; value: string }) => {
-      const context = useContext(RadioContext);
-      return (
-        <label data-state={context.value === value ? "checked" : "unchecked"}>
-          {React.Children.map(children, (child) =>
-            React.isValidElement(child)
-              ? React.cloneElement(child as React.ReactElement<Record<string, unknown>>, {
-                  name: context.name,
-                  value,
-                  checked: context.value === value,
-                  onChange: () => context.onValueChange?.({ value }),
-                })
-              : child,
-          )}
-        </label>
-      );
-    },
-    ItemHiddenInput: (props: React.InputHTMLAttributes<HTMLInputElement>) => (
-      <input type="radio" {...props} />
-    ),
-    ItemControl: () => null,
-    ItemText: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
-  },
-}));
-
 function watchlistFixture(overrides?: Partial<Watchlist>): Watchlist {
   return {
     id: overrides?.id ?? 1,
@@ -178,17 +71,21 @@ function watchlistFixture(overrides?: Partial<Watchlist>): Watchlist {
   };
 }
 
+async function openDialog() {
+  fireEvent.click(screen.getByRole("button", { name: "Open" }));
+  await waitFor(() => expect(screen.getByRole("dialog")).not.toBeNull());
+}
+
+async function closeDialog() {
+  fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+}
+
 describe("WatchlistFormDialog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createWatchlistFnMock.mockResolvedValue({ id: 99, name: "New List" });
     updateWatchlistFnMock.mockResolvedValue({ success: true });
-
-    globalThis.ResizeObserver = vi.fn(() => ({
-      observe: vi.fn(),
-      disconnect: vi.fn(),
-      unobserve: vi.fn(),
-    })) as unknown as typeof ResizeObserver;
   });
 
   afterEach(() => {
@@ -196,26 +93,26 @@ describe("WatchlistFormDialog", () => {
   });
 
   describe("create mode", () => {
-    it("renders through the Chakra dialog seam", () => {
+    it("opens the dialog from its trigger", async () => {
       render(<WatchlistFormDialog mode="create" trigger={<button>Open</button>} />);
 
-      expect(screen.getByTestId("chakra-dialog")).not.toBeNull();
+      await openDialog();
     });
 
-    it("discards unsaved changes when closed and reopened", () => {
+    it("discards unsaved changes when closed and reopened", async () => {
       render(<WatchlistFormDialog mode="create" trigger={<button>Open</button>} />);
 
-      fireEvent.click(screen.getByRole("button", { name: "Open" }));
+      await openDialog();
       fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Unsaved List" } });
-      fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
-      fireEvent.click(screen.getByRole("button", { name: "Open" }));
+      await closeDialog();
+      await openDialog();
 
       expect(screen.getByLabelText("Name")).toHaveProperty("value", "");
     });
 
-    it("renders with create title and empty form fields", () => {
+    it("renders with create title and empty form fields", async () => {
       render(<WatchlistFormDialog mode="create" trigger={<button>Open</button>} />);
-      fireEvent.click(screen.getByRole("button", { name: "Open" }));
+      await openDialog();
 
       expect(screen.getByRole("heading", { name: "Create New List" })).not.toBeNull();
       expect(screen.getByRole("button", { name: "Create List" })).not.toBeNull();
@@ -227,13 +124,15 @@ describe("WatchlistFormDialog", () => {
 
     it("submits createWatchlist with form values and shows success", async () => {
       render(<WatchlistFormDialog mode="create" trigger={<button>Open</button>} />);
-      fireEvent.click(screen.getByRole("button", { name: "Open" }));
+      await openDialog();
 
       fireEvent.change(screen.getByLabelText("Name"), { target: { value: "New List" } });
       fireEvent.change(screen.getByLabelText("Description"), {
         target: { value: "A description" },
       });
-      fireEvent.click(screen.getByLabelText("Custom order"));
+      const customOrderRadio = screen.getByRole("radio", { name: "Custom order" });
+      customOrderRadio.click();
+      await waitFor(() => expect(customOrderRadio).toHaveProperty("checked", true));
       fireEvent.click(screen.getByRole("button", { name: "Create List" }));
 
       await waitFor(() => {
@@ -249,7 +148,7 @@ describe("WatchlistFormDialog", () => {
   });
 
   describe("edit mode", () => {
-    it("renders with edit title and pre-filled form fields", () => {
+    it("renders with edit title and pre-filled form fields", async () => {
       render(
         <WatchlistFormDialog
           mode="edit"
@@ -261,7 +160,7 @@ describe("WatchlistFormDialog", () => {
           trigger={<button>Open</button>}
         />,
       );
-      fireEvent.click(screen.getByRole("button", { name: "Open" }));
+      await openDialog();
 
       expect(screen.getByRole("heading", { name: "Edit List" })).not.toBeNull();
       expect(screen.getByRole("button", { name: "Save Changes" })).not.toBeNull();
@@ -284,11 +183,13 @@ describe("WatchlistFormDialog", () => {
           trigger={<button>Open</button>}
         />,
       );
-      fireEvent.click(screen.getByRole("button", { name: "Open" }));
+      await openDialog();
 
       fireEvent.change(screen.getByLabelText("Name"), { target: { value: "Updated List" } });
       fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Updated desc" } });
-      fireEvent.click(screen.getByLabelText("Release order"));
+      const releaseOrderRadio = screen.getByRole("radio", { name: "Release order" });
+      releaseOrderRadio.click();
+      await waitFor(() => expect(releaseOrderRadio).toHaveProperty("checked", true));
       fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
       await waitFor(() => {
@@ -320,7 +221,7 @@ describe("WatchlistFormDialog", () => {
           trigger={<button>Open</button>}
         />,
       );
-      fireEvent.click(screen.getByRole("button", { name: "Open" }));
+      await openDialog();
 
       fireEvent.change(screen.getByLabelText("Description"), { target: { value: "" } });
       fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
