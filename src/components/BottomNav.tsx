@@ -1,6 +1,6 @@
 import { Search, List as ListIcon, type LucideIcon } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { HStack, Stack, Text } from "@chakra-ui/react";
+import { HStack, Link as ChakraLink, Stack, Text } from "@chakra-ui/react";
 
 export function BottomNav() {
   return (
@@ -27,30 +27,31 @@ export function BottomNav() {
 
 function BottomNavItem({ item }: { item: NavItem }) {
   return (
-    <Link
-      to={item.to}
-      preload="intent"
-      activeOptions={{ exact: item.to === "/" }}
-      activeProps={{ style: { color: "#ff0055" } }}
-      inactiveProps={{ style: { color: "#a8a4af" } }}
-    >
-      <Stack
-        align="center"
-        justify="center"
-        gap={1}
-        w={20}
-        minH={11}
-        py={2}
-        rounded="lg"
-        _hover={{ color: "fg.default", bg: "bg.subtle" }}
-        transition="all 0.3s ease-out"
+    <ChakraLink asChild color="fg.muted" _currentPage={{ color: "accent.solid" }}>
+      <Link
+        to={item.to}
+        preload="intent"
+        activeOptions={{ exact: item.to === "/" }}
+        activeProps={{ "aria-current": "page" }}
       >
-        <item.icon size={24} aria-hidden="true" />
-        <Text fontSize="xs" fontWeight="medium" letterSpacing="wide">
-          {item.label}
-        </Text>
-      </Stack>
-    </Link>
+        <Stack
+          align="center"
+          justify="center"
+          gap={1}
+          w={20}
+          minH={11}
+          py={2}
+          rounded="lg"
+          _hover={{ color: "fg.default", bg: "bg.subtle" }}
+          transition="all 0.3s ease-out"
+        >
+          <item.icon size={24} aria-hidden="true" />
+          <Text fontSize="xs" fontWeight="medium" letterSpacing="wide">
+            {item.label}
+          </Text>
+        </Stack>
+      </Link>
+    </ChakraLink>
   );
 }
 
