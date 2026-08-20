@@ -69,6 +69,7 @@ const DialogContext = createContext<{ onOpenChange: (open: boolean) => void }>({
 });
 
 vi.mock("@chakra-ui/react", () => ({
+  Portal: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   Stack: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   Button: ({
     children,
