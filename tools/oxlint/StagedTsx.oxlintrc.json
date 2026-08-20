@@ -12,6 +12,13 @@
       "rules": {
         "unicorn/filename-case": "off"
       }
+    },
+    {
+      "files": ["**/*.test.{ts,tsx}"],
+      "rules": {
+        "component-rendering/component-owned-jsx": "off",
+        "component-rendering/no-call-expression-children": "off"
+      }
     }
   ]
 }

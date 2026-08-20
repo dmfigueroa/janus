@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-/* oxlint-disable component-rendering/component-owned-jsx, component-rendering/no-call-expression-children */
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import React, { createContext, useContext } from "react";
