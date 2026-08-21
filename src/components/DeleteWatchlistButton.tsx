@@ -46,7 +46,7 @@ export function DeleteWatchlistButton({
             <Dialog.CloseTrigger aria-label="Close dialog">
               <X size={16} />
             </Dialog.CloseTrigger>
-            <Dialog.Header>
+            <Dialog.Header flexDirection="column" alignItems="flex-start" gap={1}>
               <Dialog.Title>Delete Watchlist</Dialog.Title>
               <Dialog.Description>
                 Are you sure you want to delete &quot;{watchlist.name}&quot;? This action cannot be

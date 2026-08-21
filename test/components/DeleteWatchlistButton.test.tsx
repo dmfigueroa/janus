@@ -57,4 +57,20 @@ describe("DeleteWatchlistButton", () => {
 
     expect(handleDelete).toHaveBeenCalledOnce();
   });
+
+  it("stacks the dialog title and description vertically", async () => {
+    render(
+      <Provider>
+        <DeleteWatchlistButton watchlist={watchlist()} deleting={false} handleDelete={vi.fn()} />
+      </Provider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Movie Night" }));
+
+    const title = await waitFor(() => screen.getByRole("heading", { name: "Delete Watchlist" }));
+    const header = title.parentElement;
+
+    expect(header).not.toBeNull();
+    expect(window.getComputedStyle(header as HTMLElement).flexDirection).toBe("column");
+  });
 });
