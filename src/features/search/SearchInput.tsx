@@ -2,13 +2,13 @@ import { Box, Button, Input, InputGroup, Spinner } from "@chakra-ui/react";
 import { SearchIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
-interface SearchInputProps {
+interface SearchInputProperties {
   onSearch: (query: string) => void;
   defaultValue?: string;
   isLoading?: boolean;
 }
 
-export function SearchInput({ onSearch, defaultValue = "", isLoading }: SearchInputProps) {
+export function SearchInput({ onSearch, defaultValue = "", isLoading }: SearchInputProperties) {
   const [value, setValue] = useState(defaultValue);
 
   useEffect(() => {

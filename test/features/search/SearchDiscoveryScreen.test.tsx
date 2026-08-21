@@ -19,7 +19,7 @@ vi.mock("@/features/search/useSearchNavigation", () => ({
   })),
 }));
 
-vi.mock("@/components/SearchInput", () => ({
+vi.mock("@/features/search/SearchInput", () => ({
   SearchInput: ({ defaultValue }: { defaultValue: string }) => (
     <input data-testid="search-input" defaultValue={defaultValue} />
   ),
@@ -43,11 +43,11 @@ vi.mock("@/server/Media", () => ({
   isDeprecatedMediaType: (type: string) => type === "anime" || type === "manga",
 }));
 
-import { SearchScreen } from "@/features/search/Screen";
+import { SearchDiscoveryScreen } from "@/features/search/SearchDiscoveryScreen";
 import { useSearchResults } from "@/features/search/useSearchResults";
 import { useSearchNavigation } from "@/features/search/useSearchNavigation";
 
-describe("SearchScreen behavior", () => {
+describe("SearchDiscoveryScreen behavior", () => {
   afterEach(() => {
     cleanup();
   });
@@ -67,7 +67,7 @@ describe("SearchScreen behavior", () => {
 
   it("renders search input and tabs", () => {
     const { container } = render(
-      <SearchScreen
+      <SearchDiscoveryScreen
         query=""
         type="movie"
         initialData={{ results: [], page: 1, total_pages: 0, total_results: 0 }}
@@ -80,7 +80,7 @@ describe("SearchScreen behavior", () => {
 
   it("shows 'No results found' when query is empty", () => {
     render(
-      <SearchScreen
+      <SearchDiscoveryScreen
         query=""
         type="movie"
         initialData={{ results: [], page: 1, total_pages: 0, total_results: 0 }}
@@ -106,7 +106,7 @@ describe("SearchScreen behavior", () => {
     });
 
     render(
-      <SearchScreen
+      <SearchDiscoveryScreen
         query="harry potter"
         type="book"
         initialData={{ results: [], page: 1, total_pages: 1, total_results: 1 }}
@@ -118,7 +118,7 @@ describe("SearchScreen behavior", () => {
 
   it("shows deprecated warning for anime/manga types", () => {
     render(
-      <SearchScreen
+      <SearchDiscoveryScreen
         query="naruto"
         type="anime"
         initialData={{ results: [], page: 1, total_pages: 1, total_results: 0, rejected: true }}

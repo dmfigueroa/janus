@@ -8,7 +8,7 @@
   },
   "overrides": [
     {
-      "files": ["**/__root.tsx"],
+      "files": ["**/routes/**/*.tsx"],
       "rules": {
         "unicorn/filename-case": "off"
       }

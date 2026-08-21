@@ -1,12 +1,12 @@
 import { Box, Container, Heading, Stack, Tabs, Text } from "@chakra-ui/react";
-import { SearchInput } from "@/components/SearchInput";
 import { SearchResults } from "@/features/search/SearchResults";
 import { DEPRECATED_MEDIA_MESSAGE, isDeprecatedMediaType } from "@/server/Media";
 import type { UnifiedMedia } from "@/server/Media";
+import { SearchInput } from "./SearchInput";
 import { useSearchResults } from "./useSearchResults";
 import { useSearchNavigation } from "./useSearchNavigation";
 
-interface SearchScreenProps {
+interface SearchDiscoveryScreenProperties {
   query: string;
   type: UnifiedMedia["mediaType"];
   initialData: {
@@ -45,7 +45,11 @@ function DeprecatedSearchNotice({ visible }: { visible: boolean }) {
   );
 }
 
-export function SearchScreen({ query, type, initialData }: SearchScreenProps) {
+export function SearchDiscoveryScreen({
+  query,
+  type,
+  initialData,
+}: SearchDiscoveryScreenProperties) {
   const { allResults, fetchNextPage, hasNextPage, isFetchingNextPage } = useSearchResults({
     query,
     type,

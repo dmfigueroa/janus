@@ -1,9 +1,9 @@
 import type { UnifiedMedia } from "@/server/Media";
-import { MediaCard } from "@/components/MediaCard";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import { useState } from "react";
 import { SearchMediaDetailSheet } from "./SearchMediaDetailSheet";
 import { CreateCustomItemDialog } from "./CreateCustomItemDialog";
+import { SearchMediaCard } from "./SearchMediaCard";
 import { Box, Button, SimpleGrid, Spinner, Stack, Text } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 
@@ -123,7 +123,7 @@ function SearchResultCard({
   media: UnifiedMedia;
   onSelect: (media: UnifiedMedia) => void;
 }) {
-  return <MediaCard key={media.id} media={media} onClick={() => onSelect(media)} />;
+  return <SearchMediaCard key={media.id} media={media} onClick={() => onSelect(media)} />;
 }
 
 function ResultsContent(props: Parameters<typeof PopulatedResults>[0]) {

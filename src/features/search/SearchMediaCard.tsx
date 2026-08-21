@@ -1,8 +1,8 @@
 import { Box, Image, Stack, Text } from "@chakra-ui/react";
-import { UnifiedMedia } from "../server/Media";
+import type { UnifiedMedia } from "@/server/Media";
 import { Star } from "lucide-react";
 
-interface MediaCardProps {
+interface SearchMediaCardProperties {
   media: UnifiedMedia;
   onClick: () => void;
 }
@@ -120,7 +120,7 @@ function MediaDetails({ media }: { media: UnifiedMedia }) {
   );
 }
 
-export function MediaCard({ media, onClick }: MediaCardProps) {
+export function SearchMediaCard({ media, onClick }: SearchMediaCardProperties) {
   return (
     <Box
       as="button"
