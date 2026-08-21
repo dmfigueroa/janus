@@ -1,3 +1,4 @@
+import { HStack, Text } from "@chakra-ui/react";
 import { Info } from "lucide-react";
 import type { UnifiedMedia } from "@/server/Media";
 
@@ -5,35 +6,35 @@ interface SearchMediaAdditionNoticeProps {
   mediaType: UnifiedMedia["mediaType"];
 }
 
-// The branching was moved intact from SearchMediaDetailSheet to satisfy the file-size boundary.
-// eslint-disable-next-line complexity
-export function SearchMediaAdditionNotice({ mediaType }: SearchMediaAdditionNoticeProps) {
-  if (
-    mediaType !== "tv" &&
-    mediaType !== "anime" &&
-    mediaType !== "comic" &&
-    mediaType !== "manga"
-  ) {
-    return null;
-  }
+const additionNoticeByMediaType: Partial<
+  Record<UnifiedMedia["mediaType"], { mediaLabel: string; itemLabel: string }>
+> = {
+  tv: { mediaLabel: "a TV show", itemLabel: "episodes" },
+  anime: { mediaLabel: "an anime", itemLabel: "episodes" },
+  comic: { mediaLabel: "a comic", itemLabel: "issues/volumes" },
+  manga: { mediaLabel: "a manga", itemLabel: "issues/volumes" },
+};
 
-  const mediaLabel =
-    mediaType === "tv"
-      ? "a TV show"
-      : mediaType === "anime"
-        ? "an anime"
-        : mediaType === "comic"
-          ? "a comic"
-          : "a manga";
-  const itemLabel = mediaType === "tv" || mediaType === "anime" ? "episodes" : "issues/volumes";
+export function SearchMediaAdditionNotice({ mediaType }: SearchMediaAdditionNoticeProps) {
+  const notice = additionNoticeByMediaType[mediaType];
+  if (!notice) return null;
 
   return (
-    <div className="flex items-start gap-2 text-xs text-muted-foreground bg-secondary/50 p-3 rounded-md">
-      <Info className="size-4 shrink-0 mt-0.5" />
-      <p>
-        Adding {mediaLabel} will automatically add <strong>all available {itemLabel}</strong> to
-        your watchlist. This allows you to track your progress step by step.
-      </p>
-    </div>
+    <HStack
+      align="flex-start"
+      gap={2}
+      rounded="md"
+      bg="bg.subtle"
+      p={3}
+      color="fg.muted"
+      fontSize="xs"
+    >
+      <Info size={16} aria-hidden="true" />
+      <Text>
+        Adding {notice.mediaLabel} will automatically add{" "}
+        <strong>all available {notice.itemLabel}</strong> to your watchlist. This allows you to
+        track your progress step by step.
+      </Text>
+    </HStack>
   );
 }
