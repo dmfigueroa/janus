@@ -24,7 +24,8 @@ export function WatchlistCardSurface({
       <Button
         type="button"
         variant="plain"
-        aria-label={`Select ${watchlistName}`}
+        aria-label={`${isSelected ? "Deselect" : "Select"} ${watchlistName}`}
+        aria-pressed={isSelected}
         {...surfaceStyles}
         display="block"
         w="full"

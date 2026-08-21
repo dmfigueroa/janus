@@ -278,6 +278,30 @@ describe("WatchlistCard", () => {
     expect(screen.getByText("Issue 12 • The Trial")).not.toBeNull();
   });
 
+  it("exposes whether a watchlist is selected to assistive technology", () => {
+    const { rerender } = render(
+      <WatchlistCard
+        watchlist={createWatchlist({ id: 1, name: "Movie Night" })}
+        selectionMode
+        isSelected={false}
+      />,
+    );
+
+    const selectionButton = screen.getByRole("button", { name: "Select Movie Night" });
+    expect(selectionButton.getAttribute("aria-pressed")).toBe("false");
+
+    rerender(
+      <WatchlistCard
+        watchlist={createWatchlist({ id: 1, name: "Movie Night" })}
+        selectionMode
+        isSelected
+      />,
+    );
+
+    const selectedButton = screen.getByRole("button", { name: "Deselect Movie Night" });
+    expect(selectedButton.getAttribute("aria-pressed")).toBe("true");
+  });
+
   it("lets keyboard users select a watchlist from selection mode", () => {
     const onToggle = vi.fn();
 
