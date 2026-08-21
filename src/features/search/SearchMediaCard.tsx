@@ -104,6 +104,8 @@ function MediaDetails({ media }: { media: UnifiedMedia }) {
     <Stack gap={0.5} px={1} textAlign="left">
       <Text
         as="span"
+        role="heading"
+        aria-level={3}
         truncate
         fontSize="sm"
         fontWeight="medium"

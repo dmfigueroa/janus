@@ -35,6 +35,12 @@ describe("SearchMediaCard", () => {
     expect(screen.getByText("Author One, Author Two")).toBeDefined();
   });
 
+  it("should expose media titles as level-three headings", () => {
+    render(<SearchMediaCard media={bookMedia} onClick={() => {}} />);
+
+    expect(screen.getByRole("heading", { level: 3, name: "Test Book" })).toBeDefined();
+  });
+
   it("should not display authors for movies", () => {
     render(<SearchMediaCard media={movieMedia} onClick={() => {}} />);
 
