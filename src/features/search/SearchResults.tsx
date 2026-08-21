@@ -1,10 +1,10 @@
 import type { UnifiedMedia } from "@/server/Media";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
-import { useState } from "react";
+import { useState, type Ref } from "react";
 import { SearchMediaDetailSheet } from "./SearchMediaDetailSheet";
 import { CreateCustomItemDialog } from "./CreateCustomItemDialog";
 import { SearchMediaCard } from "./SearchMediaCard";
-import { Box, Button, SimpleGrid, Spinner, Stack, Text } from "@chakra-ui/react";
+import { Box, Button, type ButtonProps, SimpleGrid, Spinner, Stack, Text } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 
 interface SearchResultsProps {
@@ -14,9 +14,18 @@ interface SearchResultsProps {
   isFetchingNextPage: boolean;
 }
 
-function CreateCustomItemButton({ compact = false }: { compact?: boolean }) {
+interface CreateCustomItemButtonProperties extends ButtonProps {
+  compact?: boolean;
+  ref?: Ref<HTMLButtonElement>;
+}
+
+function CreateCustomItemButton({
+  compact = false,
+  ref,
+  ...buttonProps
+}: CreateCustomItemButtonProperties) {
   return (
-    <Button variant="outline" size={compact ? "sm" : undefined} gap={2}>
+    <Button ref={ref} variant="outline" size={compact ? "sm" : undefined} gap={2} {...buttonProps}>
       <Plus size={16} aria-hidden="true" />
       Create Custom Item
     </Button>
