@@ -1,4 +1,5 @@
-import { WatchlistCard } from "@/components/WatchlistCard";
+import { Box, Heading, SimpleGrid } from "@chakra-ui/react";
+import { WatchlistCard } from "@/features/watchlists/components/WatchlistCard";
 import type { getWatchlistHome } from "@/features/watchlists/home/WatchlistHome";
 import { CreateWatchlistTile } from "@/features/watchlists/home/CreateWatchlistTile";
 import { useWatchlistMergeSelectionContext } from "@/features/watchlists/home/WatchlistMergeSelectionContext";
@@ -11,24 +12,68 @@ export function AllWatchlistsSection({ watchlists }: AllWatchlistsSectionProps) 
   const mergeSelection = useWatchlistMergeSelectionContext();
 
   return (
-    <section className="px-6">
+    <Box as="section" px={6}>
       {!mergeSelection.selectionMode ? (
-        <h2 className="mb-4 text-xl font-bold tracking-tight text-foreground">All Watchlists</h2>
+        <Heading as="h2" size="xl" fontWeight="bold" letterSpacing="tight" mb={4}>
+          All Watchlists
+        </Heading>
       ) : null}
-      <div className="grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:justify-start sm:gap-6">
-        {watchlists.map((watchlist) => (
-          <div key={watchlist.id} className="w-full sm:w-55">
-            <WatchlistCard
-              watchlist={watchlist}
-              selectionMode={mergeSelection.selectionMode}
-              isSelected={mergeSelection.selectedIdSet.has(watchlist.id)}
-              onToggle={() => mergeSelection.toggleSelectedWatchlist(watchlist.id)}
-            />
-          </div>
-        ))}
+      <SimpleGrid columns={{ base: 2, md: 4 }} gap={{ base: 4, md: 6 }}>
+        <WatchlistGridItems
+          watchlists={watchlists}
+          selectionMode={mergeSelection.selectionMode}
+          selectedIdSet={mergeSelection.selectedIdSet}
+          onToggle={mergeSelection.toggleSelectedWatchlist}
+        />
+      </SimpleGrid>
+    </Box>
+  );
+}
 
-        {!mergeSelection.selectionMode ? <CreateWatchlistTile /> : null}
-      </div>
-    </section>
+type WatchlistGridItemProps = {
+  watchlist: AllWatchlistsSectionProps["watchlists"][number];
+  selectionMode: boolean;
+  isSelected: boolean;
+  onToggle: () => void;
+};
+
+function WatchlistGridItems({
+  watchlists,
+  selectionMode,
+  selectedIdSet,
+  onToggle,
+}: {
+  watchlists: AllWatchlistsSectionProps["watchlists"];
+  selectionMode: boolean;
+  selectedIdSet: Set<number>;
+  onToggle: (watchlistId: number) => void;
+}) {
+  const gridItems = watchlists.map((watchlist) => ({
+    watchlist,
+    selectionMode,
+    isSelected: selectedIdSet.has(watchlist.id),
+    onToggle: () => onToggle(watchlist.id),
+  }));
+
+  return selectionMode
+    ? gridItems.map(WatchlistGridItem)
+    : [...gridItems.map(WatchlistGridItem), <CreateWatchlistTile key="create-watchlist" />];
+}
+
+function WatchlistGridItem({
+  watchlist,
+  selectionMode,
+  isSelected,
+  onToggle,
+}: WatchlistGridItemProps) {
+  return (
+    <Box key={watchlist.id} w="full" maxW={{ md: "220px" }}>
+      <WatchlistCard
+        watchlist={watchlist}
+        selectionMode={selectionMode}
+        isSelected={isSelected}
+        onToggle={onToggle}
+      />
+    </Box>
   );
 }

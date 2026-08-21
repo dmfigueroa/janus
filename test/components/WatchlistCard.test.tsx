@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@test/utils/Render";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { EnrichedWatchlist } from "@/components/WatchlistCard";
-import { WatchlistCard } from "@/components/WatchlistCard";
+import type { EnrichedWatchlist } from "@/features/watchlists/components/WatchlistCard";
+import { WatchlistCard } from "@/features/watchlists/components/WatchlistCard";
 
 const {
   invalidateMock,
@@ -57,7 +57,7 @@ vi.mock("sonner", () => ({
   },
 }));
 
-vi.mock("@/components/DeleteWatchlistButton", () => ({
+vi.mock("@/features/watchlists/components/DeleteWatchlistButton", () => ({
   DeleteWatchlistButton: () => <div>Delete button</div>,
 }));
 
@@ -132,6 +132,17 @@ describe("WatchlistCard", () => {
       });
     });
     expect(invalidateMock).toHaveBeenCalled();
+  });
+
+  it("marks the card wrapper as a Chakra group for hover actions", () => {
+    render(
+      <WatchlistCard
+        watchlist={createWatchlist({ id: 1, name: "Movie Night" })}
+        showUpNextBadge={false}
+      />,
+    );
+
+    expect(screen.getByRole("group").classList.contains("group")).toBe(true);
   });
 
   it("shows item titles instead of the watchlist name in featured up next cards", () => {
@@ -265,5 +276,48 @@ describe("WatchlistCard", () => {
 
     expect(screen.getByRole("heading", { name: "Saga" })).not.toBeNull();
     expect(screen.getByText("Issue 12 • The Trial")).not.toBeNull();
+  });
+
+  it("exposes whether a watchlist is selected to assistive technology", () => {
+    const { rerender } = render(
+      <WatchlistCard
+        watchlist={createWatchlist({ id: 1, name: "Movie Night" })}
+        selectionMode
+        isSelected={false}
+      />,
+    );
+
+    const selectionButton = screen.getByRole("button", { name: "Select Movie Night" });
+    expect(selectionButton.getAttribute("aria-pressed")).toBe("false");
+
+    rerender(
+      <WatchlistCard
+        watchlist={createWatchlist({ id: 1, name: "Movie Night" })}
+        selectionMode
+        isSelected
+      />,
+    );
+
+    const selectedButton = screen.getByRole("button", { name: "Deselect Movie Night" });
+    expect(selectedButton.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("lets keyboard users select a watchlist from selection mode", () => {
+    const onToggle = vi.fn();
+
+    render(
+      <WatchlistCard
+        watchlist={createWatchlist({ id: 1, name: "Movie Night" })}
+        selectionMode
+        onToggle={onToggle}
+      />,
+    );
+
+    const selectionButton = screen.getByRole("button", { name: "Select Movie Night" });
+    selectionButton.focus();
+    fireEvent.click(selectionButton);
+
+    expect(document.activeElement).toBe(selectionButton);
+    expect(onToggle).toHaveBeenCalledOnce();
   });
 });

@@ -8,7 +8,7 @@ import { mergeWatchlists } from "@/features/watchlists/merge/Mutation";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import type { EnrichedWatchlist } from "./WatchlistCard";
+import type { EnrichedWatchlist } from "@/features/watchlists/components/WatchlistCard";
 
 interface MergeWatchlistDialogProps {
   open: boolean;

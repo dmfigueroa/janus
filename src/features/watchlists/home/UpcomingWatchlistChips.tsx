@@ -13,13 +13,22 @@ export function UpcomingWatchlistChips({ watchlists }: UpcomingWatchlistChipsPro
   }
 
   return (
-    <div className="mt-4 border-t border-border/60 pt-3">
-      <p className="mb-2 text-sm font-medium text-muted-foreground">Coming up after these</p>
-      <div className="flex flex-wrap gap-2">
-        {watchlists.map((watchlist) => (
-          <UpcomingWatchlistChip key={watchlist.id} watchlist={watchlist} />
-        ))}
-      </div>
-    </div>
+    <Box mt={4} borderTopWidth="1px" borderColor="border.default" pt={3}>
+      <Text mb={2} fontSize="sm" fontWeight="medium" color="fg.muted">
+        Coming up after these
+      </Text>
+      <Flex wrap="wrap" gap={2}>
+        <UpcomingWatchlistChipItems watchlists={watchlists} />
+      </Flex>
+    </Box>
   );
 }
+
+function UpcomingWatchlistChipItems({ watchlists }: UpcomingWatchlistChipsProps) {
+  return watchlists.map(UpcomingWatchlistChipItem);
+}
+
+function UpcomingWatchlistChipItem(watchlist: UpcomingWatchlistChipsProps["watchlists"][number]) {
+  return <UpcomingWatchlistChip key={watchlist.id} watchlist={watchlist} />;
+}
+import { Box, Flex, Text } from "@chakra-ui/react";

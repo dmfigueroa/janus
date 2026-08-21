@@ -1,3 +1,4 @@
+import { Link as ChakraLink, Flex } from "@chakra-ui/react";
 import { useRouter, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { deleteWatchlist } from "@/features/watchlists/delete/Mutation";
@@ -45,14 +46,22 @@ function CardArtworkLink({
 }) {
   if (selectionMode) return children;
   return (
-    <Link
-      to="/watchlists/$watchlistId"
-      params={{ watchlistId: watchlistId.toString() }}
-      preload="viewport"
-      className="block h-full cursor-pointer transition-transform duration-300 active:scale-95"
+    <ChakraLink
+      asChild
+      display="block"
+      h="full"
+      cursor="pointer"
+      transition="transform 300ms"
+      _active={{ transform: "scale(0.95)" }}
     >
-      {children}
-    </Link>
+      <Link
+        to="/watchlists/$watchlistId"
+        params={{ watchlistId: watchlistId.toString() }}
+        preload="viewport"
+      >
+        {children}
+      </Link>
+    </ChakraLink>
   );
 }
 
@@ -125,23 +134,19 @@ export function WatchlistCard(cardProps: WatchlistCardProps) {
     }
   };
 
-  const CardContent = (
-    <WatchlistCardArtwork
-      watchlist={watchlist}
-      selectionMode={selectionMode}
-      isSelected={isSelected}
-      showUpNextBadge={showUpNextBadge}
-      showSkipButton={showSkipButton}
-      skipping={skipping}
-      onToggle={onToggle}
-      onSkip={() => void handleSkip()}
-    />
-  );
-
   return (
-    <div className="flex flex-col gap-2 group relative">
+    <Flex direction="column" gap={2} position="relative" role="group" className="group">
       <CardArtworkLink selectionMode={selectionMode} watchlistId={watchlist.id}>
-        {CardContent}
+        <WatchlistCardArtwork
+          watchlist={watchlist}
+          selectionMode={selectionMode}
+          isSelected={isSelected}
+          showUpNextBadge={showUpNextBadge}
+          showSkipButton={showSkipButton}
+          skipping={skipping}
+          onToggle={onToggle}
+          onSkip={() => void handleSkip()}
+        />
       </CardArtworkLink>
 
       <WatchlistDeleteAction
@@ -152,6 +157,6 @@ export function WatchlistCard(cardProps: WatchlistCardProps) {
       />
 
       <WatchlistCardInfo watchlist={watchlist} infoVariant={infoVariant} />
-    </div>
+    </Flex>
   );
 }

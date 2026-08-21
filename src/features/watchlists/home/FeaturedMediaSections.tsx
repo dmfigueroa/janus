@@ -11,13 +11,22 @@ export function FeaturedMediaSections({ sections }: FeaturedMediaSectionsProps) 
   }
 
   return (
-    <section className="px-6 pb-8">
-      <h2 className="mb-4 text-xl font-bold tracking-tight text-foreground">Up Next by Media</h2>
-      <div className="space-y-8">
-        {sections.map((section) => (
-          <FeaturedMediaSection key={section.key} section={section} />
-        ))}
-      </div>
-    </section>
+    <Box as="section" px={6} pb={8}>
+      <Heading as="h2" size="xl" fontWeight="bold" letterSpacing="tight" mb={4}>
+        Up Next by Media
+      </Heading>
+      <Stack gap={8}>
+        <FeaturedMediaSectionItems sections={sections} />
+      </Stack>
+    </Box>
   );
 }
+
+function FeaturedMediaSectionItems({ sections }: FeaturedMediaSectionsProps) {
+  return sections.map(FeaturedMediaSectionItem);
+}
+
+function FeaturedMediaSectionItem(section: FeaturedMediaSectionsProps["sections"][number]) {
+  return <FeaturedMediaSection key={section.key} section={section} />;
+}
+import { Box, Heading, Stack } from "@chakra-ui/react";

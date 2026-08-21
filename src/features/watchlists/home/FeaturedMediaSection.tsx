@@ -1,4 +1,4 @@
-import { WatchlistCard } from "@/components/WatchlistCard";
+import { WatchlistCard } from "@/features/watchlists/components/WatchlistCard";
 import type { getWatchlistHome } from "@/features/watchlists/home/WatchlistHome";
 import { UpcomingWatchlistChips } from "@/features/watchlists/home/UpcomingWatchlistChips";
 
@@ -8,22 +8,39 @@ type FeaturedMediaSectionProps = {
 
 export function FeaturedMediaSection({ section }: FeaturedMediaSectionProps) {
   return (
-    <div>
-      <h3 className="mb-3 text-lg font-semibold text-foreground">{section.title}</h3>
-      <div className="grid grid-cols-2 gap-4 sm:flex sm:flex-wrap sm:justify-start sm:gap-6">
-        {section.watchlists.map((watchlist) => (
-          <div key={watchlist.id} className="w-full sm:w-[220px]">
-            <WatchlistCard
-              watchlist={watchlist}
-              showDeleteButton={false}
-              showUpNextBadge={false}
-              showSkipButton
-              infoVariant="up-next"
-            />
-          </div>
-        ))}
-      </div>
+    <Box>
+      <Heading as="h3" size="lg" fontWeight="semibold" mb={3}>
+        {section.title}
+      </Heading>
+      <SimpleGrid columns={{ base: 2, md: 4 }} gap={{ base: 4, md: 6 }}>
+        <FeaturedWatchlistGridItems watchlists={section.watchlists} />
+      </SimpleGrid>
       <UpcomingWatchlistChips watchlists={section.upcomingWatchlists} />
-    </div>
+    </Box>
   );
 }
+
+function FeaturedWatchlistGridItems({
+  watchlists,
+}: {
+  watchlists: FeaturedMediaSectionProps["section"]["watchlists"];
+}) {
+  return watchlists.map(FeaturedWatchlistGridItem);
+}
+
+function FeaturedWatchlistGridItem(
+  watchlist: FeaturedMediaSectionProps["section"]["watchlists"][number],
+) {
+  return (
+    <Box key={watchlist.id} w="full" maxW={{ md: "220px" }}>
+      <WatchlistCard
+        watchlist={watchlist}
+        showDeleteButton={false}
+        showUpNextBadge={false}
+        showSkipButton
+        infoVariant="up-next"
+      />
+    </Box>
+  );
+}
+import { Box, Heading, SimpleGrid } from "@chakra-ui/react";
