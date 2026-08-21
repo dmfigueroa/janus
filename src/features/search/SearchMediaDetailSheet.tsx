@@ -22,13 +22,13 @@ export function SearchMediaDetailSheet({ media, isOpen, onClose }: SearchMediaDe
       onOpenChange={({ open }) => {
         if (!open) onClose();
       }}
-      placement={{ base: "bottom", md: "end" }}
-      size={{ base: "full", md: "md", lg: "lg" }}
+      placement={{ mdDown: "bottom", md: "end" }}
+      size={{ mdDown: "full", md: "md", lg: "lg" }}
     >
       <Portal>
         <Drawer.Backdrop />
         <Drawer.Positioner>
-          <Drawer.Content maxW="100vw">
+          <Drawer.Content>
             <Drawer.CloseTrigger aria-label="Close media details">
               <X size={16} />
             </Drawer.CloseTrigger>
