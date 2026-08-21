@@ -99,13 +99,12 @@ export function SearchScreen({ query, type, initialData }: SearchScreenProps) {
             w="full"
             maxW="3xl"
           >
-            <Tabs.List display="grid" gridTemplateColumns="repeat(5, minmax(0, 1fr))" w="full">
+            <Tabs.List>
               <Tabs.Trigger value="movie">Movies</Tabs.Trigger>
               <Tabs.Trigger value="tv">TV</Tabs.Trigger>
               <Tabs.Trigger value="game">Games</Tabs.Trigger>
               <Tabs.Trigger value="book">Books</Tabs.Trigger>
               <Tabs.Trigger value="comic">Comics</Tabs.Trigger>
-              <Tabs.Indicator />
             </Tabs.List>
           </Tabs.Root>
         </Stack>

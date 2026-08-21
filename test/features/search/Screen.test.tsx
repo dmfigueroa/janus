@@ -66,7 +66,7 @@ describe("SearchScreen behavior", () => {
   });
 
   it("renders search input and tabs", () => {
-    render(
+    const { container } = render(
       <SearchScreen
         query=""
         type="movie"
@@ -75,6 +75,7 @@ describe("SearchScreen behavior", () => {
     );
     expect(screen.getByTestId("search-input")).not.toBeNull();
     expect(screen.getByRole("tablist")).not.toBeNull();
+    expect(container.querySelector('[data-scope="tabs"][data-part="indicator"]')).toBeNull();
   });
 
   it("shows 'No results found' when query is empty", () => {

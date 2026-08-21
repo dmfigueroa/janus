@@ -110,7 +110,6 @@ const janusConfig = defineConfig({
         defaultVariants: {
           ...tabsSlotRecipe.defaultVariants,
           colorPalette: "pink",
-          variant: "plain",
         },
       },
     },
