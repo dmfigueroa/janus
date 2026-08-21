@@ -13,6 +13,8 @@ export function CreateWatchlistTile() {
               type="button"
               variant="outline"
               w="full"
+              h="auto"
+              display="flex"
               aspectRatio="2 / 3"
               flexDirection="column"
               justifyContent="center"
