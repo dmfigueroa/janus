@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MergeWatchlistDialog } from "@/components/MergeWatchlistDialog";
-import type { EnrichedWatchlist } from "@/components/WatchlistCard";
+import type { EnrichedWatchlist } from "@/features/watchlists/components/WatchlistCard";
 
 const { invalidateMock, mergeWatchlistsFnMock, mergeWatchlistsServerFn } = vi.hoisted(() => ({
   invalidateMock: vi.fn(),

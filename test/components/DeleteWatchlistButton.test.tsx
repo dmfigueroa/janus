@@ -3,8 +3,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Provider } from "@/app/Provider";
-import type { EnrichedWatchlist } from "@/components/WatchlistCard";
-import { DeleteWatchlistButton } from "@/components/DeleteWatchlistButton";
+import type { EnrichedWatchlist } from "@/features/watchlists/components/WatchlistCard";
+import { DeleteWatchlistButton } from "@/features/watchlists/components/DeleteWatchlistButton";
 
 function watchlist(): EnrichedWatchlist {
   return {

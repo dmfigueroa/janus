@@ -1,4 +1,4 @@
-import { WatchlistCard } from "@/components/WatchlistCard";
+import { WatchlistCard } from "@/features/watchlists/components/WatchlistCard";
 import type { getWatchlistHome } from "@/features/watchlists/home/WatchlistHome";
 import { UpcomingWatchlistChips } from "@/features/watchlists/home/UpcomingWatchlistChips";
 

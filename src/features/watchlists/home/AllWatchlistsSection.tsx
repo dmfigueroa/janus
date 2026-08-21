@@ -1,5 +1,5 @@
 import { Box, Heading, SimpleGrid } from "@chakra-ui/react";
-import { WatchlistCard } from "@/components/WatchlistCard";
+import { WatchlistCard } from "@/features/watchlists/components/WatchlistCard";
 import type { getWatchlistHome } from "@/features/watchlists/home/WatchlistHome";
 import { CreateWatchlistTile } from "@/features/watchlists/home/CreateWatchlistTile";
 import { useWatchlistMergeSelectionContext } from "@/features/watchlists/home/WatchlistMergeSelectionContext";

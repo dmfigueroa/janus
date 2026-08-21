@@ -3,8 +3,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@test/utils/Render";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { EnrichedWatchlist } from "@/components/WatchlistCard";
-import { WatchlistCard } from "@/components/WatchlistCard";
+import type { EnrichedWatchlist } from "@/features/watchlists/components/WatchlistCard";
+import { WatchlistCard } from "@/features/watchlists/components/WatchlistCard";
 
 const {
   invalidateMock,
@@ -57,7 +57,7 @@ vi.mock("sonner", () => ({
   },
 }));
 
-vi.mock("@/components/DeleteWatchlistButton", () => ({
+vi.mock("@/features/watchlists/components/DeleteWatchlistButton", () => ({
   DeleteWatchlistButton: () => <div>Delete button</div>,
 }));
 

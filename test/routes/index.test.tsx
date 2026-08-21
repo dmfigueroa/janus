@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen } from "@test/utils/Render";
 import { within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { EnrichedWatchlist } from "@/components/WatchlistCard";
+import type { EnrichedWatchlist } from "@/features/watchlists/components/WatchlistCard";
 import { WatchlistsHomeRouteContent } from "@/routes/index";
 
 vi.mock("@tanstack/react-router", () => ({
@@ -31,7 +31,7 @@ vi.mock("@tanstack/react-router", () => ({
   ),
 }));
 
-vi.mock("@/components/WatchlistCard", () => ({
+vi.mock("@/features/watchlists/components/WatchlistCard", () => ({
   WatchlistCard: ({
     watchlist,
     selectionMode = false,
