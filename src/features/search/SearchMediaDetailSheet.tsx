@@ -22,8 +22,8 @@ export function SearchMediaDetailSheet({ media, isOpen, onClose }: SearchMediaDe
       onOpenChange={({ open }) => {
         if (!open) onClose();
       }}
-      placement="end"
-      size="md"
+      placement={{ base: "bottom", md: "end" }}
+      size={{ base: "full", md: "md", lg: "lg" }}
     >
       <Portal>
         <Drawer.Backdrop />
