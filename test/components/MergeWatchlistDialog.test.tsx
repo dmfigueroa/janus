@@ -1,15 +1,18 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@test/utils/Render";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MergeWatchlistDialog } from "@/components/MergeWatchlistDialog";
+import { MergeWatchlistDialog } from "@/features/watchlists/merge/MergeWatchlistDialog";
 import type { EnrichedWatchlist } from "@/features/watchlists/components/WatchlistCard";
 
-const { invalidateMock, mergeWatchlistsFnMock, mergeWatchlistsServerFn } = vi.hoisted(() => ({
-  invalidateMock: vi.fn(),
-  mergeWatchlistsFnMock: vi.fn(),
-  mergeWatchlistsServerFn: Symbol("mergeWatchlists"),
-}));
+const { invalidateMock, mergeWatchlistsFnMock, mergeWatchlistsServerFn, toasterMock } = vi.hoisted(
+  () => ({
+    invalidateMock: vi.fn(),
+    mergeWatchlistsFnMock: vi.fn(),
+    mergeWatchlistsServerFn: Symbol("mergeWatchlists"),
+    toasterMock: { create: vi.fn() },
+  }),
+);
 
 vi.mock("@/features/watchlists/merge/Mutation", () => ({
   mergeWatchlists: mergeWatchlistsServerFn,
@@ -31,21 +34,7 @@ vi.mock("@tanstack/react-start", () => ({
   },
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
-    error: vi.fn(),
-    success: vi.fn(),
-  },
-}));
-
-vi.mock("@/components/ui/Dialog", () => ({
-  Dialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DialogTitle: ({ children }: { children: React.ReactNode }) => <h1>{children}</h1>,
-  DialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  DialogDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
-}));
+vi.mock("@/app/Toaster", () => ({ toaster: toasterMock }));
 
 function watchlist(
   overrides: Partial<EnrichedWatchlist> & Pick<EnrichedWatchlist, "id" | "name">,
@@ -124,5 +113,61 @@ describe("MergeWatchlistDialog", () => {
         },
       });
     });
+  });
+
+  it("submits the selected target when merging into an existing watchlist", async () => {
+    render(
+      <MergeWatchlistDialog
+        open
+        onOpenChange={vi.fn()}
+        selectedWatchlistIds={[2, 1]}
+        allWatchlists={[watchlist({ id: 1, name: "Alpha" }), watchlist({ id: 2, name: "Beta" })]}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Merge into existing watchlist"));
+    fireEvent.change(await screen.findByRole("combobox", { name: "Target watchlist" }), {
+      target: { value: "1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+
+    await waitFor(() => {
+      expect(mergeWatchlistsFnMock).toHaveBeenCalledWith({
+        data: {
+          sourceWatchlistIds: [2, 1],
+          targetWatchlistId: 1,
+        },
+      });
+    });
+  });
+
+  it("keeps entered values and the dialog actionable after a failed merge", async () => {
+    mergeWatchlistsFnMock.mockResolvedValueOnce({
+      success: false,
+      message: "The watchlists could not be merged",
+    });
+    render(
+      <MergeWatchlistDialog
+        open
+        onOpenChange={vi.fn()}
+        selectedWatchlistIds={[1, 2]}
+        allWatchlists={[watchlist({ id: 1, name: "Alpha" }), watchlist({ id: 2, name: "Beta" })]}
+      />,
+    );
+
+    const nameInput = screen.getByPlaceholderText("New Watchlist Name");
+    fireEvent.change(nameInput, { target: { value: "Merged Queue" } });
+    fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+
+    await waitFor(() => {
+      expect(toasterMock.create).toHaveBeenCalledWith({
+        type: "error",
+        title: "The watchlists could not be merged",
+      });
+    });
+    expect((nameInput as HTMLInputElement).value).toBe("Merged Queue");
+    expect((screen.getByRole("button", { name: "Merge" }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
   });
 });

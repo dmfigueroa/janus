@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/Button";
+import { Box, Button, Flex, Stack, Text } from "@chakra-ui/react";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query";
 
 interface MergeWatchlistOrderProps {
@@ -15,30 +15,48 @@ export function MergeWatchlistOrder({
   onMove,
 }: MergeWatchlistOrderProps) {
   return (
-    <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
-      <div className="space-y-1">
-        <p className="text-sm font-medium">Merge order</p>
-        <p className="text-xs text-muted-foreground">
+    <Box rounded="lg" borderWidth="1px" borderColor="border.default" bg="bg.subtle" p={3}>
+      <Stack gap={1}>
+        <Text fontSize="sm" fontWeight="medium">
+          Merge order
+        </Text>
+        <Text fontSize="xs" color="fg.muted">
           {hasCustomOrderedSelection
             ? "This order sets the final custom ranking when any selected list uses custom order."
             : "This order is kept for the selected lists and release ordering still applies within each list."}
-        </p>
-      </div>
+        </Text>
+      </Stack>
 
-      <ol className="mt-3 space-y-2">
-        {watchlists.map((watchlist, index) => (
-          <MergeWatchlistOrderItem
-            key={watchlist.id}
-            watchlist={watchlist}
-            index={index}
-            watchlistCount={watchlists.length}
-            isSubmitting={isSubmitting}
-            onMove={onMove}
-          />
-        ))}
-      </ol>
-    </div>
+      <Stack as="ol" gap={2} mt={3} listStyleType="none" m={0}>
+        <MergeWatchlistOrderItems
+          watchlists={watchlists}
+          isSubmitting={isSubmitting}
+          onMove={onMove}
+        />
+      </Stack>
+    </Box>
   );
+}
+
+function MergeWatchlistOrderItems({
+  watchlists,
+  isSubmitting,
+  onMove,
+}: {
+  watchlists: WatchlistSummary[];
+  isSubmitting: boolean;
+  onMove: MergeWatchlistOrderProps["onMove"];
+}) {
+  const itemProps = watchlists.map((watchlist, index) => ({
+    key: watchlist.id,
+    watchlist,
+    index,
+    watchlistCount: watchlists.length,
+    isSubmitting,
+    onMove,
+  }));
+
+  return itemProps.map(MergeWatchlistOrderItem);
 }
 
 function MergeWatchlistOrderItem({
@@ -54,41 +72,54 @@ function MergeWatchlistOrderItem({
   isSubmitting: boolean;
   onMove: MergeWatchlistOrderProps["onMove"];
 }) {
-  return (
-    <li
-      data-testid={`merge-order-item-${watchlist.id}`}
-      className="flex items-center justify-between gap-3 rounded-md border bg-background px-3 py-2"
-    >
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium">{watchlist.name}</p>
-        <p className="text-xs text-muted-foreground">
-          {getOrderModeLabel(watchlist.itemOrderMode)}
-        </p>
-      </div>
+  const orderModeLabel = getOrderModeLabel(watchlist.itemOrderMode);
 
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => onMove(watchlist.id, "up")}
-          disabled={isMoveUpDisabled(isSubmitting, index)}
-          aria-label={`Move ${watchlist.name} up`}
-        >
-          Up
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => onMove(watchlist.id, "down")}
-          disabled={isMoveDownDisabled(isSubmitting, index, watchlistCount)}
-          aria-label={`Move ${watchlist.name} down`}
-        >
-          Down
-        </Button>
-      </div>
-    </li>
+  return (
+    <Box
+      as="li"
+      key={watchlist.id}
+      data-testid={`merge-order-item-${watchlist.id}`}
+      rounded="md"
+      borderWidth="1px"
+      borderColor="border.default"
+      bg="bg.surface"
+      px={3}
+      py={2}
+    >
+      <Flex align="center" justify="space-between" gap={3}>
+        <Box minW={0}>
+          <Text truncate fontSize="sm" fontWeight="medium">
+            {watchlist.name}
+          </Text>
+          <Text fontSize="xs" color="fg.muted">
+            {orderModeLabel}
+          </Text>
+        </Box>
+
+        <Flex gap={2}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onMove(watchlist.id, "up")}
+            disabled={isMoveUpDisabled(isSubmitting, index)}
+            aria-label={`Move ${watchlist.name} up`}
+          >
+            Up
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onMove(watchlist.id, "down")}
+            disabled={isMoveDownDisabled(isSubmitting, index, watchlistCount)}
+            aria-label={`Move ${watchlist.name} down`}
+          >
+            Down
+          </Button>
+        </Flex>
+      </Flex>
+    </Box>
   );
 }
 
