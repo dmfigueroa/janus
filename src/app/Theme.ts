@@ -1,4 +1,5 @@
 import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
+import { tabsSlotRecipe } from "@chakra-ui/react/theme";
 
 const janusConfig = defineConfig({
   // Keep Chakra's reset inert during the Tailwind migration. `false` creates an empty reset
@@ -100,6 +101,15 @@ const janusConfig = defineConfig({
         },
         "gray.focusRing": {
           value: "{colors.pink.500}",
+        },
+      },
+    },
+    slotRecipes: {
+      tabs: {
+        ...tabsSlotRecipe,
+        defaultVariants: {
+          ...tabsSlotRecipe.defaultVariants,
+          colorPalette: "pink",
         },
       },
     },
