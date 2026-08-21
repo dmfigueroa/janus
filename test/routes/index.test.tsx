@@ -62,7 +62,7 @@ vi.mock("@/features/watchlists/components/WatchlistFormDialog", () => ({
   WatchlistFormDialog: ({ trigger }: { trigger: React.ReactNode }) => <div>{trigger}</div>,
 }));
 
-vi.mock("@/components/MergeWatchlistDialog", () => ({
+vi.mock("@/features/watchlists/merge/MergeWatchlistDialog", () => ({
   MergeWatchlistDialog: () => <div>Merge Watchlists Dialog</div>,
 }));
 

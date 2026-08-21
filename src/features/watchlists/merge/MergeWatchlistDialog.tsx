@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
-import { Dialog } from "@/components/ui/Dialog";
+import { useRouter } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { toaster } from "@/app/Toaster";
+import type { EnrichedWatchlist } from "@/features/watchlists/components/WatchlistCard";
+import { mergeWatchlists } from "./Mutation";
 import {
   MergeWatchlistDialogContent,
   type MergeDestinationMode,
-} from "@/features/watchlists/merge/MergeWatchlistDialogContent";
-import { mergeWatchlists } from "@/features/watchlists/merge/Mutation";
-import { useRouter } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
-import { toast } from "sonner";
-import type { EnrichedWatchlist } from "@/features/watchlists/components/WatchlistCard";
+} from "./MergeWatchlistDialogContent";
 
 interface MergeWatchlistDialogProps {
   open: boolean;
@@ -22,15 +21,19 @@ function isArrayIndex(index: number, length: number) {
   return index >= 0 && index < length;
 }
 
+function showMergeError(message: string) {
+  toaster.create({ type: "error", title: message });
+}
+
 function validateNewWatchlistName(name: string) {
   if (name.trim()) return true;
-  toast.error("Please enter a name for the new watchlist");
+  showMergeError("Please enter a name for the new watchlist");
   return false;
 }
 
 function validateTargetWatchlist(targetId: string) {
   if (targetId) return true;
-  toast.error("Please select a target watchlist");
+  showMergeError("Please select a target watchlist");
   return false;
 }
 
@@ -55,7 +58,7 @@ export function MergeWatchlistDialog({
 }: MergeWatchlistDialogProps) {
   const [mode, setMode] = useState<MergeDestinationMode>("new");
   const [newName, setNewName] = useState("");
-  const [targetId, setTargetId] = useState<string>("");
+  const [targetId, setTargetId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderedSourceWatchlistIds, setOrderedSourceWatchlistIds] = useState(selectedWatchlistIds);
   const router = useRouter();
@@ -86,7 +89,7 @@ export function MergeWatchlistDialog({
         newWatchlistName: newName,
       },
     });
-    if (!result.success) toast.error(result.message);
+    if (!result.success) showMergeError(result.message);
     return result.success;
   };
 
@@ -98,7 +101,7 @@ export function MergeWatchlistDialog({
         targetWatchlistId: parseInt(targetId, 10),
       },
     });
-    if (!result.success) toast.error(result.message);
+    if (!result.success) showMergeError(result.message);
     return result.success;
   };
 
@@ -108,11 +111,10 @@ export function MergeWatchlistDialog({
   };
 
   const completeMerge = async () => {
-    toast.success("Watchlists merged successfully");
+    toaster.create({ type: "success", title: "Watchlists merged successfully" });
     await router.invalidate?.();
     onSuccess?.();
     onOpenChange(false);
-    // Reset state
     setNewName("");
     setTargetId("");
     setMode("new");
@@ -128,28 +130,28 @@ export function MergeWatchlistDialog({
       })
       .catch((error) => {
         console.error(error);
-        toast.error("Failed to merge watchlists");
+        showMergeError("Failed to merge watchlists");
       })
       .finally(() => setIsSubmitting(false));
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <MergeWatchlistDialogContent
-        selectedCount={selectedWatchlistIds.length}
-        selectedWatchlists={selectedWatchlists}
-        hasCustomOrderedSelection={hasCustomOrderedSelection}
-        isSubmitting={isSubmitting}
-        mode={mode}
-        newName={newName}
-        targetId={targetId}
-        onMove={moveSelectedWatchlist}
-        onModeChange={setMode}
-        onNewNameChange={setNewName}
-        onTargetChange={setTargetId}
-        onCancel={() => onOpenChange(false)}
-        onMerge={handleMerge}
-      />
-    </Dialog>
+    <MergeWatchlistDialogContent
+      open={open}
+      onOpenChange={onOpenChange}
+      selectedCount={selectedWatchlistIds.length}
+      selectedWatchlists={selectedWatchlists}
+      hasCustomOrderedSelection={hasCustomOrderedSelection}
+      isSubmitting={isSubmitting}
+      mode={mode}
+      newName={newName}
+      targetId={targetId}
+      onMove={moveSelectedWatchlist}
+      onModeChange={setMode}
+      onNewNameChange={setNewName}
+      onTargetChange={setTargetId}
+      onCancel={() => onOpenChange(false)}
+      onMerge={handleMerge}
+    />
   );
 }

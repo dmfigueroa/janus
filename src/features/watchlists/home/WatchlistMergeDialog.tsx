@@ -1,4 +1,4 @@
-import { MergeWatchlistDialog } from "@/components/MergeWatchlistDialog";
+import { MergeWatchlistDialog } from "@/features/watchlists/merge/MergeWatchlistDialog";
 import type { getWatchlistHome } from "@/features/watchlists/home/WatchlistHome";
 import { useWatchlistMergeSelectionContext } from "@/features/watchlists/home/WatchlistMergeSelectionContext";
 

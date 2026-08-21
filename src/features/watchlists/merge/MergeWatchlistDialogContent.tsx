@@ -1,21 +1,15 @@
-import { Input } from "@/components/ui/Input";
-import { Label } from "@/components/ui/Label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/RadioGroup";
-import { Button } from "@/components/ui/Button";
 import {
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/Dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/Select";
+  Button,
+  Dialog,
+  Field,
+  Input,
+  NativeSelect,
+  Portal,
+  RadioGroup,
+  Stack,
+  Text,
+} from "@chakra-ui/react";
+import { X } from "lucide-react";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query";
 import { MergeWatchlistOrder } from "./MergeWatchlistOrder";
 
@@ -41,49 +35,92 @@ function MergeWatchlistDestination({
   onTargetChange,
 }: MergeWatchlistDestinationProps) {
   return (
-    <RadioGroup value={mode} onValueChange={(value) => onModeChange(value as MergeDestinationMode)}>
-      <div className="flex items-center space-x-2">
-        <RadioGroupItem value="new" id="r-new" />
-        <Label htmlFor="r-new">Create a new watchlist</Label>
-      </div>
-      {mode === "new" && (
-        <div className="ml-6">
+    <RadioGroup.Root
+      value={mode}
+      onValueChange={({ value }) => {
+        if (value) onModeChange(value as MergeDestinationMode);
+      }}
+      colorPalette="pink"
+      display="flex"
+      flexDir="column"
+      gap={3}
+    >
+      <RadioGroup.Item value="new">
+        <RadioGroup.ItemHiddenInput />
+        <RadioGroup.ItemControl borderWidth="2px" />
+        <RadioGroup.ItemText>Create a new watchlist</RadioGroup.ItemText>
+      </RadioGroup.Item>
+      {mode === "new" ? (
+        <Field.Root ml={6} required>
+          <Field.Label htmlFor="new-watchlist-name">New watchlist name</Field.Label>
           <Input
+            id="new-watchlist-name"
             placeholder="New Watchlist Name"
             value={newName}
             onChange={(event) => onNewNameChange(event.target.value)}
           />
-        </div>
-      )}
+        </Field.Root>
+      ) : null}
 
-      <div className="flex items-center space-x-2">
-        <RadioGroupItem value="existing" id="r-existing" />
-        <Label htmlFor="r-existing">Merge into existing watchlist</Label>
-      </div>
-      {mode === "existing" && (
-        <div className="ml-6 space-y-2">
-          <Select value={targetId} onValueChange={onTargetChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select target watchlist" />
-            </SelectTrigger>
-            <SelectContent>
-              {selectedWatchlists.map((watchlist) => (
-                <SelectItem key={watchlist.id} value={watchlist.id.toString()}>
-                  {watchlist.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground">
+      <RadioGroup.Item value="existing">
+        <RadioGroup.ItemHiddenInput />
+        <RadioGroup.ItemControl borderWidth="2px" />
+        <RadioGroup.ItemText>Merge into existing watchlist</RadioGroup.ItemText>
+      </RadioGroup.Item>
+      {mode === "existing" ? (
+        <Stack ml={6} gap={2}>
+          <Field.Root required>
+            <Field.Label htmlFor="merge-target-watchlist">Target watchlist</Field.Label>
+            <NativeSelect.Root>
+              <NativeSelect.Field
+                id="merge-target-watchlist"
+                value={targetId}
+                onChange={(event) => onTargetChange(event.target.value)}
+              >
+                <option value="">Select target watchlist</option>
+                <MergeWatchlistOptions selectedWatchlists={selectedWatchlists} />
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+          </Field.Root>
+          <Text fontSize="xs" color="fg.muted">
             The selected list will be kept. Other selected lists will be removed after merging.
-          </p>
-        </div>
-      )}
-    </RadioGroup>
+          </Text>
+        </Stack>
+      ) : null}
+    </RadioGroup.Root>
+  );
+}
+
+function MergeWatchlistOptions({ selectedWatchlists }: { selectedWatchlists: WatchlistSummary[] }) {
+  const optionProps = selectedWatchlists.map((watchlist) => ({
+    optionKey: watchlist.id,
+    value: watchlist.id.toString(),
+    name: watchlist.name,
+  }));
+
+  return optionProps.map(MergeWatchlistOption);
+}
+
+function MergeWatchlistOption({
+  optionKey,
+  value,
+  name,
+}: {
+  optionKey: number;
+  value: string;
+  name: string;
+}) {
+  return (
+    <option key={optionKey} value={value}>
+      {name}
+    </option>
   );
 }
 
 interface MergeWatchlistDialogContentProps extends MergeWatchlistDestinationProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   selectedCount: number;
   hasCustomOrderedSelection: boolean;
   isSubmitting: boolean;
@@ -93,6 +130,8 @@ interface MergeWatchlistDialogContentProps extends MergeWatchlistDestinationProp
 }
 
 export function MergeWatchlistDialogContent({
+  open,
+  onOpenChange,
   selectedCount,
   selectedWatchlists,
   hasCustomOrderedSelection,
@@ -103,30 +142,45 @@ export function MergeWatchlistDialogContent({
   ...destinationProps
 }: MergeWatchlistDialogContentProps) {
   return (
-    <DialogContent className="sm:max-w-md">
-      <DialogHeader>
-        <DialogTitle>Merge Watchlists</DialogTitle>
-        <DialogDescription>
-          Merge {selectedCount} lists. All items will be combined into the target list.
-        </DialogDescription>
-      </DialogHeader>
-      <div className="space-y-4 py-4">
-        <MergeWatchlistOrder
-          watchlists={selectedWatchlists}
-          hasCustomOrderedSelection={hasCustomOrderedSelection}
-          isSubmitting={isSubmitting}
-          onMove={onMove}
-        />
-        <MergeWatchlistDestination {...destinationProps} selectedWatchlists={selectedWatchlists} />
-      </div>
-      <DialogFooter>
-        <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
-          Cancel
-        </Button>
-        <Button onClick={onMerge} disabled={isSubmitting}>
-          {isSubmitting ? "Merging..." : "Merge"}
-        </Button>
-      </DialogFooter>
-    </DialogContent>
+    <Dialog.Root open={open} onOpenChange={({ open: nextOpen }) => onOpenChange(nextOpen)}>
+      <Portal>
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content maxW={{ base: "calc(100% - 2rem)", sm: "md" }}>
+            <Dialog.CloseTrigger aria-label="Close dialog">
+              <X size={16} />
+            </Dialog.CloseTrigger>
+            <Dialog.Header flexDirection="column" alignItems="flex-start" gap={1}>
+              <Dialog.Title>Merge Watchlists</Dialog.Title>
+              <Dialog.Description color="fg.muted">
+                Merge {selectedCount} lists. All items will be combined into the target list.
+              </Dialog.Description>
+            </Dialog.Header>
+            <Dialog.Body>
+              <Stack gap={4}>
+                <MergeWatchlistOrder
+                  watchlists={selectedWatchlists}
+                  hasCustomOrderedSelection={hasCustomOrderedSelection}
+                  isSubmitting={isSubmitting}
+                  onMove={onMove}
+                />
+                <MergeWatchlistDestination
+                  {...destinationProps}
+                  selectedWatchlists={selectedWatchlists}
+                />
+              </Stack>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
+                Cancel
+              </Button>
+              <Button colorPalette="pink" onClick={onMerge} disabled={isSubmitting}>
+                {isSubmitting ? "Merging..." : "Merge"}
+              </Button>
+            </Dialog.Footer>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Portal>
+    </Dialog.Root>
   );
 }
