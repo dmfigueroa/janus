@@ -1,4 +1,4 @@
-import { SearchScreen } from "@/features/search/Screen";
+import { SearchDiscoveryScreen } from "@/features/search/SearchDiscoveryScreen";
 import { searchUnified } from "../server/Search";
 import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
@@ -41,5 +41,5 @@ export const Route = createFileRoute("/search")({
 function Search() {
   const { query, type } = useSearch({ from: Route.fullPath });
   const initialData = Route.useLoaderData();
-  return <SearchScreen query={query} type={type} initialData={initialData} />;
+  return <SearchDiscoveryScreen query={query} type={type} initialData={initialData} />;
 }

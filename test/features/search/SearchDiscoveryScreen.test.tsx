@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { cleanup, render, screen } from "../../utils/Render";
 
 vi.mock("@/features/search/useSearchResults", () => ({
   useSearchResults: vi.fn(() => ({
@@ -20,21 +19,9 @@ vi.mock("@/features/search/useSearchNavigation", () => ({
   })),
 }));
 
-vi.mock("@/components/SearchInput", () => ({
+vi.mock("@/features/search/SearchInput", () => ({
   SearchInput: ({ defaultValue }: { defaultValue: string }) => (
     <input data-testid="search-input" defaultValue={defaultValue} />
-  ),
-}));
-
-vi.mock("@/components/ui/Tabs", () => ({
-  Tabs: ({ children, value }: { children: ReactNode; value: string }) => (
-    <div data-testid="tabs" data-value={value}>
-      {children}
-    </div>
-  ),
-  TabsList: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  TabsTrigger: ({ value, children }: { value: string; children: ReactNode }) => (
-    <button data-testid={`tab-${value}`}>{children}</button>
   ),
 }));
 
@@ -56,11 +43,11 @@ vi.mock("@/server/Media", () => ({
   isDeprecatedMediaType: (type: string) => type === "anime" || type === "manga",
 }));
 
-import { SearchScreen } from "@/features/search/Screen";
+import { SearchDiscoveryScreen } from "@/features/search/SearchDiscoveryScreen";
 import { useSearchResults } from "@/features/search/useSearchResults";
 import { useSearchNavigation } from "@/features/search/useSearchNavigation";
 
-describe("SearchScreen behavior", () => {
+describe("SearchDiscoveryScreen behavior", () => {
   afterEach(() => {
     cleanup();
   });
@@ -79,20 +66,26 @@ describe("SearchScreen behavior", () => {
   });
 
   it("renders search input and tabs", () => {
-    render(
-      <SearchScreen
+    const { container } = render(
+      <SearchDiscoveryScreen
         query=""
         type="movie"
         initialData={{ results: [], page: 1, total_pages: 0, total_results: 0 }}
       />,
     );
     expect(screen.getByTestId("search-input")).not.toBeNull();
-    expect(screen.getByTestId("tabs")).not.toBeNull();
+    expect(screen.getByRole("tablist")).not.toBeNull();
+    expect(container.querySelector('[data-scope="tabs"][data-part="indicator"]')).toBeNull();
+    const tabsRoot = container.querySelector<HTMLElement>('[data-scope="tabs"][data-part="root"]');
+    expect(tabsRoot).not.toBeNull();
+    expect(
+      getComputedStyle(tabsRoot!).getPropertyValue("--chakra-colors-color-palette-solid"),
+    ).toBe("var(--chakra-colors-pink-solid)");
   });
 
   it("shows 'No results found' when query is empty", () => {
     render(
-      <SearchScreen
+      <SearchDiscoveryScreen
         query=""
         type="movie"
         initialData={{ results: [], page: 1, total_pages: 0, total_results: 0 }}
@@ -118,7 +111,7 @@ describe("SearchScreen behavior", () => {
     });
 
     render(
-      <SearchScreen
+      <SearchDiscoveryScreen
         query="harry potter"
         type="book"
         initialData={{ results: [], page: 1, total_pages: 1, total_results: 1 }}
@@ -130,7 +123,7 @@ describe("SearchScreen behavior", () => {
 
   it("shows deprecated warning for anime/manga types", () => {
     render(
-      <SearchScreen
+      <SearchDiscoveryScreen
         query="naruto"
         type="anime"
         initialData={{ results: [], page: 1, total_pages: 1, total_results: 0, rejected: true }}

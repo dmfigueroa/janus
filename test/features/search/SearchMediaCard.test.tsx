@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
-import { MediaCard } from "@/components/MediaCard";
+import { render, screen, cleanup } from "../../utils/Render";
+import { SearchMediaCard } from "@/features/search/SearchMediaCard";
 import type { UnifiedMedia } from "@/server/Media";
 
 afterEach(() => {
   cleanup();
 });
 
-describe("MediaCard", () => {
+describe("SearchMediaCard", () => {
   const bookMedia: UnifiedMedia = {
     id: "book123",
     mediaType: "book",
@@ -30,13 +30,19 @@ describe("MediaCard", () => {
   };
 
   it("should display authors for books", () => {
-    render(<MediaCard media={bookMedia} onClick={() => {}} />);
+    render(<SearchMediaCard media={bookMedia} onClick={() => {}} />);
 
     expect(screen.getByText("Author One, Author Two")).toBeDefined();
   });
 
+  it("should expose media titles as level-three headings", () => {
+    render(<SearchMediaCard media={bookMedia} onClick={() => {}} />);
+
+    expect(screen.getByRole("heading", { level: 3, name: "Test Book" })).toBeDefined();
+  });
+
   it("should not display authors for movies", () => {
-    render(<MediaCard media={movieMedia} onClick={() => {}} />);
+    render(<SearchMediaCard media={movieMedia} onClick={() => {}} />);
 
     expect(screen.getByText("Test Movie Different Title")).toBeDefined();
     expect(screen.queryByText(/Author/)).toBeNull();
