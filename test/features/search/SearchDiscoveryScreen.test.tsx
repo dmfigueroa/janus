@@ -76,6 +76,11 @@ describe("SearchDiscoveryScreen behavior", () => {
     expect(screen.getByTestId("search-input")).not.toBeNull();
     expect(screen.getByRole("tablist")).not.toBeNull();
     expect(container.querySelector('[data-scope="tabs"][data-part="indicator"]')).toBeNull();
+    const tabsRoot = container.querySelector<HTMLElement>('[data-scope="tabs"][data-part="root"]');
+    expect(tabsRoot).not.toBeNull();
+    expect(
+      getComputedStyle(tabsRoot!).getPropertyValue("--chakra-colors-color-palette-solid"),
+    ).toBe("var(--chakra-colors-pink-solid)");
   });
 
   it("shows 'No results found' when query is empty", () => {

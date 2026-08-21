@@ -100,6 +100,7 @@ export function SearchDiscoveryScreen({
           <Tabs.Root
             value={activeTab}
             onValueChange={({ value }) => handleTabChange(value)}
+            colorPalette="pink"
             w="full"
             maxW="3xl"
           >
