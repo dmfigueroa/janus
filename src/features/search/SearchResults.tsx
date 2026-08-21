@@ -1,6 +1,6 @@
 import type { UnifiedMedia } from "@/server/Media";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
-import { forwardRef, useState } from "react";
+import { useState, type Ref } from "react";
 import { SearchMediaDetailSheet } from "./SearchMediaDetailSheet";
 import { CreateCustomItemDialog } from "./CreateCustomItemDialog";
 import { SearchMediaCard } from "./SearchMediaCard";
@@ -16,24 +16,21 @@ interface SearchResultsProps {
 
 interface CreateCustomItemButtonProperties extends ButtonProps {
   compact?: boolean;
+  ref?: Ref<HTMLButtonElement>;
 }
 
-const CreateCustomItemButton = forwardRef<HTMLButtonElement, CreateCustomItemButtonProperties>(
-  function CreateCustomItemButton({ compact = false, ...buttonProps }, ref) {
-    return (
-      <Button
-        ref={ref}
-        variant="outline"
-        size={compact ? "sm" : undefined}
-        gap={2}
-        {...buttonProps}
-      >
-        <Plus size={16} aria-hidden="true" />
-        Create Custom Item
-      </Button>
-    );
-  },
-);
+function CreateCustomItemButton({
+  compact = false,
+  ref,
+  ...buttonProps
+}: CreateCustomItemButtonProperties) {
+  return (
+    <Button ref={ref} variant="outline" size={compact ? "sm" : undefined} gap={2} {...buttonProps}>
+      <Plus size={16} aria-hidden="true" />
+      Create Custom Item
+    </Button>
+  );
+}
 
 function EmptyResults({ onCreated }: { onCreated: (media: UnifiedMedia) => void }) {
   return (
