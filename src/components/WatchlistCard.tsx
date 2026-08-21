@@ -135,7 +135,7 @@ export function WatchlistCard(cardProps: WatchlistCardProps) {
   };
 
   return (
-    <Flex direction="column" gap={2} position="relative" role="group">
+    <Flex direction="column" gap={2} position="relative" role="group" className="group">
       <CardArtworkLink selectionMode={selectionMode} watchlistId={watchlist.id}>
         <WatchlistCardArtwork
           watchlist={watchlist}

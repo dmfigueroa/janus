@@ -134,6 +134,17 @@ describe("WatchlistCard", () => {
     expect(invalidateMock).toHaveBeenCalled();
   });
 
+  it("marks the card wrapper as a Chakra group for hover actions", () => {
+    render(
+      <WatchlistCard
+        watchlist={createWatchlist({ id: 1, name: "Movie Night" })}
+        showUpNextBadge={false}
+      />,
+    );
+
+    expect(screen.getByRole("group").classList.contains("group")).toBe(true);
+  });
+
   it("shows item titles instead of the watchlist name in featured up next cards", () => {
     render(
       <WatchlistCard
