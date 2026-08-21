@@ -4,7 +4,7 @@ import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import { useState } from "react";
 import { SearchMediaDetailSheet } from "./SearchMediaDetailSheet";
 import { CreateCustomItemDialog } from "./CreateCustomItemDialog";
-import { Button } from "@/components/ui/Button";
+import { Box, Button, SimpleGrid, Spinner, Stack, Text } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 
 interface SearchResultsProps {
@@ -16,8 +16,8 @@ interface SearchResultsProps {
 
 function CreateCustomItemButton({ compact = false }: { compact?: boolean }) {
   return (
-    <Button variant="outline" size={compact ? "sm" : undefined}>
-      <Plus className="mr-2 h-4 w-4" />
+    <Button variant="outline" size={compact ? "sm" : undefined} gap={2}>
+      <Plus size={16} aria-hidden="true" />
       Create Custom Item
     </Button>
   );
@@ -25,13 +25,17 @@ function CreateCustomItemButton({ compact = false }: { compact?: boolean }) {
 
 function EmptyResults({ onCreated }: { onCreated: (media: UnifiedMedia) => void }) {
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="text-lg font-medium text-muted-foreground">No results found</div>
-      <p className="text-sm text-zinc-500 mb-6">Try adjusting your search terms</p>
+    <Stack align="center" justify="center" gap={1} py={20} textAlign="center">
+      <Text fontSize="lg" fontWeight="medium" color="fg.muted">
+        No results found
+      </Text>
+      <Text fontSize="sm" color="fg.muted" mb={5}>
+        Try adjusting your search terms
+      </Text>
       <CreateCustomItemDialog onCreated={onCreated}>
         <CreateCustomItemButton />
       </CreateCustomItemDialog>
-    </div>
+    </Stack>
   );
 }
 
@@ -44,9 +48,9 @@ function LoadingMore({
 }) {
   if (!visible) return null;
   return (
-    <div ref={observerRef} className="flex justify-center py-4">
-      <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-    </div>
+    <Box ref={observerRef} display="flex" justifyContent="center" py={4} role="status">
+      <Spinner size="sm" colorPalette="pink" aria-label="Loading more results" />
+    </Box>
   );
 }
 
@@ -59,12 +63,21 @@ function EndOfResults({
 }) {
   if (!visible) return null;
   return (
-    <div className="flex flex-col items-center justify-center py-8 border-t">
-      <p className="text-sm text-muted-foreground mb-4">Can't find what you're looking for?</p>
+    <Stack
+      align="center"
+      justify="center"
+      gap={4}
+      borderTopWidth="1px"
+      borderColor="border.default"
+      py={8}
+    >
+      <Text fontSize="sm" color="fg.muted">
+        Can't find what you're looking for?
+      </Text>
       <CreateCustomItemDialog onCreated={onCreated}>
         <CreateCustomItemButton compact />
       </CreateCustomItemDialog>
-    </div>
+    </Stack>
   );
 }
 
@@ -82,16 +95,35 @@ function PopulatedResults({
   onSelect: (media: UnifiedMedia) => void;
 }) {
   return (
-    <div className="space-y-8">
-      <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-        {results.map((item) => (
-          <MediaCard key={item.id} media={item} onClick={() => onSelect(item)} />
-        ))}
-      </div>
+    <Stack gap={8}>
+      <SimpleGrid columns={{ base: 2, sm: 3, md: 4, lg: 5 }} gapX={4} gapY={8}>
+        <SearchResultCards results={results} onSelect={onSelect} />
+      </SimpleGrid>
       <LoadingMore visible={hasNextPage || isFetchingNextPage} observerRef={observerRef} />
       <EndOfResults visible={!hasNextPage} onCreated={onSelect} />
-    </div>
+    </Stack>
   );
+}
+
+function SearchResultCards({
+  results,
+  onSelect,
+}: {
+  results: UnifiedMedia[];
+  onSelect: (media: UnifiedMedia) => void;
+}) {
+  const cardProps = results.map((media) => ({ media, onSelect }));
+  return cardProps.map(SearchResultCard);
+}
+
+function SearchResultCard({
+  media,
+  onSelect,
+}: {
+  media: UnifiedMedia;
+  onSelect: (media: UnifiedMedia) => void;
+}) {
+  return <MediaCard key={media.id} media={media} onClick={() => onSelect(media)} />;
 }
 
 function ResultsContent(props: Parameters<typeof PopulatedResults>[0]) {

@@ -1,25 +1,16 @@
 import { useState } from "react";
 import type { UnifiedMedia } from "@/server/Media";
 import {
+  Button,
   Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/Dialog";
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Label } from "@/components/ui/Label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/Select";
-import { Textarea } from "@/components/ui/Textarea";
+  Field,
+  Input,
+  NativeSelect,
+  Portal,
+  Stack,
+  Textarea,
+} from "@chakra-ui/react";
+import { X } from "lucide-react";
 
 interface CreateCustomItemDialogProps {
   children?: React.ReactNode;
@@ -72,7 +63,14 @@ export function CreateCustomItemDialog({
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = open !== undefined;
   const isOpen = isControlled ? open : internalOpen;
-  const setIsOpen = isControlled ? onOpenChange! : setInternalOpen;
+
+  const setIsOpen = (nextOpen: boolean) => {
+    if (isControlled) {
+      onOpenChange?.(nextOpen);
+      return;
+    }
+    setInternalOpen(nextOpen);
+  };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -83,50 +81,78 @@ export function CreateCustomItemDialog({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Add Custom Item</DialogTitle>
-          <DialogDescription>
-            Add an item that couldn't be found in the search results.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
-            <Input id="title" name="title" placeholder="e.g. My Favorite obscure movie" required />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="type">Type</Label>
-              <Select name="mediaType" defaultValue="movie">
-                <SelectTrigger id="type">
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="movie">Movie</SelectItem>
-                  <SelectItem value="tv">TV Show</SelectItem>
-                  <SelectItem value="book">Book</SelectItem>
-                  <SelectItem value="game">Game</SelectItem>
-                  <SelectItem value="comic">Comic</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="year">Year (Optional)</Label>
-              <Input id="year" name="year" placeholder="YYYY" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="overview">Description (Optional)</Label>
-            <Textarea id="overview" name="overview" placeholder="Brief description..." />
-          </div>
-          <DialogFooter>
-            <Button type="submit">Create Item</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <Dialog.Root open={isOpen} onOpenChange={({ open: nextOpen }) => setIsOpen(nextOpen)}>
+      {children ? <Dialog.Trigger asChild>{children}</Dialog.Trigger> : null}
+      <Portal>
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content maxW={{ base: "calc(100% - 2rem)", sm: "md" }}>
+            <Dialog.CloseTrigger aria-label="Close dialog">
+              <X size={16} />
+            </Dialog.CloseTrigger>
+            <Dialog.Header flexDirection="column" alignItems="flex-start" gap={1}>
+              <Dialog.Title>Add Custom Item</Dialog.Title>
+              <Dialog.Description color="fg.muted">
+                Add an item that couldn't be found in the search results.
+              </Dialog.Description>
+            </Dialog.Header>
+            <form onSubmit={handleSubmit}>
+              <Dialog.Body>
+                <Stack gap={4}>
+                  <Field.Root required>
+                    <Field.Label htmlFor="custom-item-title">Title</Field.Label>
+                    <Input
+                      id="custom-item-title"
+                      name="title"
+                      placeholder="e.g. My Favorite obscure movie"
+                      required
+                    />
+                  </Field.Root>
+                  <Stack direction={{ base: "column", sm: "row" }} gap={4}>
+                    <Field.Root flex={1}>
+                      <Field.Label htmlFor="custom-item-type">Type</Field.Label>
+                      <NativeSelect.Root>
+                        <NativeSelect.Field
+                          id="custom-item-type"
+                          name="mediaType"
+                          defaultValue="movie"
+                        >
+                          <option value="movie">Movie</option>
+                          <option value="tv">TV Show</option>
+                          <option value="book">Book</option>
+                          <option value="game">Game</option>
+                          <option value="comic">Comic</option>
+                        </NativeSelect.Field>
+                        <NativeSelect.Indicator />
+                      </NativeSelect.Root>
+                    </Field.Root>
+                    <Field.Root flex={1}>
+                      <Field.Label htmlFor="custom-item-year">Year (Optional)</Field.Label>
+                      <Input id="custom-item-year" name="year" placeholder="YYYY" />
+                    </Field.Root>
+                  </Stack>
+                  <Field.Root>
+                    <Field.Label htmlFor="custom-item-overview">Description (Optional)</Field.Label>
+                    <Textarea
+                      id="custom-item-overview"
+                      name="overview"
+                      placeholder="Brief description..."
+                    />
+                  </Field.Root>
+                </Stack>
+              </Dialog.Body>
+              <Dialog.Footer>
+                <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" colorPalette="pink">
+                  Create Item
+                </Button>
+              </Dialog.Footer>
+            </form>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Portal>
+    </Dialog.Root>
   );
 }

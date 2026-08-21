@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { cleanup, render, screen } from "../../utils/Render";
 
 vi.mock("@/features/search/useSearchResults", () => ({
   useSearchResults: vi.fn(() => ({
@@ -23,18 +22,6 @@ vi.mock("@/features/search/useSearchNavigation", () => ({
 vi.mock("@/components/SearchInput", () => ({
   SearchInput: ({ defaultValue }: { defaultValue: string }) => (
     <input data-testid="search-input" defaultValue={defaultValue} />
-  ),
-}));
-
-vi.mock("@/components/ui/Tabs", () => ({
-  Tabs: ({ children, value }: { children: ReactNode; value: string }) => (
-    <div data-testid="tabs" data-value={value}>
-      {children}
-    </div>
-  ),
-  TabsList: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-  TabsTrigger: ({ value, children }: { value: string; children: ReactNode }) => (
-    <button data-testid={`tab-${value}`}>{children}</button>
   ),
 }));
 
@@ -87,7 +74,7 @@ describe("SearchScreen behavior", () => {
       />,
     );
     expect(screen.getByTestId("search-input")).not.toBeNull();
-    expect(screen.getByTestId("tabs")).not.toBeNull();
+    expect(screen.getByRole("tablist")).not.toBeNull();
   });
 
   it("shows 'No results found' when query is empty", () => {

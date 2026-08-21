@@ -1,3 +1,4 @@
+import { Box, Image, Stack, Text } from "@chakra-ui/react";
 import { UnifiedMedia } from "../server/Media";
 import { Star } from "lucide-react";
 
@@ -14,42 +15,83 @@ function getPosterUrl(poster: string | null | undefined) {
 
 function HighRatingStar({ visible }: { visible: boolean }) {
   if (!visible) return null;
-  return <Star className="size-3 fill-current" />;
+  return <Star size={12} fill="currentColor" aria-hidden="true" />;
 }
 
 function MediaRating({ rating }: { rating: number | null | undefined }) {
   if (!rating) return null;
   const isHighRating = rating >= 7.5;
+  const ratingLabel = rating.toFixed(1);
 
   return (
-    <div
-      className={`absolute top-2 right-2 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-bold text-white shadow-sm backdrop-blur-md ${isHighRating ? "bg-primary" : "bg-black/40"}`}
+    <Box
+      position="absolute"
+      top={2}
+      right={2}
+      display="flex"
+      alignItems="center"
+      gap={1}
+      rounded="sm"
+      bg={isHighRating ? "accent.solid" : "blackAlpha.600"}
+      color="white"
+      px={1.5}
+      py={0.5}
+      fontSize="xs"
+      fontWeight="bold"
+      shadow="sm"
+      backdropFilter="blur(12px)"
     >
       <HighRatingStar visible={isHighRating} />
-      <span>{rating.toFixed(1)}</span>
-    </div>
+      <Text as="span">{ratingLabel}</Text>
+    </Box>
   );
 }
 
 function MediaArtwork({ media }: { media: UnifiedMedia }) {
   return (
-    <div className="relative aspect-[2/3] overflow-hidden rounded-xl bg-secondary/30 shadow-sm border border-white/5 transition-all group-hover:border-primary/30 group-hover:shadow-lg group-hover:shadow-primary/5">
-      <img
+    <Box
+      position="relative"
+      aspectRatio="2 / 3"
+      overflow="hidden"
+      rounded="card"
+      bg="bg.subtle"
+      borderWidth="1px"
+      borderColor="border.default"
+      shadow="sm"
+      transition="all 300ms"
+    >
+      <Image
         src={getPosterUrl(media.poster)}
         alt={media.title}
-        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+        h="full"
+        w="full"
+        objectFit="cover"
+        transition="transform 500ms"
         loading="lazy"
         referrerPolicy="no-referrer"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/0 to-transparent opacity-60 transition-opacity group-hover:opacity-40" />
+      <Box
+        position="absolute"
+        inset={0}
+        bgGradient="to-t"
+        gradientFrom="blackAlpha.800"
+        gradientTo="transparent"
+        opacity={0.6}
+      />
       <MediaRating rating={media.rating} />
-    </div>
+    </Box>
   );
 }
 
 function Authors({ authors }: { authors: string[] | undefined }) {
   if (!authors || authors.length === 0) return null;
-  return <p className="line-clamp-1 text-xs text-muted-foreground">{authors.join(", ")}</p>;
+  const authorLabel = authors.join(", ");
+
+  return (
+    <Text truncate fontSize="xs" color="fg.muted">
+      {authorLabel}
+    </Text>
+  );
 }
 
 function BookAuthors({ media }: { media: UnifiedMedia }) {
@@ -59,24 +101,45 @@ function BookAuthors({ media }: { media: UnifiedMedia }) {
 
 function MediaDetails({ media }: { media: UnifiedMedia }) {
   return (
-    <div className="space-y-0.5 px-1">
-      <h3 className="line-clamp-1 text-sm font-medium text-foreground group-hover:text-primary transition-colors">
+    <Stack gap={0.5} px={1} textAlign="left">
+      <Text
+        as="span"
+        truncate
+        fontSize="sm"
+        fontWeight="medium"
+        color="fg.default"
+        transition="color 150ms"
+      >
         {media.title}
-      </h3>
+      </Text>
       <BookAuthors media={media} />
-      <p className="text-xs text-muted-foreground">{media.year}</p>
-    </div>
+      <Text fontSize="xs" color="fg.muted">
+        {media.year}
+      </Text>
+    </Stack>
   );
 }
 
 export function MediaCard({ media, onClick }: MediaCardProps) {
   return (
-    <div
+    <Box
+      as="button"
       onClick={onClick}
-      className="group relative flex flex-col gap-2 transition-all duration-300 hover:scale-[1.02] cursor-pointer"
+      display="flex"
+      position="relative"
+      flexDir="column"
+      alignItems="stretch"
+      gap={2}
+      w="full"
+      p={0}
+      textAlign="left"
+      cursor="pointer"
+      transition="transform 300ms"
+      _hover={{ transform: "scale(1.02)" }}
+      _focusVisible={{ outline: "3px solid", outlineColor: "accent.solid", outlineOffset: 3 }}
     >
       <MediaArtwork media={media} />
       <MediaDetails media={media} />
-    </div>
+    </Box>
   );
 }

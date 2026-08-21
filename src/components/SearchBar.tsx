@@ -1,24 +1,30 @@
 import { Search, SlidersHorizontal } from "lucide-react";
-import { Input } from "@/components/ui/Input";
-import { Button } from "@/components/ui/Button";
+import { Box, IconButton, Input, InputGroup } from "@chakra-ui/react";
 
 export function SearchBar() {
   return (
-    <div className="relative flex items-center gap-3">
-      <div className="relative flex-1">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+    <Box display="flex" alignItems="center" gap={3}>
+      <InputGroup flex={1} startElement={<Search size={16} aria-hidden="true" />}>
         <Input
-          className="pl-10 bg-card border-none rounded-2xl h-12 text-md placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/50"
+          aria-label="Find a list, movie, or show"
           placeholder="Find a list, movie, or show..."
+          h={12}
+          bg="bg.surface"
+          borderColor="transparent"
+          rounded="lg"
+          _focusVisible={{ borderColor: "accent.solid" }}
         />
-      </div>
-      <Button
-        size="icon"
+      </InputGroup>
+      <IconButton
+        aria-label="Filter search results"
         variant="ghost"
-        className="bg-card rounded-2xl w-12 h-12 text-muted-foreground hover:text-foreground hover:bg-secondary"
+        size="lg"
+        rounded="lg"
+        color="fg.muted"
+        _hover={{ color: "fg.default", bg: "bg.subtle" }}
       >
-        <SlidersHorizontal className="w-5 h-5" />
-      </Button>
-    </div>
+        <SlidersHorizontal size={20} />
+      </IconButton>
+    </Box>
   );
 }

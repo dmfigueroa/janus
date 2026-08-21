@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup } from "../utils/Render";
 import { MediaCard } from "@/components/MediaCard";
 import type { UnifiedMedia } from "@/server/Media";
 
