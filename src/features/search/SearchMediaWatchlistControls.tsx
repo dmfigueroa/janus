@@ -45,7 +45,11 @@ function WatchlistSelection({
   const addButtonLabel = getAddButtonLabel(isAdding);
 
   return (
-    <Flex gap={3} direction={{ base: "column", sm: "row" }}>
+    <Flex
+      gap={3}
+      direction={{ base: "column", sm: "row" }}
+      alignItems={{ base: "stretch", sm: "flex-end" }}
+    >
       <SearchWatchlistSelector
         watchlists={watchlists}
         selectedWatchlistId={selectedWatchlistId}
