@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Combobox, createListCollection, IconButton, Portal } from "@chakra-ui/react";
 import { Check, ChevronDown, Plus } from "lucide-react";
 import type { SearchWatchlistSelectorItem } from "./SearchWatchlistSelector";
@@ -90,12 +91,16 @@ export function SearchWatchlistCombobox({
   onSelect: (id: string) => void;
   onInputValueChange: (value: string) => void;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
   const collection = createListCollection({ items });
 
   return (
     <Combobox.Root
       collection={collection}
       value={getComboboxValue(selectedWatchlistId)}
+      open={isOpen}
+      onOpenChange={({ open }) => setIsOpen(open)}
+      openOnClick
       onValueChange={({ value }) =>
         handleSelectorValue(value[0], selectedWatchlistId, onClear, onCreate, onSelect)
       }
@@ -109,6 +114,7 @@ export function SearchWatchlistCombobox({
         <Combobox.Input
           aria-label="Watchlist"
           placeholder={getComboboxPlaceholder(selectedWatchlistName)}
+          onFocus={() => setIsOpen(true)}
         />
         <Combobox.IndicatorGroup>
           <Combobox.ClearTrigger aria-label="Clear watchlist" />

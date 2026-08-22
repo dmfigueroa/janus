@@ -64,6 +64,16 @@ describe("SearchWatchlistSelector", () => {
     await waitFor(() => expect(onSelect).toHaveBeenCalledWith("2"));
   });
 
+  it("opens the watchlist options when the input receives focus", async () => {
+    render(
+      <SearchWatchlistSelector watchlists={watchlists} selectedWatchlistId="" onSelect={vi.fn()} />,
+    );
+
+    fireEvent.focus(screen.getByRole("combobox"));
+
+    expect(await screen.findByRole("option", { name: "Custom Queue" })).not.toBeNull();
+  });
+
   it("creates a watchlist from the search value", async () => {
     const onSelect = vi.fn();
     createWatchlistFnMock.mockResolvedValue({ id: 3, name: "New Queue" });
@@ -76,7 +86,7 @@ describe("SearchWatchlistSelector", () => {
     );
 
     const input = screen.getByRole("combobox");
-    fireEvent.click(screen.getByRole("button", { name: "Open watchlist list" }));
+    fireEvent.focus(input);
     fireEvent.change(input, { target: { value: "New Queue" } });
     fireEvent.click(await screen.findByRole("option", { name: 'Create "New Queue"' }));
 
