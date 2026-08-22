@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render } from "../../utils/Render";
 import { SearchMediaDetailSheet } from "@/features/search/SearchMediaDetailSheet";
 
 const {
@@ -22,16 +23,8 @@ vi.mock("dompurify", () => ({
   },
 }));
 
-vi.mock("@/components/ui/Sheet", () => ({
-  Sheet: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  SheetContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  SheetHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  SheetTitle: ({ children }: { children: React.ReactNode }) => <h1>{children}</h1>,
-  SheetDescription: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
-
-vi.mock("@/components/watchlist/WatchlistSelector", () => ({
-  WatchlistSelector: ({
+vi.mock("@/features/search/SearchWatchlistSelector", () => ({
+  SearchWatchlistSelector: ({
     onSelect,
     selectedWatchlistId,
     watchlists,
@@ -113,12 +106,7 @@ vi.mock("@tanstack/react-start", () => ({
   },
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
-    error: vi.fn(),
-    success: vi.fn(),
-  },
-}));
+vi.mock("@/app/Toaster", () => ({ toaster: { create: vi.fn() } }));
 
 describe("SearchMediaDetailSheet custom-order insertion choices", () => {
   beforeEach(() => {
@@ -133,6 +121,7 @@ describe("SearchMediaDetailSheet custom-order insertion choices", () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    cleanup();
   });
 
   it("shows insertion choices only for custom-ordered watchlists and passes the selected choice", async () => {
@@ -163,8 +152,9 @@ describe("SearchMediaDetailSheet custom-order insertion choices", () => {
     fireEvent.click(screen.getByRole("button", { name: "Custom Queue" }));
 
     expect(await screen.findByText("Insert in custom order")).not.toBeNull();
+    expect(screen.getByText("Selected: 2")).not.toBeNull();
 
-    fireEvent.click(screen.getByLabelText("End"));
+    fireEvent.click(screen.getByText("End"));
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() => {
