@@ -74,6 +74,19 @@ describe("SearchWatchlistSelector", () => {
     expect(await screen.findByRole("option", { name: "Custom Queue" })).not.toBeNull();
   });
 
+  it("filters existing watchlists by name when the input receives a value", async () => {
+    render(
+      <SearchWatchlistSelector watchlists={watchlists} selectedWatchlistId="" onSelect={vi.fn()} />,
+    );
+
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "release" } });
+
+    expect(await screen.findByRole("option", { name: "Release Queue" })).not.toBeNull();
+    expect(screen.queryByRole("option", { name: "Custom Queue" })).toBeNull();
+  });
+
   it("creates a watchlist from the search value", async () => {
     const onSelect = vi.fn();
     createWatchlistFnMock.mockResolvedValue({ id: 3, name: "New Queue" });

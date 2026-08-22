@@ -54,6 +54,12 @@ function getExistingSelectorItems(watchlists: WatchlistSummary[] | undefined) {
   );
 }
 
+function filterExistingSelectorItems(existingItems: SelectorItem[], inputValue: string) {
+  const normalizedInput = inputValue.trim().toLowerCase();
+  if (!normalizedInput) return existingItems;
+  return existingItems.filter((item) => item.label.toLowerCase().includes(normalizedInput));
+}
+
 function getCreatedSelectorItems(
   createdWatchlist: SelectorItem | null,
   existingItems: SelectorItem[],
@@ -83,7 +89,8 @@ function getSelectorItems(
   const existingItems = getExistingSelectorItems(watchlists);
   const createdItems = getCreatedSelectorItems(createdWatchlist, existingItems);
   const createItems = getCreateSelectorItems(inputValue);
-  return [...createItems, ...createdItems, ...existingItems];
+  const filteredExistingItems = filterExistingSelectorItems(existingItems, inputValue);
+  return [...createItems, ...createdItems, ...filteredExistingItems];
 }
 
 export function SearchWatchlistSelector({
