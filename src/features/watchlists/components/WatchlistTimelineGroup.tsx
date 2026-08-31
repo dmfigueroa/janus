@@ -72,8 +72,11 @@ function TimelineRows({
   return rowProps.map(TimelineRow);
 }
 
-function TimelineRow(props: React.ComponentProps<typeof ReorderableTimelineRow> & { key: number }) {
-  return <ReorderableTimelineRow {...props} />;
+function TimelineRow({
+  key,
+  ...props
+}: React.ComponentProps<typeof ReorderableTimelineRow> & { key: number }) {
+  return <ReorderableTimelineRow key={key} {...props} />;
 }
 
 function TimelineYearHeader({ year }: { year: string }) {

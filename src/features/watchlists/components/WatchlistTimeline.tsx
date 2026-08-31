@@ -139,7 +139,16 @@ function TimelineGroups({
     reorderEnabled,
     showHandleSlot,
   }));
-  return groupProps.map(WatchlistTimelineGroupSection);
+  return groupProps.map(TimelineGroup);
+}
+
+function TimelineGroup({
+  key,
+  ...props
+}: React.ComponentProps<typeof WatchlistTimelineGroupSection> & {
+  key: string;
+}) {
+  return <WatchlistTimelineGroupSection key={key} {...props} />;
 }
 
 function EmptyWatchlistState() {
