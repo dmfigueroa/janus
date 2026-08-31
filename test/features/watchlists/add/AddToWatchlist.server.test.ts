@@ -14,9 +14,9 @@ const { getMovieDetailsMock, getSeasonDetailsMock, getTVDetailsMock } = vi.hoist
 const dbState = vi.hoisted(() => ({ db: undefined as IsolatedTestDb | undefined }));
 
 vi.mock("@/server/providers/TmdbApi.server", () => ({
-  getMovieDetails: getMovieDetailsMock,
-  getSeasonDetails: getSeasonDetailsMock,
-  getTVDetails: getTVDetailsMock,
+  fetchTmdbMovie: getMovieDetailsMock,
+  fetchTmdbSeason: getSeasonDetailsMock,
+  fetchTmdbTv: getTVDetailsMock,
 }));
 vi.mock("@/db/Db.server", () => ({ getDb: () => dbState.db }));
 
@@ -249,7 +249,7 @@ describe("provider-backed add to watchlist mutation", () => {
     const detail = await readWatchlistDetail({ watchlistId: watchlist.id });
 
     expect(result).toEqual({ success: true, message: "Added to watchlist" });
-    expect(getMovieDetailsMock).toHaveBeenCalledWith({ data: { id: 42 } });
+    expect(getMovieDetailsMock).toHaveBeenCalledWith({ id: 42 });
     expect(detail?.items[0]).toMatchObject({ title: "Fetched Title", runtime: 127 });
   });
 });

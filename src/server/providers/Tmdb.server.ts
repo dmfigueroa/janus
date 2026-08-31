@@ -4,9 +4,9 @@ import { fetchTmdbSearch, type TMDBMedia } from "./TmdbApi.server";
 export {
   type TMDBMedia,
   type TMDBSearchResponse,
-  getTVDetails,
-  getSeasonDetails,
-  getMovieDetails,
+  fetchTmdbMovie,
+  fetchTmdbSeason,
+  fetchTmdbTv,
 } from "./TmdbApi.server";
 
 function getTmdbImage(path: string | null, size: "w500" | "w1280") {

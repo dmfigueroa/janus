@@ -2,7 +2,7 @@ import pLimit from "p-limit";
 import { watchlistItems } from "@/db/Schema";
 import type { WatchlistMedia } from "./Mutation";
 import * as repository from "@/features/watchlists/Repository.server";
-import { getSeasonDetails, getTVDetails } from "@/server/providers/TmdbApi.server";
+import { fetchTmdbSeason, fetchTmdbTv } from "@/server/providers/TmdbApi.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
 import { persistAddedItems } from "./Insert.server";
 import { rejectAdd, type WatchlistWriteResult } from "./Shared.server";
@@ -28,7 +28,7 @@ async function addShowEpisodes(
   watchlistId: number,
   tmdbId: number,
   media: WatchlistMedia,
-  showDetails: Awaited<ReturnType<typeof getTVDetails>>,
+  showDetails: Awaited<ReturnType<typeof fetchTmdbTv>>,
   insertionPosition?: AddToWatchlistInsertionPosition,
 ): Promise<WatchlistWriteResult> {
   const episodes = await fetchEpisodesAcrossSeasons(tmdbId, showDetails.seasons);
@@ -84,7 +84,7 @@ type TMDBEpisode = {
 
 async function fetchShowDetails(tmdbId: number) {
   try {
-    return await getTVDetails({ data: { id: tmdbId } });
+    return await fetchTmdbTv({ id: tmdbId });
   } catch {
     return null;
   }
@@ -99,7 +99,7 @@ async function fetchEpisodesAcrossSeasons(
   const results = await Promise.all(
     targetSeasons.map((season) =>
       limit(() =>
-        getSeasonDetails({ data: { id: tmdbId, seasonNumber: season.season_number } }).then(
+        fetchTmdbSeason({ id: tmdbId, seasonNumber: season.season_number }).then(
           (sd: { episodes: TMDBEpisode[] }) => sd.episodes,
         ),
       ),

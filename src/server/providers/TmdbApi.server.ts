@@ -1,4 +1,3 @@
-import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
@@ -99,23 +98,20 @@ export async function fetchTmdbSearch(data: { query: string; page: number; type:
   return response;
 }
 
-export const getTVDetails = createServerFn({ method: "GET" })
-  .inputValidator((data) => z.object({ id: z.number() }).parse(data))
-  .handler(async ({ data }) => {
-    const url = new URL(`${TMDB_BASE_URL}/tv/${data.id}`);
-    return fetchWithAuth(url.toString());
-  });
+export async function fetchTmdbTv(data: { id: number }) {
+  const input = z.object({ id: z.number() }).parse(data);
+  const url = new URL(`${TMDB_BASE_URL}/tv/${input.id}`);
+  return fetchWithAuth(url.toString());
+}
 
-export const getSeasonDetails = createServerFn({ method: "GET" })
-  .inputValidator((data) => z.object({ id: z.number(), seasonNumber: z.number() }).parse(data))
-  .handler(async ({ data }) => {
-    const url = new URL(`${TMDB_BASE_URL}/tv/${data.id}/season/${data.seasonNumber}`);
-    return fetchWithAuth(url.toString());
-  });
+export async function fetchTmdbSeason(data: { id: number; seasonNumber: number }) {
+  const input = z.object({ id: z.number(), seasonNumber: z.number() }).parse(data);
+  const url = new URL(`${TMDB_BASE_URL}/tv/${input.id}/season/${input.seasonNumber}`);
+  return fetchWithAuth(url.toString());
+}
 
-export const getMovieDetails = createServerFn({ method: "GET" })
-  .inputValidator((data) => z.object({ id: z.number() }).parse(data))
-  .handler(async ({ data }) => {
-    const url = new URL(`${TMDB_BASE_URL}/movie/${data.id}`);
-    return fetchWithAuth(url.toString());
-  });
+export async function fetchTmdbMovie(data: { id: number }) {
+  const input = z.object({ id: z.number() }).parse(data);
+  const url = new URL(`${TMDB_BASE_URL}/movie/${input.id}`);
+  return fetchWithAuth(url.toString());
+}

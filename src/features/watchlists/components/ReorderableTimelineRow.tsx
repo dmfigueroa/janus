@@ -1,9 +1,9 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
+import { Box, Button, Flex } from "@chakra-ui/react";
 import type { WatchlistItem } from "@/db/Schema";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
-import { cn } from "@/utils/Cn";
 import { TimelineItem } from "./TimelineItem";
 
 type ReorderableTimelineRowProps = {
@@ -39,11 +39,12 @@ export function ReorderableTimelineRow({
   };
 
   return (
-    <div
+    <Box
       ref={setNodeRef}
       data-testid={`watchlist-timeline-row-${item.id}`}
       style={style}
-      className={cn("rounded-xl", isDragging && "opacity-0")}
+      rounded="xl"
+      opacity={isDragging ? 0 : 1}
     >
       <TimelineRowShell
         item={item}
@@ -58,7 +59,7 @@ export function ReorderableTimelineRow({
           ref: setActivatorNodeRef,
         }}
       />
-    </div>
+    </Box>
   );
 }
 
@@ -70,7 +71,13 @@ export function DragOverlayTimelineRow({
   interactionDisabled: boolean;
 }) {
   return (
-    <div className="rounded-xl bg-background/95 shadow-xl ring-1 ring-border">
+    <Box
+      rounded="xl"
+      bg="bg.canvas/95"
+      shadow="overlay"
+      borderWidth="1px"
+      borderColor="border.default"
+    >
       <TimelineRowShell
         item={item}
         showHandleSlot
@@ -78,7 +85,7 @@ export function DragOverlayTimelineRow({
         interactionDisabled={interactionDisabled}
         dragging
       />
-    </div>
+    </Box>
   );
 }
 
@@ -100,7 +107,7 @@ function TimelineRowShell({
   handleProps?: Record<string, unknown>;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl bg-background/80">
+    <Flex align="center" gap={2} rounded="xl" bg="bg.canvas/80">
       <TimelineDragHandle
         itemTitle={item.title}
         showHandleSlot={showHandleSlot}
@@ -109,14 +116,14 @@ function TimelineRowShell({
         handleProps={handleProps}
       />
 
-      <div className="min-w-0 flex-1">
+      <Box minW={0} flex={1}>
         <TimelineItem
           item={item}
           activeFilters={activeFilters}
           interactionDisabled={interactionDisabled}
         />
-      </div>
-    </div>
+      </Box>
+    </Flex>
   );
 }
 
@@ -137,27 +144,45 @@ function TimelineDragHandle({
     return <EmptyHandleSlot show={showHandleSlot} />;
   }
 
+  return <DragHandleButton itemTitle={itemTitle} dragging={dragging} handleProps={handleProps} />;
+}
+
+function DragHandleButton({
+  itemTitle,
+  dragging,
+  handleProps,
+}: {
+  itemTitle: string;
+  dragging: boolean;
+  handleProps?: Record<string, unknown>;
+}) {
+  const dragStyles = dragging
+    ? { cursor: "grabbing", bg: "bg.subtle", shadow: "sm" }
+    : { cursor: "grab", bg: undefined, shadow: undefined };
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
       aria-label={`Move ${itemTitle}`}
       onMouseDown={(event) => {
         // Prevent the handle from stealing focus and scrolling back into view after drop.
         event.preventDefault();
       }}
-      className={cn(
-        "flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors cursor-grab",
-        dragging
-          ? "bg-secondary text-foreground shadow-sm cursor-grabbing"
-          : "hover:bg-secondary hover:text-foreground active:cursor-grabbing",
-      )}
+      minW={8}
+      h={8}
+      p={0}
+      flexShrink={0}
+      rounded="md"
+      color="fg.muted"
+      {...dragStyles}
+      _hover={{ bg: "bg.subtle", color: "fg.default" }}
       {...handleProps}
     >
-      <GripVertical className="size-4" />
-    </button>
+      <GripVertical size={16} />
+    </Button>
   );
 }
 
 function EmptyHandleSlot({ show }: { show: boolean }) {
-  return show ? <div aria-hidden className="size-8 shrink-0" /> : null;
+  return show ? <Box aria-hidden w={8} h={8} flexShrink={0} /> : null;
 }

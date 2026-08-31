@@ -1,7 +1,7 @@
 import type { Watchlist } from "@/db/Schema";
+import { Box, Button, Flex, Heading, IconButton, Input, Text } from "@chakra-ui/react";
 import { WatchlistFormDialog } from "@/features/watchlists/components/WatchlistFormDialog";
 import { calculateWatchlistProgress } from "@/features/watchlists/Progress";
-import { ToggleButton } from "@/ui/ToggleButton";
 import { Pencil, Search } from "lucide-react";
 
 interface WatchlistHeaderProps {
@@ -30,55 +30,73 @@ export function WatchlistHeader({
   interactionDisabled = false,
 }: WatchlistHeaderProps) {
   return (
-    <header className="sticky top-0 z-40 bg-background/95 pb-4 pt-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:pb-6">
+    <Box
+      as="header"
+      position="sticky"
+      top={0}
+      zIndex={40}
+      bg="bg.canvas/95"
+      backdropFilter="blur(8px)"
+      pb={{ base: 4, md: 6 }}
+      pt={4}
+    >
       <WatchlistTitle watchlist={watchlist} />
 
-      <div className="space-y-4">
+      <Box mt={4}>
         <WatchlistProgress totalItems={totalItems} watchedItems={watchedItems} />
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Flex
+          direction={{ base: "column", sm: "row" }}
+          align={{ sm: "center" }}
+          justify="space-between"
+          gap={3}
+        >
           <WatchlistSearch
             query={searchQuery}
             onChange={onSearchChange}
             disabled={interactionDisabled}
           />
 
-          <div className="flex flex-col gap-2 self-start sm:self-auto sm:items-end">
-            <WatchlistFilterToggle
-              showUnwatchedOnly={showUnwatchedOnly}
-              onChange={onFilterChange}
-              disabled={interactionDisabled}
-            />
-          </div>
-        </div>
-      </div>
-    </header>
+          <WatchlistFilterToggle
+            showUnwatchedOnly={showUnwatchedOnly}
+            onChange={onFilterChange}
+            disabled={interactionDisabled}
+          />
+        </Flex>
+      </Box>
+    </Box>
   );
 }
 
 function WatchlistTitle({ watchlist }: { watchlist: Watchlist }) {
   return (
-    <div className="mb-2 flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <h1 className="text-xl font-bold tracking-tight md:text-2xl">{watchlist.name}</h1>
+    <Flex mb={2} align="center" justify="space-between" gap={2}>
+      <Flex align="center" gap={2} minW={0}>
+        <Heading as="h1" size={{ base: "xl", md: "2xl" }} letterSpacing="tight" truncate>
+          {watchlist.name}
+        </Heading>
         <WatchlistFormDialog
           mode="edit"
           watchlist={watchlist}
           trigger={
-            <button
+            <IconButton
               type="button"
               aria-label="Edit watchlist"
-              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              variant="ghost"
+              size="sm"
+              color="fg.muted"
             >
-              <Pencil className="h-4 w-4" />
-            </button>
+              <Pencil size={16} />
+            </IconButton>
           }
         />
-      </div>
+      </Flex>
       {watchlist.description && (
-        <p className="text-sm text-muted-foreground hidden md:block">{watchlist.description}</p>
+        <Text fontSize="sm" color="fg.muted" display={{ base: "none", md: "block" }}>
+          {watchlist.description}
+        </Text>
       )}
-    </div>
+    </Flex>
   );
 }
 
@@ -92,21 +110,24 @@ function WatchlistProgress({
   const percentage = calculateWatchlistProgress({ totalItems, watchedItems });
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-end justify-between text-sm font-medium">
-        <span className="text-primary font-bold">
+    <Box>
+      <Flex align="end" justify="space-between" fontSize="sm" fontWeight="medium">
+        <Text color="accent.solid" fontWeight="bold">
           {watchedItems}/{totalItems} Watched
-        </span>
-        <span className="text-muted-foreground">{percentage}% Complete</span>
-      </div>
+        </Text>
+        <Text color="fg.muted">{percentage}% Complete</Text>
+      </Flex>
 
-      <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
-        <div
-          className="h-full bg-primary transition-all duration-500 ease-out"
-          style={{ width: `${percentage}%` }}
+      <Box h={2} mt={2} bg="bg.subtle" rounded="full" overflow="hidden">
+        <Box
+          h="full"
+          w={`${percentage}%`}
+          bg="accent.solid"
+          rounded="full"
+          transition="width 500ms ease-out"
         />
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }
 
@@ -120,17 +141,22 @@ function WatchlistSearch({
   disabled?: boolean;
 }) {
   return (
-    <div className="relative flex-1 max-w-sm">
-      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-      <input
-        type="text"
+    <Box position="relative" flex="1" maxW="sm">
+      <Search
+        size={16}
+        style={{ position: "absolute", left: 10, top: 10 }}
+        color="var(--chakra-colors-fg-muted)"
+      />
+      <Input
+        type="search"
         placeholder="Search titles..."
         disabled={disabled}
-        className="h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        h={9}
+        pl={9}
         value={query}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(event) => onChange(event.target.value)}
       />
-    </div>
+    </Box>
   );
 }
 
@@ -144,13 +170,45 @@ function WatchlistFilterToggle({
   disabled?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border bg-secondary/30 p-1">
-      <ToggleButton active={!showUnwatchedOnly} onClick={() => onChange(false)} disabled={disabled}>
+    <Flex
+      align="center"
+      gap={1}
+      rounded="lg"
+      borderWidth="1px"
+      borderColor="border.default"
+      bg="bg.subtle/30"
+      p={1}
+    >
+      <FilterButton active={!showUnwatchedOnly} onClick={() => onChange(false)} disabled={disabled}>
         All
-      </ToggleButton>
-      <ToggleButton active={showUnwatchedOnly} onClick={() => onChange(true)} disabled={disabled}>
+      </FilterButton>
+      <FilterButton active={showUnwatchedOnly} onClick={() => onChange(true)} disabled={disabled}>
         Unwatched
-      </ToggleButton>
-    </div>
+      </FilterButton>
+    </Flex>
+  );
+}
+
+function FilterButton({
+  active,
+  onClick,
+  disabled,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  disabled: boolean;
+  children: string;
+}) {
+  return (
+    <Button
+      size="xs"
+      variant={active ? "solid" : "ghost"}
+      colorPalette="pink"
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </Button>
   );
 }

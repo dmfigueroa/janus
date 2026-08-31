@@ -1,5 +1,5 @@
 import * as repository from "@/features/watchlists/Repository.server";
-import { getMovieDetails } from "@/server/providers/TmdbApi.server";
+import { fetchTmdbMovie } from "@/server/providers/TmdbApi.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
 import { persistAddedItems } from "./Insert.server";
 import { rejectAdd, type WatchlistWriteResult } from "./Shared.server";
@@ -35,7 +35,7 @@ export async function addMovieToWatchlist(
 async function persistMovie(
   watchlistId: number,
   tmdbId: number,
-  details: Awaited<ReturnType<typeof getMovieDetails>>,
+  details: Awaited<ReturnType<typeof fetchTmdbMovie>>,
   insertionPosition?: AddToWatchlistInsertionPosition,
 ): Promise<WatchlistWriteResult> {
   const result = await persistAddedItems({
@@ -58,14 +58,14 @@ async function persistMovie(
 
 async function fetchMovieDetails(tmdbId: number) {
   try {
-    return await getMovieDetails({ data: { id: tmdbId } });
+    return await fetchTmdbMovie({ id: tmdbId });
   } catch {
     return null;
   }
 }
 
 function mapToWatchlistMovie(
-  details: Awaited<ReturnType<typeof getMovieDetails>>,
+  details: Awaited<ReturnType<typeof fetchTmdbMovie>>,
   watchlistId: number,
   tmdbId: number,
 ) {
@@ -82,7 +82,7 @@ function mapToWatchlistMovie(
   };
 }
 
-function getMovieTitle(details: Awaited<ReturnType<typeof getMovieDetails>>) {
+function getMovieTitle(details: Awaited<ReturnType<typeof fetchTmdbMovie>>) {
   if (details.title) return details.title;
   if (details.name) return details.name;
   return "Unknown";

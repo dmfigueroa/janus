@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { Provider } from "@/app/Provider";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistItem } from "@/db/Schema";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
@@ -196,5 +197,9 @@ describe("TimelineItem removal actions", () => {
 });
 
 function renderTimelineItem(overrides: Partial<WatchlistItem> = {}) {
-  render(<TimelineItem item={{ ...baseItem, ...overrides }} activeFilters={activeFilters} />);
+  render(
+    <Provider>
+      <TimelineItem item={{ ...baseItem, ...overrides }} activeFilters={activeFilters} />
+    </Provider>,
+  );
 }

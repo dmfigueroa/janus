@@ -1,4 +1,5 @@
-import { Flag, Loader2 } from "lucide-react";
+import { Flag } from "lucide-react";
+import { Flex, Spinner, Text } from "@chakra-ui/react";
 import type { RefObject } from "react";
 
 export function WatchlistTimelineEndcap({
@@ -9,28 +10,58 @@ export function WatchlistTimelineEndcap({
   sentinelRef: RefObject<HTMLDivElement | null>;
 }) {
   return (
-    <div className="relative mt-12 pb-12" ref={sentinelRef}>
-      <div className="flex items-center md:top-48">
+    <Flex position="relative" mt={12} pb={12} ref={sentinelRef} align="center">
+      <Flex align="center">
         <TimelineStatusPill hasMore={hasMore} />
-      </div>
-    </div>
+      </Flex>
+    </Flex>
   );
 }
 
 function TimelineStatusPill({ hasMore }: { hasMore?: boolean }) {
   if (hasMore) {
     return (
-      <div className="relative z-10 flex h-8 items-center gap-2 rounded-full bg-background px-4 text-xs font-medium text-muted-foreground ring-1 ring-border md:ml-4">
-        <Loader2 className="size-3 animate-spin" />
-        <span>Loading more...</span>
-      </div>
+      <Flex
+        position="relative"
+        zIndex={10}
+        h={8}
+        align="center"
+        gap={2}
+        rounded="full"
+        bg="bg.canvas"
+        px={4}
+        fontSize="xs"
+        fontWeight="medium"
+        color="fg.muted"
+        borderWidth="1px"
+        borderColor="border.default"
+        ml={{ base: 0, md: 4 }}
+      >
+        <Spinner size="xs" />
+        <Text>Loading more...</Text>
+      </Flex>
     );
   }
 
   return (
-    <div className="relative z-10 flex h-8 items-center gap-2 rounded-full bg-background px-4 text-xs font-medium text-muted-foreground ring-1 ring-border md:ml-4">
-      <Flag className="size-3" />
-      <span>End of Watchlist</span>
-    </div>
+    <Flex
+      position="relative"
+      zIndex={10}
+      h={8}
+      align="center"
+      gap={2}
+      rounded="full"
+      bg="bg.canvas"
+      px={4}
+      fontSize="xs"
+      fontWeight="medium"
+      color="fg.muted"
+      borderWidth="1px"
+      borderColor="border.default"
+      ml={{ base: 0, md: 4 }}
+    >
+      <Flag size={12} />
+      <Text>End of Watchlist</Text>
+    </Flex>
   );
 }
