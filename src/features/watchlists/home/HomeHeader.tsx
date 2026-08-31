@@ -1,10 +1,10 @@
 import { Button, Flex, Heading, IconButton, Text } from "@chakra-ui/react";
 import { CheckSquare } from "lucide-react";
-import type { getWatchlistHome } from "@/features/watchlists/home/WatchlistHome";
+import type { WatchlistHomeData } from "@/features/watchlists/home/WatchlistHome";
 import { useWatchlistMergeSelectionContext } from "@/features/watchlists/home/WatchlistMergeSelectionContext";
 
 type HomeHeaderProps = {
-  totals: Awaited<ReturnType<typeof getWatchlistHome>>["totals"];
+  totals: WatchlistHomeData["totals"];
 };
 
 export function HomeHeader({ totals }: HomeHeaderProps) {

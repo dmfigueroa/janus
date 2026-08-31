@@ -1,8 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
-import {
-  listWatchlistSummaries,
-  type WatchlistSummary,
-} from "@/features/watchlists/list/Query.server";
+import { listWatchlistSummaries } from "@/features/watchlists/list/Query.server";
+import type { WatchlistSummary } from "@/features/watchlists/list/Query";
 
 const HOME_SECTION_ORDER = [
   { key: "movie", title: "Movies" },
@@ -92,8 +90,7 @@ function buildFeaturedHomeSections(buckets: Map<WatchlistHomeSectionKey, Watchli
   return HOME_SECTION_ORDER.flatMap((section) => buildFeaturedHomeSection(section, buckets));
 }
 
-export async function getWatchlistHome() {
-  const allWatchlists = await listWatchlistSummaries({ orderBy: "recency" });
+export function buildWatchlistHome(allWatchlists: WatchlistSummary[]) {
   const buckets = allWatchlists.reduce(addWatchlistToHomeBucket, new Map());
   const totals = buildWatchlistHomeTotals(allWatchlists);
   const featuredSections = buildFeaturedHomeSections(buckets);
@@ -101,4 +98,9 @@ export async function getWatchlistHome() {
   return { totals, featuredSections, allWatchlists };
 }
 
-export const getWatchlistHomeData = createServerFn().handler(getWatchlistHome);
+export type WatchlistHomeData = ReturnType<typeof buildWatchlistHome>;
+
+export const getWatchlistHomeData = createServerFn().handler(async () => {
+  const allWatchlists = await listWatchlistSummaries({ orderBy: "recency" });
+  return buildWatchlistHome(allWatchlists);
+});

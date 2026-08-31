@@ -54,7 +54,7 @@ function formatProviderResponse(result: ProviderSearchResult, page: number) {
 
 async function searchActiveMedia({ query, type, page }: SearchInput) {
   if (type === "movie" || type === "tv") {
-    const result = await searchMultimedia({ data: { query, page, type } });
+    const result = await searchMultimedia({ query, page, type });
     return { ...result, rejected: false };
   }
 
