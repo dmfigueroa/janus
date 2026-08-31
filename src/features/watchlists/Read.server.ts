@@ -5,7 +5,7 @@ import {
   getWatchlistDetail,
   type GetWatchlistDetailParams,
 } from "@/features/watchlists/detail/Query.server";
-import { getWatchlistHome } from "@/features/watchlists/home/WatchlistHome";
+import { buildWatchlistHome } from "@/features/watchlists/home/WatchlistHome";
 
 export type WatchlistListScreenSummary = WatchlistSummary;
 
@@ -25,6 +25,6 @@ export const WatchlistsRead = {
   },
 
   async homeScreen() {
-    return getWatchlistHome();
+    return buildWatchlistHome(await listWatchlistSummaries({ orderBy: "recency" }));
   },
 };

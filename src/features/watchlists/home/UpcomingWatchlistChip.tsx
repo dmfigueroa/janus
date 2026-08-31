@@ -1,11 +1,10 @@
 import { Link as ChakraLink, Text } from "@chakra-ui/react";
 import { Link } from "@tanstack/react-router";
-import type { getWatchlistHome } from "@/features/watchlists/home/WatchlistHome";
+import type { WatchlistHomeData } from "@/features/watchlists/home/WatchlistHome";
 import { formatNextItemWithParentTitle } from "@/features/watchlists/NextItemLabel";
 
-type UpcomingWatchlist = Awaited<
-  ReturnType<typeof getWatchlistHome>
->["featuredSections"][number]["upcomingWatchlists"][number];
+type UpcomingWatchlist =
+  Awaited<WatchlistHomeData>["featuredSections"][number]["upcomingWatchlists"][number];
 
 function formatIncomingWatchlistLabel(watchlist: UpcomingWatchlist) {
   const nextItem = watchlist.stats.nextUnwatched;

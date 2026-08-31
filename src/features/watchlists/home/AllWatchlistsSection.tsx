@@ -1,11 +1,11 @@
 import { Box, Heading, SimpleGrid } from "@chakra-ui/react";
 import { WatchlistCard } from "@/features/watchlists/components/WatchlistCard";
-import type { getWatchlistHome } from "@/features/watchlists/home/WatchlistHome";
+import type { WatchlistHomeData } from "@/features/watchlists/home/WatchlistHome";
 import { CreateWatchlistTile } from "@/features/watchlists/home/CreateWatchlistTile";
 import { useWatchlistMergeSelectionContext } from "@/features/watchlists/home/WatchlistMergeSelectionContext";
 
 type AllWatchlistsSectionProps = {
-  watchlists: Awaited<ReturnType<typeof getWatchlistHome>>["allWatchlists"];
+  watchlists: WatchlistHomeData["allWatchlists"];
 };
 
 export function AllWatchlistsSection({ watchlists }: AllWatchlistsSectionProps) {

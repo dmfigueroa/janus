@@ -1,9 +1,9 @@
 import { MergeWatchlistDialog } from "@/features/watchlists/merge/MergeWatchlistDialog";
-import type { getWatchlistHome } from "@/features/watchlists/home/WatchlistHome";
+import type { WatchlistHomeData } from "@/features/watchlists/home/WatchlistHome";
 import { useWatchlistMergeSelectionContext } from "@/features/watchlists/home/WatchlistMergeSelectionContext";
 
 type WatchlistMergeDialogProps = {
-  allWatchlists: Awaited<ReturnType<typeof getWatchlistHome>>["allWatchlists"];
+  allWatchlists: WatchlistHomeData["allWatchlists"];
 };
 
 export function WatchlistMergeDialog({ allWatchlists }: WatchlistMergeDialogProps) {

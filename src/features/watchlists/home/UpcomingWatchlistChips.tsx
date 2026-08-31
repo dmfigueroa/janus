@@ -1,10 +1,8 @@
-import type { getWatchlistHome } from "@/features/watchlists/home/WatchlistHome";
+import type { WatchlistHomeData } from "@/features/watchlists/home/WatchlistHome";
 import { UpcomingWatchlistChip } from "@/features/watchlists/home/UpcomingWatchlistChip";
 
 type UpcomingWatchlistChipsProps = {
-  watchlists: Awaited<
-    ReturnType<typeof getWatchlistHome>
-  >["featuredSections"][number]["upcomingWatchlists"];
+  watchlists: Awaited<WatchlistHomeData>["featuredSections"][number]["upcomingWatchlists"];
 };
 
 export function UpcomingWatchlistChips({ watchlists }: UpcomingWatchlistChipsProps) {

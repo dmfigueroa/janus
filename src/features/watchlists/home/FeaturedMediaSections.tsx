@@ -1,8 +1,8 @@
-import type { getWatchlistHome } from "@/features/watchlists/home/WatchlistHome";
+import type { WatchlistHomeData } from "@/features/watchlists/home/WatchlistHome";
 import { FeaturedMediaSection } from "@/features/watchlists/home/FeaturedMediaSection";
 
 type FeaturedMediaSectionsProps = {
-  sections: Awaited<ReturnType<typeof getWatchlistHome>>["featuredSections"];
+  sections: WatchlistHomeData["featuredSections"];
 };
 
 export function FeaturedMediaSections({ sections }: FeaturedMediaSectionsProps) {
