@@ -73,35 +73,31 @@ async function fetchWithAuth(url: string) {
   return response.json();
 }
 
-export const fetchFromTMDB = createServerFn({ method: "GET" })
-  .inputValidator((data) =>
-    z
-      .object({
-        query: z.string(),
-        page: z.number(),
-        type: z.enum(["movie", "tv"]),
-      })
-      .parse(data),
-  )
-  .handler(async ({ data }) => {
-    const { query, page, type } = data;
-    const endpoint = type === "movie" ? "search/movie" : "search/tv";
-    const url = new URL(`${TMDB_BASE_URL}/${endpoint}`);
+export async function fetchTmdbSearch(data: { query: string; page: number; type: "movie" | "tv" }) {
+  const { query, page, type } = z
+    .object({
+      query: z.string(),
+      page: z.number(),
+      type: z.enum(["movie", "tv"]),
+    })
+    .parse(data);
+  const endpoint = type === "movie" ? "search/movie" : "search/tv";
+  const url = new URL(`${TMDB_BASE_URL}/${endpoint}`);
 
-    url.searchParams.set("query", query);
-    url.searchParams.set("page", page.toString());
-    url.searchParams.set("include_adult", "false");
-    url.searchParams.set("language", "en-US");
+  url.searchParams.set("query", query);
+  url.searchParams.set("page", page.toString());
+  url.searchParams.set("include_adult", "false");
+  url.searchParams.set("language", "en-US");
 
-    const response = (await fetchWithAuth(url.toString())) as TMDBSearchResponse;
+  const response = (await fetchWithAuth(url.toString())) as TMDBSearchResponse;
 
-    response.results = response.results.map((item) => ({
-      ...item,
-      media_type: item.media_type || type,
-    }));
+  response.results = response.results.map((item) => ({
+    ...item,
+    media_type: item.media_type || type,
+  }));
 
-    return response;
-  });
+  return response;
+}
 
 export const getTVDetails = createServerFn({ method: "GET" })
   .inputValidator((data) => z.object({ id: z.number() }).parse(data))

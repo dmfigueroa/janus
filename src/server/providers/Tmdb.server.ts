@@ -1,9 +1,5 @@
-"use server";
-
-import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
 import { type UnifiedMedia } from "../Media";
-import { fetchFromTMDB, type TMDBMedia } from "./TmdbApi.server";
+import { fetchTmdbSearch, type TMDBMedia } from "./TmdbApi.server";
 
 export {
   type TMDBMedia,
@@ -45,36 +41,23 @@ function mapTmdbMedia(item: TMDBMedia, type: "movie" | "tv"): UnifiedMedia {
   };
 }
 
-export const searchMultimedia = createServerFn({ method: "GET" })
-  .inputValidator((data) =>
-    z
-      .object({
-        query: z.string().min(1),
-        page: z.coerce.number().default(1),
-        type: z.enum(["movie", "tv"]).default("movie"),
-      })
-      .parse(data),
-  )
-  .handler(
-    async ({
-      data,
-    }): Promise<{
-      results: UnifiedMedia[];
-      page: number;
-      total_pages: number;
-      total_results: number;
-    }> => {
-      const { query, page, type } = data;
+export async function searchMultimedia(data: {
+  query: string;
+  page: number;
+  type: "movie" | "tv";
+}): Promise<{
+  results: UnifiedMedia[];
+  page: number;
+  total_pages: number;
+  total_results: number;
+}> {
+  const tmdbData = await fetchTmdbSearch(data);
+  const results = tmdbData.results.map((item) => mapTmdbMedia(item, data.type));
 
-      const tmdbData = await fetchFromTMDB({ data: { query, page, type } });
-
-      const results: UnifiedMedia[] = tmdbData.results.map((item) => mapTmdbMedia(item, type));
-
-      return {
-        results,
-        page: tmdbData.page,
-        total_pages: tmdbData.total_pages,
-        total_results: tmdbData.total_results,
-      };
-    },
-  );
+  return {
+    results,
+    page: tmdbData.page,
+    total_pages: tmdbData.total_pages,
+    total_results: tmdbData.total_results,
+  };
+}
