@@ -6,6 +6,7 @@ import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistItem } from "@/db/Schema";
 import { TimelineItem } from "@/features/watchlists/components/TimelineItem";
+import { Provider } from "@/app/Provider";
 
 const { editWatchlistItemFn, editWatchlistItemServerFn } = vi.hoisted(() => ({
   editWatchlistItemFn: vi.fn(),
@@ -204,16 +205,18 @@ function renderTimelineItem() {
 
 function TimelineItemFixture({ queryClient }: { queryClient: QueryClient }) {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TimelineItem
-        item={item}
-        activeFilters={{
-          watchlistId: item.watchlistId,
-          itemOrderMode: "custom",
-          unwatchedOnly: false,
-          query: "",
-        }}
-      />
-    </QueryClientProvider>
+    <Provider>
+      <QueryClientProvider client={queryClient}>
+        <TimelineItem
+          item={item}
+          activeFilters={{
+            watchlistId: item.watchlistId,
+            itemOrderMode: "custom",
+            unwatchedOnly: false,
+            query: "",
+          }}
+        />
+      </QueryClientProvider>
+    </Provider>
   );
 }

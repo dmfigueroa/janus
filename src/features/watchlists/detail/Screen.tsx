@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { Box, Container } from "@chakra-ui/react";
 import { useInfiniteQuery, useIsMutating, type InfiniteData } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -95,7 +96,7 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
   );
 
   return (
-    <div className="container mx-auto min-h-screen max-w-3xl px-4 py-6 md:px-8 pb-32">
+    <Container maxW="3xl" minH="100vh" px={{ base: 4, md: 8 }} pt={6} pb={32}>
       <WatchlistHeader
         watchlist={latestWatchlist}
         totalItems={totalItems}
@@ -107,7 +108,7 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
         interactionDisabled={isReorderPending}
       />
 
-      <div className="mt-8">
+      <Box mt={8}>
         <WatchlistTimeline
           items={allItems}
           activeFilters={activeFilters}
@@ -123,8 +124,8 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
             toast.success("Order saved", { duration: 2000 });
           }}
         />
-      </div>
-    </div>
+      </Box>
+    </Container>
   );
 }
 

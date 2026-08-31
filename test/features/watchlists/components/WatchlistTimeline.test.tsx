@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, render, screen } from "@testing-library/react";
+import { ChakraProvider } from "@chakra-ui/react";
 import type { DndContextProps, DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistItem } from "@/db/Schema";
 import { WatchlistTimeline } from "@/features/watchlists/components/WatchlistTimeline";
+import { janusSystem } from "@/app/Theme";
 
 const activeFilters = {
   watchlistId: 1,
@@ -125,7 +127,7 @@ describe("WatchlistTimeline reorder controls", () => {
   });
 
   it("renders a flat custom-mode list with reorder handles", () => {
-    render(
+    renderWithProvider(
       <WatchlistTimeline
         items={[
           item({ id: 1, title: "First", releaseDate: "2024-01-01" }),
@@ -145,7 +147,7 @@ describe("WatchlistTimeline reorder controls", () => {
   });
 
   it("hides reorder handles in custom mode when reordering is unavailable", () => {
-    render(
+    renderWithProvider(
       <WatchlistTimeline
         items={[item({ id: 1, title: "First" }), item({ id: 2, title: "Second" })]}
         activeFilters={activeFilters}
@@ -160,7 +162,7 @@ describe("WatchlistTimeline reorder controls", () => {
   });
 
   it("keeps year groupings and removes reorder affordances in release mode", () => {
-    render(
+    renderWithProvider(
       <WatchlistTimeline
         items={[
           item({ id: 1, title: "First", releaseDate: "2024-01-01" }),
@@ -181,7 +183,7 @@ describe("WatchlistTimeline reorder controls", () => {
   it("keeps the dropped order locally until the reordered items arrive", () => {
     const onReorder = vi.fn();
 
-    const { rerender } = render(
+    const { rerender: rerenderBase } = renderWithProvider(
       <WatchlistTimeline
         items={[item({ id: 1, title: "First" }), item({ id: 2, title: "Second" })]}
         activeFilters={activeFilters}
@@ -205,29 +207,26 @@ describe("WatchlistTimeline reorder controls", () => {
       referenceItemId: 2,
     });
 
-    rerender(
-      <WatchlistTimeline
-        items={[item({ id: 1, title: "First" }), item({ id: 2, title: "Second" })]}
-        activeFilters={activeFilters}
-        itemOrderMode="custom"
-        canReorder
-        onReorder={onReorder}
-      />,
-    );
-
     const rowLabels = screen
       .getAllByTestId(/watchlist-timeline-row-/)
       .map((row) => row.textContent?.trim());
     expect(rowLabels).toEqual(["Second", "First"]);
 
-    rerender(
-      <WatchlistTimeline
-        items={[item({ id: 2, title: "Second" }), item({ id: 1, title: "First" })]}
-        activeFilters={activeFilters}
-        itemOrderMode="custom"
-        canReorder
-        onReorder={onReorder}
-      />,
+    rerenderBase(
+      <ChakraProvider value={janusSystem}>
+        <WatchlistTimeline
+          items={[item({ id: 2, title: "Second" }), item({ id: 1, title: "First" })]}
+          activeFilters={activeFilters}
+          itemOrderMode="custom"
+          canReorder
+          onReorder={onReorder}
+        />
+        ,
+      </ChakraProvider>,
     );
   });
 });
+
+function renderWithProvider(ui: React.ReactElement) {
+  return render(<ChakraProvider value={janusSystem}>{ui}</ChakraProvider>);
+}
