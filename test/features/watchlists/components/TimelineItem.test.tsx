@@ -122,7 +122,9 @@ describe("TimelineItem watched actions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "More actions for Standalone Movie" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Mark watched without updating list" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Mark watched without updating list" }),
+    );
 
     await waitFor(() => {
       expect(toggleWatchedWithoutRecencyMutate).toHaveBeenCalledTimes(1);
@@ -130,11 +132,12 @@ describe("TimelineItem watched actions", () => {
     expect(toggleWatchedMutate).not.toHaveBeenCalled();
   });
 
-  it("hides the quiet watched action for items that are already watched", () => {
+  it("hides the quiet watched action for items that are already watched", async () => {
     renderTimelineItem({ isWatched: true });
 
     fireEvent.click(screen.getByRole("button", { name: "More actions for Standalone Movie" }));
 
+    await screen.findByRole("button", { name: "Edit" });
     expect(screen.queryByRole("button", { name: "Mark watched without updating list" })).toBeNull();
   });
 });
@@ -146,7 +149,7 @@ describe("TimelineItem removal actions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "More actions for Standalone Movie" }));
 
-    expect(screen.getByRole("button", { name: "Remove item" })).not.toBeNull();
+    expect(await screen.findByRole("button", { name: "Remove item" })).not.toBeNull();
     expect(screen.queryByRole("button", { name: "Remove group" })).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Remove item" }));
@@ -176,7 +179,7 @@ describe("TimelineItem removal actions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "More actions for Pilot" }));
 
-    expect(screen.getByRole("button", { name: "Remove episode" })).not.toBeNull();
+    expect(await screen.findByRole("button", { name: "Remove episode" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "Remove show" })).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Remove show" }));

@@ -1,9 +1,6 @@
+import { Button, Dialog, Field, Image, Input, Stack, Text } from "@chakra-ui/react";
 import { useState, type FormEvent } from "react";
 import type { WatchlistItem } from "@/db/Schema";
-import { Button } from "@/components/ui/Button";
-import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/Dialog";
-import { Input } from "@/components/ui/Input";
-import { Label } from "@/components/ui/Label";
 import { ReleaseDateField } from "@/features/watchlists/components/ReleaseDateField";
 import { posterPathSchema } from "@/features/watchlists/edit/Mutation";
 import {
@@ -20,7 +17,7 @@ type EditWatchlistItemFormProps = {
 
 function SaveButton({ isSaving }: { isSaving: boolean }) {
   return (
-    <Button type="submit" disabled={isSaving}>
+    <Button type="submit" disabled={isSaving} colorPalette="pink">
       {isSaving ? "Saving..." : "Save"}
     </Button>
   );
@@ -32,10 +29,13 @@ function PosterPreview({ posterPath, title }: { posterPath: string | null; title
   }
 
   return (
-    <img
+    <Image
       src={buildMediaPosterUrl(posterPath)}
       alt={`Poster preview for ${title}`}
-      className="h-36 w-24 rounded-md object-cover"
+      h={36}
+      w={24}
+      rounded="md"
+      objectFit="cover"
       referrerPolicy="no-referrer"
     />
   );
@@ -46,7 +46,11 @@ function FormError({ message }: { message: string | null }) {
     return null;
   }
 
-  return <p className="text-sm text-destructive">{message}</p>;
+  return (
+    <Text role="alert" fontSize="sm" color="status.error">
+      {message}
+    </Text>
+  );
 }
 
 type EditFormSubmission =
@@ -123,43 +127,45 @@ export function EditWatchlistItemForm({ item, onSaved, onCanceled }: EditWatchli
 
   return (
     <form onSubmit={handleSubmit}>
-      <DialogHeader>
-        <DialogTitle>Edit watchlist item</DialogTitle>
-        <DialogDescription>
+      <Dialog.Header flexDirection="column" alignItems="flex-start" gap={1}>
+        <Dialog.Title>Edit watchlist item</Dialog.Title>
+        <Dialog.Description color="fg.muted">
           Update this item’s title, release date, and poster image.
-        </DialogDescription>
-      </DialogHeader>
-      <div className="grid gap-4 py-4">
-        <div className="grid gap-2">
-          <Label htmlFor={`edit-title-${item.id}`}>Title</Label>
-          <Input id={`edit-title-${item.id}`} name="title" defaultValue={item.title} required />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor={`edit-release-date-${item.id}`}>Release date</Label>
-          <ReleaseDateField
-            inputId={`edit-release-date-${item.id}`}
-            inputName="releaseDate"
-            initialReleaseDate={item.releaseDate ?? ""}
-          />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor={`edit-poster-${item.id}`}>Poster image</Label>
-          <Input
-            id={`edit-poster-${item.id}`}
-            name="posterPath"
-            value={posterPath}
-            onChange={(event) => setPosterPath(event.target.value)}
-          />
-          <PosterPreview posterPath={posterPreviewPath} title={item.title} />
-        </div>
-        <FormError message={errorMessage} />
-      </div>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCanceled}>
+        </Dialog.Description>
+      </Dialog.Header>
+      <Dialog.Body>
+        <Stack gap={4}>
+          <Field.Root required>
+            <Field.Label htmlFor={`edit-title-${item.id}`}>Title</Field.Label>
+            <Input id={`edit-title-${item.id}`} name="title" defaultValue={item.title} required />
+          </Field.Root>
+          <Field.Root>
+            <Field.Label htmlFor={`edit-release-date-${item.id}`}>Release date</Field.Label>
+            <ReleaseDateField
+              inputId={`edit-release-date-${item.id}`}
+              inputName="releaseDate"
+              initialReleaseDate={item.releaseDate ?? ""}
+            />
+          </Field.Root>
+          <Field.Root invalid={Boolean(errorMessage)}>
+            <Field.Label htmlFor={`edit-poster-${item.id}`}>Poster image</Field.Label>
+            <Input
+              id={`edit-poster-${item.id}`}
+              name="posterPath"
+              value={posterPath}
+              onChange={(event) => setPosterPath(event.target.value)}
+            />
+            <PosterPreview posterPath={posterPreviewPath} title={item.title} />
+          </Field.Root>
+          <FormError message={errorMessage} />
+        </Stack>
+      </Dialog.Body>
+      <Dialog.Footer>
+        <Button type="button" variant="outline" disabled={mutation.isPending} onClick={onCanceled}>
           Cancel
         </Button>
         <SaveButton isSaving={mutation.isPending} />
-      </DialogFooter>
+      </Dialog.Footer>
     </form>
   );
 }
