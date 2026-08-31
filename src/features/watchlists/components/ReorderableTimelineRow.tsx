@@ -162,6 +162,7 @@ function DragHandleButton({
   return (
     <Button
       type="button"
+      variant="ghost"
       aria-label={`Move ${itemTitle}`}
       onMouseDown={(event) => {
         // Prevent the handle from stealing focus and scrolling back into view after drop.

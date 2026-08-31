@@ -142,7 +142,9 @@ describe("WatchlistTimeline reorder controls", () => {
 
     expect(screen.queryByText("2024")).toBeNull();
     expect(screen.queryByText("2025")).toBeNull();
-    expect(screen.getByRole("button", { name: "Move First" })).toHaveProperty("disabled", false);
+    const firstHandle = screen.getByRole("button", { name: "Move First" });
+    expect(firstHandle).toHaveProperty("disabled", false);
+    expect(getComputedStyle(firstHandle).backgroundColor).toBe("rgba(0, 0, 0, 0)");
     expect(screen.getByRole("button", { name: "Move Second" })).toHaveProperty("disabled", false);
   });
 
