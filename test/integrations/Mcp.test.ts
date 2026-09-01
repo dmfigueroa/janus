@@ -4,7 +4,7 @@ import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 describe("Janus MCP endpoint", () => {
   let temporaryDirectory: string;
@@ -634,5 +634,229 @@ describe("Janus MCP endpoint", () => {
     });
 
     expect(result.isError).toBe(true);
+  });
+
+  it("discovers and searches TMDB movies through the MCP protocol", async () => {
+    process.env.TMDB_API_KEY = "test-tmdb-key";
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          page: 1,
+          total_pages: 1,
+          total_results: 1,
+          results: [
+            {
+              id: 550,
+              title: "Fight Club",
+              poster_path: "/fight-club.jpg",
+              backdrop_path: "/fight-club-backdrop.jpg",
+              release_date: "1999-10-15",
+              vote_average: 8.4,
+              overview: "An insomniac office worker forms an underground club.",
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    const tools = await client.listTools();
+    const searchMedia = tools.tools.find((tool) => tool.name === "search_media");
+
+    expect(searchMedia).toMatchObject({
+      name: "search_media",
+      annotations: { readOnlyHint: true, destructiveHint: false },
+    });
+    expect(searchMedia?.description).toContain("TMDB for movies and TV");
+    expect(searchMedia?.description).toContain("RAWG for games");
+    expect(searchMedia?.description).toContain("Google Books for books");
+    expect(searchMedia?.description).toContain("ComicVine for comics");
+    expect(searchMedia?.description).toContain("AniList for anime and manga");
+    expect(searchMedia?.inputSchema).toMatchObject({
+      properties: {
+        query: { type: "string" },
+        mediaType: { enum: ["movie", "tv", "game", "book", "comic", "anime", "manga"] },
+        page: { minimum: 1, maximum: 100 },
+      },
+    });
+
+    const result = await client.callTool({
+      name: "search_media",
+      arguments: { query: "Fight Club", mediaType: "movie", page: 1 },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          provider: "tmdb",
+          providerId: "550",
+          mediaType: "movie",
+          title: "Fight Club",
+          releaseDate: "1999-10-15",
+        },
+      ],
+      page: 1,
+      totalPages: 1,
+      totalResults: 1,
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("https://api.themoviedb.org/3/search/movie"),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: "Bearer test-tmdb-key" }),
+      }),
+    );
+    fetchMock.mockRestore();
+  });
+
+  it("routes each active media type to its documented provider", async () => {
+    process.env.TMDB_API_KEY = "test-tmdb-key";
+    process.env.RAWG_API_KEY = "test-rawg-key";
+    process.env.GOOGLE_BOOKS_API_KEY = "test-google-books-key";
+    process.env.COMICVINE_API_KEY = "test-comicvine-key";
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            page: 1,
+            total_pages: 1,
+            total_results: 1,
+            results: [
+              {
+                id: 1399,
+                name: "Game of Thrones",
+                poster_path: "/game-of-thrones.jpg",
+                backdrop_path: null,
+                first_air_date: "2011-04-17",
+                vote_average: 8.5,
+                overview: "Noble families vie for control.",
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            count: 1,
+            results: [
+              {
+                id: 3498,
+                name: "Grand Theft Auto V",
+                background_image: "https://example.test/gta-v.jpg",
+                released: "2013-09-17",
+                rating: 4.5,
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            totalItems: 1,
+            items: [
+              {
+                id: "book-42",
+                volumeInfo: {
+                  title: "The Left Hand of Darkness",
+                  publishedDate: "1969-03-01",
+                  description: "A visitor confronts a world without fixed gender.",
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            number_of_total_results: 1,
+            results: [
+              {
+                id: 4050,
+                name: "Saga",
+                start_year: "2012",
+                deck: "A space-fantasy comic series.",
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    await expect(
+      client.callTool({
+        name: "search_media",
+        arguments: { query: "Game of Thrones", mediaType: "tv" },
+      }),
+    ).resolves.toMatchObject({
+      structuredContent: { results: [{ provider: "tmdb", providerId: "1399", mediaType: "tv" }] },
+    });
+    await expect(
+      client.callTool({
+        name: "search_media",
+        arguments: { query: "Grand Theft Auto", mediaType: "game" },
+      }),
+    ).resolves.toMatchObject({
+      structuredContent: { results: [{ provider: "rawg", providerId: "3498", mediaType: "game" }] },
+    });
+    await expect(
+      client.callTool({
+        name: "search_media",
+        arguments: { query: "Le Guin", mediaType: "book" },
+      }),
+    ).resolves.toMatchObject({
+      structuredContent: {
+        results: [{ provider: "google_books", providerId: "book-42", mediaType: "book" }],
+      },
+    });
+    await expect(
+      client.callTool({
+        name: "search_media",
+        arguments: { query: "Saga", mediaType: "comic" },
+      }),
+    ).resolves.toMatchObject({
+      structuredContent: {
+        results: [{ provider: "comicvine", providerId: "4050", mediaType: "comic" }],
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    fetchMock.mockRestore();
+  });
+
+  it("returns structured, credential-safe outcomes for unavailable provider categories", async () => {
+    const animeResult = await client.callTool({
+      name: "search_media",
+      arguments: { query: "Cowboy Bebop", mediaType: "anime" },
+    });
+
+    expect(animeResult.isError).not.toBe(true);
+    expect(animeResult.structuredContent).toMatchObject({
+      success: false,
+      code: "provider_unavailable",
+      message: "Anime and manga categories are deprecated while we revisit provider data quality.",
+    });
+
+    const rawgApiKey = process.env.RAWG_API_KEY;
+    delete process.env.RAWG_API_KEY;
+    const gameResult = await client.callTool({
+      name: "search_media",
+      arguments: { query: "Hades", mediaType: "game" },
+    });
+    if (rawgApiKey) process.env.RAWG_API_KEY = rawgApiKey;
+    else delete process.env.RAWG_API_KEY;
+
+    expect(gameResult.isError).not.toBe(true);
+    expect(gameResult.structuredContent).toEqual({
+      success: false,
+      code: "provider_unavailable",
+      message: "The selected provider is unavailable. Please try again later.",
+    });
   });
 });
