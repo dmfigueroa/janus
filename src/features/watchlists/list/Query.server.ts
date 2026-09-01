@@ -2,6 +2,7 @@ import type { Watchlist as WatchlistRecord } from "@/db/Schema";
 import { sql } from "drizzle-orm";
 import { watchlists } from "@/db/Schema";
 import { getDb } from "@/db/Db.server";
+import { unicodeCaseFold } from "@/db/UnicodeCaseFold.server";
 import { decodeWatchlistCursor, encodeWatchlistCursor } from "./WatchlistCursor.server";
 import { buildListOrderBy } from "./WatchlistListOrder.server";
 import { buildWatchlistSummaries, type WatchlistSummary } from "./WatchlistSummaryBuilder.server";
@@ -57,7 +58,8 @@ export async function searchWatchlistSummaryPage(options: {
 }): Promise<WatchlistSummaryPage> {
   const { orderBy, order } = normalizeListOptions(options);
   const pageSize = options.pageSize ?? 50;
-  const offset = getWatchlistPageOffset(options.cursor, orderBy, order);
+  const searchQuery = unicodeCaseFold(options.query);
+  const offset = getWatchlistPageOffset(options.cursor, orderBy, order, searchQuery);
   const db = getDb();
   const pageWithContinuation = await loadWatchlistPage(
     db,
@@ -65,7 +67,7 @@ export async function searchWatchlistSummaryPage(options: {
     order,
     pageSize,
     offset,
-    options.query,
+    searchQuery,
   );
   const summaries = await buildWatchlistSummaries(db, pageWithContinuation.slice(0, pageSize));
 
@@ -76,6 +78,7 @@ export async function searchWatchlistSummaryPage(options: {
     offset,
     orderBy,
     order,
+    searchQuery,
   );
 }
 
@@ -93,7 +96,7 @@ function loadWatchlistPage(
     .where(
       searchQuery === undefined
         ? undefined
-        : sql`instr(lower(${watchlists.name}), lower(${searchQuery})) > 0`,
+        : sql`instr(unicode_case_fold(${watchlists.name}), ${searchQuery}) > 0`,
     )
     .orderBy(...buildListOrderBy(orderBy, order))
     .limit(pageSize + 1)
@@ -107,10 +110,11 @@ function buildWatchlistSummaryPage(
   offset: number,
   orderBy: WatchlistListOrder,
   order: "asc" | "desc",
+  searchQuery?: string,
 ): WatchlistSummaryPage {
   const nextCursor =
     pageWithContinuation.length > pageSize
-      ? encodeWatchlistCursor(offset + pageSize, orderBy, order)
+      ? encodeWatchlistCursor(offset + pageSize, orderBy, order, searchQuery)
       : undefined;
 
   return { watchlists, nextCursor };
@@ -120,8 +124,9 @@ function getWatchlistPageOffset(
   cursor: string | undefined,
   orderBy: WatchlistListOrder,
   order: "asc" | "desc",
+  searchQuery?: string,
 ) {
-  return cursor === undefined ? 0 : decodeWatchlistCursor(cursor, orderBy, order);
+  return cursor === undefined ? 0 : decodeWatchlistCursor(cursor, orderBy, order, searchQuery);
 }
 
 function normalizeListOptions(options: { orderBy?: WatchlistListOrder; order?: "asc" | "desc" }) {

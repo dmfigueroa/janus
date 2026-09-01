@@ -162,6 +162,18 @@ describe("Janus MCP endpoint", () => {
     await expect(
       client.callTool({
         name: "search_watchlists",
+        arguments: {
+          query: "other",
+          orderBy: "createdAt",
+          order: "asc",
+          pageSize: 1,
+          cursor: firstPageContent.nextCursor,
+        },
+      }),
+    ).resolves.toMatchObject({ isError: true });
+    await expect(
+      client.callTool({
+        name: "search_watchlists",
         arguments: { query: "archive", pageSize: 101 },
       }),
     ).resolves.toMatchObject({ isError: true });

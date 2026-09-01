@@ -575,4 +575,37 @@ describe("searchWatchlistSummaryPage", () => {
     expect(page.watchlists.map((watchlist) => watchlist.id)).not.toContain(descriptionMatch.id);
     expect(page.watchlists.map((watchlist) => watchlist.id)).not.toContain(itemMatch.id);
   });
+
+  it("matches Unicode case-insensitively", async () => {
+    await db.insert(watchlists).values({ name: "Été en France" });
+
+    const page = await searchWatchlistSummaryPage({ query: "ÉTÉ" });
+
+    expect(page.watchlists.map((watchlist) => watchlist.name)).toEqual(["Été en France"]);
+  });
+
+  it("rejects a cursor issued for another search query", async () => {
+    await db.insert(watchlists).values([
+      { name: "Archive One", createdAt: "2024-01-01 00:00:00" },
+      { name: "Archive Two", createdAt: "2024-01-02 00:00:00" },
+      { name: "Other Archive", createdAt: "2024-01-03 00:00:00" },
+    ]);
+
+    const page = await searchWatchlistSummaryPage({
+      query: "archive",
+      orderBy: "createdAt",
+      order: "asc",
+      pageSize: 1,
+    });
+
+    await expect(
+      searchWatchlistSummaryPage({
+        query: "other",
+        orderBy: "createdAt",
+        order: "asc",
+        pageSize: 1,
+        cursor: page.nextCursor,
+      }),
+    ).rejects.toThrow("Invalid watchlist cursor.");
+  });
 });
