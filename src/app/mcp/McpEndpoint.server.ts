@@ -1,12 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
 import { listWatchlistSummaryPage } from "@/features/watchlists/list/Query.server";
-
-type McpSession = {
-  server: McpServer;
-  transport: WebStandardStreamableHTTPServerTransport;
-};
+import { handleMcpSessionRequest } from "@/integrations/mcp/McpSessionTransport.server";
 
 const watchlistSummaryOutputSchema = z.object({
   id: z.number(),
@@ -29,44 +24,8 @@ const watchlistSummaryOutputSchema = z.object({
   }),
 });
 
-const sessions = new Map<string, McpSession>();
-
-export async function handleMcpRequest(request: Request) {
-  const sessionId = request.headers.get("mcp-session-id");
-  const session = sessions.get(sessionId ?? "");
-
-  if (session) {
-    return session.transport.handleRequest(request);
-  }
-
-  return handleMissingSession(request, sessionId);
-}
-
-function handleMissingSession(request: Request, sessionId: string | null) {
-  return sessionId === null
-    ? handleNewSession(request)
-    : Promise.resolve(new Response("MCP session not found", { status: 404 }));
-}
-
-async function handleNewSession(request: Request) {
-  let pendingSession: McpSession | undefined;
-  const transport = new WebStandardStreamableHTTPServerTransport({
-    sessionIdGenerator: () => crypto.randomUUID(),
-    onsessioninitialized: (initializedSessionId) => {
-      if (pendingSession) {
-        sessions.set(initializedSessionId, pendingSession);
-      }
-    },
-    onsessionclosed: (closedSessionId) => {
-      sessions.delete(closedSessionId);
-    },
-    enableJsonResponse: true,
-  });
-  const server = createMcpServer();
-  pendingSession = { server, transport };
-
-  await server.connect(transport);
-  return transport.handleRequest(request);
+export function handleMcpEndpointRequest(request: Request) {
+  return handleMcpSessionRequest(request, createMcpServer);
 }
 
 function createMcpServer() {

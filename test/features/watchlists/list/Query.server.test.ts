@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
 import * as schema from "@/db/Schema";
 import { createIsolatedTestDb, type IsolatedTestDb } from "@test/IsolatedDb";
-import { listWatchlistSummaries } from "@/features/watchlists/list/Query.server";
+import {
+  listWatchlistSummaries,
+  listWatchlistSummaryPage,
+} from "@/features/watchlists/list/Query.server";
 
 const dbState = vi.hoisted(() => ({
   db: undefined as IsolatedTestDb | undefined,
@@ -502,5 +505,40 @@ describe("listWatchlistSummaries", () => {
           query.includes("count(*)") || query.includes(" limit ") || query.includes("row_number()"),
       ),
     ).toBe(true);
+  });
+});
+
+describe("listWatchlistSummaryPage", () => {
+  it("loads summaries only for the requested page", async () => {
+    await db.insert(watchlists).values([
+      { name: "First", createdAt: "2024-01-01 00:00:00" },
+      { name: "Second", createdAt: "2024-01-02 00:00:00" },
+      { name: "Third", createdAt: "2024-01-03 00:00:00" },
+    ]);
+
+    const preparedSql: string[] = [];
+    const sqlite = (db as typeof db & { $client: { prepare: (sql: string) => unknown } }).$client;
+    const originalPrepare = sqlite.prepare.bind(sqlite);
+    const prepareSpy = vi.spyOn(sqlite, "prepare").mockImplementation((query) => {
+      preparedSql.push(query);
+      return originalPrepare(query);
+    });
+
+    let page: Awaited<ReturnType<typeof listWatchlistSummaryPage>>;
+    try {
+      page = await listWatchlistSummaryPage({ orderBy: "createdAt", order: "asc", pageSize: 1 });
+    } finally {
+      prepareSpy.mockRestore();
+    }
+
+    expect(page.watchlists.map((watchlist) => watchlist.name)).toEqual(["First"]);
+    expect(page.nextCursor).toEqual(expect.any(String));
+
+    const watchlistQuery = preparedSql.find((query) => query.includes('from "watchlists"'));
+    const summaryQueries = preparedSql.filter((query) => query.includes('from "watchlist_items"'));
+
+    expect(watchlistQuery).toContain("limit ?");
+    expect(summaryQueries).toHaveLength(2);
+    expect(summaryQueries.every((query) => query.includes("in (?)"))).toBe(true);
   });
 });
