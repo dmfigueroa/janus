@@ -1,5 +1,5 @@
 import { SearchDiscoveryScreen } from "@/features/search/SearchDiscoveryScreen";
-import { searchUnified } from "@/features/search/MediaSearch";
+import { searchUnified } from "@/features/search/search/MediaSearch";
 import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
 import { isDeprecatedMediaType } from "../server/Media";

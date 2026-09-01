@@ -4,7 +4,7 @@ import {
   getDeprecatedWatchlistAddRejection,
   isDeprecatedMediaType,
 } from "@/server/Media";
-import { getDeprecatedMediaSearchPage } from "@/features/search/MediaSearch.server";
+import { getDeprecatedMediaSearchPage } from "@/features/search/search/MediaSearch.server";
 
 describe("deprecated media behavior", () => {
   it("marks anime and manga types as deprecated", () => {

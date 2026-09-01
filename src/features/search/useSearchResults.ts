@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { searchUnified } from "@/features/search/MediaSearch";
+import { searchUnified } from "@/features/search/search/MediaSearch";
 import { DEPRECATED_MEDIA_MESSAGE, isDeprecatedMediaType } from "@/server/Media";
 import type { UnifiedMedia } from "@/server/Media";
 

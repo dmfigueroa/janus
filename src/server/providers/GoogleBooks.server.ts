@@ -80,7 +80,7 @@ async function searchBooksRequest(query: string, page: number) {
   }).toString();
 
   const res = await fetch(url.toString());
-  if (!res.ok) return { results: [], totalResults: 0 };
+  if (!res.ok) throw new Error(`Google Books search request failed: ${res.status}`);
 
   const rawData = await res.json();
   const data = GoogleBooksResponseSchema.parse(rawData);

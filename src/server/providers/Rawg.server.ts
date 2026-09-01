@@ -62,7 +62,7 @@ async function searchGamesRequest(query: string, apiKey: string, page: number) {
   }).toString();
 
   const res = await fetch(url.toString());
-  if (!res.ok) return { results: [], totalResults: 0 };
+  if (!res.ok) throw new Error(`RAWG search request failed: ${res.status}`);
 
   const rawData = await res.json();
   const data = RawgResponseSchema.parse(rawData);
