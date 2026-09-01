@@ -23,7 +23,7 @@ const dateFormatTokens = new Map([
   ["month", "MM"],
   ["day", "dd"],
 ]);
-const dateInputParts = new Intl.DateTimeFormat(undefined, {
+const dateInputParts = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
