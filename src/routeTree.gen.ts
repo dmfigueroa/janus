@@ -10,12 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as McpRouteImport } from './routes/mcp'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as WatchlistsWatchlistIdRouteImport } from './routes/watchlists/$watchlistId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SearchRoute = SearchRouteImport.update({
@@ -31,30 +37,34 @@ const WatchlistsWatchlistIdRoute = WatchlistsWatchlistIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/mcp': typeof McpRoute
   '/search': typeof SearchRoute
   '/watchlists/$watchlistId': typeof WatchlistsWatchlistIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/mcp': typeof McpRoute
   '/search': typeof SearchRoute
   '/watchlists/$watchlistId': typeof WatchlistsWatchlistIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/mcp': typeof McpRoute
   '/search': typeof SearchRoute
   '/watchlists/$watchlistId': typeof WatchlistsWatchlistIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/search' | '/watchlists/$watchlistId'
+  fullPaths: '/' | '/mcp' | '/search' | '/watchlists/$watchlistId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/search' | '/watchlists/$watchlistId'
-  id: '__root__' | '/' | '/search' | '/watchlists/$watchlistId'
+  to: '/' | '/mcp' | '/search' | '/watchlists/$watchlistId'
+  id: '__root__' | '/' | '/mcp' | '/search' | '/watchlists/$watchlistId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  McpRoute: typeof McpRoute
   SearchRoute: typeof SearchRoute
   WatchlistsWatchlistIdRoute: typeof WatchlistsWatchlistIdRoute
 }
@@ -66,6 +76,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/search': {
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  McpRoute: McpRoute,
   SearchRoute: SearchRoute,
   WatchlistsWatchlistIdRoute: WatchlistsWatchlistIdRoute,
 }

@@ -14,10 +14,16 @@ import {
   type SummarySelection,
   type WatchlistStats,
 } from "@/features/watchlists/Summary.server";
-import { and, asc, count, desc, eq, getTableColumns, inArray, or, sql } from "drizzle-orm";
+import { decodeWatchlistCursor, encodeWatchlistCursor } from "./WatchlistCursor.server";
+import { buildListOrderBy } from "./WatchlistListOrder.server";
+import { and, count, eq, getTableColumns, inArray, or, sql } from "drizzle-orm";
 
 export type WatchlistListOrder = "createdAt" | "lastWatched" | "lastAdded" | "recency";
 export type WatchlistSummary = WatchlistRecord & { stats: WatchlistStats };
+export type WatchlistSummaryPage = {
+  watchlists: WatchlistSummary[];
+  nextCursor?: string;
+};
 
 export async function listWatchlistSummaries(
   options: {
@@ -52,6 +58,43 @@ export async function listWatchlistSummaries(
       selectionsByWatchlist[watchlist.id] ?? emptySummarySelection,
     ),
   }));
+}
+
+export async function listWatchlistSummaryPage(
+  options: {
+    orderBy?: WatchlistListOrder;
+    order?: "asc" | "desc";
+    pageSize?: number;
+    cursor?: string;
+  } = {},
+): Promise<WatchlistSummaryPage> {
+  const { orderBy, order } = normalizeListOptions(options);
+  const pageSize = options.pageSize ?? 50;
+  const offset = getWatchlistPageOffset(options.cursor, orderBy, order);
+  const watchlists = await listWatchlistSummaries({ orderBy, order });
+  return buildWatchlistSummaryPage(watchlists, pageSize, offset, orderBy, order);
+}
+
+function getWatchlistPageOffset(
+  cursor: string | undefined,
+  orderBy: WatchlistListOrder,
+  order: "asc" | "desc",
+) {
+  return cursor === undefined ? 0 : decodeWatchlistCursor(cursor, orderBy, order);
+}
+
+function buildWatchlistSummaryPage(
+  watchlists: WatchlistSummary[],
+  pageSize: number,
+  offset: number,
+  orderBy: WatchlistListOrder,
+  order: "asc" | "desc",
+): WatchlistSummaryPage {
+  const page = watchlists.slice(offset, offset + pageSize + 1);
+  const nextCursor =
+    page.length > pageSize ? encodeWatchlistCursor(offset + pageSize, orderBy, order) : undefined;
+
+  return { watchlists: page.slice(0, pageSize), nextCursor };
 }
 
 function normalizeListOptions(options: { orderBy?: WatchlistListOrder; order?: "asc" | "desc" }) {
@@ -159,32 +202,3 @@ function assignNextUnwatched(
     entry.nextUnwatched = item;
   }
 }
-
-function buildListOrderBy(orderBy: WatchlistListOrder, order: "asc" | "desc") {
-  const builder = listOrderBuilders[orderBy] ?? listOrderBuilders.createdAt;
-  return builder(order === "desc" ? desc : asc, order);
-}
-
-type OrderFunction = typeof asc;
-
-const listOrderBuilders = {
-  lastWatched: (orderFunction: OrderFunction, order: "asc" | "desc") => [
-    order === "desc"
-      ? sql`CASE WHEN ${watchlists.lastWatchedAt} IS NULL THEN 1 ELSE 0 END`
-      : sql`CASE WHEN ${watchlists.lastWatchedAt} IS NULL THEN 0 ELSE 1 END`,
-    orderFunction(watchlists.lastWatchedAt),
-  ],
-  lastAdded: (orderFunction: OrderFunction) => [
-    orderFunction(sql`COALESCE(${watchlists.lastItemAddedAt}, ${watchlists.createdAt})`),
-  ],
-  recency: () => [
-    sql`CASE WHEN ${watchlists.lastWatchedAt} IS NULL THEN 0 ELSE 1 END`,
-    asc(watchlists.lastWatchedAt),
-    asc(watchlists.createdAt),
-    asc(watchlists.id),
-  ],
-  createdAt: (orderFunction: OrderFunction) => [orderFunction(watchlists.createdAt)],
-} satisfies Record<
-  WatchlistListOrder,
-  (orderFunction: OrderFunction, order: "asc" | "desc") => unknown[]
->;
