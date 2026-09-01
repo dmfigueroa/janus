@@ -7,6 +7,7 @@ import { updateWatchlistSchema } from "@/features/watchlists/update/Mutation";
 import { deleteWatchlistMutation } from "@/features/watchlists/delete/Mutation.server";
 import { skipWatchlistMutation } from "@/features/watchlists/skip/Mutation.server";
 import { asMcpContent } from "./McpToolResponse.server";
+import { registerAddMediaToWatchlistsTool } from "./AddMediaToWatchlistsTool.server";
 
 const watchlistSchema = z.object({
   id: z.number(),
@@ -45,6 +46,7 @@ export function registerWatchlistWriteTools(server: McpServer) {
   registerCreateWatchlists(server);
   registerUpdateWatchlists(server);
   registerDeleteWatchlists(server);
+  registerAddMediaToWatchlistsTool(server);
   registerSkipWatchlists(server);
 }
 

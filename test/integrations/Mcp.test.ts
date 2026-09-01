@@ -110,6 +110,268 @@ describe("Janus MCP endpoint", () => {
     });
   });
 
+  it("adds a TMDB movie from its provider ID using canonical metadata", async () => {
+    process.env.TMDB_API_KEY = "test-tmdb-key";
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP movie additions" })
+      .returning();
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          title: "Canonical Movie Title",
+          poster_path: "/canonical-poster.jpg",
+          release_date: "2024-02-03",
+          vote_average: 8.7,
+          runtime: 127,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    const tools = await client.listTools();
+    const addMedia = tools.tools.find((tool) => tool.name === "add_media_to_watchlists");
+
+    expect(addMedia).toMatchObject({
+      name: "add_media_to_watchlists",
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    });
+    expect(addMedia?.description).toContain("TV additions expand into episodes");
+    expect(addMedia?.inputSchema).toMatchObject({
+      properties: { additions: { type: "array" } },
+    });
+
+    const result = await client.callTool({
+      name: "add_media_to_watchlists",
+      arguments: {
+        additions: [
+          {
+            watchlistId: watchlist.id,
+            provider: "tmdb",
+            providerId: "550",
+            mediaType: "movie",
+          },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: true,
+          code: "added",
+          watchlistId: watchlist.id,
+          provider: "tmdb",
+          providerId: "550",
+          affectedCount: 1,
+        },
+      ],
+    });
+    const [item] = await database
+      .getDb()
+      .select()
+      .from(watchlistItems)
+      .where(eq(watchlistItems.watchlistId, watchlist.id));
+    expect(item).toMatchObject({
+      tmdbId: "550",
+      title: "Canonical Movie Title",
+      releaseDate: "2024-02-03",
+      posterPath: "/canonical-poster.jpg",
+    });
+    fetchMock.mockRestore();
+  });
+
+  it("expands TMDB TV additions and reports no new episodes on a repeat request", async () => {
+    process.env.TMDB_API_KEY = "test-tmdb-key";
+    const { watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP TV additions" })
+      .returning();
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            name: "Canonical Show",
+            poster_path: "/show-poster.jpg",
+            seasons: [{ season_number: 0 }, { season_number: 1 }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            episodes: [
+              {
+                id: 101,
+                name: "Pilot",
+                season_number: 1,
+                episode_number: 1,
+                still_path: null,
+                air_date: "2024-01-10",
+                vote_average: 7.2,
+                runtime: 42,
+              },
+              {
+                id: 102,
+                name: "Second Wave",
+                season_number: 1,
+                episode_number: 2,
+                still_path: null,
+                air_date: "2024-01-17",
+                vote_average: 7.8,
+                runtime: 44,
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            name: "Canonical Show",
+            poster_path: "/show-poster.jpg",
+            seasons: [{ season_number: 1 }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            episodes: [
+              {
+                id: 101,
+                name: "Pilot",
+                season_number: 1,
+                episode_number: 1,
+                still_path: null,
+                air_date: "2024-01-10",
+                vote_average: 7.2,
+                runtime: 42,
+              },
+              {
+                id: 102,
+                name: "Second Wave",
+                season_number: 1,
+                episode_number: 2,
+                still_path: null,
+                air_date: "2024-01-17",
+                vote_average: 7.8,
+                runtime: 44,
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+    const arguments_ = {
+      additions: [
+        { watchlistId: watchlist.id, provider: "tmdb", providerId: "1399", mediaType: "tv" },
+      ],
+    };
+
+    const firstResult = await client.callTool({
+      name: "add_media_to_watchlists",
+      arguments: arguments_,
+    });
+    const repeatedResult = await client.callTool({
+      name: "add_media_to_watchlists",
+      arguments: arguments_,
+    });
+
+    expect(firstResult.structuredContent).toMatchObject({
+      results: [{ success: true, code: "added", affectedCount: 2 }],
+    });
+    expect(repeatedResult.structuredContent).toMatchObject({
+      results: [{ success: true, code: "no_new_episodes", affectedCount: 0 }],
+    });
+    fetchMock.mockRestore();
+  });
+
+  it("preserves batch order when a missing destination fails beside a valid addition", async () => {
+    process.env.TMDB_API_KEY = "test-tmdb-key";
+    const { watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP partial additions" })
+      .returning();
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          title: "Partial Success",
+          poster_path: null,
+          release_date: "2024-02-03",
+          vote_average: 8.7,
+          runtime: 127,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    const result = await client.callTool({
+      name: "add_media_to_watchlists",
+      arguments: {
+        additions: [
+          { watchlistId: watchlist.id, provider: "tmdb", providerId: "551", mediaType: "movie" },
+          { watchlistId: 999_999, provider: "tmdb", providerId: "552", mediaType: "movie" },
+        ],
+      },
+    });
+
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        { index: 0, success: true, code: "added", affectedCount: 1 },
+        {
+          index: 1,
+          success: false,
+          code: "not_found",
+          message: "Watchlist not found.",
+          affectedCount: 0,
+        },
+      ],
+    });
+    fetchMock.mockRestore();
+  });
+
+  it("returns a structured insertion-choice result for custom-ordered destinations", async () => {
+    const { watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP custom additions", itemOrderMode: "custom" })
+      .returning();
+
+    const result = await client.callTool({
+      name: "add_media_to_watchlists",
+      arguments: {
+        additions: [
+          { watchlistId: watchlist.id, provider: "tmdb", providerId: "553", mediaType: "movie" },
+        ],
+      },
+    });
+
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          success: false,
+          code: "insertion_choice_required",
+          message: "Choose where to insert this item in the custom order.",
+          affectedCount: 0,
+        },
+      ],
+    });
+  });
+
   it("returns ordered structured validation failures without rolling back valid creates", async () => {
     const result = await client.callTool({
       name: "create_watchlists",
