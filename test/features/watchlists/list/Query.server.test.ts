@@ -4,6 +4,7 @@ import { createIsolatedTestDb, type IsolatedTestDb } from "@test/IsolatedDb";
 import {
   listWatchlistSummaries,
   listWatchlistSummaryPage,
+  searchWatchlistSummaryPage,
 } from "@/features/watchlists/list/Query.server";
 
 const dbState = vi.hoisted(() => ({
@@ -540,5 +541,71 @@ describe("listWatchlistSummaryPage", () => {
     expect(watchlistQuery).toContain("limit ?");
     expect(summaryQueries).toHaveLength(2);
     expect(summaryQueries.every((query) => query.includes("in (?)"))).toBe(true);
+  });
+});
+
+describe("searchWatchlistSummaryPage", () => {
+  it("matches a partial watchlist name without searching descriptions or item contents", async () => {
+    const [matchingWatchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Weekend Movies", description: "A weekend-only description" })
+      .returning();
+    const [descriptionMatch] = await db
+      .insert(watchlists)
+      .values({ name: "Classics", description: "Weekend recommendations" })
+      .returning();
+    const [itemMatch] = await db.insert(watchlists).values({ name: "Books" }).returning();
+
+    await db.insert(watchlistItems).values({
+      watchlistId: itemMatch.id,
+      tmdbId: "weekend-item",
+      source: "tmdb",
+      mediaType: "movie",
+      title: "Weekend at Bernie's",
+    });
+
+    const page = await searchWatchlistSummaryPage({ query: "WEEKEND" });
+
+    expect(page.watchlists.map((watchlist) => watchlist.id)).toEqual([matchingWatchlist.id]);
+    expect(page.watchlists[0]).toMatchObject({
+      id: matchingWatchlist.id,
+      name: "Weekend Movies",
+      description: "A weekend-only description",
+    });
+    expect(page.watchlists.map((watchlist) => watchlist.id)).not.toContain(descriptionMatch.id);
+    expect(page.watchlists.map((watchlist) => watchlist.id)).not.toContain(itemMatch.id);
+  });
+
+  it("matches Unicode case-insensitively", async () => {
+    await db.insert(watchlists).values({ name: "Été en France" });
+
+    const page = await searchWatchlistSummaryPage({ query: "ÉTÉ" });
+
+    expect(page.watchlists.map((watchlist) => watchlist.name)).toEqual(["Été en France"]);
+  });
+
+  it("rejects a cursor issued for another search query", async () => {
+    await db.insert(watchlists).values([
+      { name: "Archive One", createdAt: "2024-01-01 00:00:00" },
+      { name: "Archive Two", createdAt: "2024-01-02 00:00:00" },
+      { name: "Other Archive", createdAt: "2024-01-03 00:00:00" },
+    ]);
+
+    const page = await searchWatchlistSummaryPage({
+      query: "archive",
+      orderBy: "createdAt",
+      order: "asc",
+      pageSize: 1,
+    });
+
+    await expect(
+      searchWatchlistSummaryPage({
+        query: "other",
+        orderBy: "createdAt",
+        order: "asc",
+        pageSize: 1,
+        cursor: page.nextCursor,
+      }),
+    ).rejects.toThrow("Invalid watchlist cursor.");
   });
 });

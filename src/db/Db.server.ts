@@ -2,8 +2,10 @@ import { createServerOnlyFn } from "@tanstack/react-start";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import * as schema from "./Schema";
+import { registerUnicodeCaseFold } from "./UnicodeCaseFold.server";
 
 const sqlite = new Database(process.env.DATABASE_URL || "sqlite.db");
+registerUnicodeCaseFold(sqlite);
 const db = drizzle(sqlite, { schema });
 let isSqliteClosed = false;
 
