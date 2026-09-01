@@ -66,11 +66,10 @@ describe("watchlist item poster image editing", () => {
 
   afterEach(cleanup);
 
-  it("shows the current poster image value and preview in the Edit dialog", () => {
+  it("shows the current poster image value and preview in the Edit dialog", async () => {
     renderTimelineItem();
 
-    fireEvent.click(screen.getByRole("button", { name: "More actions for Movie" }));
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await openEditDialog();
 
     expect(screen.getByLabelText("Poster image")).toHaveProperty("value", "/current-poster.jpg");
     expect(screen.getByRole("img", { name: "Poster preview for Movie" }).getAttribute("src")).toBe(
@@ -78,11 +77,10 @@ describe("watchlist item poster image editing", () => {
     );
   });
 
-  it("previews a provider poster image path before saving", () => {
+  it("previews a provider poster image path before saving", async () => {
     renderTimelineItem();
 
-    fireEvent.click(screen.getByRole("button", { name: "More actions for Movie" }));
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await openEditDialog();
     fireEvent.change(screen.getByLabelText("Poster image"), {
       target: { value: "/replacement-poster.jpg" },
     });
@@ -93,11 +91,10 @@ describe("watchlist item poster image editing", () => {
     expect(editWatchlistItemFn).not.toHaveBeenCalled();
   });
 
-  it("rejects an unsafe poster image value without closing the Edit dialog", () => {
+  it("rejects an unsafe poster image value without closing the Edit dialog", async () => {
     renderTimelineItem();
 
-    fireEvent.click(screen.getByRole("button", { name: "More actions for Movie" }));
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await openEditDialog();
     fireEvent.change(screen.getByLabelText("Poster image"), {
       target: { value: "http://images.example.com/poster.jpg" },
     });
@@ -106,7 +103,7 @@ describe("watchlist item poster image editing", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(editWatchlistItemFn).not.toHaveBeenCalled();
-    expect(screen.getByRole("dialog")).not.toBeNull();
+    expect(screen.getByRole("dialog", { name: "Edit watchlist item" })).not.toBeNull();
     expect(screen.getByLabelText("Poster image")).toHaveProperty(
       "value",
       "http://images.example.com/poster.jpg",
@@ -121,8 +118,7 @@ describe("watchlist item poster image editing", () => {
     const queryClient = renderTimelineItem();
     const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
 
-    fireEvent.click(screen.getByRole("button", { name: "More actions for Movie" }));
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await openEditDialog();
     fireEvent.change(screen.getByLabelText("Poster image"), {
       target: { value: "https://images.example.com/replacement.jpg" },
     });
@@ -140,15 +136,16 @@ describe("watchlist item poster image editing", () => {
       });
     });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ["watchlists"] });
-    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Edit watchlist item" })).toBeNull();
+    });
   });
 
   it("clears the poster image only after Save", async () => {
     editWatchlistItemFn.mockResolvedValue({ success: true });
     renderTimelineItem();
 
-    fireEvent.click(screen.getByRole("button", { name: "More actions for Movie" }));
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await openEditDialog();
     fireEvent.change(screen.getByLabelText("Poster image"), { target: { value: "" } });
 
     expect(screen.queryByRole("img", { name: "Poster preview for Movie" })).toBeNull();
@@ -176,15 +173,14 @@ describe("watchlist item poster image editing", () => {
     const queryClient = renderTimelineItem();
     const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
 
-    fireEvent.click(screen.getByRole("button", { name: "More actions for Movie" }));
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await openEditDialog();
     fireEvent.change(screen.getByLabelText("Poster image"), {
       target: { value: "/replacement-poster.jpg" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByText("Poster image was not saved.")).not.toBeNull();
-    expect(screen.getByRole("dialog")).not.toBeNull();
+    expect(screen.getByRole("dialog", { name: "Edit watchlist item" })).not.toBeNull();
     expect(screen.getByLabelText("Poster image")).toHaveProperty(
       "value",
       "/replacement-poster.jpg",
@@ -192,6 +188,12 @@ describe("watchlist item poster image editing", () => {
     expect(invalidateQueries).not.toHaveBeenCalled();
   });
 });
+
+async function openEditDialog() {
+  fireEvent.click(screen.getByRole("button", { name: "More actions for Movie" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+  await screen.findByRole("dialog", { name: "Edit watchlist item" });
+}
 
 function renderTimelineItem() {
   const queryClient = new QueryClient({
