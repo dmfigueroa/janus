@@ -7,12 +7,9 @@ import {
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { pwaInfo } from "virtual:pwa-info";
-import { Toaster } from "@/components/ui/Sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BottomNav } from "@/components/BottomNav";
 import { PwaUpdatePrompt } from "@/components/PwaUpdatePrompt";
-
-import appCss from "../styles.css?url";
 
 import { NotFound } from "@/components/NotFound";
 import { Provider } from "@/app/Provider";
@@ -59,10 +56,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "/janus-logo-light.png",
         media: "(prefers-color-scheme: light)",
       },
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
       ...getManifestLinks(pwaInfo?.webManifest),
     ],
   }),
@@ -85,7 +78,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <QueryClientProvider client={queryClient}>
             <PwaUpdatePrompt />
             {children}
-            <Toaster />
             <ChakraToaster />
             <TanStackDevtools
               config={{

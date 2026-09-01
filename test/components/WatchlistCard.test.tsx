@@ -50,12 +50,7 @@ vi.mock("@tanstack/react-start", () => ({
   },
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
-    error: vi.fn(),
-    success: vi.fn(),
-  },
-}));
+vi.mock("@/app/Toaster", () => ({ toaster: { create: vi.fn() } }));
 
 vi.mock("@/features/watchlists/components/DeleteWatchlistButton", () => ({
   DeleteWatchlistButton: () => <div>Delete button</div>,
@@ -134,7 +129,7 @@ describe("WatchlistCard", () => {
     expect(invalidateMock).toHaveBeenCalled();
   });
 
-  it("marks the card wrapper as a Chakra group for hover actions", () => {
+  it("marks the card wrapper as a group for hover actions", () => {
     render(
       <WatchlistCard
         watchlist={createWatchlist({ id: 1, name: "Movie Night" })}
@@ -142,7 +137,7 @@ describe("WatchlistCard", () => {
       />,
     );
 
-    expect(screen.getByRole("group").classList.contains("group")).toBe(true);
+    expect(screen.getByRole("group")).not.toBeNull();
   });
 
   it("shows item titles instead of the watchlist name in featured up next cards", () => {

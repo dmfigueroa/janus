@@ -1,9 +1,7 @@
 import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
 
 const janusConfig = defineConfig({
-  // Keep Chakra's reset inert during the Tailwind migration. `false` creates an empty reset
-  // layer that Emotion serializes next to the base layer as invalid `@layer reset@layer base`.
-  preflight: { scope: ".chakra-preflight" },
+  preflight: true,
   globalCss: {
     "html, body": {
       minHeight: "100%",

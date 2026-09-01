@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { deleteWatchlist } from "@/features/watchlists/delete/Mutation";
 import { skipWatchlist } from "@/features/watchlists/skip/Mutation";
 import { useState } from "react";
-import { toast } from "sonner";
+import { toaster } from "@/app/Toaster";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query";
 import {
   WatchlistCardInfo,
@@ -112,10 +112,10 @@ export function WatchlistCard(cardProps: WatchlistCardProps) {
     try {
       await deleteWatchlistFn({ data: { id: watchlist.id } });
       await router.invalidate?.();
-      toast.success("Watchlist deleted successfully");
+      toaster.create({ type: "success", title: "Watchlist deleted successfully" });
     } catch (error) {
       console.error("Failed to delete", error);
-      toast.error("Failed to delete watchlist. Please try again.");
+      toaster.create({ type: "error", title: "Failed to delete watchlist. Please try again." });
       setDeleting(false);
     }
   };
@@ -128,14 +128,14 @@ export function WatchlistCard(cardProps: WatchlistCardProps) {
       await router.invalidate?.();
     } catch (error) {
       console.error("Failed to skip watchlist", error);
-      toast.error("Failed to skip watchlist. Please try again.");
+      toaster.create({ type: "error", title: "Failed to skip watchlist. Please try again." });
     } finally {
       setSkipping(false);
     }
   };
 
   return (
-    <Flex direction="column" gap={2} position="relative" role="group" className="group">
+    <Flex direction="column" gap={2} position="relative" role="group">
       <CardArtworkLink selectionMode={selectionMode} watchlistId={watchlist.id}>
         <WatchlistCardArtwork
           watchlist={watchlist}
