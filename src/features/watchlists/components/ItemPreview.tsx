@@ -1,3 +1,4 @@
+import { Box, Center, Flex, Image as ChakraImage, Text } from "@chakra-ui/react";
 import { Image } from "lucide-react";
 import type { WatchlistItem } from "@/db/Schema";
 import { buildMediaPosterUrl } from "@/utils/Tmdb";
@@ -8,22 +9,30 @@ type ItemPreviewProps = {
 
 export function ItemPreview({ item }: ItemPreviewProps) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border p-3">
+    <Flex align="center" gap={3} rounded="lg" borderWidth="1px" borderColor="border.default" p={3}>
       {item.posterPath ? (
-        <img
+        <ChakraImage
           src={buildMediaPosterUrl(item.posterPath, "w92")}
           alt=""
-          className="h-12 w-8 rounded object-cover shrink-0"
+          h={12}
+          w={8}
+          rounded="sm"
+          objectFit="cover"
+          flexShrink={0}
         />
       ) : (
-        <div className="flex h-12 w-8 shrink-0 items-center justify-center rounded bg-muted">
-          <Image size={16} className="text-muted-foreground" />
-        </div>
+        <Center h={12} w={8} flexShrink={0} rounded="sm" bg="bg.subtle" color="fg.muted">
+          <Image size={16} aria-hidden="true" />
+        </Center>
       )}
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium">{item.title}</p>
-        <p className="text-xs text-muted-foreground capitalize">{item.mediaType}</p>
-      </div>
-    </div>
+      <Box minW={0}>
+        <Text truncate fontSize="sm" fontWeight="medium">
+          {item.title}
+        </Text>
+        <Text fontSize="xs" color="fg.muted" textTransform="capitalize">
+          {item.mediaType}
+        </Text>
+      </Box>
+    </Flex>
   );
 }

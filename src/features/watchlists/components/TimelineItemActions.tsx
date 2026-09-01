@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { WatchlistItem } from "@/db/Schema";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
 import { MoveItemDialog } from "@/features/watchlists/move/MoveItemDialog";
-import type { InsertionPosition } from "@/features/watchlists/InsertOrderedItem.server";
+import type { InsertionPosition } from "@/features/watchlists/Order";
 import { useToggleWatchedItem } from "@/features/watchlists/detail/useToggleWatchedItem";
 import { MoveParentDialog } from "@/features/watchlists/move/MoveParentDialog";
 import {

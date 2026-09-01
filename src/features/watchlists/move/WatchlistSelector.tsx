@@ -1,6 +1,7 @@
-import { useState, type ReactNode, type KeyboardEvent } from "react";
-import type { WatchlistSummary } from "@/features/watchlists/list/Query.server";
-import { Input } from "@/components/ui/Input";
+import { Center, Field, Input, Stack, Text } from "@chakra-ui/react";
+import { useState, type KeyboardEvent, type ReactNode } from "react";
+import type { WatchlistSummary } from "@/features/watchlists/list/Query";
+import { WatchlistOption, type WatchlistOptionProps } from "./WatchlistOption";
 
 function filterWatchlists(watchlists: WatchlistSummary[], query: string) {
   if (!query) return watchlists;
@@ -47,6 +48,7 @@ type WatchlistSelectorProps = {
   selectedId: number | null;
   isLoading: boolean;
   isError: boolean;
+  disabled?: boolean;
   onSelect: (id: number) => void;
 };
 
@@ -55,46 +57,96 @@ export function WatchlistSelector({
   selectedId,
   isLoading,
   isError,
+  disabled = false,
   onSelect,
 }: WatchlistSelectorProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const filteredWatchlists = filterWatchlists(watchlists, searchQuery);
 
   return (
-    <div>
-      <p className="mb-2 text-sm font-medium">Select destination</p>
+    <Field.Root>
+      <Field.Label>Select destination</Field.Label>
       <WatchlistSelectorState
         isLoading={isLoading}
         isError={isError}
         isEmpty={watchlists.length === 0}
       >
-        <Input
-          placeholder="Search watchlists..."
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          onKeyDown={suppressEnterSubmit}
-          className="mb-2"
-        />
-        {filteredWatchlists.length === 0 ? (
-          <ListStateMessage>No matching watchlists</ListStateMessage>
-        ) : (
-          <div className="max-h-48 overflow-y-auto rounded-md border">
-            <div className="p-1">
-              {filteredWatchlists.map((wl) => (
-                <WatchlistOption
-                  key={wl.id}
-                  selected={selectedId === wl.id}
-                  onClick={() => onSelect(wl.id)}
-                  name={wl.name}
-                  itemCount={wl.stats.totalItems}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+        <Stack gap={2}>
+          <Input
+            aria-label="Search destination watchlists"
+            placeholder="Search watchlists..."
+            value={searchQuery}
+            disabled={disabled}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            onKeyDown={suppressEnterSubmit}
+          />
+          <WatchlistOptions
+            watchlists={filteredWatchlists}
+            selectedId={selectedId}
+            disabled={disabled}
+            onSelect={onSelect}
+          />
+        </Stack>
       </WatchlistSelectorState>
-    </div>
+    </Field.Root>
   );
+}
+
+function WatchlistOptions({
+  watchlists,
+  selectedId,
+  disabled,
+  onSelect,
+}: {
+  watchlists: WatchlistSummary[];
+  selectedId: number | null;
+  disabled: boolean;
+  onSelect: (id: number) => void;
+}) {
+  if (watchlists.length === 0) {
+    return <ListStateMessage>No matching watchlists</ListStateMessage>;
+  }
+
+  return (
+    <Stack
+      gap={1}
+      maxH="12rem"
+      overflowY="auto"
+      rounded="md"
+      borderWidth="1px"
+      borderColor="border.default"
+      p={1}
+    >
+      <WatchlistOptionList
+        watchlists={watchlists}
+        selectedId={selectedId}
+        disabled={disabled}
+        onSelect={onSelect}
+      />
+    </Stack>
+  );
+}
+
+function WatchlistOptionList({
+  watchlists,
+  selectedId,
+  disabled,
+  onSelect,
+}: {
+  watchlists: WatchlistSummary[];
+  selectedId: number | null;
+  disabled: boolean;
+  onSelect: (id: number) => void;
+}) {
+  const optionProps: WatchlistOptionProps[] = watchlists.map((watchlist) => ({
+    optionKey: watchlist.id,
+    watchlist,
+    selected: selectedId === watchlist.id,
+    disabled,
+    onSelect,
+  }));
+
+  return optionProps.map(WatchlistOption);
 }
 
 type ListStateMessageProps = {
@@ -104,62 +156,10 @@ type ListStateMessageProps = {
 
 function ListStateMessage({ children, variant = "default" }: ListStateMessageProps) {
   return (
-    <div
-      className={`flex h-32 items-center justify-center text-sm ${variant === "error" ? "text-destructive" : "text-muted-foreground"}`}
-    >
-      {children}
-    </div>
+    <Center minH="8rem">
+      <Text fontSize="sm" color={variant === "error" ? "status.error" : "fg.muted"}>
+        {children}
+      </Text>
+    </Center>
   );
-}
-
-type WatchlistOptionProps = {
-  selected: boolean;
-  onClick: () => void;
-  name: string;
-  itemCount: number;
-};
-
-function WatchlistOption({ selected, onClick, name, itemCount }: WatchlistOptionProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors ${getOptionClass(selected)}`}
-    >
-      <SelectionCheckbox selected={selected} />
-      <div className="min-w-0">
-        <p className="truncate font-medium">{name}</p>
-        <p className="text-xs text-muted-foreground">{formatItemCount(itemCount)}</p>
-      </div>
-    </button>
-  );
-}
-
-function getOptionClass(selected: boolean) {
-  return selected ? "bg-secondary text-secondary-foreground" : "hover:bg-secondary/50";
-}
-
-function SelectionCheckbox({ selected }: { selected: boolean }) {
-  return (
-    <div
-      className={`size-4 shrink-0 rounded border ${selected ? "border-primary bg-primary" : "border-muted-foreground"}`}
-    >
-      {selected ? (
-        <svg viewBox="0 0 12 12" className="size-full text-primary-foreground">
-          <path
-            d="M2 6l3 3 5-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ) : null}
-    </div>
-  );
-}
-
-function formatItemCount(itemCount: number) {
-  return `${itemCount} item${itemCount !== 1 ? "s" : ""}`;
 }

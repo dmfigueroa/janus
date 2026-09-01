@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { toast } from "sonner";
+import { toaster } from "@/app/Toaster";
 import type { WatchlistItem } from "@/db/Schema";
 import { invalidateWatchlistQueries } from "@/features/watchlists/Cache";
 import {
@@ -51,10 +51,10 @@ export function useRemoveWatchlistItemMutation({
       }),
     onError: (_error, _variables, snapshot) => {
       restoreWatchlistDetailSnapshot({ queryClient, snapshot });
-      toast.error("Failed to remove item");
+      toaster.create({ type: "error", title: "Failed to remove item" });
     },
     onSuccess: (result) => {
-      toast.success(result.message);
+      toaster.create({ type: "success", title: result.message });
     },
     onSettled: () => invalidateWatchlistQueries(queryClient),
   });
