@@ -216,6 +216,9 @@ describe("Janus MCP endpoint", () => {
       name: "find_watchlist_items",
       annotations: { readOnlyHint: true, destructiveHint: false },
     });
+    expect(findWatchlistItems?.description).toContain(
+      "case-insensitive title, parent-title, and episode",
+    );
     expect(findWatchlistItems?.inputSchema).toMatchObject({
       properties: {
         watchlistId: { type: "integer" },

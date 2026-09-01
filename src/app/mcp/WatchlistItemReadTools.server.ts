@@ -61,7 +61,7 @@ function registerFindWatchlistItems(server: McpServer) {
     {
       title: "Find watchlist items",
       description:
-        "Find watchlist items by a Janus watchlist item ID or explicit provider, provider ID, and media type.",
+        "Find watchlist items by a Janus watchlist item ID; explicit provider, provider ID, and media type; or case-insensitive title, parent-title, and episode text.",
       inputSchema: {
         watchlistId: z.number().int().positive(),
         watchlistItemId: z.number().int().positive().optional(),
