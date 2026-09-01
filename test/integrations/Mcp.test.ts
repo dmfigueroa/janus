@@ -185,6 +185,99 @@ describe("Janus MCP endpoint", () => {
     fetchMock.mockRestore();
   });
 
+  it("adds supported provider media canonically and preserves mixed-batch outcomes", async () => {
+    process.env.RAWG_API_KEY = "test-rawg-key";
+    process.env.GOOGLE_BOOKS_API_KEY = "test-google-books-key";
+    process.env.COMICVINE_API_KEY = "test-comicvine-key";
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP canonical providers" })
+      .returning();
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = input.toString();
+      if (url.includes("rawg.io")) {
+        return new Response(
+          JSON.stringify({ id: 3498, name: "Canonical Game", released: "2013-09-17" }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (url.includes("googleapis.com")) {
+        return new Response(
+          JSON.stringify({
+            id: "book-42",
+            volumeInfo: { title: "Canonical Book", publishedDate: "1969-03-01" },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (url.includes("/volume/")) {
+        return new Response(JSON.stringify({ results: { id: 4050, name: "Canonical Volume" } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          error: "OK",
+          number_of_total_results: 1,
+          results: [{ id: 1, name: "Canonical Issue", issue_number: "1" }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+
+    const result = await client.callTool({
+      name: "add_media_to_watchlists",
+      arguments: {
+        additions: [
+          {
+            watchlistId: watchlist.id,
+            provider: "google_books",
+            providerId: "book-42",
+            mediaType: "book",
+          },
+          { watchlistId: watchlist.id, provider: "rawg", providerId: "3498", mediaType: "game" },
+          {
+            watchlistId: watchlist.id,
+            provider: "comicvine",
+            providerId: "4050",
+            mediaType: "comic",
+          },
+          { watchlistId: watchlist.id, provider: "anilist", providerId: "1", mediaType: "anime" },
+        ],
+      },
+    });
+
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        { index: 0, success: true, code: "added", provider: "google_books" },
+        { index: 1, success: true, code: "added", provider: "rawg" },
+        { index: 2, success: true, code: "added", provider: "comicvine" },
+        { index: 3, success: false, code: "provider_unavailable", provider: "anilist" },
+      ],
+    });
+    await expect(
+      database
+        .getDb()
+        .select({
+          source: watchlistItems.source,
+          title: watchlistItems.title,
+          parentTitle: watchlistItems.parentTitle,
+        })
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, watchlist.id)),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: "google_books", title: "Canonical Book" }),
+        expect.objectContaining({ source: "rawg", title: "Canonical Game" }),
+        expect.objectContaining({ source: "comicvine", parentTitle: "Canonical Volume" }),
+      ]),
+    );
+    fetchMock.mockRestore();
+  });
+
   it("expands TMDB TV additions and reports no new episodes on a repeat request", async () => {
     process.env.TMDB_API_KEY = "test-tmdb-key";
     const { watchlists } = await import("@/db/Schema");

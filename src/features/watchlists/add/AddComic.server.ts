@@ -2,6 +2,7 @@ import { watchlistItems } from "@/db/Schema";
 import type { WatchlistMedia } from "./Mutation";
 import * as repository from "@/features/watchlists/Repository.server";
 import { getComicIssues } from "@/server/providers/Comicvine.server";
+import { getComicVolumeDetails } from "@/integrations/comicvine/ComicvineVolume.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
 import { persistAddedItems } from "./Insert.server";
 import { rejectAdd, type WatchlistWriteResult } from "./Shared.server";
@@ -21,7 +22,18 @@ export async function addComicToWatchlist(
     return rejectAdd(COMICVINE_UNAVAILABLE_MESSAGE);
   }
 
-  return addFetchedComicIssues(watchlistId, volumeId, media, apiKey, insertionPosition);
+  try {
+    const canonicalVolume = await getComicVolumeDetails(volumeId, apiKey);
+    return addFetchedComicIssues(
+      watchlistId,
+      volumeId,
+      { ...media, title: canonicalVolume.title },
+      apiKey,
+      insertionPosition,
+    );
+  } catch {
+    return rejectAdd(COMICVINE_FETCH_FAILURE_MESSAGE);
+  }
 }
 
 async function addFetchedComicIssues(
