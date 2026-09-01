@@ -856,7 +856,7 @@ describe("Janus MCP endpoint", () => {
     expect(gameResult.structuredContent).toEqual({
       success: false,
       code: "provider_unavailable",
-      message: "The selected provider is unavailable. Please try again later.",
+      message: "Search is temporarily unavailable for this media type. Please try again later.",
     });
   });
 
@@ -883,7 +883,8 @@ describe("Janus MCP endpoint", () => {
           structuredContent: {
             success: false,
             code: "provider_unavailable",
-            message: "The selected provider is unavailable. Please try again later.",
+            message:
+              "Search is temporarily unavailable for this media type. Please try again later.",
           },
         }),
       ),

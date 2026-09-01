@@ -6,6 +6,7 @@ import { cleanup, render, screen } from "../../utils/Render";
 vi.mock("@/features/search/useSearchResults", () => ({
   useSearchResults: vi.fn(() => ({
     allResults: [],
+    rejectionMessage: undefined,
     fetchNextPage: vi.fn(),
     hasNextPage: false,
     isFetchingNextPage: false,
@@ -55,6 +56,7 @@ describe("SearchDiscoveryScreen behavior", () => {
   beforeEach(() => {
     vi.mocked(useSearchResults).mockReturnValue({
       allResults: [],
+      rejectionMessage: undefined,
       fetchNextPage: vi.fn(),
       hasNextPage: false,
       isFetchingNextPage: false,
@@ -105,6 +107,7 @@ describe("SearchDiscoveryScreen behavior", () => {
           poster: null,
         },
       ],
+      rejectionMessage: undefined,
       fetchNextPage: vi.fn(),
       hasNextPage: false,
       isFetchingNextPage: false,
@@ -132,5 +135,28 @@ describe("SearchDiscoveryScreen behavior", () => {
     // The warning banner should appear in addition to the static header message
     const deprecatedMessages = screen.getAllByText(/Anime and manga categories are deprecated/);
     expect(deprecatedMessages.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("shows the provider-unavailable message returned by the search boundary", () => {
+    vi.mocked(useSearchResults).mockReturnValue({
+      allResults: [],
+      rejectionMessage:
+        "Search is temporarily unavailable for this media type. Please try again later.",
+      fetchNextPage: vi.fn(),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+    });
+
+    render(
+      <SearchDiscoveryScreen
+        query="Dune"
+        type="book"
+        initialData={{ results: [], page: 1, total_pages: 1, total_results: 0, rejected: true }}
+      />,
+    );
+
+    expect(screen.getByRole("status").textContent).toBe(
+      "Search is temporarily unavailable for this media type. Please try again later.",
+    );
   });
 });

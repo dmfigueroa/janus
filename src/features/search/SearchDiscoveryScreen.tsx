@@ -45,16 +45,39 @@ function DeprecatedSearchNotice({ visible }: { visible: boolean }) {
   );
 }
 
+function ProviderUnavailableNotice({ message }: { message: string | undefined }) {
+  if (!message) return null;
+  return (
+    <Box
+      maxW="3xl"
+      mx="auto"
+      mt={8}
+      rounded="md"
+      borderWidth="1px"
+      borderColor="orange.muted"
+      bg="orange.subtle"
+      color="orange.fg"
+      px={4}
+      py={3}
+      fontSize="sm"
+      role="status"
+    >
+      {message}
+    </Box>
+  );
+}
+
 export function SearchDiscoveryScreen({
   query,
   type,
   initialData,
 }: SearchDiscoveryScreenProperties) {
-  const { allResults, fetchNextPage, hasNextPage, isFetchingNextPage } = useSearchResults({
-    query,
-    type,
-    initialData,
-  });
+  const { allResults, rejectionMessage, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useSearchResults({
+      query,
+      type,
+      initialData,
+    });
   const { handleSearch, handleTabChange } = useSearchNavigation(query, type);
   const isDeprecated = isDeprecatedMediaType(type);
   const activeTab = getActiveTab(type);
@@ -115,6 +138,7 @@ export function SearchDiscoveryScreen({
         </Stack>
 
         <DeprecatedSearchNotice visible={isDeprecated && Boolean(query)} />
+        <ProviderUnavailableNotice message={isDeprecated ? undefined : rejectionMessage} />
 
         <Box mt={8}>
           <SearchResults

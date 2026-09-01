@@ -30,6 +30,10 @@ function flattenResults(data: { pages: SearchPage[] } | undefined) {
   return data.pages.flatMap((page) => page.results);
 }
 
+function getRejectionMessage(data: { pages: SearchPage[] } | undefined) {
+  return data?.pages.find((page) => page.rejected)?.message;
+}
+
 export function useSearchResults({ query, type, initialData }: UseSearchResultsOptions) {
   const searchUnifiedFn = useServerFn(searchUnified);
 
@@ -58,9 +62,11 @@ export function useSearchResults({ query, type, initialData }: UseSearchResultsO
   });
 
   const allResults = flattenResults(data);
+  const rejectionMessage = getRejectionMessage(data);
 
   return {
     allResults,
+    rejectionMessage,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
