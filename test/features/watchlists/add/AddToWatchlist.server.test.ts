@@ -260,6 +260,53 @@ describe("provider-backed add to watchlist mutation", () => {
     });
   });
 
+  it("returns a provider failure when a TV season cannot be resolved", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Unavailable TV provider" });
+    getTVDetailsMock.mockResolvedValue({
+      name: "Unavailable Show",
+      poster_path: null,
+      seasons: [{ season_number: 1 }],
+    });
+    getSeasonDetailsMock.mockRejectedValue(new Error("TMDB unavailable"));
+
+    await expect(
+      addProviderMediaToWatchlist({
+        watchlistId: watchlist.id,
+        provider: "tmdb",
+        providerId: "42",
+        mediaType: "tv",
+      }),
+    ).resolves.toEqual({
+      success: false,
+      code: "provider_unavailable",
+      message: "TMDB is temporarily unavailable. Please try again later.",
+      affectedCount: 0,
+    });
+  });
+
+  it("reports a show with no regular episodes as a zero-count outcome", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Specials only" });
+    getTVDetailsMock.mockResolvedValue({
+      name: "Specials Only",
+      poster_path: null,
+      seasons: [{ season_number: 0 }],
+    });
+
+    const result = await addProviderMediaToWatchlist({
+      watchlistId: watchlist.id,
+      provider: "tmdb",
+      providerId: "43",
+      mediaType: "tv",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      code: "no_new_episodes",
+      message: "No episodes found for this show",
+      affectedCount: 0,
+    });
+  });
+
   it("uses provider details for TMDB movies", async () => {
     const watchlist = await createTestWatchlist(db, { name: "Movie Night" });
     getMovieDetailsMock.mockResolvedValue({

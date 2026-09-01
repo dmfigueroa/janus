@@ -343,6 +343,69 @@ describe("Janus MCP endpoint", () => {
     fetchMock.mockRestore();
   });
 
+  it("returns per-addition provider failures without discarding successful batch additions", async () => {
+    process.env.TMDB_API_KEY = "test-tmdb-key";
+    const { watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP provider failure isolation" })
+      .returning();
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = input.toString();
+      if (url.includes("/movie/554")) {
+        return new Response(
+          JSON.stringify({
+            title: "Successful Movie",
+            poster_path: null,
+            release_date: "2024-02-03",
+            vote_average: 8.7,
+            runtime: 127,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (url.includes("/tv/1399/season/1")) {
+        return new Response(JSON.stringify({ status_code: 503, status_message: "Unavailable" }), {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(
+        JSON.stringify({
+          name: "Unavailable Show",
+          poster_path: null,
+          seasons: [{ season_number: 1 }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+
+    const result = await client.callTool({
+      name: "add_media_to_watchlists",
+      arguments: {
+        additions: [
+          { watchlistId: watchlist.id, provider: "tmdb", providerId: "1399", mediaType: "tv" },
+          {
+            watchlistId: watchlist.id,
+            provider: "tmdb",
+            providerId: "554",
+            mediaType: "movie",
+          },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        { index: 0, success: false, code: "provider_unavailable", affectedCount: 0 },
+        { index: 1, success: true, code: "added", affectedCount: 1 },
+      ],
+    });
+    fetchMock.mockRestore();
+  });
+
   it("returns a structured insertion-choice result for custom-ordered destinations", async () => {
     const { watchlists } = await import("@/db/Schema");
     const [watchlist] = await database

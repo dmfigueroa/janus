@@ -25,7 +25,7 @@ export async function addProviderMediaToWatchlist(
     return destinationFailure;
   }
 
-  const result = await addToWatchlistMutation({
+  return addToWatchlistMutation({
     watchlistId: addition.watchlistId,
     insertionPosition: addition.insertionPosition,
     media: {
@@ -35,9 +35,18 @@ export async function addProviderMediaToWatchlist(
       title: "",
       poster: null,
     },
-  });
+  })
+    .then(providerMediaAdditionResult)
+    .catch(providerUnavailableResult);
+}
 
-  return providerMediaAdditionResult(result);
+function providerUnavailableResult(): ProviderMediaAdditionResult {
+  return {
+    success: false,
+    code: "provider_unavailable",
+    message: "TMDB is temporarily unavailable. Please try again later.",
+    affectedCount: 0,
+  };
 }
 
 function validateDestination(addition: ProviderMediaAddition): ProviderMediaAdditionResult | null {
@@ -100,6 +109,7 @@ function noChangeProviderMediaResult(message: string): ProviderMediaAdditionResu
   const codeByMessage = {
     "Already in watchlist": "duplicate",
     "No new episodes found for this show": "no_new_episodes",
+    "No episodes found for this show": "no_new_episodes",
   } as const;
   const code = codeByMessage[message as keyof typeof codeByMessage];
   return code ? { success: true, code, message, affectedCount: 0 } : null;
