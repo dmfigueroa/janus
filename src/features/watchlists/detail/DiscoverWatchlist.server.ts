@@ -74,14 +74,14 @@ export async function findWatchlistItemsByText({
   return discoverWatchlistPage({ watchlistId, query, pageSize, cursor });
 }
 
-export async function findWatchlistTitlesByText({
+export async function findWatchlistTitles({
   watchlistId,
   query,
   pageSize = 50,
   cursor,
 }: {
   watchlistId: number;
-  query: string;
+  query?: string;
   pageSize?: number;
   cursor?: string;
 }) {
@@ -96,7 +96,7 @@ async function loadWatchlistTitlePage({
   offset,
 }: {
   watchlistId: number;
-  query: string;
+  query?: string;
   pageSize: number;
   offset: number;
 }) {
