@@ -150,7 +150,7 @@ function registerGetWatchlist(server: McpServer, watchlistSummaryOutputSchema: z
       description:
         'Get one watchlist with summary counts and a cursor-paginated result page. Use resultView: "items" | "titles" to choose individual entries or titles that group all episodes from the same TV show and issues from the same series.',
       inputSchema: {
-        watchlistId: z.number().int().positive(),
+        watchlistId: z.coerce.number().int().positive(),
         pageSize: z.number().int().min(1).max(100).optional(),
         cursor: z.string().optional(),
         resultView: z.enum(["items", "titles"]).optional(),

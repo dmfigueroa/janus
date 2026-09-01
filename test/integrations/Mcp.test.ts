@@ -165,7 +165,7 @@ describe("Janus MCP endpoint", () => {
 
     const result = await client.callTool({
       name: "get_watchlist",
-      arguments: { watchlistId: watchlist.id, pageSize: 1 },
+      arguments: { watchlistId: String(watchlist.id), pageSize: 1 },
     });
 
     expect(result.isError).not.toBe(true);
