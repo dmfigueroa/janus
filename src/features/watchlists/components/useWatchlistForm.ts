@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useForm, type SubmitHandler } from "react-hook-form";
-import { toast } from "sonner";
+import { toaster } from "@/app/Toaster";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -111,9 +111,10 @@ async function handleSubmitSuccess({
   router: ReturnType<typeof useRouter>;
   queryClient: ReturnType<typeof useQueryClient>;
 }) {
-  toast.success(
-    mode === "create" ? "Watchlist created successfully" : "Changes saved successfully",
-  );
+  toaster.create({
+    type: "success",
+    title: mode === "create" ? "Watchlist created successfully" : "Changes saved successfully",
+  });
 
   await router.invalidate?.();
   invalidateWatchlistQueries(queryClient);
@@ -122,9 +123,10 @@ async function handleSubmitSuccess({
 function handleSubmitError(error: unknown) {
   console.error("Failed to save watchlist", error);
 
-  toast.error(
-    error instanceof Error ? error.message : "Failed to save watchlist. Please try again.",
-  );
+  toaster.create({
+    type: "error",
+    title: error instanceof Error ? error.message : "Failed to save watchlist. Please try again.",
+  });
 }
 
 function getDefaultValues(watchlist: Watchlist | undefined): WatchlistFormValues {

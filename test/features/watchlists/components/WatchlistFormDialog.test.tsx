@@ -51,12 +51,7 @@ vi.mock("@tanstack/react-start", () => ({
   },
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
-    error: vi.fn(),
-    success: vi.fn(),
-  },
-}));
+vi.mock("@/app/Toaster", () => ({ toaster: { create: vi.fn() } }));
 
 function watchlistFixture(overrides?: Partial<Watchlist>): Watchlist {
   return {

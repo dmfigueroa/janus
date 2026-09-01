@@ -19,15 +19,12 @@ elevation, motion, focus, and glass-effect vocabulary. Chakra uses
 `next-themes` in system mode so users continue to follow the operating-system
 preference without a theme selector.
 
-Migration slices may temporarily coexist with the legacy Tailwind and Sonner
-surfaces. Sonner remains mounted for unmigrated publishers while Chakra's
-toaster is available to migrated surfaces. Lucide remains the icon-library
-exception.
+Chakra is now the only application component library and the Chakra toaster is
+the sole notification boundary. Lucide remains the icon-library exception.
 
 ## Consequences
 
 Chakra reduces the application-owned component and utility-styling surface and
-provides a maintained API boundary for shared UI. The initial foundation does
-not remove legacy dependencies; later migration slices must replace active
-consumers before the old styling system is removed. Chakra's preflight is
-disabled during coexistence so unmigrated components retain their behavior.
+provides a maintained API boundary for shared UI. The completed migration
+removes the legacy generated primitives, utility styling, and notification
+adapter, leaving Chakra's preflight and semantic theme tokens authoritative.

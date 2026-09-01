@@ -19,7 +19,7 @@
 
 - **Framework**: [TanStack Start](https://tanstack.com/start) (Full-stack React framework)
 - **Database**: [SQLite](https://sqlite.org/) via [Drizzle ORM](https://orm.drizzle.team/)
-- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) & [shadcn/ui](https://ui.shadcn.com/)
+- **Styling**: [Chakra UI](https://chakra-ui.com/) with a centralized Janus theme
 - **Runtime**: [Node.js](https://nodejs.org/)
 - **Quality**: [Oxlint](https://oxc-project.github.io/op/oxlint) & [Vitest](https://vitest.dev/)
 

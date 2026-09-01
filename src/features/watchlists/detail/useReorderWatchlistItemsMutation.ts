@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { toast } from "sonner";
+import { toaster } from "@/app/Toaster";
 import {
   optimisticallyReorderWatchlistItems,
   restoreWatchlistDetailSnapshot,
@@ -47,7 +47,10 @@ export function useReorderWatchlistItemsMutation({
       }),
     onError: (error, _input, snapshot) => {
       restoreWatchlistDetailSnapshot({ queryClient, snapshot });
-      toast.error(error instanceof Error ? error.message : "Failed to reorder watchlist");
+      toaster.create({
+        type: "error",
+        title: error instanceof Error ? error.message : "Failed to reorder watchlist",
+      });
     },
     onSettled: () =>
       queryClient.invalidateQueries({

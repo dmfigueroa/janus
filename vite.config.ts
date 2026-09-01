@@ -6,7 +6,6 @@ import { VitePWA } from "vite-plugin-pwa";
 import viteTsConfigPaths from "vite-tsconfig-paths";
 import { fileURLToPath, URL } from "url";
 import { nitro } from "nitro/vite";
-import tailwind from "@tailwindcss/vite";
 
 const config = defineConfig({
   resolve: {
@@ -26,7 +25,6 @@ const config = defineConfig({
     }),
     tanstackStart(),
     viteReact(),
-    tailwind(),
     VitePWA({
       outDir: ".output/public",
       injectRegister: null,
@@ -41,8 +39,8 @@ const config = defineConfig({
         name: "Janus",
         start_url: "/",
         display: "standalone",
-        theme_color: "#e11d48",
-        background_color: "#0f172a",
+        theme_color: "#ff0055",
+        background_color: "#141218",
         icons: [
           {
             src: "/icon-192.png",

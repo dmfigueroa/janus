@@ -215,7 +215,7 @@ motion:
     - name: Card Hover Scale
       type: scale transform
       duration: 300ms
-      values: scale-[1.02] on hover, scale-[0.98] on press
+      values: scale 1.02 on hover, scale 0.98 on press
     - name: Selection Ring
       type: ring-4 with ring-primary
       description: Blue selection state on watchlist cards
@@ -371,7 +371,7 @@ The mobile-first layout prioritizes browsing a personal media collection. Touch 
 
 ### Spatial System
 
-- **Base unit:** 4px (0.25rem in Tailwind)
+- **Base unit:** 4px (0.25rem Chakra spacing unit)
 - **Standard padding:** 24px (6 units) for page content
 - **Card gaps:** 16px in compact grids, 24px in relaxed layouts
 - **Section spacing:** 32px between major content blocks

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { toast } from "sonner";
+import { toaster } from "@/app/Toaster";
 import type { WatchlistItem } from "@/db/Schema";
 import { invalidateWatchlistQueries } from "@/features/watchlists/Cache";
 import {
@@ -46,7 +46,7 @@ export function useToggleWatchedItem(
       }),
     onError: (_error, _variables, snapshot) => {
       restoreWatchlistDetailSnapshot({ queryClient, snapshot });
-      toast.error("Failed to update status");
+      toaster.create({ type: "error", title: "Failed to update status" });
     },
     onSettled: () => invalidateWatchlistQueries(queryClient),
   });

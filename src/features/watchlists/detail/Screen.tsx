@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import { Box, Container } from "@chakra-ui/react";
 import { useInfiniteQuery, useIsMutating, type InfiniteData } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { toast } from "sonner";
+import { toaster } from "@/app/Toaster";
 import { WatchlistHeader } from "@/features/watchlists/components/WatchlistHeader";
 import { WatchlistTimeline } from "@/features/watchlists/components/WatchlistTimeline";
 import {
@@ -121,7 +121,7 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
           reorderFailed={reorderItemsMutation.isError}
           onReorder={async (intent) => {
             await reorderItemsMutation.mutateAsync(intent);
-            toast.success("Order saved", { duration: 2000 });
+            toaster.create({ type: "success", title: "Order saved", duration: 2000 });
           }}
         />
       </Box>

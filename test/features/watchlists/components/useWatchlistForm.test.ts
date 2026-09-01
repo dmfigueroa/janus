@@ -9,8 +9,7 @@ const {
   invalidateMock,
   createWatchlistFnMock,
   updateWatchlistFnMock,
-  toastSuccessMock,
-  toastErrorMock,
+  toasterCreateMock,
   createWatchlistServerFn,
   updateWatchlistServerFn,
 } = vi.hoisted(() => ({
@@ -18,8 +17,7 @@ const {
   invalidateMock: vi.fn(),
   createWatchlistFnMock: vi.fn(),
   updateWatchlistFnMock: vi.fn(),
-  toastSuccessMock: vi.fn(),
-  toastErrorMock: vi.fn(),
+  toasterCreateMock: vi.fn(),
   createWatchlistServerFn: Symbol("createWatchlist"),
   updateWatchlistServerFn: Symbol("updateWatchlist"),
 }));
@@ -36,12 +34,7 @@ vi.mock("@tanstack/react-router", () => ({
   }),
 }));
 
-vi.mock("sonner", () => ({
-  toast: {
-    success: toastSuccessMock,
-    error: toastErrorMock,
-  },
-}));
+vi.mock("@/app/Toaster", () => ({ toaster: { create: toasterCreateMock } }));
 
 vi.mock("@/features/watchlists/Cache", () => ({
   invalidateWatchlistQueries: (queryClient: unknown) => {
@@ -97,7 +90,10 @@ describe("useWatchlistForm", () => {
     expect(createWatchlistFnMock).toHaveBeenCalledWith({
       data: { name: "New List", description: "A description", itemOrderMode: "custom" },
     });
-    expect(toastSuccessMock).toHaveBeenCalledWith("Watchlist created successfully");
+    expect(toasterCreateMock).toHaveBeenCalledWith({
+      type: "success",
+      title: "Watchlist created successfully",
+    });
     expect(invalidateMock).toHaveBeenCalled();
     expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["watchlists"] });
     expect(result.current.loading).toBe(false);
@@ -148,7 +144,10 @@ describe("useWatchlistForm", () => {
         itemOrderMode: "custom",
       },
     });
-    expect(toastSuccessMock).toHaveBeenCalledWith("Changes saved successfully");
+    expect(toasterCreateMock).toHaveBeenCalledWith({
+      type: "success",
+      title: "Changes saved successfully",
+    });
     expect(invalidateMock).toHaveBeenCalled();
     expect(result.current.loading).toBe(false);
   });
@@ -177,7 +176,7 @@ describe("useWatchlistForm", () => {
 
     await result.current.onSubmit();
 
-    expect(toastErrorMock).toHaveBeenCalledWith("Name already exists");
+    expect(toasterCreateMock).toHaveBeenCalledWith({ type: "error", title: "Name already exists" });
     expect(result.current.loading).toBe(false);
   });
 
@@ -194,7 +193,7 @@ describe("useWatchlistForm", () => {
 
     await result.current.onSubmit();
 
-    expect(toastErrorMock).toHaveBeenCalledWith("Network error");
+    expect(toasterCreateMock).toHaveBeenCalledWith({ type: "error", title: "Network error" });
     expect(result.current.loading).toBe(false);
   });
 
@@ -211,7 +210,10 @@ describe("useWatchlistForm", () => {
 
     await result.current.onSubmit();
 
-    expect(toastErrorMock).toHaveBeenCalledWith("Failed to save watchlist. Please try again.");
+    expect(toasterCreateMock).toHaveBeenCalledWith({
+      type: "error",
+      title: "Failed to save watchlist. Please try again.",
+    });
     expect(result.current.loading).toBe(false);
   });
 });
