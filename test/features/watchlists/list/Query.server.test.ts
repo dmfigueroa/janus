@@ -4,6 +4,7 @@ import { createIsolatedTestDb, type IsolatedTestDb } from "@test/IsolatedDb";
 import {
   listWatchlistSummaries,
   listWatchlistSummaryPage,
+  searchWatchlistSummaryPage,
 } from "@/features/watchlists/list/Query.server";
 
 const dbState = vi.hoisted(() => ({
@@ -540,5 +541,38 @@ describe("listWatchlistSummaryPage", () => {
     expect(watchlistQuery).toContain("limit ?");
     expect(summaryQueries).toHaveLength(2);
     expect(summaryQueries.every((query) => query.includes("in (?)"))).toBe(true);
+  });
+});
+
+describe("searchWatchlistSummaryPage", () => {
+  it("matches a partial watchlist name without searching descriptions or item contents", async () => {
+    const [matchingWatchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Weekend Movies", description: "A weekend-only description" })
+      .returning();
+    const [descriptionMatch] = await db
+      .insert(watchlists)
+      .values({ name: "Classics", description: "Weekend recommendations" })
+      .returning();
+    const [itemMatch] = await db.insert(watchlists).values({ name: "Books" }).returning();
+
+    await db.insert(watchlistItems).values({
+      watchlistId: itemMatch.id,
+      tmdbId: "weekend-item",
+      source: "tmdb",
+      mediaType: "movie",
+      title: "Weekend at Bernie's",
+    });
+
+    const page = await searchWatchlistSummaryPage({ query: "WEEKEND" });
+
+    expect(page.watchlists.map((watchlist) => watchlist.id)).toEqual([matchingWatchlist.id]);
+    expect(page.watchlists[0]).toMatchObject({
+      id: matchingWatchlist.id,
+      name: "Weekend Movies",
+      description: "A weekend-only description",
+    });
+    expect(page.watchlists.map((watchlist) => watchlist.id)).not.toContain(descriptionMatch.id);
+    expect(page.watchlists.map((watchlist) => watchlist.id)).not.toContain(itemMatch.id);
   });
 });

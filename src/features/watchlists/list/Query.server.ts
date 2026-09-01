@@ -1,4 +1,5 @@
 import type { Watchlist as WatchlistRecord } from "@/db/Schema";
+import { sql } from "drizzle-orm";
 import { watchlists } from "@/db/Schema";
 import { getDb } from "@/db/Db.server";
 import { decodeWatchlistCursor, encodeWatchlistCursor } from "./WatchlistCursor.server";
@@ -47,16 +48,53 @@ export async function listWatchlistSummaryPage(
   );
 }
 
+export async function searchWatchlistSummaryPage(options: {
+  query: string;
+  orderBy?: WatchlistListOrder;
+  order?: "asc" | "desc";
+  pageSize?: number;
+  cursor?: string;
+}): Promise<WatchlistSummaryPage> {
+  const { orderBy, order } = normalizeListOptions(options);
+  const pageSize = options.pageSize ?? 50;
+  const offset = getWatchlistPageOffset(options.cursor, orderBy, order);
+  const db = getDb();
+  const pageWithContinuation = await loadWatchlistPage(
+    db,
+    orderBy,
+    order,
+    pageSize,
+    offset,
+    options.query,
+  );
+  const summaries = await buildWatchlistSummaries(db, pageWithContinuation.slice(0, pageSize));
+
+  return buildWatchlistSummaryPage(
+    summaries,
+    pageWithContinuation,
+    pageSize,
+    offset,
+    orderBy,
+    order,
+  );
+}
+
 function loadWatchlistPage(
   db: ReturnType<typeof getDb>,
   orderBy: WatchlistListOrder,
   order: "asc" | "desc",
   pageSize: number,
   offset: number,
+  searchQuery?: string,
 ) {
   return db
     .select()
     .from(watchlists)
+    .where(
+      searchQuery === undefined
+        ? undefined
+        : sql`instr(lower(${watchlists.name}), lower(${searchQuery})) > 0`,
+    )
     .orderBy(...buildListOrderBy(orderBy, order))
     .limit(pageSize + 1)
     .offset(offset);

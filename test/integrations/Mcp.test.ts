@@ -69,6 +69,110 @@ describe("Janus MCP endpoint", () => {
     });
   });
 
+  it("discovers and calls search_watchlists using watchlist names only", async () => {
+    const { watchlists, watchlistItems } = await import("@/db/Schema");
+    const [itemMatch] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "Books", description: "Weekend recommendations" })
+      .returning();
+    await database.getDb().insert(watchlistItems).values({
+      watchlistId: itemMatch.id,
+      tmdbId: "weekend-item",
+      source: "tmdb",
+      mediaType: "movie",
+      title: "Weekend at Bernie's",
+    });
+
+    const tools = await client.listTools();
+    const searchWatchlists = tools.tools.find((tool) => tool.name === "search_watchlists");
+
+    expect(searchWatchlists).toMatchObject({
+      name: "search_watchlists",
+      annotations: { readOnlyHint: true, destructiveHint: false },
+    });
+    expect(searchWatchlists?.inputSchema).toMatchObject({
+      properties: {
+        query: { type: "string" },
+        pageSize: { maximum: 100 },
+        cursor: { type: "string" },
+      },
+    });
+
+    const result = await client.callTool({
+      name: "search_watchlists",
+      arguments: { query: "RECENT" },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      watchlists: [{ id: expect.any(Number), name: "Recently Added" }],
+    });
+    expect(
+      (result.structuredContent as { watchlists: unknown[] }).watchlists[0],
+    ).not.toHaveProperty("items");
+
+    const excludedFieldResult = await client.callTool({
+      name: "search_watchlists",
+      arguments: { query: "weekend" },
+    });
+
+    expect(excludedFieldResult.isError).not.toBe(true);
+    expect(excludedFieldResult.structuredContent).toMatchObject({ watchlists: [] });
+  });
+
+  it("paginates search_watchlists results and rejects invalid inputs", async () => {
+    const { watchlists } = await import("@/db/Schema");
+    await database
+      .getDb()
+      .insert(watchlists)
+      .values([{ name: "Archive One" }, { name: "Archive Two" }]);
+
+    const firstPage = await client.callTool({
+      name: "search_watchlists",
+      arguments: { query: "archive", orderBy: "createdAt", order: "asc", pageSize: 1 },
+    });
+    const firstPageContent = firstPage.structuredContent as {
+      watchlists: Array<{ id: number }>;
+      nextCursor?: string;
+    };
+
+    expect(firstPage.isError).not.toBe(true);
+    expect(firstPageContent.watchlists).toHaveLength(1);
+    expect(firstPageContent.nextCursor).toEqual(expect.any(String));
+
+    const secondPage = await client.callTool({
+      name: "search_watchlists",
+      arguments: {
+        query: "archive",
+        orderBy: "createdAt",
+        order: "asc",
+        pageSize: 1,
+        cursor: firstPageContent.nextCursor,
+      },
+    });
+    const secondPageContent = secondPage.structuredContent as {
+      watchlists: Array<{ id: number }>;
+    };
+
+    expect(secondPage.isError).not.toBe(true);
+    expect(secondPageContent.watchlists).toHaveLength(1);
+    expect(secondPageContent.watchlists[0]?.id).not.toBe(firstPageContent.watchlists[0]?.id);
+
+    await expect(
+      client.callTool({
+        name: "search_watchlists",
+        arguments: { query: "archive", pageSize: 101 },
+      }),
+    ).resolves.toMatchObject({ isError: true });
+    await expect(
+      client.callTool({
+        name: "search_watchlists",
+        arguments: { query: "archive", cursor: "bad" },
+      }),
+    ).resolves.toMatchObject({ isError: true });
+  });
+
   it("returns an opaque continuation cursor for another page", async () => {
     const firstPage = await client.callTool({
       name: "list_watchlists",
