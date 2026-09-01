@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Box, Container, Heading, Stack, Tabs, Text } from "@chakra-ui/react";
+import { toaster } from "@/app/Toaster";
 import { SearchResults } from "@/features/search/SearchResults";
 import { DEPRECATED_MEDIA_MESSAGE, isDeprecatedMediaType } from "@/server/Media";
 import type { UnifiedMedia } from "@/server/Media";
@@ -18,6 +20,8 @@ interface SearchDiscoveryScreenProperties {
     message?: string;
   };
 }
+
+const PROVIDER_UNAVAILABLE_TOAST_ID = "media-search-provider-unavailable";
 
 function getActiveTab(type: UnifiedMedia["mediaType"]) {
   if (isDeprecatedMediaType(type)) return "movie";
@@ -50,14 +54,25 @@ export function SearchDiscoveryScreen({
   type,
   initialData,
 }: SearchDiscoveryScreenProperties) {
-  const { allResults, fetchNextPage, hasNextPage, isFetchingNextPage } = useSearchResults({
-    query,
-    type,
-    initialData,
-  });
+  const { allResults, rejectionMessage, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useSearchResults({
+      query,
+      type,
+      initialData,
+    });
   const { handleSearch, handleTabChange } = useSearchNavigation(query, type);
   const isDeprecated = isDeprecatedMediaType(type);
   const activeTab = getActiveTab(type);
+
+  useEffect(() => {
+    if (isDeprecated || !rejectionMessage) return;
+
+    toaster.create({
+      id: PROVIDER_UNAVAILABLE_TOAST_ID,
+      type: "error",
+      title: rejectionMessage,
+    });
+  }, [isDeprecated, rejectionMessage]);
 
   return (
     <Box minH="100vh" pb={24}>

@@ -856,7 +856,40 @@ describe("Janus MCP endpoint", () => {
     expect(gameResult.structuredContent).toEqual({
       success: false,
       code: "provider_unavailable",
-      message: "The selected provider is unavailable. Please try again later.",
+      message: "Search is temporarily unavailable for this media type. Please try again later.",
     });
+  });
+
+  it("reports active provider HTTP failures as unavailable", async () => {
+    process.env.RAWG_API_KEY = "test-rawg-key";
+    process.env.GOOGLE_BOOKS_API_KEY = "test-google-books-key";
+    process.env.COMICVINE_API_KEY = "test-comicvine-key";
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("Provider unavailable", { status: 503 }));
+
+    const providerResults = await Promise.all(
+      ["game", "book", "comic"].map((mediaType) =>
+        client.callTool({
+          name: "search_media",
+          arguments: { query: "test", mediaType },
+        }),
+      ),
+    );
+
+    expect(providerResults).toEqual(
+      Array.from({ length: 3 }, () =>
+        expect.objectContaining({
+          structuredContent: {
+            success: false,
+            code: "provider_unavailable",
+            message:
+              "Search is temporarily unavailable for this media type. Please try again later.",
+          },
+        }),
+      ),
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    fetchMock.mockRestore();
   });
 });

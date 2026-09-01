@@ -153,7 +153,7 @@ async function searchComicsRequest(query: string, apiKey: string, page: number) 
   const res = await fetch(url.toString(), {
     headers: { "User-Agent": "JanusApp/1.0" },
   });
-  if (!res.ok) return { results: [], totalResults: 0 };
+  if (!res.ok) throw new Error(`ComicVine search request failed: ${res.status}`);
 
   const rawData = await res.json();
   const data = ComicVineResponseSchema.parse(rawData);

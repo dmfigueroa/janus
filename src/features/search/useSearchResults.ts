@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { searchUnified } from "@/features/search/MediaSearch";
+import { searchUnified } from "@/features/search/search/MediaSearch";
 import { DEPRECATED_MEDIA_MESSAGE, isDeprecatedMediaType } from "@/server/Media";
 import type { UnifiedMedia } from "@/server/Media";
 
@@ -28,6 +28,10 @@ function getInitialData(query: string, initialData: SearchPage) {
 function flattenResults(data: { pages: SearchPage[] } | undefined) {
   if (!data) return [];
   return data.pages.flatMap((page) => page.results);
+}
+
+function getRejectionMessage(data: { pages: SearchPage[] } | undefined) {
+  return data?.pages.find((page) => page.rejected)?.message;
 }
 
 export function useSearchResults({ query, type, initialData }: UseSearchResultsOptions) {
@@ -58,9 +62,11 @@ export function useSearchResults({ query, type, initialData }: UseSearchResultsO
   });
 
   const allResults = flattenResults(data);
+  const rejectionMessage = getRejectionMessage(data);
 
   return {
     allResults,
+    rejectionMessage,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,

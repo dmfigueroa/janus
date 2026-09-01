@@ -9,6 +9,9 @@ import type { SearchableMediaType } from "./MediaSearch";
 
 type ProviderSearchResult = { results: UnifiedMedia[]; totalResults: number };
 
+export const PROVIDER_UNAVAILABLE_MESSAGE =
+  "Search is temporarily unavailable for this media type. Please try again later.";
+
 export type MediaSearchPage = {
   results: UnifiedMedia[];
   page: number;
@@ -61,6 +64,12 @@ async function searchTmdbMedia(query: string, mediaType: "movie" | "tv", page: n
   return { ...result, rejected: false };
 }
 
+async function getMediaSearchPage(query: string, mediaType: SearchableMediaType, page: number) {
+  if (isTmdbMediaType(mediaType)) return searchTmdbMedia(query, mediaType, page);
+
+  return formatProviderResponse(await providerSearches[mediaType](query, page), page);
+}
+
 export function getDeprecatedMediaSearchPage(
   mediaType: string,
   page: number,
@@ -77,6 +86,17 @@ export function getDeprecatedMediaSearchPage(
   };
 }
 
+function getUnavailableMediaSearchPage(page: number): MediaSearchPage {
+  return {
+    results: [],
+    page,
+    total_pages: 1,
+    total_results: 0,
+    rejected: true,
+    message: PROVIDER_UNAVAILABLE_MESSAGE,
+  };
+}
+
 export async function searchMedia({
   query,
   mediaType,
@@ -89,7 +109,9 @@ export async function searchMedia({
   const deprecatedPage = getDeprecatedMediaSearchPage(mediaType, page);
   if (deprecatedPage) return deprecatedPage;
 
-  if (isTmdbMediaType(mediaType)) return searchTmdbMedia(query, mediaType, page);
-
-  return formatProviderResponse(await providerSearches[mediaType](query, page), page);
+  try {
+    return await getMediaSearchPage(query, mediaType, page);
+  } catch {
+    return getUnavailableMediaSearchPage(page);
+  }
 }

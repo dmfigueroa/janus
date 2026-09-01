@@ -4,8 +4,8 @@ import {
   listWatchlistSummaryPage,
   searchWatchlistSummaryPage,
 } from "@/features/watchlists/list/Query.server";
-import { searchMedia, type MediaSearchPage } from "@/features/search/MediaSearch.server";
-import { searchableMediaTypes } from "@/features/search/MediaSearch";
+import { searchMedia, type MediaSearchPage } from "@/features/search/search/MediaSearch.server";
+import { searchableMediaTypes } from "@/features/search/search/MediaSearch";
 import { handleMcpSessionRequest } from "@/integrations/mcp/McpSessionTransport.server";
 import { asMcpContent } from "./McpToolResponse.server";
 import { registerWatchlistItemReadTools } from "./WatchlistItemReadTools.server";

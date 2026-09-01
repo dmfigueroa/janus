@@ -3,9 +3,14 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "../../utils/Render";
 
+const { toasterCreateMock } = vi.hoisted(() => ({ toasterCreateMock: vi.fn() }));
+
+vi.mock("@/app/Toaster", () => ({ toaster: { create: toasterCreateMock } }));
+
 vi.mock("@/features/search/useSearchResults", () => ({
   useSearchResults: vi.fn(() => ({
     allResults: [],
+    rejectionMessage: undefined,
     fetchNextPage: vi.fn(),
     hasNextPage: false,
     isFetchingNextPage: false,
@@ -53,8 +58,10 @@ describe("SearchDiscoveryScreen behavior", () => {
   });
 
   beforeEach(() => {
+    toasterCreateMock.mockReset();
     vi.mocked(useSearchResults).mockReturnValue({
       allResults: [],
+      rejectionMessage: undefined,
       fetchNextPage: vi.fn(),
       hasNextPage: false,
       isFetchingNextPage: false,
@@ -105,6 +112,7 @@ describe("SearchDiscoveryScreen behavior", () => {
           poster: null,
         },
       ],
+      rejectionMessage: undefined,
       fetchNextPage: vi.fn(),
       hasNextPage: false,
       isFetchingNextPage: false,
@@ -132,5 +140,30 @@ describe("SearchDiscoveryScreen behavior", () => {
     // The warning banner should appear in addition to the static header message
     const deprecatedMessages = screen.getAllByText(/Anime and manga categories are deprecated/);
     expect(deprecatedMessages.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("toasts the provider-unavailable message returned by the search boundary", () => {
+    vi.mocked(useSearchResults).mockReturnValue({
+      allResults: [],
+      rejectionMessage:
+        "Search is temporarily unavailable for this media type. Please try again later.",
+      fetchNextPage: vi.fn(),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+    });
+
+    render(
+      <SearchDiscoveryScreen
+        query="Dune"
+        type="book"
+        initialData={{ results: [], page: 1, total_pages: 1, total_results: 0, rejected: true }}
+      />,
+    );
+
+    expect(toasterCreateMock).toHaveBeenCalledWith({
+      id: "media-search-provider-unavailable",
+      type: "error",
+      title: "Search is temporarily unavailable for this media type. Please try again later.",
+    });
   });
 });
