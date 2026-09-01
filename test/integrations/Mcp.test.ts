@@ -383,7 +383,9 @@ describe("Janus MCP endpoint", () => {
     const tools = await client.listTools();
     const findWatchlistItems = tools.tools.find((tool) => tool.name === "find_watchlist_items");
 
-    expect(findWatchlistItems?.description).toContain('resultView: "items" | "titles"');
+    expect(findWatchlistItems?.description).toContain(
+      "all matching episodes from the same TV show",
+    );
     expect(findWatchlistItems?.inputSchema).toMatchObject({
       properties: { resultView: { enum: ["items", "titles"] } },
     });

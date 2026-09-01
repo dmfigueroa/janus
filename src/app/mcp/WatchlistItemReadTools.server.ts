@@ -65,7 +65,7 @@ function registerFindWatchlistItems(server: McpServer) {
     {
       title: "Find watchlist items",
       description:
-        'Find watchlist items by a Janus watchlist item ID; explicit provider, provider ID, and media type; or case-insensitive title, parent-title, and episode text. For text lookup, use resultView: "items" | "titles"; titles collapses matching episodes or issues into a title with a matching-item count.',
+        'Find watchlist items by a Janus watchlist item ID; explicit provider, provider ID, and media type; or case-insensitive title, parent-title, and episode text. For text lookup, use resultView: "items" | "titles"; titles groups all matching episodes from the same TV show, or issues from the same series, into one title result with a matching-item count.',
       inputSchema: {
         watchlistId: z.number().int().positive(),
         watchlistItemId: z.number().int().positive().optional(),
