@@ -347,6 +347,66 @@ describe("Janus MCP endpoint", () => {
     });
   });
 
+  it("collapses matching watchlist items into title results when requested", async () => {
+    const { watchlists, watchlistItems } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "Collapsed titles" })
+      .returning();
+    await database
+      .getDb()
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "show-episode-one",
+          source: "tmdb",
+          mediaType: "episode",
+          title: "Pilot",
+          parentId: "show-identity",
+          parentTitle: "Collapsed Show",
+          episode: "S01E01",
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "show-episode-two",
+          source: "tmdb",
+          mediaType: "episode",
+          title: "Finale",
+          parentId: "show-identity",
+          parentTitle: "Collapsed Show",
+          episode: "S01E02",
+        },
+      ]);
+
+    const tools = await client.listTools();
+    const findWatchlistItems = tools.tools.find((tool) => tool.name === "find_watchlist_items");
+
+    expect(findWatchlistItems?.description).toContain('resultView: "items" | "titles"');
+    expect(findWatchlistItems?.inputSchema).toMatchObject({
+      properties: { resultView: { enum: ["items", "titles"] } },
+    });
+
+    const result = await client.callTool({
+      name: "find_watchlist_items",
+      arguments: { watchlistId: watchlist.id, query: "collapsed", resultView: "titles" },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      titles: [
+        {
+          title: "Collapsed Show",
+          provider: "tmdb",
+          providerId: "show-identity",
+          mediaType: "episode",
+          matchingItemCount: 2,
+        },
+      ],
+    });
+  });
+
   it("paginates text item searches and returns structured expected failures", async () => {
     const { watchlists, watchlistItems } = await import("@/db/Schema");
     const [watchlist] = await database

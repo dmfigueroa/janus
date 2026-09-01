@@ -93,7 +93,7 @@ function selectCoverItem(
   return firstItemOrNull(firstItems);
 }
 
-function buildDetailFilters({
+export function buildDetailFilters({
   watchlistId,
   query,
   unwatchedOnly,

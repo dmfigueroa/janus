@@ -2,10 +2,13 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
   discoverWatchlistPage,
+  findWatchlistItemsByText,
+  findWatchlistTitlesByText,
+} from "@/features/watchlists/detail/DiscoverWatchlist.server";
+import {
   findWatchlistItemById,
   findWatchlistItemByProvider,
-  findWatchlistItemsByText,
-} from "@/features/watchlists/detail/DiscoverWatchlist.server";
+} from "@/features/watchlists/detail/FindWatchlistItem.server";
 import { asMcpContent, asMcpError } from "./McpToolResponse.server";
 
 const mediaTypeSchema = z.enum(["movie", "episode", "game", "book", "comic", "anime", "manga"]);
@@ -43,6 +46,7 @@ const selectorSchema = z.union([
       query: z.string().trim().min(1),
       pageSize: z.number().int().min(1).max(100).optional(),
       cursor: z.string().optional(),
+      resultView: z.enum(["items", "titles"]).optional(),
     })
     .strict(),
 ]);
@@ -61,7 +65,7 @@ function registerFindWatchlistItems(server: McpServer) {
     {
       title: "Find watchlist items",
       description:
-        "Find watchlist items by a Janus watchlist item ID; explicit provider, provider ID, and media type; or case-insensitive title, parent-title, and episode text.",
+        'Find watchlist items by a Janus watchlist item ID; explicit provider, provider ID, and media type; or case-insensitive title, parent-title, and episode text. For text lookup, use resultView: "items" | "titles"; titles collapses matching episodes or issues into a title with a matching-item count.',
       inputSchema: {
         watchlistId: z.number().int().positive(),
         watchlistItemId: z.number().int().positive().optional(),
@@ -71,8 +75,23 @@ function registerFindWatchlistItems(server: McpServer) {
         query: z.string().trim().min(1).optional(),
         pageSize: z.number().int().min(1).max(100).optional(),
         cursor: z.string().optional(),
+        resultView: z.enum(["items", "titles"]).optional(),
       },
-      outputSchema: { items: z.array(itemOutputSchema), nextCursor: z.string().optional() },
+      outputSchema: {
+        items: z.array(itemOutputSchema).optional(),
+        titles: z
+          .array(
+            z.object({
+              provider: z.string(),
+              providerId: z.string(),
+              mediaType: mediaTypeSchema,
+              title: z.string(),
+              matchingItemCount: z.number(),
+            }),
+          )
+          .optional(),
+        nextCursor: z.string().optional(),
+      },
       annotations: { readOnlyHint: true, destructiveHint: false },
     },
     async (arguments_) => respondToFindWatchlistItems(arguments_),
@@ -91,9 +110,19 @@ async function respondToFindWatchlistItems(arguments_: Record<string, unknown>) 
 async function respondToTextSearch(
   selection: Extract<z.infer<typeof selectorSchema>, { query: string }>,
 ) {
+  if (selection.resultView === "titles") return respondToTitleSearch(selection);
+
   const page = await findWatchlistItemsByText(selection);
   if (!page) return asMcpError(`Watchlist ${selection.watchlistId} was not found.`);
   return asMcpContent({ items: page.items.map(toMcpWatchlistItem), nextCursor: page.nextCursor });
+}
+
+async function respondToTitleSearch(
+  selection: Extract<z.infer<typeof selectorSchema>, { query: string }>,
+) {
+  const page = await findWatchlistTitlesByText(selection);
+  if (!page) return asMcpError(`Watchlist ${selection.watchlistId} was not found.`);
+  return asMcpContent(page);
 }
 
 function findSelectedItems(selection: Exclude<z.infer<typeof selectorSchema>, { query: string }>) {
