@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Box, Container, Heading, Stack, Tabs, Text } from "@chakra-ui/react";
+import { toaster } from "@/app/Toaster";
 import { SearchResults } from "@/features/search/SearchResults";
 import { DEPRECATED_MEDIA_MESSAGE, isDeprecatedMediaType } from "@/server/Media";
 import type { UnifiedMedia } from "@/server/Media";
@@ -18,6 +20,8 @@ interface SearchDiscoveryScreenProperties {
     message?: string;
   };
 }
+
+const PROVIDER_UNAVAILABLE_TOAST_ID = "media-search-provider-unavailable";
 
 function getActiveTab(type: UnifiedMedia["mediaType"]) {
   if (isDeprecatedMediaType(type)) return "movie";
@@ -45,28 +49,6 @@ function DeprecatedSearchNotice({ visible }: { visible: boolean }) {
   );
 }
 
-function ProviderUnavailableNotice({ message }: { message: string | undefined }) {
-  if (!message) return null;
-  return (
-    <Box
-      maxW="3xl"
-      mx="auto"
-      mt={8}
-      rounded="md"
-      borderWidth="1px"
-      borderColor="orange.muted"
-      bg="orange.subtle"
-      color="orange.fg"
-      px={4}
-      py={3}
-      fontSize="sm"
-      role="status"
-    >
-      {message}
-    </Box>
-  );
-}
-
 export function SearchDiscoveryScreen({
   query,
   type,
@@ -81,6 +63,16 @@ export function SearchDiscoveryScreen({
   const { handleSearch, handleTabChange } = useSearchNavigation(query, type);
   const isDeprecated = isDeprecatedMediaType(type);
   const activeTab = getActiveTab(type);
+
+  useEffect(() => {
+    if (isDeprecated || !rejectionMessage) return;
+
+    toaster.create({
+      id: PROVIDER_UNAVAILABLE_TOAST_ID,
+      type: "error",
+      title: rejectionMessage,
+    });
+  }, [isDeprecated, rejectionMessage]);
 
   return (
     <Box minH="100vh" pb={24}>
@@ -138,7 +130,6 @@ export function SearchDiscoveryScreen({
         </Stack>
 
         <DeprecatedSearchNotice visible={isDeprecated && Boolean(query)} />
-        <ProviderUnavailableNotice message={isDeprecated ? undefined : rejectionMessage} />
 
         <Box mt={8}>
           <SearchResults

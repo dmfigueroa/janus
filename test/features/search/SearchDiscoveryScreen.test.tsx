@@ -3,6 +3,10 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "../../utils/Render";
 
+const { toasterCreateMock } = vi.hoisted(() => ({ toasterCreateMock: vi.fn() }));
+
+vi.mock("@/app/Toaster", () => ({ toaster: { create: toasterCreateMock } }));
+
 vi.mock("@/features/search/useSearchResults", () => ({
   useSearchResults: vi.fn(() => ({
     allResults: [],
@@ -54,6 +58,7 @@ describe("SearchDiscoveryScreen behavior", () => {
   });
 
   beforeEach(() => {
+    toasterCreateMock.mockReset();
     vi.mocked(useSearchResults).mockReturnValue({
       allResults: [],
       rejectionMessage: undefined,
@@ -137,7 +142,7 @@ describe("SearchDiscoveryScreen behavior", () => {
     expect(deprecatedMessages.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("shows the provider-unavailable message returned by the search boundary", () => {
+  it("toasts the provider-unavailable message returned by the search boundary", () => {
     vi.mocked(useSearchResults).mockReturnValue({
       allResults: [],
       rejectionMessage:
@@ -155,8 +160,10 @@ describe("SearchDiscoveryScreen behavior", () => {
       />,
     );
 
-    expect(screen.getByRole("status").textContent).toBe(
-      "Search is temporarily unavailable for this media type. Please try again later.",
-    );
+    expect(toasterCreateMock).toHaveBeenCalledWith({
+      id: "media-search-provider-unavailable",
+      type: "error",
+      title: "Search is temporarily unavailable for this media type. Please try again later.",
+    });
   });
 });
