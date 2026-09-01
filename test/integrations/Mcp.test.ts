@@ -121,6 +121,303 @@ describe("Janus MCP endpoint", () => {
     expect(excludedFieldResult.structuredContent).toMatchObject({ watchlists: [] });
   });
 
+  it("discovers and calls get_watchlist with a paginated watchlist item page", async () => {
+    const { watchlists, watchlistItems } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP detail" })
+      .returning();
+    await database
+      .getDb()
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "detail-one",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Detail one",
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "detail-two",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Detail two",
+        },
+      ]);
+
+    const tools = await client.listTools();
+    const getWatchlist = tools.tools.find((tool) => tool.name === "get_watchlist");
+
+    expect(getWatchlist).toMatchObject({
+      name: "get_watchlist",
+      annotations: { readOnlyHint: true, destructiveHint: false },
+    });
+    expect(getWatchlist?.inputSchema).toMatchObject({
+      properties: {
+        watchlistId: { type: "integer" },
+        pageSize: { maximum: 100 },
+        cursor: { type: "string" },
+      },
+    });
+
+    const result = await client.callTool({
+      name: "get_watchlist",
+      arguments: { watchlistId: watchlist.id, pageSize: 1 },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      watchlist: { id: watchlist.id, name: "MCP detail", stats: { totalItems: 2 } },
+      items: [{ title: "Detail one" }],
+      nextCursor: expect.any(String),
+    });
+
+    const firstPage = result.structuredContent as {
+      items: Array<{ id: number }>;
+      nextCursor: string;
+    };
+    const secondPage = await client.callTool({
+      name: "get_watchlist",
+      arguments: { watchlistId: watchlist.id, pageSize: 1, cursor: firstPage.nextCursor },
+    });
+
+    expect(secondPage.structuredContent).toMatchObject({ items: [{ title: "Detail two" }] });
+    expect(
+      (secondPage.structuredContent as { items: Array<{ id: number }> }).items[0]?.id,
+    ).not.toBe(firstPage.items[0]?.id);
+  });
+
+  it("finds a watchlist item by its explicit Janus identity", async () => {
+    const { watchlists, watchlistItems } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP selectors" })
+      .returning();
+    const [item] = await database
+      .getDb()
+      .insert(watchlistItems)
+      .values({
+        watchlistId: watchlist.id,
+        tmdbId: "selector-item",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Selected item",
+      })
+      .returning();
+
+    const tools = await client.listTools();
+    const findWatchlistItems = tools.tools.find((tool) => tool.name === "find_watchlist_items");
+
+    expect(findWatchlistItems).toMatchObject({
+      name: "find_watchlist_items",
+      annotations: { readOnlyHint: true, destructiveHint: false },
+    });
+    expect(findWatchlistItems?.inputSchema).toMatchObject({
+      properties: {
+        watchlistId: { type: "integer" },
+        watchlistItemId: { type: "integer" },
+      },
+    });
+    expect(findWatchlistItems?.inputSchema.properties).not.toHaveProperty("id");
+
+    const result = await client.callTool({
+      name: "find_watchlist_items",
+      arguments: { watchlistId: watchlist.id, watchlistItemId: item.id },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      items: [
+        {
+          id: item.id,
+          watchlistId: watchlist.id,
+          provider: "tmdb",
+          providerId: "selector-item",
+          title: "Selected item",
+        },
+      ],
+    });
+  });
+
+  it("finds a watchlist item by explicit provider identity", async () => {
+    const { watchlists, watchlistItems } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "Provider selectors" })
+      .returning();
+    const [item] = await database
+      .getDb()
+      .insert(watchlistItems)
+      .values({
+        watchlistId: watchlist.id,
+        tmdbId: "provider-item",
+        source: "rawg",
+        mediaType: "game",
+        title: "Provider selected item",
+      })
+      .returning();
+
+    const tools = await client.listTools();
+    const findWatchlistItems = tools.tools.find((tool) => tool.name === "find_watchlist_items");
+
+    expect(findWatchlistItems?.inputSchema).toMatchObject({
+      properties: {
+        provider: { type: "string" },
+        providerId: { type: "string" },
+        mediaType: { type: "string" },
+      },
+    });
+    expect(findWatchlistItems?.inputSchema.properties).not.toHaveProperty("id");
+
+    const result = await client.callTool({
+      name: "find_watchlist_items",
+      arguments: {
+        watchlistId: watchlist.id,
+        provider: "rawg",
+        providerId: "provider-item",
+        mediaType: "game",
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      items: [{ id: item.id, provider: "rawg", providerId: "provider-item" }],
+    });
+  });
+
+  it("finds watchlist items with the same text matching as the UI", async () => {
+    const { watchlists, watchlistItems } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "Text selectors" })
+      .returning();
+    await database
+      .getDb()
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "title-match",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Captain Text",
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "parent-match",
+          source: "tmdb",
+          mediaType: "episode",
+          title: "Pilot",
+          parentId: "series-text",
+          parentTitle: "Textual Series",
+          episode: "S01E01",
+        },
+      ]);
+
+    const titleResult = await client.callTool({
+      name: "find_watchlist_items",
+      arguments: { watchlistId: watchlist.id, query: "CAPTAIN" },
+    });
+    const parentResult = await client.callTool({
+      name: "find_watchlist_items",
+      arguments: { watchlistId: watchlist.id, query: "textual" },
+    });
+    const episodeResult = await client.callTool({
+      name: "find_watchlist_items",
+      arguments: { watchlistId: watchlist.id, query: "01" },
+    });
+
+    expect(titleResult.structuredContent).toMatchObject({
+      items: [{ title: "Captain Text" }],
+    });
+    expect(parentResult.structuredContent).toMatchObject({
+      items: [{ title: "Pilot", parent: { title: "Textual Series" } }],
+    });
+    expect(episodeResult.structuredContent).toMatchObject({
+      items: [{ title: "Pilot", episode: "S01E01" }],
+    });
+  });
+
+  it("paginates text item searches and returns structured expected failures", async () => {
+    const { watchlists, watchlistItems } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "Paginated text selectors" })
+      .returning();
+    await database
+      .getDb()
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "pagination-one",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Pagination one",
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "pagination-two",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Pagination two",
+        },
+      ]);
+
+    const firstPage = await client.callTool({
+      name: "find_watchlist_items",
+      arguments: { watchlistId: watchlist.id, query: "pagination", pageSize: 1 },
+    });
+    const firstPageContent = firstPage.structuredContent as {
+      items: Array<{ id: number }>;
+      nextCursor: string;
+    };
+    const secondPage = await client.callTool({
+      name: "find_watchlist_items",
+      arguments: {
+        watchlistId: watchlist.id,
+        query: "pagination",
+        pageSize: 1,
+        cursor: firstPageContent.nextCursor,
+      },
+    });
+
+    expect(firstPageContent.nextCursor).toEqual(expect.any(String));
+    expect(
+      (secondPage.structuredContent as { items: Array<{ id: number }> }).items[0]?.id,
+    ).not.toBe(firstPageContent.items[0]?.id);
+    await expect(
+      client.callTool({
+        name: "find_watchlist_items",
+        arguments: {
+          watchlistId: watchlist.id,
+          query: "different query",
+          pageSize: 1,
+          cursor: firstPageContent.nextCursor,
+        },
+      }),
+    ).resolves.toMatchObject({ isError: true });
+    await expect(
+      client.callTool({
+        name: "find_watchlist_items",
+        arguments: { watchlistId: watchlist.id },
+      }),
+    ).resolves.toMatchObject({ isError: true });
+    await expect(
+      client.callTool({
+        name: "get_watchlist",
+        arguments: { watchlistId: 999_999 },
+      }),
+    ).resolves.toMatchObject({ isError: true });
+  });
+
   it("paginates search_watchlists results and rejects invalid inputs", async () => {
     const { watchlists } = await import("@/db/Schema");
     await database

@@ -5,6 +5,8 @@ import {
   searchWatchlistSummaryPage,
 } from "@/features/watchlists/list/Query.server";
 import { handleMcpSessionRequest } from "@/integrations/mcp/McpSessionTransport.server";
+import { asMcpContent } from "./McpToolResponse.server";
+import { registerWatchlistItemReadTools } from "./WatchlistItemReadTools.server";
 
 const watchlistSummaryOutputSchema = z.object({
   id: z.number(),
@@ -40,7 +42,17 @@ export function handleMcpEndpointRequest(request: Request) {
 
 function createMcpServer() {
   const server = new McpServer({ name: "janus", version: "1.0.0" });
+  registerWatchlistItemReadTools(server, watchlistSummaryOutputSchema);
+  registerWatchlistSummaryTools(server);
+  return server;
+}
 
+function registerWatchlistSummaryTools(server: McpServer) {
+  registerListWatchlists(server);
+  registerSearchWatchlists(server);
+}
+
+function registerListWatchlists(server: McpServer) {
   server.registerTool(
     "list_watchlists",
     {
@@ -51,49 +63,27 @@ function createMcpServer() {
         watchlists: z.array(watchlistSummaryOutputSchema),
         nextCursor: z.string().optional(),
       },
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-      },
+      annotations: { readOnlyHint: true, destructiveHint: false },
     },
-    async ({ orderBy, order, pageSize, cursor }) => {
-      const page = await listWatchlistSummaryPage({ orderBy, order, pageSize, cursor });
-
-      return asMcpContent(page);
-    },
+    async ({ orderBy, order, pageSize, cursor }) =>
+      asMcpContent(await listWatchlistSummaryPage({ orderBy, order, pageSize, cursor })),
   );
+}
 
+function registerSearchWatchlists(server: McpServer) {
   server.registerTool(
     "search_watchlists",
     {
       title: "Search watchlists",
       description: "Find watchlist summaries by a case-insensitive partial name.",
-      inputSchema: {
-        query: z.string().trim().min(1),
-        ...watchlistPageInputSchema,
-      },
+      inputSchema: { query: z.string().trim().min(1), ...watchlistPageInputSchema },
       outputSchema: {
         watchlists: z.array(watchlistSummaryOutputSchema),
         nextCursor: z.string().optional(),
       },
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-      },
+      annotations: { readOnlyHint: true, destructiveHint: false },
     },
-    async ({ query, orderBy, order, pageSize, cursor }) => {
-      const page = await searchWatchlistSummaryPage({ query, orderBy, order, pageSize, cursor });
-
-      return asMcpContent(page);
-    },
+    async ({ query, orderBy, order, pageSize, cursor }) =>
+      asMcpContent(await searchWatchlistSummaryPage({ query, orderBy, order, pageSize, cursor })),
   );
-
-  return server;
-}
-
-function asMcpContent(page: { watchlists: unknown[]; nextCursor?: string }) {
-  return {
-    structuredContent: page,
-    content: [{ type: "text" as const, text: JSON.stringify(page) }],
-  };
 }
