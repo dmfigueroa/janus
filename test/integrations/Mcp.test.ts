@@ -414,6 +414,20 @@ describe("Janus MCP endpoint", () => {
     expect(watchlistResult.structuredContent).toMatchObject({
       titles: [{ title: "Collapsed Show", matchingItemCount: 2 }],
     });
+
+    const selectedTitleResult = await client.callTool({
+      name: "find_watchlist_items",
+      arguments: {
+        watchlistId: watchlist.id,
+        provider: "tmdb",
+        providerId: "show-identity",
+        mediaType: "episode",
+      },
+    });
+
+    expect(selectedTitleResult.structuredContent).toMatchObject({
+      items: [{ title: "Pilot" }, { title: "Finale" }],
+    });
   });
 
   it("paginates text item searches and returns structured expected failures", async () => {

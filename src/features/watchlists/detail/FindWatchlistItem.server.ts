@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { getDb } from "@/db/Db.server";
 import { watchlistItems } from "@/db/Schema";
 
@@ -35,7 +35,7 @@ export async function findWatchlistItemByProvider({
       and(
         eq(watchlistItems.watchlistId, watchlistId),
         eq(watchlistItems.source, provider),
-        eq(watchlistItems.tmdbId, providerId),
+        or(eq(watchlistItems.tmdbId, providerId), eq(watchlistItems.parentId, providerId)),
         eq(watchlistItems.mediaType, mediaType),
       ),
     );
