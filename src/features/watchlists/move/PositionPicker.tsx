@@ -1,37 +1,55 @@
-import { RadioGroup, RadioGroupItem } from "@/components/ui/RadioGroup";
-import { Label } from "@/components/ui/Label";
-import type { InsertionPosition } from "@/features/watchlists/InsertOrderedItem.server";
+import { Box, RadioGroup, Stack, Text } from "@chakra-ui/react";
+import type { InsertionPosition } from "@/features/watchlists/Order";
 
 type PositionPickerProps = {
   value: InsertionPosition;
   onChange: (value: InsertionPosition) => void;
 };
 
-const ID_PREFIX = "move-insert-";
+const positions: Array<{ value: InsertionPosition; label: string }> = [
+  { value: "beginning", label: "Beginning" },
+  { value: "end", label: "End" },
+  { value: "release-adjacent", label: "Release-adjacent" },
+];
 
 export function PositionPicker({ value, onChange }: PositionPickerProps) {
   return (
-    <div className="space-y-3 rounded-md border bg-secondary/20 p-4">
-      <div className="space-y-1">
-        <p className="text-sm font-medium">Insert position</p>
-        <p className="text-xs text-muted-foreground">
-          Choose where this item should land in the watchlist&apos;s manual sequence.
-        </p>
-      </div>
-      <RadioGroup value={value} onValueChange={(v) => onChange(v as InsertionPosition)}>
-        <div className="flex items-center gap-2">
-          <RadioGroupItem id={`${ID_PREFIX}beginning`} value="beginning" />
-          <Label htmlFor={`${ID_PREFIX}beginning`}>Beginning</Label>
-        </div>
-        <div className="flex items-center gap-2">
-          <RadioGroupItem id={`${ID_PREFIX}end`} value="end" />
-          <Label htmlFor={`${ID_PREFIX}end`}>End</Label>
-        </div>
-        <div className="flex items-center gap-2">
-          <RadioGroupItem id={`${ID_PREFIX}release-adjacent`} value="release-adjacent" />
-          <Label htmlFor={`${ID_PREFIX}release-adjacent`}>Release-adjacent</Label>
-        </div>
-      </RadioGroup>
-    </div>
+    <Box rounded="md" borderWidth="1px" borderColor="border.default" bg="bg.subtle" p={4}>
+      <Stack gap={3}>
+        <Stack gap={1}>
+          <Text fontSize="sm" fontWeight="medium">
+            Insert position
+          </Text>
+          <Text fontSize="xs" color="fg.muted">
+            Choose where this item should land in the watchlist&apos;s manual sequence.
+          </Text>
+        </Stack>
+        <RadioGroup.Root
+          value={value}
+          colorPalette="pink"
+          onValueChange={({ value: nextValue }) => {
+            if (nextValue) onChange(nextValue as InsertionPosition);
+          }}
+        >
+          <Stack gap={2}>
+            <PositionOptions />
+          </Stack>
+        </RadioGroup.Root>
+      </Stack>
+    </Box>
+  );
+}
+
+function PositionOptions() {
+  return positions.map(PositionOption);
+}
+
+function PositionOption({ value, label }: { value: InsertionPosition; label: string }) {
+  return (
+    <RadioGroup.Item key={value} value={value}>
+      <RadioGroup.ItemHiddenInput />
+      <RadioGroup.ItemControl borderWidth="2px" />
+      <RadioGroup.ItemText>{label}</RadioGroup.ItemText>
+    </RadioGroup.Item>
   );
 }

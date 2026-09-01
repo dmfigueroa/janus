@@ -1,15 +1,7 @@
+import { Button, Dialog, Portal, Text } from "@chakra-ui/react";
+import { useEffect, useRef, type ReactNode } from "react";
 import type { WatchlistItem } from "@/db/Schema";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/AlertDialog";
 import { useRemoveWatchlistItemMutation } from "./useRemoveWatchlistItem";
 import { useRemoveWatchlistParentMutation } from "./useRemoveWatchlistParent";
 
@@ -29,30 +21,27 @@ export function ItemRemovalDialog({
   onOpenChange,
 }: RemovalDialogProps) {
   const mutation = useRemoveWatchlistItemMutation({ item, activeFilters });
+  const handleRemove = () => {
+    void mutation
+      .mutateAsync()
+      .then(() => onOpenChange(false))
+      .catch(() => undefined);
+  };
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{label}?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This will remove <strong>{item.title}</strong> from this watchlist.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={mutation.isPending}>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            disabled={mutation.isPending}
-            onClick={(event) => {
-              event.preventDefault();
-              void mutation.mutateAsync().then(() => onOpenChange(false));
-            }}
-          >
-            {label}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <RemovalDialogContent
+      open={open}
+      onOpenChange={onOpenChange}
+      title={`${label}?`}
+      description={
+        <>
+          This will remove <Text as="strong">{item.title}</Text> from this watchlist.
+        </>
+      }
+      label={label}
+      isPending={mutation.isPending}
+      onConfirm={handleRemove}
+    />
   );
 }
 
@@ -79,28 +68,90 @@ export function ParentRemovalDialog({
     preview: previewQuery.data,
     isLoading: previewQuery.isLoading,
   });
+  const handleRemove = () => {
+    void mutation
+      .mutateAsync()
+      .then(() => onOpenChange(false))
+      .catch(() => undefined);
+  };
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{label}?</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={mutation.isPending}>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            disabled={mutation.isPending}
-            onClick={(event) => {
-              event.preventDefault();
-              void mutation.mutateAsync().then(() => onOpenChange(false));
-            }}
-          >
-            {label}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <RemovalDialogContent
+      open={open}
+      onOpenChange={onOpenChange}
+      title={`${label}?`}
+      description={description}
+      label={label}
+      isPending={mutation.isPending}
+      onConfirm={handleRemove}
+    />
+  );
+}
+
+function RemovalDialogContent({
+  open,
+  onOpenChange,
+  title,
+  description,
+  label,
+  isPending,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description: ReactNode;
+  label: string;
+  isPending: boolean;
+  onConfirm: () => void;
+}) {
+  const cancelButtonReference = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const focusTimeout = window.setTimeout(() => cancelButtonReference.current?.focus());
+    return () => window.clearTimeout(focusTimeout);
+  }, [open]);
+
+  return (
+    <Dialog.Root
+      role="alertdialog"
+      open={open}
+      closeOnInteractOutside={false}
+      initialFocusEl={() => cancelButtonReference.current}
+      onOpenChange={({ open: nextOpen }) => onOpenChange(nextOpen)}
+    >
+      <Portal>
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content maxW={{ base: "calc(100% - 2rem)", sm: "md" }}>
+            <Dialog.Header flexDirection="column" alignItems="flex-start" gap={1}>
+              <Dialog.Title>{title}</Dialog.Title>
+              <Dialog.Description color="fg.muted">{description}</Dialog.Description>
+            </Dialog.Header>
+            <Dialog.Footer flexDir={{ base: "column-reverse", sm: "row" }}>
+              <Button
+                ref={cancelButtonReference}
+                variant="outline"
+                w={{ base: "full", sm: "auto" }}
+                disabled={isPending}
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                colorPalette="red"
+                w={{ base: "full", sm: "auto" }}
+                disabled={isPending}
+                onClick={onConfirm}
+              >
+                {label}
+              </Button>
+            </Dialog.Footer>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Portal>
+    </Dialog.Root>
   );
 }
 

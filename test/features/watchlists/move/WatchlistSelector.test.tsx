@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { Provider } from "@/app/Provider";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query.server";
 import { WatchlistSelector } from "@/features/watchlists/move/WatchlistSelector";
@@ -40,7 +42,7 @@ describe("WatchlistSelector", () => {
   ];
 
   it("renders all watchlists when no search query is entered", () => {
-    render(
+    renderWithProvider(
       <WatchlistSelector
         watchlists={watchlists}
         selectedId={null}
@@ -56,7 +58,7 @@ describe("WatchlistSelector", () => {
   });
 
   it("filters watchlists by name when a search query is typed", () => {
-    render(
+    renderWithProvider(
       <WatchlistSelector
         watchlists={watchlists}
         selectedId={null}
@@ -75,7 +77,7 @@ describe("WatchlistSelector", () => {
   });
 
   it("shows a message when the search query matches no watchlists", () => {
-    render(
+    renderWithProvider(
       <WatchlistSelector
         watchlists={watchlists}
         selectedId={null}
@@ -93,7 +95,7 @@ describe("WatchlistSelector", () => {
   });
 
   it("restores the full list when the search query is cleared", () => {
-    render(
+    renderWithProvider(
       <WatchlistSelector
         watchlists={watchlists}
         selectedId={null}
@@ -115,7 +117,7 @@ describe("WatchlistSelector", () => {
   });
 
   it("prevents Enter key from triggering form submission", () => {
-    render(
+    renderWithProvider(
       <WatchlistSelector
         watchlists={watchlists}
         selectedId={null}
@@ -139,7 +141,7 @@ describe("WatchlistSelector", () => {
 
   it("preserves the selected watchlist even when hidden by search", () => {
     const onSelect = vi.fn();
-    render(
+    renderWithProvider(
       <WatchlistSelector
         watchlists={watchlists}
         selectedId={2}
@@ -156,3 +158,7 @@ describe("WatchlistSelector", () => {
     expect(screen.getByText("Anime Collection")).not.toBeNull();
   });
 });
+
+function renderWithProvider(children: ReactNode) {
+  return render(<Provider>{children}</Provider>);
+}

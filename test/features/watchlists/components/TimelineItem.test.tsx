@@ -5,14 +5,22 @@ import { Provider } from "@/app/Provider";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistItem } from "@/db/Schema";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
+import type { WatchlistSummary } from "@/features/watchlists/list/Query";
 import { TimelineItem } from "@/features/watchlists/components/TimelineItem";
 
 const toggleWatchedMutate = vi.fn();
 const toggleWatchedWithoutRecencyMutate = vi.fn();
 const removeItemMutateAsync = vi.fn();
 const removeParentMutateAsync = vi.fn();
+const moveItemMutate = vi.fn();
+const moveParentMutate = vi.fn();
 const previewState = {
   data: undefined as { count: number; watchedCount: number } | undefined,
+  isLoading: false,
+  isError: false,
+};
+const watchlistListState = {
+  data: [] as WatchlistSummary[],
   isLoading: false,
   isError: false,
 };
@@ -70,15 +78,19 @@ vi.mock("@/features/watchlists/remove/useRemoveWatchlistParent", () => ({
 vi.mock("@/features/watchlists/move/useMoveWatchlistItem", () => ({
   useMoveWatchlistItemMutation: () => ({
     isPending: false,
-    mutateAsync: vi.fn(),
+    mutate: moveItemMutate,
   }),
 }));
 
 vi.mock("@/features/watchlists/move/useMoveWatchlistParent", () => ({
   useMoveWatchlistParentMutation: () => ({
     isPending: false,
-    mutateAsync: vi.fn(),
+    mutate: moveParentMutate,
   }),
+}));
+
+vi.mock("@/features/watchlists/move/useWatchlistListQuery", () => ({
+  useWatchlistListQuery: () => watchlistListState,
 }));
 
 vi.mock("@/features/watchlists/components/EditWatchlistItemDialog", () => ({
@@ -111,9 +123,14 @@ afterEach(() => {
   toggleWatchedWithoutRecencyMutate.mockReset();
   removeItemMutateAsync.mockReset();
   removeParentMutateAsync.mockReset();
+  moveItemMutate.mockReset();
+  moveParentMutate.mockReset();
   previewState.data = undefined;
   previewState.isLoading = false;
   previewState.isError = false;
+  watchlistListState.data = [];
+  watchlistListState.isLoading = false;
+  watchlistListState.isError = false;
 });
 
 describe("TimelineItem watched actions", () => {
@@ -154,10 +171,14 @@ describe("TimelineItem removal actions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove item" }));
 
-    const dialog = screen.getByRole("alertdialog");
+    const dialog = await screen.findByRole("alertdialog");
 
     expect(within(dialog).getByText(/This will remove/i)).not.toBeNull();
     expect(within(dialog).getByText("Standalone Movie")).not.toBeNull();
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Cancel" }));
+    });
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Remove item" }));
 
@@ -184,18 +205,112 @@ describe("TimelineItem removal actions", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove show" }));
 
-    expect(screen.getByText("Remove show?")).not.toBeNull();
+    expect(await screen.findByText("Remove show?")).not.toBeNull();
     expect(
       screen.getByText("This will remove 3 items from Great Show, including 1 watched."),
     ).not.toBeNull();
 
-    const dialog = screen.getByRole("alertdialog");
+    const dialog = await screen.findByRole("alertdialog");
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Remove show" }));
 
     await waitFor(() => {
       expect(removeParentMutateAsync).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it("retains the confirmation after failure and still allows cancellation", async () => {
+    removeItemMutateAsync.mockRejectedValue(new Error("Removal failed"));
+    renderTimelineItem();
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions for Standalone Movie" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove item" }));
+
+    const dialog = await screen.findByRole("alertdialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove item" }));
+
+    await waitFor(() => expect(removeItemMutateAsync).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("alertdialog")).not.toBeNull();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  });
+});
+
+describe("TimelineItem movement actions", () => {
+  it("moves an item to a custom-ordered destination with the selected position", async () => {
+    watchlistListState.data = createDestinationWatchlists();
+    renderTimelineItem();
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions for Standalone Movie" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Move to..." }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Move to another watchlist" });
+    expect(within(dialog).queryByText("Current list")).toBeNull();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: /Manual queue/ }));
+    const beginningPosition = within(dialog).getByRole("radio", { name: "Beginning" });
+    beginningPosition.click();
+    await waitFor(() => expect(beginningPosition).toHaveProperty("checked", true));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Move" }));
+
+    expect(moveItemMutate).toHaveBeenCalledWith(
+      { destinationWatchlistId: 3, position: "beginning" },
+      { onSuccess: expect.any(Function) },
+    );
+
+    moveItemMutate.mock.calls[0][1].onSuccess();
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Move to another watchlist" })).toBeNull(),
+    );
+  });
+
+  it("shows the automatic-ordering notice and omits a manual position", async () => {
+    watchlistListState.data = createDestinationWatchlists();
+    renderTimelineItem();
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions for Standalone Movie" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Move to..." }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Move to another watchlist" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Release queue/ }));
+
+    expect(within(dialog).getByText(/ordered by release date/i)).not.toBeNull();
+    expect(within(dialog).queryByRole("radio")).toBeNull();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Move" }));
+
+    expect(moveItemMutate).toHaveBeenCalledWith(
+      { destinationWatchlistId: 2, position: undefined },
+      { onSuccess: expect.any(Function) },
+    );
+  });
+
+  it("moves a parent group with the current controlled position", async () => {
+    watchlistListState.data = createDestinationWatchlists();
+    renderTimelineItem({
+      id: 2,
+      title: "Pilot",
+      mediaType: "episode",
+      parentId: "tmdb:42",
+      parentTitle: "Great Show",
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "More actions for Pilot" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Move show" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Move show" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Manual queue/ }));
+    const releaseAdjacentPosition = within(dialog).getByRole("radio", {
+      name: "Release-adjacent",
+    });
+    releaseAdjacentPosition.click();
+    await waitFor(() => expect(releaseAdjacentPosition).toHaveProperty("checked", true));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Move" }));
+
+    expect(moveParentMutate).toHaveBeenCalledWith(
+      { destinationWatchlistId: 3, position: "release-adjacent" },
+      { onSuccess: expect.any(Function) },
+    );
   });
 });
 
@@ -205,4 +320,37 @@ function renderTimelineItem(overrides: Partial<WatchlistItem> = {}) {
       <TimelineItem item={{ ...baseItem, ...overrides }} activeFilters={activeFilters} />
     </Provider>,
   );
+}
+
+function createDestinationWatchlists(): WatchlistSummary[] {
+  return [
+    createWatchlistSummary({ id: 1, name: "Current list", itemOrderMode: "release" }),
+    createWatchlistSummary({ id: 2, name: "Release queue", itemOrderMode: "release" }),
+    createWatchlistSummary({ id: 3, name: "Manual queue", itemOrderMode: "custom" }),
+  ];
+}
+
+function createWatchlistSummary({
+  id,
+  name,
+  itemOrderMode,
+}: Pick<WatchlistSummary, "id" | "name" | "itemOrderMode">): WatchlistSummary {
+  return {
+    id,
+    name,
+    itemOrderMode,
+    description: null,
+    createdAt: "2024-01-01 00:00:00",
+    updatedAt: null,
+    lastWatchedAt: null,
+    lastItemAddedAt: null,
+    stats: {
+      totalItems: 1,
+      watchedItems: 0,
+      progress: 0,
+      nextUnwatched: null,
+      coverImage: null,
+      coverMediaType: null,
+    },
+  };
 }

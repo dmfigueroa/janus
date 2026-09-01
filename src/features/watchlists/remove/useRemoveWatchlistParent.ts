@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { toast } from "sonner";
+import { toaster } from "@/app/Toaster";
 import type { WatchlistItem } from "@/db/Schema";
 import { invalidateWatchlistQueries } from "@/features/watchlists/Cache";
 import {
@@ -65,10 +65,13 @@ export function useRemoveWatchlistParentMutation({
     },
     onError: (error, _variables, snapshot) => {
       restoreWatchlistDetailSnapshot({ queryClient, snapshot });
-      toast.error(error instanceof Error ? error.message : "Failed to remove group");
+      toaster.create({
+        type: "error",
+        title: error instanceof Error ? error.message : "Failed to remove group",
+      });
     },
     onSuccess: (result) => {
-      toast.success(result.message);
+      toaster.create({ type: "success", title: result.message });
     },
     onSettled: () => invalidateWatchlistQueries(queryClient),
   });

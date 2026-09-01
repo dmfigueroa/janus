@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { toast } from "sonner";
+import { toaster } from "@/app/Toaster";
 import type { WatchlistItem } from "@/db/Schema";
-import type { InsertionPosition } from "@/features/watchlists/InsertOrderedItem.server";
+import type { InsertionPosition } from "@/features/watchlists/Order";
 import { invalidateWatchlistQueries } from "@/features/watchlists/Cache";
 import {
   optimisticallyRemoveWatchlistItem,
@@ -66,10 +66,10 @@ export function useMoveWatchlistItemMutation({
         queryClient,
         snapshot: context?.snapshot,
       });
-      toast.error("Failed to move item");
+      toaster.create({ type: "error", title: "Failed to move item" });
     },
     onSuccess: (result) => {
-      toast.success(result.message);
+      toaster.create({ type: "success", title: result.message });
     },
     onSettled: () => invalidateWatchlistQueries(queryClient),
   });
