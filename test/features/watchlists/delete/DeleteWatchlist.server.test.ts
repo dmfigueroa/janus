@@ -55,4 +55,16 @@ describe("delete watchlist mutation", () => {
     await expect(listWatchlists()).resolves.toEqual([]);
     await expect(readWatchlistDetail({ watchlistId: watchlist.id })).resolves.toBeNull();
   });
+
+  it("returns a structured not-found result without deleting another watchlist", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Keep me" });
+
+    await expect(deleteWatchlistMutation({ id: 999_999 })).resolves.toEqual({
+      success: false,
+      message: "Watchlist not found.",
+    });
+    await expect(readWatchlistDetail({ watchlistId: watchlist.id })).resolves.toMatchObject({
+      watchlist: { id: watchlist.id, name: "Keep me" },
+    });
+  });
 });

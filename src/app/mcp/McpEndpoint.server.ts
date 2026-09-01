@@ -9,6 +9,7 @@ import { searchableMediaTypes } from "@/features/search/search/MediaSearch";
 import { handleMcpSessionRequest } from "@/integrations/mcp/McpSessionTransport.server";
 import { asMcpContent } from "./McpToolResponse.server";
 import { registerWatchlistItemReadTools } from "./WatchlistItemReadTools.server";
+import { registerWatchlistWriteTools } from "./WatchlistWriteTools.server";
 
 const watchlistSummaryOutputSchema = z.object({
   id: z.number(),
@@ -47,6 +48,7 @@ function createMcpServer() {
   registerWatchlistItemReadTools(server, watchlistSummaryOutputSchema);
   registerWatchlistSummaryTools(server);
   registerSearchMedia(server);
+  registerWatchlistWriteTools(server);
   return server;
 }
 

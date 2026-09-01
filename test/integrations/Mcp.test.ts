@@ -4,6 +4,7 @@ import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 describe("Janus MCP endpoint", () => {
@@ -67,6 +68,236 @@ describe("Janus MCP endpoint", () => {
         { name: "Classics", description: "Worth revisiting" },
       ],
     });
+  });
+
+  it("creates a watchlist through the ordered batch lifecycle contract", async () => {
+    const tools = await client.listTools();
+    const createWatchlists = tools.tools.find((tool) => tool.name === "create_watchlists");
+
+    expect(createWatchlists).toMatchObject({
+      name: "create_watchlists",
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    });
+    expect(createWatchlists?.inputSchema).toMatchObject({
+      properties: { watchlists: { type: "array" } },
+    });
+
+    const result = await client.callTool({
+      name: "create_watchlists",
+      arguments: {
+        watchlists: [
+          { name: "MCP created", description: "Created through MCP", itemOrderMode: "custom" },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: true,
+          code: "created",
+          message: "Watchlist created.",
+          watchlist: {
+            id: expect.any(Number),
+            name: "MCP created",
+            description: "Created through MCP",
+            itemOrderMode: "custom",
+          },
+        },
+      ],
+    });
+  });
+
+  it("returns ordered structured validation failures without rolling back valid creates", async () => {
+    const result = await client.callTool({
+      name: "create_watchlists",
+      arguments: {
+        watchlists: [{ name: "Valid beside invalid" }, { description: "Name is missing" }],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: true,
+          code: "created",
+          watchlist: { name: "Valid beside invalid" },
+        },
+        {
+          index: 1,
+          success: false,
+          code: "validation_error",
+          message: "Name is required",
+        },
+      ],
+    });
+  });
+
+  it("updates each requested watchlist independently and preserves input order", async () => {
+    const { watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP update", description: "Before update", itemOrderMode: "release" })
+      .returning();
+    const tools = await client.listTools();
+    const updateWatchlists = tools.tools.find((tool) => tool.name === "update_watchlists");
+
+    expect(updateWatchlists).toMatchObject({
+      name: "update_watchlists",
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    });
+
+    const result = await client.callTool({
+      name: "update_watchlists",
+      arguments: {
+        watchlists: [
+          {
+            watchlistId: watchlist.id,
+            name: "MCP updated",
+            description: "After update",
+            itemOrderMode: "custom",
+          },
+          {
+            watchlistId: 999_999,
+            name: "Missing",
+            itemOrderMode: "release",
+          },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: true,
+          code: "updated",
+          message: "Watchlist updated.",
+          watchlistId: watchlist.id,
+        },
+        {
+          index: 1,
+          success: false,
+          code: "not_found",
+          message: "Watchlist not found.",
+          watchlistId: 999_999,
+        },
+      ],
+    });
+
+    const [updatedWatchlist] = await database
+      .getDb()
+      .select()
+      .from(watchlists)
+      .where(eq(watchlists.id, watchlist.id));
+    expect(updatedWatchlist).toMatchObject({
+      name: "MCP updated",
+      description: "After update",
+      itemOrderMode: "custom",
+    });
+  });
+
+  it("deletes requested watchlists without rolling back unrelated operations", async () => {
+    const { watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP deletion" })
+      .returning();
+    const tools = await client.listTools();
+    const deleteWatchlists = tools.tools.find((tool) => tool.name === "delete_watchlists");
+
+    expect(deleteWatchlists).toMatchObject({
+      name: "delete_watchlists",
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    });
+    expect(deleteWatchlists?.description).toContain("Permanently");
+
+    const result = await client.callTool({
+      name: "delete_watchlists",
+      arguments: { watchlistIds: [watchlist.id, 999_999] },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: true,
+          code: "deleted",
+          message: "Watchlist deleted.",
+          watchlistId: watchlist.id,
+        },
+        {
+          index: 1,
+          success: false,
+          code: "not_found",
+          message: "Watchlist not found.",
+          watchlistId: 999_999,
+        },
+      ],
+    });
+
+    const deletedWatchlists = await database
+      .getDb()
+      .select()
+      .from(watchlists)
+      .where(eq(watchlists.id, watchlist.id));
+    expect(deletedWatchlists).toEqual([]);
+  });
+
+  it("skips requested watchlists with Janus's existing recency behavior", async () => {
+    const { watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP skip", lastWatchedAt: "2000-01-01 00:00:00" })
+      .returning();
+    const tools = await client.listTools();
+    const skipWatchlists = tools.tools.find((tool) => tool.name === "skip_watchlists");
+
+    expect(skipWatchlists).toMatchObject({
+      name: "skip_watchlists",
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    });
+
+    const result = await client.callTool({
+      name: "skip_watchlists",
+      arguments: { watchlistIds: [watchlist.id, 999_999] },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: true,
+          code: "skipped",
+          message: "Watchlist skipped.",
+          watchlistId: watchlist.id,
+        },
+        {
+          index: 1,
+          success: false,
+          code: "not_found",
+          message: "Watchlist not found.",
+          watchlistId: 999_999,
+        },
+      ],
+    });
+
+    const [skippedWatchlist] = await database
+      .getDb()
+      .select()
+      .from(watchlists)
+      .where(eq(watchlists.id, watchlist.id));
+    expect(skippedWatchlist?.lastWatchedAt).not.toBe("2000-01-01 00:00:00");
   });
 
   it("discovers and calls search_watchlists using watchlist names only", async () => {
