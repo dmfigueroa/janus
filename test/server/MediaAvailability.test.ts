@@ -4,7 +4,7 @@ import {
   getDeprecatedWatchlistAddRejection,
   isDeprecatedMediaType,
 } from "@/server/Media";
-import { getDeprecatedSearchResponse } from "@/server/Search";
+import { getDeprecatedMediaSearchPage } from "@/features/search/MediaSearch.server";
 
 describe("deprecated media behavior", () => {
   it("marks anime and manga types as deprecated", () => {
@@ -14,9 +14,9 @@ describe("deprecated media behavior", () => {
   });
 
   it("builds graceful search rejections for deprecated media types", () => {
-    const animeResult = getDeprecatedSearchResponse("anime", 1);
-    const mangaResult = getDeprecatedSearchResponse("manga", 2);
-    const movieResult = getDeprecatedSearchResponse("movie", 1);
+    const animeResult = getDeprecatedMediaSearchPage("anime", 1);
+    const mangaResult = getDeprecatedMediaSearchPage("manga", 2);
+    const movieResult = getDeprecatedMediaSearchPage("movie", 1);
 
     expect(movieResult).toBeNull();
     expect(animeResult).not.toBeNull();

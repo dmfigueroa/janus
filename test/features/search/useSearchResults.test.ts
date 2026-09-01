@@ -25,7 +25,7 @@ vi.mock("@tanstack/react-query", () => ({
   },
 }));
 
-vi.mock("@/server/Search", () => ({
+vi.mock("@/features/search/MediaSearch", () => ({
   searchUnified: vi.fn(),
 }));
 
