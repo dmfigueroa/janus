@@ -23,17 +23,20 @@ vi.mock("@/db/Db.server", () => ({ getDb: () => dbState.db }));
 let testDb: Awaited<ReturnType<typeof createIsolatedTestDb>>;
 let db: IsolatedTestDb;
 let addToWatchlistMutation: typeof import("@/features/watchlists/add/Mutation.server").addToWatchlistMutation;
+let addProviderMediaToWatchlist: typeof import("@/features/watchlists/add/AddProviderMedia.server").addProviderMediaToWatchlist;
 let readWatchlistDetail: typeof import("@/features/watchlists/Read.server").WatchlistsRead.detailScreen;
 
 beforeAll(async () => {
   testDb = await createIsolatedTestDb();
   db = testDb.db;
   dbState.db = db;
-  const [addModule, readModule] = await Promise.all([
+  const [addModule, addProviderMediaModule, readModule] = await Promise.all([
     import("@/features/watchlists/add/Mutation.server"),
+    import("@/features/watchlists/add/AddProviderMedia.server"),
     import("@/features/watchlists/Read.server"),
   ]);
   addToWatchlistMutation = addModule.addToWatchlistMutation;
+  addProviderMediaToWatchlist = addProviderMediaModule.addProviderMediaToWatchlist;
   readWatchlistDetail = readModule.WatchlistsRead.detailScreen;
 });
 
@@ -225,6 +228,85 @@ describe("custom order add validation", () => {
 });
 
 describe("provider-backed add to watchlist mutation", () => {
+  it("resolves a provider-ID-only TMDB movie with canonical details", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Canonical provider movie" });
+    getMovieDetailsMock.mockResolvedValue({
+      title: "Canonical Title",
+      poster_path: "/canonical-poster.jpg",
+      release_date: "2024-02-03",
+      vote_average: 8.7,
+      runtime: 127,
+    });
+
+    const result = await addProviderMediaToWatchlist({
+      watchlistId: watchlist.id,
+      provider: "tmdb",
+      providerId: "42",
+      mediaType: "movie",
+    });
+    const detail = await readWatchlistDetail({ watchlistId: watchlist.id });
+
+    expect(result).toEqual({
+      success: true,
+      code: "added",
+      message: "Added to watchlist",
+      affectedCount: 1,
+    });
+    expect(detail?.items[0]).toMatchObject({
+      tmdbId: "42",
+      title: "Canonical Title",
+      releaseDate: "2024-02-03",
+      posterPath: "/canonical-poster.jpg",
+    });
+  });
+
+  it("returns a provider failure when a TV season cannot be resolved", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Unavailable TV provider" });
+    getTVDetailsMock.mockResolvedValue({
+      name: "Unavailable Show",
+      poster_path: null,
+      seasons: [{ season_number: 1 }],
+    });
+    getSeasonDetailsMock.mockRejectedValue(new Error("TMDB unavailable"));
+
+    await expect(
+      addProviderMediaToWatchlist({
+        watchlistId: watchlist.id,
+        provider: "tmdb",
+        providerId: "42",
+        mediaType: "tv",
+      }),
+    ).resolves.toEqual({
+      success: false,
+      code: "provider_unavailable",
+      message: "TMDB is temporarily unavailable. Please try again later.",
+      affectedCount: 0,
+    });
+  });
+
+  it("reports a show with no regular episodes as a zero-count outcome", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Specials only" });
+    getTVDetailsMock.mockResolvedValue({
+      name: "Specials Only",
+      poster_path: null,
+      seasons: [{ season_number: 0 }],
+    });
+
+    const result = await addProviderMediaToWatchlist({
+      watchlistId: watchlist.id,
+      provider: "tmdb",
+      providerId: "43",
+      mediaType: "tv",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      code: "no_new_episodes",
+      message: "No episodes found for this show",
+      affectedCount: 0,
+    });
+  });
+
   it("uses provider details for TMDB movies", async () => {
     const watchlist = await createTestWatchlist(db, { name: "Movie Night" });
     getMovieDetailsMock.mockResolvedValue({
