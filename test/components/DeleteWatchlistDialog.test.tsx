@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Provider } from "@/app/Provider";
 import type { EnrichedWatchlist } from "@/features/watchlists/components/WatchlistCard";
-import { DeleteWatchlistButton } from "@/features/watchlists/components/DeleteWatchlistButton";
+import { DeleteWatchlistDialog } from "@/features/watchlists/components/DeleteWatchlistDialog";
 
 function watchlist(): EnrichedWatchlist {
   return {
@@ -28,7 +28,7 @@ function watchlist(): EnrichedWatchlist {
   };
 }
 
-describe("DeleteWatchlistButton", () => {
+describe("DeleteWatchlistDialog", () => {
   afterEach(() => {
     cleanup();
   });
@@ -38,15 +38,15 @@ describe("DeleteWatchlistButton", () => {
 
     render(
       <Provider>
-        <DeleteWatchlistButton
+        <DeleteWatchlistDialog
           watchlist={watchlist()}
+          open
+          onOpenChange={() => {}}
           deleting={false}
           handleDelete={handleDelete}
         />
       </Provider>,
     );
-
-    fireEvent.click(screen.getByRole("button", { name: "Delete Movie Night" }));
 
     const dialog = await waitFor(() => screen.getByRole("alertdialog"));
 
@@ -62,11 +62,15 @@ describe("DeleteWatchlistButton", () => {
   it("stacks the dialog title and description vertically", async () => {
     render(
       <Provider>
-        <DeleteWatchlistButton watchlist={watchlist()} deleting={false} handleDelete={vi.fn()} />
+        <DeleteWatchlistDialog
+          watchlist={watchlist()}
+          open
+          onOpenChange={() => {}}
+          deleting={false}
+          handleDelete={vi.fn()}
+        />
       </Provider>,
     );
-
-    fireEvent.click(screen.getByRole("button", { name: "Delete Movie Night" }));
 
     const title = await waitFor(() => screen.getByRole("heading", { name: "Delete Watchlist" }));
     const header = title.parentElement;

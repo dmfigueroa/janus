@@ -1,17 +1,23 @@
-import { Box, Button } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 
 type WatchlistCardActionsProps = {
   hasNextUnwatched: boolean;
   selectionMode: boolean;
   showUpNextBadge: boolean;
-  showSkipButton: boolean;
-  skipping: boolean;
-  watchlistName: string;
-  onSkip: () => void;
 };
 
 export function WatchlistCardActions(props: WatchlistCardActionsProps) {
-  if (!hasActionsToShow(props)) {
+  const visible = props.hasNextUnwatched && props.showUpNextBadge && !props.selectionMode;
+
+  return <UpNextBadgeOverlay visible={visible} />;
+}
+
+type UpNextBadgeOverlayProps = {
+  visible: boolean;
+};
+
+function UpNextBadgeOverlay({ visible }: UpNextBadgeOverlayProps) {
+  if (!visible) {
     return null;
   }
 
@@ -24,34 +30,14 @@ export function WatchlistCardActions(props: WatchlistCardActionsProps) {
       zIndex={20}
       display="flex"
       alignItems="flex-start"
-      gap={2}
-      justifyContent={getActionAlignment(props.showUpNextBadge)}
+      justifyContent="flex-start"
     >
-      <UpNextBadge show={props.showUpNextBadge} />
-      <SkipButton {...props} />
+      <UpNextBadge />
     </Box>
   );
 }
 
-function hasActionsToShow({
-  hasNextUnwatched,
-  selectionMode,
-  showUpNextBadge,
-  showSkipButton,
-}: WatchlistCardActionsProps) {
-  const hasConfiguredAction = [showUpNextBadge, showSkipButton].some(Boolean);
-  return !selectionMode && hasNextUnwatched && hasConfiguredAction;
-}
-
-function getActionAlignment(showUpNextBadge: boolean) {
-  return showUpNextBadge ? "space-between" : "flex-end";
-}
-
-function UpNextBadge({ show }: { show: boolean }) {
-  if (!show) {
-    return null;
-  }
-
+function UpNextBadge() {
   return (
     <Box
       bg="accent.solid"
@@ -65,43 +51,5 @@ function UpNextBadge({ show }: { show: boolean }) {
     >
       UP NEXT
     </Box>
-  );
-}
-
-function SkipButton({
-  showSkipButton,
-  skipping,
-  watchlistName,
-  onSkip,
-}: WatchlistCardActionsProps) {
-  if (!showSkipButton) {
-    return null;
-  }
-
-  return (
-    <Button
-      type="button"
-      variant="solid"
-      bg="blackAlpha.600"
-      color="white"
-      fontSize="xs"
-      fontWeight="bold"
-      px={2}
-      py={1}
-      minW="auto"
-      h="auto"
-      rounded="sm"
-      shadow="lg"
-      _hover={{ bg: "blackAlpha.800" }}
-      onClick={(event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        onSkip();
-      }}
-      disabled={skipping}
-      aria-label={`Skip ${watchlistName}`}
-    >
-      Skip
-    </Button>
   );
 }

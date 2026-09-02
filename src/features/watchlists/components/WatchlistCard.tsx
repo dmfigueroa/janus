@@ -3,6 +3,7 @@ import { useRouter, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { deleteWatchlist } from "@/features/watchlists/delete/Mutation";
 import { skipWatchlist } from "@/features/watchlists/skip/Mutation";
+import { pauseWatchlist, resumeWatchlist } from "@/features/watchlists/pause/Mutation";
 import { useState } from "react";
 import { toaster } from "@/app/Toaster";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query";
@@ -11,7 +12,8 @@ import {
   type WatchlistCardInfoVariant,
 } from "@/features/watchlists/components/WatchlistCardInfo";
 import { WatchlistCardArtwork } from "@/features/watchlists/components/WatchlistCardArtwork";
-import { DeleteWatchlistButton } from "./DeleteWatchlistButton";
+import { WatchlistCardMenu } from "@/features/watchlists/components/WatchlistCardMenu";
+import { DeleteWatchlistDialog } from "@/features/watchlists/components/DeleteWatchlistDialog";
 
 export type EnrichedWatchlist = WatchlistSummary;
 
@@ -20,9 +22,7 @@ interface WatchlistCardProps {
   selectionMode?: boolean;
   isSelected?: boolean;
   onToggle?: () => void;
-  showDeleteButton?: boolean;
   showUpNextBadge?: boolean;
-  showSkipButton?: boolean;
   infoVariant?: WatchlistCardInfoVariant;
 }
 
@@ -31,8 +31,8 @@ function withDefault<T>(value: T | undefined, fallback: T) {
   return value;
 }
 
-function ensureSuccessfulSkip(result: { success: boolean }) {
-  if (!result.success) throw new Error("Failed to skip watchlist");
+function ensureSuccessfulResult(result: { success: boolean }) {
+  if (!result.success) throw new Error("The watchlist action failed");
 }
 
 function CardArtworkLink({
@@ -65,47 +65,23 @@ function CardArtworkLink({
   );
 }
 
-function WatchlistDeleteAction({
-  visible,
-  watchlist,
-  deleting,
-  handleDelete,
-}: {
-  visible: boolean;
-  watchlist: EnrichedWatchlist;
-  deleting: boolean;
-  handleDelete: () => Promise<void>;
-}) {
-  if (!visible) return null;
-  return (
-    <DeleteWatchlistButton watchlist={watchlist} deleting={deleting} handleDelete={handleDelete} />
-  );
-}
-
 export function WatchlistCard(cardProps: WatchlistCardProps) {
-  const {
-    watchlist,
-    selectionMode,
-    isSelected,
-    onToggle,
-    showDeleteButton,
-    showUpNextBadge,
-    showSkipButton,
-    infoVariant,
-  } = {
+  const { watchlist, selectionMode, isSelected, onToggle, showUpNextBadge, infoVariant } = {
     ...cardProps,
     selectionMode: withDefault(cardProps.selectionMode, false),
     isSelected: withDefault(cardProps.isSelected, false),
-    showDeleteButton: withDefault(cardProps.showDeleteButton, true),
     showUpNextBadge: withDefault(cardProps.showUpNextBadge, true),
-    showSkipButton: withDefault(cardProps.showSkipButton, false),
     infoVariant: withDefault(cardProps.infoVariant, "watchlist"),
   };
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
   const [skipping, setSkipping] = useState(false);
+  const [pausePending, setPausePending] = useState(false);
+  const [isDeleteOpen, setDeleteOpen] = useState(false);
   const deleteWatchlistFn = useServerFn(deleteWatchlist);
   const skipWatchlistFn = useServerFn(skipWatchlist);
+  const pauseWatchlistFn = useServerFn(pauseWatchlist);
+  const resumeWatchlistFn = useServerFn(resumeWatchlist);
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -124,13 +100,37 @@ export function WatchlistCard(cardProps: WatchlistCardProps) {
     setSkipping(true);
     try {
       const result = await skipWatchlistFn({ data: { watchlistId: watchlist.id } });
-      ensureSuccessfulSkip(result);
+      ensureSuccessfulResult(result);
       await router.invalidate?.();
     } catch (error) {
       console.error("Failed to skip watchlist", error);
       toaster.create({ type: "error", title: "Failed to skip watchlist. Please try again." });
     } finally {
       setSkipping(false);
+    }
+  };
+
+  const requestPauseToggle = () => {
+    if (watchlist.pausedAt) {
+      return resumeWatchlistFn({ data: { watchlistId: watchlist.id } });
+    }
+    return pauseWatchlistFn({ data: { watchlistId: watchlist.id } });
+  };
+
+  const handleTogglePause = async () => {
+    setPausePending(true);
+    try {
+      const result = await requestPauseToggle();
+      ensureSuccessfulResult(result);
+      await router.invalidate?.();
+    } catch (error) {
+      console.error("Failed to change watchlist pause state", error);
+      toaster.create({
+        type: "error",
+        title: "Failed to change the pause state. Please try again.",
+      });
+    } finally {
+      setPausePending(false);
     }
   };
 
@@ -142,18 +142,29 @@ export function WatchlistCard(cardProps: WatchlistCardProps) {
           selectionMode={selectionMode}
           isSelected={isSelected}
           showUpNextBadge={showUpNextBadge}
-          showSkipButton={showSkipButton}
-          skipping={skipping}
           onToggle={onToggle}
-          onSkip={() => void handleSkip()}
         />
       </CardArtworkLink>
 
-      <WatchlistDeleteAction
-        visible={showDeleteButton && !selectionMode}
+      {!selectionMode ? (
+        <WatchlistCardMenu
+          watchlistName={watchlist.name}
+          hasNextUnwatched={Boolean(watchlist.stats.nextUnwatched)}
+          isPaused={watchlist.pausedAt !== null}
+          skipping={skipping}
+          pausePending={pausePending}
+          onSkip={() => void handleSkip()}
+          onTogglePause={() => void handleTogglePause()}
+          onDelete={() => setDeleteOpen(true)}
+        />
+      ) : null}
+
+      <DeleteWatchlistDialog
         watchlist={watchlist}
+        open={isDeleteOpen}
+        onOpenChange={setDeleteOpen}
         deleting={deleting}
-        handleDelete={handleDelete}
+        handleDelete={() => void handleDelete()}
       />
 
       <WatchlistCardInfo watchlist={watchlist} infoVariant={infoVariant} />
