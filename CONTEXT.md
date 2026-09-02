@@ -19,3 +19,15 @@ _Avoid_: Picture, cover art
 **Release date**:
 The complete calendar date associated with an entry, always represented with a year, month, and day.
 _Avoid_: Release year
+
+**Rotation**:
+The ordered cycle of watchlists the home page uses to surface what to watch next. A watchlist leaves the rotation while it is paused or completed, and returns automatically once neither applies.
+_Avoid_: Active queue, cycle
+
+**Paused**:
+The persisted on/off state that removes a watchlist from the rotation without deleting it. Pausing records when the pause began; resuming clears it and returns the list to its previous position in the rotation.
+_Avoid_: Archived, hidden, snoozed
+
+**Completed**:
+The derived state of a watchlist whose items are all watched (progress is 100%). It is never stored; adding a new item un-completes the list automatically.
+_Avoid_: Finished, done, watched

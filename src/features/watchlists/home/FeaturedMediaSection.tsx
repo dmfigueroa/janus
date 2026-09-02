@@ -33,13 +33,7 @@ function FeaturedWatchlistGridItem(
 ) {
   return (
     <Box key={watchlist.id} w="full" maxW={{ md: "220px" }}>
-      <WatchlistCard
-        watchlist={watchlist}
-        showDeleteButton={false}
-        showUpNextBadge={false}
-        showSkipButton
-        infoVariant="up-next"
-      />
+      <WatchlistCard watchlist={watchlist} showUpNextBadge={false} infoVariant="up-next" />
     </Box>
   );
 }

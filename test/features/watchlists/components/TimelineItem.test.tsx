@@ -344,6 +344,7 @@ function createWatchlistSummary({
     updatedAt: null,
     lastWatchedAt: null,
     lastItemAddedAt: null,
+    pausedAt: null,
     stats: {
       totalItems: 1,
       watchedItems: 0,

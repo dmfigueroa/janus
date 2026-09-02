@@ -1,44 +1,24 @@
 import { Button, Dialog, Portal } from "@chakra-ui/react";
 import { X } from "lucide-react";
-import { useState } from "react";
 import type { EnrichedWatchlist } from "./WatchlistCard";
 
-type DeleteWatchlistButtonProps = {
+type DeleteWatchlistDialogProps = {
   watchlist: EnrichedWatchlist;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   deleting: boolean;
   handleDelete: () => void;
 };
 
-export function DeleteWatchlistButton({
+export function DeleteWatchlistDialog({
   watchlist,
+  open,
+  onOpenChange,
   deleting,
   handleDelete,
-}: DeleteWatchlistButtonProps) {
-  const [open, setOpen] = useState(false);
-
+}: DeleteWatchlistDialogProps) {
   return (
-    <Dialog.Root open={open} onOpenChange={({ open: nextOpen }) => setOpen(nextOpen)}>
-      <Dialog.Trigger asChild>
-        <Button
-          aria-label={`Delete ${watchlist.name}`}
-          position="absolute"
-          top={2}
-          right={2}
-          zIndex={10}
-          size="sm"
-          minW="8"
-          p={0}
-          rounded="full"
-          colorPalette="red"
-          shadow="lg"
-          opacity={{ base: 1, md: 0 }}
-          _groupHover={{ opacity: 1 }}
-          _focusVisible={{ opacity: 1 }}
-          disabled={deleting}
-        >
-          <X size={16} />
-        </Button>
-      </Dialog.Trigger>
+    <Dialog.Root open={open} onOpenChange={({ open: nextOpen }) => onOpenChange(nextOpen)}>
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>

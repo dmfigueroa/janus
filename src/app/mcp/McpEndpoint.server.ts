@@ -20,6 +20,7 @@ const watchlistSummaryOutputSchema = z.object({
   updatedAt: z.string().nullable(),
   lastWatchedAt: z.string().nullable(),
   lastItemAddedAt: z.string().nullable(),
+  pausedAt: z.string().nullable(),
   stats: z.object({
     totalItems: z.number(),
     watchedItems: z.number(),

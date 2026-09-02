@@ -178,6 +178,7 @@ function createWatchlist({
     updatedAt: null,
     lastWatchedAt: null,
     lastItemAddedAt: null,
+    pausedAt: null,
     stats: {
       totalItems,
       watchedItems,

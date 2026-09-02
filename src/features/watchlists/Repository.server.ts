@@ -72,6 +72,19 @@ export async function markLastWatched(watchlistId: number) {
     .where(eq(watchlists.id, watchlistId));
 }
 
+export async function pauseWatchlist(watchlistId: number) {
+  const db = getDb();
+  await db
+    .update(watchlists)
+    .set({ pausedAt: sql`CURRENT_TIMESTAMP` })
+    .where(eq(watchlists.id, watchlistId));
+}
+
+export async function resumeWatchlist(watchlistId: number) {
+  const db = getDb();
+  await db.update(watchlists).set({ pausedAt: null }).where(eq(watchlists.id, watchlistId));
+}
+
 export async function updateWatchlist({
   watchlistId,
   name,

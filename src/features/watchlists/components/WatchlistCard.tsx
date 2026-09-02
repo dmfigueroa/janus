@@ -1,17 +1,12 @@
 import { Link as ChakraLink, Flex } from "@chakra-ui/react";
-import { useRouter, Link } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
-import { deleteWatchlist } from "@/features/watchlists/delete/Mutation";
-import { skipWatchlist } from "@/features/watchlists/skip/Mutation";
-import { useState } from "react";
-import { toaster } from "@/app/Toaster";
+import { Link } from "@tanstack/react-router";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query";
 import {
   WatchlistCardInfo,
   type WatchlistCardInfoVariant,
 } from "@/features/watchlists/components/WatchlistCardInfo";
 import { WatchlistCardArtwork } from "@/features/watchlists/components/WatchlistCardArtwork";
-import { DeleteWatchlistButton } from "./DeleteWatchlistButton";
+import { WatchlistCardMenu } from "@/features/watchlists/components/WatchlistCardMenu";
 
 export type EnrichedWatchlist = WatchlistSummary;
 
@@ -20,19 +15,13 @@ interface WatchlistCardProps {
   selectionMode?: boolean;
   isSelected?: boolean;
   onToggle?: () => void;
-  showDeleteButton?: boolean;
   showUpNextBadge?: boolean;
-  showSkipButton?: boolean;
   infoVariant?: WatchlistCardInfoVariant;
 }
 
 function withDefault<T>(value: T | undefined, fallback: T) {
   if (value === undefined) return fallback;
   return value;
-}
-
-function ensureSuccessfulSkip(result: { success: boolean }) {
-  if (!result.success) throw new Error("Failed to skip watchlist");
 }
 
 function CardArtworkLink({
@@ -65,96 +54,28 @@ function CardArtworkLink({
   );
 }
 
-function WatchlistDeleteAction({
-  visible,
-  watchlist,
-  deleting,
-  handleDelete,
-}: {
-  visible: boolean;
-  watchlist: EnrichedWatchlist;
-  deleting: boolean;
-  handleDelete: () => Promise<void>;
-}) {
-  if (!visible) return null;
-  return (
-    <DeleteWatchlistButton watchlist={watchlist} deleting={deleting} handleDelete={handleDelete} />
-  );
-}
-
 export function WatchlistCard(cardProps: WatchlistCardProps) {
-  const {
-    watchlist,
-    selectionMode,
-    isSelected,
-    onToggle,
-    showDeleteButton,
-    showUpNextBadge,
-    showSkipButton,
-    infoVariant,
-  } = {
+  const { watchlist, selectionMode, isSelected, onToggle, showUpNextBadge, infoVariant } = {
     ...cardProps,
     selectionMode: withDefault(cardProps.selectionMode, false),
     isSelected: withDefault(cardProps.isSelected, false),
-    showDeleteButton: withDefault(cardProps.showDeleteButton, true),
     showUpNextBadge: withDefault(cardProps.showUpNextBadge, true),
-    showSkipButton: withDefault(cardProps.showSkipButton, false),
     infoVariant: withDefault(cardProps.infoVariant, "watchlist"),
-  };
-  const router = useRouter();
-  const [deleting, setDeleting] = useState(false);
-  const [skipping, setSkipping] = useState(false);
-  const deleteWatchlistFn = useServerFn(deleteWatchlist);
-  const skipWatchlistFn = useServerFn(skipWatchlist);
-
-  const handleDelete = async () => {
-    setDeleting(true);
-    try {
-      await deleteWatchlistFn({ data: { id: watchlist.id } });
-      await router.invalidate?.();
-      toaster.create({ type: "success", title: "Watchlist deleted successfully" });
-    } catch (error) {
-      console.error("Failed to delete", error);
-      toaster.create({ type: "error", title: "Failed to delete watchlist. Please try again." });
-      setDeleting(false);
-    }
-  };
-
-  const handleSkip = async () => {
-    setSkipping(true);
-    try {
-      const result = await skipWatchlistFn({ data: { watchlistId: watchlist.id } });
-      ensureSuccessfulSkip(result);
-      await router.invalidate?.();
-    } catch (error) {
-      console.error("Failed to skip watchlist", error);
-      toaster.create({ type: "error", title: "Failed to skip watchlist. Please try again." });
-    } finally {
-      setSkipping(false);
-    }
   };
 
   return (
-    <Flex direction="column" gap={2} position="relative" role="group">
+    <Flex direction="column" gap={2} position="relative" role="group" className="group">
       <CardArtworkLink selectionMode={selectionMode} watchlistId={watchlist.id}>
         <WatchlistCardArtwork
           watchlist={watchlist}
           selectionMode={selectionMode}
           isSelected={isSelected}
           showUpNextBadge={showUpNextBadge}
-          showSkipButton={showSkipButton}
-          skipping={skipping}
           onToggle={onToggle}
-          onSkip={() => void handleSkip()}
         />
       </CardArtworkLink>
 
-      <WatchlistDeleteAction
-        visible={showDeleteButton && !selectionMode}
-        watchlist={watchlist}
-        deleting={deleting}
-        handleDelete={handleDelete}
-      />
+      {!selectionMode ? <WatchlistCardMenu watchlist={watchlist} /> : null}
 
       <WatchlistCardInfo watchlist={watchlist} infoVariant={infoVariant} />
     </Flex>

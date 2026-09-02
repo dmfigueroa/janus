@@ -35,24 +35,18 @@ vi.mock("@/features/watchlists/components/WatchlistCard", () => ({
   WatchlistCard: ({
     watchlist,
     selectionMode = false,
-    showDeleteButton = true,
     showUpNextBadge = true,
-    showSkipButton = false,
     infoVariant = "watchlist",
   }: {
     watchlist: EnrichedWatchlist;
     selectionMode?: boolean;
-    showDeleteButton?: boolean;
     showUpNextBadge?: boolean;
-    showSkipButton?: boolean;
     infoVariant?: "watchlist" | "up-next";
   }) => (
     <div data-testid={`watchlist-card-${watchlist.id}`}>
       <span>{watchlist.name}</span>
       <span>{selectionMode ? "selection" : "browse"}</span>
-      <span>{showDeleteButton ? "delete" : "no-delete"}</span>
       <span>{showUpNextBadge ? "badge" : "no-badge"}</span>
-      <span>{showSkipButton ? "skip" : "no-skip"}</span>
       <span>{infoVariant}</span>
     </div>
   ),
@@ -78,6 +72,7 @@ function watchlist(
     updatedAt: overrides.updatedAt ?? null,
     lastWatchedAt: overrides.lastWatchedAt ?? null,
     lastItemAddedAt: overrides.lastItemAddedAt ?? null,
+    pausedAt: overrides.pausedAt ?? null,
     stats: overrides.stats ?? {
       totalItems: 1,
       watchedItems: 0,
@@ -145,6 +140,9 @@ function homeData(overrides?: Partial<HomeData>): HomeData {
       },
     ],
     allWatchlists: [featuredMovie, backlog],
+    rotation: [featuredMovie, backlog],
+    completed: [],
+    paused: [],
     ...overrides,
   };
 }
@@ -161,13 +159,44 @@ describe("WatchlistsHomeRouteContent", () => {
     expect(screen.getByText("2 watchlists, 2 items")).not.toBeNull();
     expect(screen.getByRole("heading", { name: "Up Next by Media" })).not.toBeNull();
     expect(screen.getByRole("heading", { name: "Movies" })).not.toBeNull();
-    expect(screen.getByRole("heading", { name: "All Watchlists" })).not.toBeNull();
-    expect(screen.getAllByTestId("watchlist-card-1")[0]?.textContent).toContain("skip");
+    expect(screen.getByRole("heading", { name: "Watchlists" })).not.toBeNull();
     expect(screen.getAllByTestId("watchlist-card-1")[0]?.textContent).toContain("up-next");
     expect(screen.getAllByTestId("watchlist-card-1")[1]?.textContent).toContain("watchlist");
-    expect(screen.getByTestId("watchlist-card-2").textContent).toContain("no-skip");
+    expect(screen.getByTestId("watchlist-card-2").textContent).toContain("browse");
     expect(screen.queryByPlaceholderText("Find a list, movie, or show...")).toBeNull();
     expect(screen.queryByRole("button", { name: "Settings" })).toBeNull();
+  });
+
+  it("renders completed and paused lists in collapsed sections below the rotation grid", () => {
+    const finished = watchlist({
+      id: 3,
+      name: "Finished List",
+      stats: {
+        totalItems: 2,
+        watchedItems: 2,
+        progress: 100,
+        nextUnwatched: null,
+        coverImage: null,
+        coverMediaType: null,
+      },
+    });
+    const resting = watchlist({ id: 4, name: "Resting List", pausedAt: "2024-06-01 00:00:00" });
+
+    render(
+      <WatchlistsHomeRouteContent
+        initialData={homeData({
+          allWatchlists: [resting, finished],
+          rotation: [],
+          completed: [finished],
+          paused: [resting],
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Completed (1)" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "Paused (1)" })).not.toBeNull();
+    expect(screen.getByTestId("watchlist-card-3")).not.toBeNull();
+    expect(screen.getByTestId("watchlist-card-4")).not.toBeNull();
   });
 
   it("hides featured sections and internal headings in selection mode", () => {
@@ -178,7 +207,7 @@ describe("WatchlistsHomeRouteContent", () => {
     expect(screen.getByRole("heading", { name: "0 Selected" })).not.toBeNull();
     expect(screen.queryByText("2 watchlists, 2 items")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Up Next by Media" })).toBeNull();
-    expect(screen.queryByRole("heading", { name: "All Watchlists" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Watchlists" })).toBeNull();
     expect(screen.queryByText("Create New List")).toBeNull();
     expect(screen.getAllByText("selection")).toHaveLength(2);
   });

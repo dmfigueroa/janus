@@ -9,10 +9,7 @@ interface WatchlistCardArtworkProps {
   selectionMode: boolean;
   isSelected: boolean;
   showUpNextBadge: boolean;
-  showSkipButton: boolean;
-  skipping: boolean;
   onToggle?: () => void;
-  onSkip: () => void;
 }
 
 export function WatchlistCardArtwork({
@@ -20,10 +17,7 @@ export function WatchlistCardArtwork({
   selectionMode,
   isSelected,
   showUpNextBadge,
-  showSkipButton,
-  skipping,
   onToggle,
-  onSkip,
 }: WatchlistCardArtworkProps) {
   return (
     <WatchlistCardSurface
@@ -45,10 +39,6 @@ export function WatchlistCardArtwork({
         hasNextUnwatched={Boolean(watchlist.stats.nextUnwatched)}
         selectionMode={selectionMode}
         showUpNextBadge={showUpNextBadge}
-        showSkipButton={showSkipButton}
-        skipping={skipping}
-        watchlistName={watchlist.name}
-        onSkip={onSkip}
       />
     </WatchlistCardSurface>
   );
