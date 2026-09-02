@@ -3,16 +3,31 @@ import { watchlistItems, watchlists } from "@/db/Schema";
 import { and, asc, eq, sql } from "drizzle-orm";
 import type { ReorderItemsInput } from "./Schema";
 
+export type ReorderItemsResult =
+  | { success: true }
+  | { success: false; code: ReorderFailureCode; message: string };
+
+export type ReorderFailureCode =
+  | "not_found"
+  | "not_custom_mode"
+  | "invalid_reorder"
+  | "invalid_item"
+  | "invalid_reference";
+
 export async function reorderItems({
   watchlistId,
   movedItemId,
   referenceItemId,
   position,
-}: ReorderItemsInput) {
+}: ReorderItemsInput): Promise<ReorderItemsResult> {
   const db = getDb();
 
   if (movedItemId === referenceItemId) {
-    return { success: false, message: "Moved item and reference item must differ" };
+    return {
+      success: false,
+      code: "invalid_reorder",
+      message: "Moved item and reference item must differ",
+    };
   }
 
   return db.transaction((transaction) =>
@@ -23,15 +38,23 @@ export async function reorderItems({
 function reorderItemsInTransaction(
   transaction: DatabaseTransaction,
   { watchlistId, movedItemId, referenceItemId, position }: ReorderItemsInput,
-) {
+): ReorderItemsResult {
   const [watchlist] = transaction
     .select({ itemOrderMode: watchlists.itemOrderMode })
     .from(watchlists)
     .where(eq(watchlists.id, watchlistId))
     .all();
 
-  if (!watchlist || watchlist.itemOrderMode !== "custom") {
-    return { success: false as const, message: "Reordering is only available in custom mode" };
+  if (!watchlist) {
+    return { success: false, code: "not_found", message: "Watchlist not found." };
+  }
+
+  if (watchlist.itemOrderMode !== "custom") {
+    return {
+      success: false,
+      code: "not_custom_mode",
+      message: "Reordering is only available in custom mode",
+    };
   }
 
   const existingItems = transaction
@@ -59,20 +82,14 @@ function reorderExistingItems(
   transaction: DatabaseTransaction,
   existingItems: Array<{ id: number; customRank: number | null }>,
   { watchlistId, movedItemId, referenceItemId, position }: ReorderItemsInput,
-) {
-  const validIds = new Set(existingItems.map((item) => item.id));
-  if (!hasAllIds(validIds, [movedItemId, referenceItemId])) {
-    return { success: false as const, message: "Some items do not belong to this watchlist" };
-  }
+): ReorderItemsResult {
+  const missingItemError = findMissingItemError(existingItems, movedItemId, referenceItemId);
+  if (missingItemError) return missingItemError;
 
   const orderedIds = existingItems.map((item) => item.id);
   const oldIndex = orderedIds.indexOf(movedItemId);
   const remainingIds = orderedIds.filter((itemId) => itemId !== movedItemId);
   const referenceIndex = remainingIds.indexOf(referenceItemId);
-
-  if (!hasValidIndexes(oldIndex, referenceIndex)) {
-    return { success: false as const, message: "Some items do not belong to this watchlist" };
-  }
 
   return applyItemReorder(transaction, {
     watchlistId,
@@ -84,12 +101,30 @@ function reorderExistingItems(
   });
 }
 
-function hasAllIds(validIds: Set<number>, itemIds: number[]) {
-  return itemIds.every((itemId) => validIds.has(itemId));
-}
+function findMissingItemError(
+  existingItems: Array<{ id: number; customRank: number | null }>,
+  movedItemId: number,
+  referenceItemId: number,
+) {
+  const validIds = new Set(existingItems.map((item) => item.id));
 
-function hasValidIndexes(oldIndex: number, referenceIndex: number) {
-  return oldIndex !== -1 && referenceIndex !== -1;
+  if (!validIds.has(movedItemId)) {
+    return {
+      success: false as const,
+      code: "invalid_item" as const,
+      message: "Moved item does not belong to this watchlist",
+    };
+  }
+
+  if (!validIds.has(referenceItemId)) {
+    return {
+      success: false as const,
+      code: "invalid_reference" as const,
+      message: "Reference item does not belong to this watchlist",
+    };
+  }
+
+  return null;
 }
 
 function applyItemReorder(

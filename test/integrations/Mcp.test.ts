@@ -2292,4 +2292,269 @@ describe("Janus MCP endpoint", () => {
       ],
     });
   });
+
+  it("discovers reorder_watchlist_items as consequential with explicit selectors", async () => {
+    const tools = await client.listTools();
+    const reorder = tools.tools.find((tool) => tool.name === "reorder_watchlist_items");
+
+    expect(reorder).toMatchObject({
+      name: "reorder_watchlist_items",
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    });
+    expect(reorder?.description).toContain("before or after");
+    expect(reorder?.description).toContain("custom");
+    expect(reorder?.description).toContain("confirm");
+    expect(reorder?.inputSchema).toMatchObject({
+      properties: { reorders: { type: "array" } },
+    });
+    const reorderInput = reorder?.inputSchema;
+    const reorderProperties = (
+      reorderInput as {
+        properties?: { reorders?: { items?: { properties?: Record<string, unknown> } } };
+      }
+    ).properties?.reorders?.items?.properties;
+    expect(reorderProperties).toMatchObject({
+      watchlistId: { type: "integer" },
+      movedItemId: { type: "integer" },
+      referenceItemId: { type: "integer" },
+      position: { enum: ["before", "after"] },
+    });
+    expect(reorder?.outputSchema).toMatchObject({
+      properties: { results: { type: "array" } },
+    });
+  });
+
+  it("reorders items before and after a reference and persists the order", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP reorder", itemOrderMode: "custom" })
+      .returning();
+    const [item1, item2, item3, item4] = await database
+      .getDb()
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "r1",
+          title: "Item 1",
+          mediaType: "movie",
+          customRank: 1,
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "r2",
+          title: "Item 2",
+          mediaType: "movie",
+          customRank: 2,
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "r3",
+          title: "Item 3",
+          mediaType: "movie",
+          customRank: 3,
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "r4",
+          title: "Item 4",
+          mediaType: "movie",
+          customRank: 4,
+        },
+      ])
+      .returning();
+
+    const afterResult = await client.callTool({
+      name: "reorder_watchlist_items",
+      arguments: {
+        reorders: [
+          {
+            watchlistId: watchlist.id,
+            movedItemId: item1.id,
+            referenceItemId: item3.id,
+            position: "after",
+          },
+        ],
+      },
+    });
+
+    expect(afterResult.isError).not.toBe(true);
+    expect(afterResult.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: true,
+          code: "reordered",
+          watchlistId: watchlist.id,
+          movedItemId: item1.id,
+          referenceItemId: item3.id,
+        },
+      ],
+    });
+    await expect(
+      database
+        .getDb()
+        .select({ id: watchlistItems.id })
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, watchlist.id))
+        .orderBy(watchlistItems.customRank),
+    ).resolves.toEqual([{ id: item2.id }, { id: item3.id }, { id: item1.id }, { id: item4.id }]);
+
+    const beforeResult = await client.callTool({
+      name: "reorder_watchlist_items",
+      arguments: {
+        reorders: [
+          {
+            watchlistId: watchlist.id,
+            movedItemId: item4.id,
+            referenceItemId: item2.id,
+            position: "before",
+          },
+        ],
+      },
+    });
+
+    expect(beforeResult.isError).not.toBe(true);
+    expect(beforeResult.structuredContent).toMatchObject({
+      results: [{ index: 0, success: true, code: "reordered" }],
+    });
+    await expect(
+      database
+        .getDb()
+        .select({ id: watchlistItems.id })
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, watchlist.id))
+        .orderBy(watchlistItems.customRank),
+    ).resolves.toEqual([{ id: item4.id }, { id: item2.id }, { id: item3.id }, { id: item1.id }]);
+  });
+
+  it("preserves batch order across reorder anchors and allows partial success", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP reorder partial", itemOrderMode: "custom" })
+      .returning();
+    const [item1, item2] = await database
+      .getDb()
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "p1",
+          title: "Item 1",
+          mediaType: "movie",
+          customRank: 1,
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "p2",
+          title: "Item 2",
+          mediaType: "movie",
+          customRank: 2,
+        },
+      ])
+      .returning();
+
+    const result = await client.callTool({
+      name: "reorder_watchlist_items",
+      arguments: {
+        reorders: [
+          {
+            watchlistId: watchlist.id,
+            movedItemId: item1.id,
+            referenceItemId: item2.id,
+            position: "before",
+          },
+          {
+            watchlistId: watchlist.id,
+            movedItemId: item1.id,
+            referenceItemId: 999_999,
+            position: "before",
+          },
+          {
+            watchlistId: watchlist.id,
+            movedItemId: 999_998,
+            referenceItemId: item2.id,
+            position: "before",
+          },
+          {
+            watchlistId: watchlist.id,
+            movedItemId: item1.id,
+            referenceItemId: item1.id,
+            position: "before",
+          },
+          { watchlistId: watchlist.id },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        { index: 0, success: true, code: "reordered" },
+        { index: 1, success: false, code: "invalid_reference" },
+        { index: 2, success: false, code: "invalid_item" },
+        { index: 3, success: false, code: "invalid_reorder" },
+        {
+          index: 4,
+          success: false,
+          code: "validation_error",
+          message: "watchlistId, movedItemId, referenceItemId, and position are required.",
+        },
+      ],
+    });
+  });
+
+  it("returns structured reorder failures for a missing and non-custom watchlist", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [releaseWatchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP reorder release", itemOrderMode: "release" })
+      .returning();
+    const [item] = await database
+      .getDb()
+      .insert(watchlistItems)
+      .values({
+        watchlistId: releaseWatchlist.id,
+        tmdbId: "release-item",
+        title: "Release item",
+        mediaType: "movie",
+      })
+      .returning();
+
+    const nonCustom = await client.callTool({
+      name: "reorder_watchlist_items",
+      arguments: {
+        reorders: [
+          {
+            watchlistId: releaseWatchlist.id,
+            movedItemId: item.id,
+            referenceItemId: 999_999,
+            position: "before",
+          },
+        ],
+      },
+    });
+
+    expect(nonCustom.isError).not.toBe(true);
+    expect(nonCustom.structuredContent).toMatchObject({
+      results: [{ index: 0, success: false, code: "not_custom_mode" }],
+    });
+
+    const missing = await client.callTool({
+      name: "reorder_watchlist_items",
+      arguments: {
+        reorders: [{ watchlistId: 999_999, movedItemId: 1, referenceItemId: 2, position: "after" }],
+      },
+    });
+
+    expect(missing.isError).not.toBe(true);
+    expect(missing.structuredContent).toMatchObject({
+      results: [{ index: 0, success: false, code: "not_found" }],
+    });
+  });
 });
