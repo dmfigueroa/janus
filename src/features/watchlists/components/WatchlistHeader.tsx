@@ -1,8 +1,8 @@
 import type { Watchlist } from "@/db/Schema";
-import { Box, Button, Flex, Heading, IconButton, Input, Text } from "@chakra-ui/react";
-import { WatchlistFormDialog } from "@/features/watchlists/components/WatchlistFormDialog";
+import { Box, Button, Flex, Input, Text } from "@chakra-ui/react";
+import { WatchlistTitle } from "@/features/watchlists/components/WatchlistTitle";
 import { calculateWatchlistProgress } from "@/features/watchlists/Progress";
-import { Pencil, Search } from "lucide-react";
+import { Search } from "lucide-react";
 
 interface WatchlistHeaderProps {
   watchlist: Watchlist;
@@ -12,6 +12,7 @@ interface WatchlistHeaderProps {
   onFilterChange: (showUnwatchedOnly: boolean) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  onTogglePause: () => void;
   interactionDisabled?: boolean;
 }
 
@@ -27,6 +28,7 @@ export function WatchlistHeader({
   onFilterChange,
   searchQuery,
   onSearchChange,
+  onTogglePause,
   interactionDisabled = false,
 }: WatchlistHeaderProps) {
   return (
@@ -40,7 +42,11 @@ export function WatchlistHeader({
       pb={{ base: 4, md: 6 }}
       pt={4}
     >
-      <WatchlistTitle watchlist={watchlist} />
+      <WatchlistTitle
+        watchlist={watchlist}
+        onTogglePause={onTogglePause}
+        interactionDisabled={interactionDisabled}
+      />
 
       <Box mt={4}>
         <WatchlistProgress totalItems={totalItems} watchedItems={watchedItems} />
@@ -65,38 +71,6 @@ export function WatchlistHeader({
         </Flex>
       </Box>
     </Box>
-  );
-}
-
-function WatchlistTitle({ watchlist }: { watchlist: Watchlist }) {
-  return (
-    <Flex mb={2} align="center" justify="space-between" gap={2}>
-      <Flex align="center" gap={2} minW={0}>
-        <Heading as="h1" size={{ base: "xl", md: "2xl" }} letterSpacing="tight" truncate>
-          {watchlist.name}
-        </Heading>
-        <WatchlistFormDialog
-          mode="edit"
-          watchlist={watchlist}
-          trigger={
-            <IconButton
-              type="button"
-              aria-label="Edit watchlist"
-              variant="ghost"
-              size="sm"
-              color="fg.muted"
-            >
-              <Pencil size={16} />
-            </IconButton>
-          }
-        />
-      </Flex>
-      {watchlist.description && (
-        <Text fontSize="sm" color="fg.muted" display={{ base: "none", md: "block" }}>
-          {watchlist.description}
-        </Text>
-      )}
-    </Flex>
   );
 }
 

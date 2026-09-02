@@ -12,6 +12,7 @@ import {
 } from "@/features/watchlists/detail/Query";
 import { useReorderWatchlistItemsMutation } from "@/features/watchlists/detail/useReorderWatchlistItemsMutation";
 import { canReorderWatchlistItems } from "@/features/watchlists/detail/Reorder";
+import { useToggleWatchlistPause } from "@/features/watchlists/pause/useToggleWatchlistPause";
 
 interface WatchlistDetailScreenProps {
   initialData: WatchlistDetailQueryData;
@@ -74,6 +75,7 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
   const isWatchedTogglePending =
     useIsMutating({ mutationKey: ["watchlists", "toggle-watched", watchlistId] }) > 0;
   const isReorderPending = reorderItemsMutation.isPending;
+  const togglePauseMutation = useToggleWatchlistPause(latestWatchlist);
 
   const canReorderItems = canReorderWatchlistItems({
     itemOrderMode: latestItemOrderMode,
@@ -105,6 +107,7 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
         onFilterChange={setShowUnwatchedOnly}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        onTogglePause={() => void togglePauseMutation.mutateAsync()}
         interactionDisabled={isReorderPending}
       />
 
