@@ -53,3 +53,25 @@ protocol tests validate the MCP handler and watchlist behavior with an
 isolated SQLite database.
 
 Reference: [Cloudflare Managed OAuth](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/managed-oauth/).
+
+## Anchored insert and move
+
+`add_media_to_watchlists`, `add_custom_items_to_watchlists`, `move_watchlist_items`, and
+`move_watchlist_parents` accept the same anchor contract. Each addition or move may include
+`insertionPosition: "before" | "after"` together with `referenceItemId`, the stable Janus
+watchlist item ID returned by `get_watchlist` or `find_watchlist_items`. The new or moved
+item lands at the reference's rank and existing items shift to keep the order contiguous.
+
+Constraints:
+
+- `referenceItemId` is required when `insertionPosition` is `"before"` or `"after"`. It must
+  not be set for the legacy `"beginning"`, `"end"`, or `"release-adjacent"` positions.
+- Anchors only work in custom-ordered watchlists. Anchoring against a release-ordered list
+  returns `not_custom_mode`. The legacy positions still silently ignore their anchor on
+  release-ordered lists to preserve prior behavior.
+- An unranked reference or a reference that does not belong to the destination watchlist
+  returns `invalid_reference` and leaves the destination unchanged.
+- Anchoring within the same watchlist via `move_watchlist_items` returns `invalid_reference`
+  with a hint to use `reorder_watchlist_items` instead.
+- `move_watchlist_parents` lands the first sibling at the anchor and trails the rest
+  consecutively in the source's existing customRank order.
