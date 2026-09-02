@@ -1,5 +1,5 @@
 import { Box, Flex, Heading, Text } from "@chakra-ui/react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query";
 import { formatNextItemDetail } from "@/features/watchlists/NextItemLabel";
 
@@ -118,6 +118,5 @@ function PausedSinceLine({ pausedAt }: { pausedAt: string }) {
 }
 
 function formatUtcTimestamp(timestamp: string, pattern: string) {
-  const utcDate = new Date(`${timestamp.replace(" ", "T")}Z`);
-  return format(utcDate, pattern);
+  return format(parseISO(`${timestamp}Z`), pattern);
 }
