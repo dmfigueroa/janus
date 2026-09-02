@@ -26,6 +26,35 @@ beforeEach(async () => {
 });
 
 describe("edit watchlist item mutation", () => {
+  it("updates only the provided field", async () => {
+    const [watchlist] = await db.insert(schema.watchlists).values({ name: "Queue" }).returning();
+    const [item] = await db
+      .insert(schema.watchlistItems)
+      .values({
+        watchlistId: watchlist.id,
+        tmdbId: "movie-1",
+        mediaType: "movie",
+        title: "Old title",
+        releaseDate: "2024-01-01",
+        posterPath: "/old-poster.jpg",
+      })
+      .returning();
+
+    const result = await editWatchlistItemMutation({
+      watchlistId: watchlist.id,
+      itemId: item.id,
+      title: "New title",
+    });
+    const detail = await getWatchlistDetail({ watchlistId: watchlist.id });
+
+    expect(result).toEqual({ success: true });
+    expect(detail?.items[0]).toMatchObject({
+      title: "New title",
+      releaseDate: "2024-01-01",
+      posterPath: "/old-poster.jpg",
+    });
+  });
+
   it("replaces the title and release date without changing custom order", async () => {
     const [watchlist] = await db
       .insert(schema.watchlists)

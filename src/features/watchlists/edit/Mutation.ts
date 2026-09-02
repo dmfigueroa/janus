@@ -16,13 +16,19 @@ export const posterPathSchema = z
   ])
   .nullable();
 
-export const editWatchlistItemSchema = z.object({
-  watchlistId: z.number(),
-  itemId: z.number(),
-  title: z.string().trim().min(1, "Title is required."),
-  releaseDate: z.union([releaseDateSchema, z.null()]),
-  posterPath: posterPathSchema,
-});
+export const editWatchlistItemSchema = z
+  .object({
+    watchlistId: z.number(),
+    itemId: z.number(),
+    title: z.string().trim().min(1, "Title is required.").optional(),
+    releaseDate: z.union([releaseDateSchema, z.null()]).optional(),
+    posterPath: posterPathSchema.optional(),
+  })
+  .refine(
+    ({ title, releaseDate, posterPath }) =>
+      title !== undefined || releaseDate !== undefined || posterPath !== undefined,
+    "No fields to update.",
+  );
 
 export type EditWatchlistItemInput = z.infer<typeof editWatchlistItemSchema>;
 

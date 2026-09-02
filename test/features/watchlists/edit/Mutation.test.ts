@@ -4,6 +4,19 @@ import { editWatchlistItemSchema } from "@/features/watchlists/edit/Mutation";
 describe("edit watchlist item validation", () => {
   const baseInput = { watchlistId: 1, itemId: 2, title: "Movie", posterPath: null };
 
+  it("accepts an edit with only the title", () => {
+    expect(
+      editWatchlistItemSchema.safeParse({ watchlistId: 1, itemId: 2, title: "Movie" }).success,
+    ).toBe(true);
+  });
+
+  it("rejects an edit with no editable fields", () => {
+    const result = editWatchlistItemSchema.safeParse({ watchlistId: 1, itemId: 2 });
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error.issues[0]?.message).toBe("No fields to update.");
+  });
+
   it("accepts a full HTTPS poster image URL", () => {
     const result = editWatchlistItemSchema.safeParse({
       ...baseInput,

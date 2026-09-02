@@ -31,6 +31,26 @@ beforeEach(async () => {
 });
 
 describe("update watchlist mutation", () => {
+  it("updates only the provided fields", async () => {
+    const watchlist = await createTestWatchlist(db, {
+      name: "Original Name",
+      description: "Original desc",
+    });
+
+    const result = await updateWatchlistMutation({
+      watchlistId: watchlist.id,
+      description: "Updated desc",
+    });
+    const detail = await readWatchlistDetail({ watchlistId: watchlist.id });
+
+    expect(result).toEqual({ success: true });
+    expect(detail?.watchlist).toMatchObject({
+      name: "Original Name",
+      description: "Updated desc",
+      itemOrderMode: "release",
+    });
+  });
+
   it("updates name, description, and item order mode", async () => {
     const watchlist = await createTestWatchlist(db, {
       name: "Original Name",

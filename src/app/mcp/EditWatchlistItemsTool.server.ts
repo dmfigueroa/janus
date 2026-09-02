@@ -14,11 +14,22 @@ const editResultSchema = z.object({
 });
 
 const editWatchlistItemInputSchema = z.object({
-  watchlistId: z.number().optional(),
-  watchlistItemId: z.number().optional(),
-  title: z.string().optional(),
-  releaseDate: z.union([z.string(), z.null()]).optional(),
-  posterImage: z.union([z.string(), z.null()]).optional(),
+  watchlistId: z.number().optional().describe("Stable internal watchlist ID."),
+  watchlistItemId: z.number().optional().describe("Stable internal watchlist item ID."),
+  title: z
+    .string()
+    .optional()
+    .describe("New title; omit to keep the existing title. Null is not allowed."),
+  releaseDate: z
+    .union([z.string(), z.null()])
+    .optional()
+    .describe("New YYYY or YYYY-MM-DD date; omit to keep it, or null to clear it."),
+  posterImage: z
+    .union([z.string(), z.null()])
+    .optional()
+    .describe(
+      "New HTTPS URL or provider path beginning with /; omit to keep it, or null to clear it.",
+    ),
 });
 
 export function registerEditWatchlistItemsTool(server: McpServer) {
@@ -27,7 +38,7 @@ export function registerEditWatchlistItemsTool(server: McpServer) {
     {
       title: "Edit watchlist item metadata",
       description:
-        "Edit the stored title, release date, and poster image of one or more watchlist items. Each edit targets a stable internal watchlist item ID and is processed independently, returning an ordered result. Poster image must be an HTTPS URL or a provider path beginning with /. Release date must be YYYY or YYYY-MM-DD.",
+        "Edit the stored title, release date, and poster image of one or more watchlist items. Each edit targets a stable internal watchlist item ID and is processed independently, returning an ordered result. Omit a field to keep its existing value; use null only to clear release date or poster image. Title cannot be cleared. Each edit must include at least one field to update. Poster image must be an HTTPS URL or a provider path beginning with /. Release date must be YYYY or YYYY-MM-DD.",
       inputSchema: { edits: z.array(editWatchlistItemInputSchema).min(1) },
       outputSchema: { results: z.array(editResultSchema) },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
