@@ -2010,4 +2010,286 @@ describe("Janus MCP endpoint", () => {
       ],
     });
   });
+
+  it("discovers distinct remove item and parent tools with destructive annotations", async () => {
+    const tools = await client.listTools();
+    const removeItems = tools.tools.find((tool) => tool.name === "remove_watchlist_items");
+    const removeParents = tools.tools.find((tool) => tool.name === "remove_watchlist_parents");
+
+    expect(removeItems).toMatchObject({
+      name: "remove_watchlist_items",
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    });
+    expect(removeItems?.description).toContain("single item");
+    expect(removeItems?.description).toContain("remove_watchlist_parents");
+    expect(removeItems?.inputSchema).toMatchObject({
+      properties: { removals: { type: "array" } },
+    });
+    const removeItemsInput = removeItems?.inputSchema;
+    const removeItemsProperties = (
+      removeItemsInput as {
+        properties?: { removals?: { items?: { properties?: Record<string, unknown> } } };
+      }
+    ).properties?.removals?.items?.properties;
+    expect(removeItemsProperties).toMatchObject({
+      watchlistId: { type: "integer" },
+      watchlistItemId: { type: "integer" },
+    });
+    expect(removeItemsProperties).not.toHaveProperty("parentId");
+    expect(removeItems?.outputSchema).toMatchObject({
+      properties: { results: { type: "array" } },
+    });
+
+    expect(removeParents).toMatchObject({
+      name: "remove_watchlist_parents",
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    });
+    expect(removeParents?.description).toContain("parent");
+    expect(removeParents?.description).toContain("remove_watchlist_items");
+    expect(removeParents?.inputSchema).toMatchObject({
+      properties: { removals: { type: "array" } },
+    });
+    const removeParentsInput = removeParents?.inputSchema;
+    const removeParentsProperties = (
+      removeParentsInput as {
+        properties?: { removals?: { items?: { properties?: Record<string, unknown> } } };
+      }
+    ).properties?.removals?.items?.properties;
+    expect(removeParentsProperties).toMatchObject({
+      watchlistId: { type: "integer" },
+      parentId: { type: "string" },
+    });
+    expect(removeParentsProperties).not.toHaveProperty("watchlistItemId");
+    expect(removeParents?.outputSchema).toMatchObject({
+      properties: { results: { type: "array" } },
+    });
+  });
+
+  it("removes a single watchlist item without removing its siblings", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP item removal" })
+      .returning();
+    const [target, sibling] = await database
+      .getDb()
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "remove-target",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Target",
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "remove-sibling",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Sibling",
+        },
+      ])
+      .returning();
+
+    const result = await client.callTool({
+      name: "remove_watchlist_items",
+      arguments: { removals: [{ watchlistId: watchlist.id, watchlistItemId: target.id }] },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: true,
+          code: "removed",
+          watchlistId: watchlist.id,
+          watchlistItemId: target.id,
+          affectedCount: 1,
+        },
+      ],
+    });
+
+    const remaining = await database
+      .getDb()
+      .select({ id: watchlistItems.id })
+      .from(watchlistItems)
+      .where(eq(watchlistItems.watchlistId, watchlist.id));
+    expect(remaining.map((row) => row.id)).toEqual([sibling.id]);
+  });
+
+  it("preserves batch order across item removals and treats stale repeats as success", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP item removal partial" })
+      .returning();
+    const [target] = await database
+      .getDb()
+      .insert(watchlistItems)
+      .values({
+        watchlistId: watchlist.id,
+        tmdbId: "remove-partial",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Partial target",
+      })
+      .returning();
+
+    const result = await client.callTool({
+      name: "remove_watchlist_items",
+      arguments: {
+        removals: [
+          { watchlistId: watchlist.id, watchlistItemId: target.id },
+          { watchlistId: watchlist.id, watchlistItemId: target.id },
+          { watchlistId: watchlist.id },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        { index: 0, success: true, code: "removed", affectedCount: 1 },
+        { index: 1, success: true, code: "removed", affectedCount: 0 },
+        {
+          index: 2,
+          success: false,
+          code: "validation_error",
+          message: "watchlistId and watchlistItemId are required.",
+          affectedCount: 0,
+        },
+      ],
+    });
+  });
+
+  it("removes a whole parent group and affects only the selected parent in the watchlist", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist, otherWatchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values([{ name: "MCP parent removal" }, { name: "MCP parent removal other" }])
+      .returning();
+    await database
+      .getDb()
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "episode-a",
+          source: "tmdb",
+          mediaType: "episode",
+          title: "Pilot",
+          parentId: "tmdb:series-a",
+          parentTitle: "Series A",
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "episode-b",
+          source: "tmdb",
+          mediaType: "episode",
+          title: "Finale",
+          parentId: "tmdb:series-a",
+          parentTitle: "Series A",
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "episode-c",
+          source: "tmdb",
+          mediaType: "episode",
+          title: "Pilot",
+          parentId: "tmdb:series-b",
+          parentTitle: "Series B",
+        },
+        {
+          watchlistId: otherWatchlist.id,
+          tmdbId: "episode-d",
+          source: "tmdb",
+          mediaType: "episode",
+          title: "Pilot",
+          parentId: "tmdb:series-a",
+          parentTitle: "Series A",
+        },
+      ]);
+
+    const result = await client.callTool({
+      name: "remove_watchlist_parents",
+      arguments: { removals: [{ watchlistId: watchlist.id, parentId: "tmdb:series-a" }] },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: true,
+          code: "removed",
+          watchlistId: watchlist.id,
+          parentId: "tmdb:series-a",
+          affectedCount: 2,
+        },
+      ],
+    });
+
+    const remainingInWatchlist = await database
+      .getDb()
+      .select({ parentId: watchlistItems.parentId, title: watchlistItems.title })
+      .from(watchlistItems)
+      .where(eq(watchlistItems.watchlistId, watchlist.id));
+    expect(remainingInWatchlist.map((row) => row.parentId)).toEqual(["tmdb:series-b"]);
+
+    const remainingInOtherWatchlist = await database
+      .getDb()
+      .select({ parentId: watchlistItems.parentId })
+      .from(watchlistItems)
+      .where(eq(watchlistItems.watchlistId, otherWatchlist.id));
+    expect(remainingInOtherWatchlist.map((row) => row.parentId)).toEqual(["tmdb:series-a"]);
+  });
+
+  it("preserves batch order across parent removals and reports a stale repeat", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP parent removal partial" })
+      .returning();
+    await database.getDb().insert(watchlistItems).values({
+      watchlistId: watchlist.id,
+      tmdbId: "episode-e",
+      source: "tmdb",
+      mediaType: "episode",
+      title: "Pilot",
+      parentId: "tmdb:series-c",
+      parentTitle: "Series C",
+    });
+
+    const result = await client.callTool({
+      name: "remove_watchlist_parents",
+      arguments: {
+        removals: [
+          { watchlistId: watchlist.id, parentId: "tmdb:series-c" },
+          { watchlistId: watchlist.id, parentId: "tmdb:series-c" },
+          { watchlistId: watchlist.id },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        { index: 0, success: true, code: "removed", parentId: "tmdb:series-c", affectedCount: 1 },
+        { index: 1, success: true, code: "removed", parentId: "tmdb:series-c", affectedCount: 0 },
+        {
+          index: 2,
+          success: false,
+          code: "validation_error",
+          message: "watchlistId and parentId are required.",
+          affectedCount: 0,
+        },
+      ],
+    });
+  });
 });

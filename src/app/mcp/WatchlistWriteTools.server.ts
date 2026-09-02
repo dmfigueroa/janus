@@ -12,6 +12,8 @@ import { registerAddMediaToWatchlistsTool } from "./AddMediaToWatchlistsTool.ser
 import { registerAddCustomItemsToWatchlistsTool } from "./AddCustomItemsTool.server";
 import { registerEditWatchlistItemsTool } from "./EditWatchlistItemsTool.server";
 import { registerSetWatchlistItemsWatchedTool } from "./SetWatchlistItemsWatchedTool.server";
+import { registerRemoveWatchlistItemsTool } from "./RemoveWatchlistItemsTool.server";
+import { registerRemoveWatchlistParentsTool } from "./RemoveWatchlistParentsTool.server";
 
 const createWatchlistInputSchema = z.object({
   name: z.string().optional(),
@@ -34,6 +36,8 @@ export function registerWatchlistWriteTools(server: McpServer) {
   registerAddCustomItemsToWatchlistsTool(server);
   registerEditWatchlistItemsTool(server);
   registerSetWatchlistItemsWatchedTool(server);
+  registerRemoveWatchlistItemsTool(server);
+  registerRemoveWatchlistParentsTool(server);
   registerSkipWatchlists(server);
 }
 
