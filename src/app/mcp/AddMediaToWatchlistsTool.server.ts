@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { anchorInsertionRefinement } from "@/features/watchlists/add/InsertionRefinement";
 import {
   providerMediaAdditionSchema,
   type ProviderMediaAddition,
@@ -18,13 +19,18 @@ const mediaAdditionResultSchema = z.object({
   affectedCount: z.number().int().nonnegative(),
 });
 
-const mediaAdditionInputSchema = z.object({
-  watchlistId: z.number().optional(),
-  provider: z.enum(["tmdb", "rawg", "google_books", "comicvine", "anilist"]).optional(),
-  providerId: z.string().optional(),
-  mediaType: z.enum(["movie", "tv", "game", "book", "comic", "anime", "manga"]).optional(),
-  insertionPosition: z.enum(["beginning", "end", "release-adjacent"]).optional(),
-});
+const mediaAdditionInputSchema = z
+  .object({
+    watchlistId: z.number().optional(),
+    provider: z.enum(["tmdb", "rawg", "google_books", "comicvine", "anilist"]).optional(),
+    providerId: z.string().optional(),
+    mediaType: z.enum(["movie", "tv", "game", "book", "comic", "anime", "manga"]).optional(),
+    insertionPosition: z
+      .enum(["beginning", "end", "release-adjacent", "before", "after"])
+      .optional(),
+    referenceItemId: z.number().int().positive().optional(),
+  })
+  .superRefine(anchorInsertionRefinement);
 
 export function registerAddMediaToWatchlistsTool(server: McpServer) {
   server.registerTool(

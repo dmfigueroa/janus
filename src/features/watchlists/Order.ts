@@ -3,7 +3,7 @@ import type { WatchlistItem } from "@/db/Schema";
 
 export type WatchlistItemOrderMode = Watchlist["itemOrderMode"];
 
-export type InsertionPosition = "beginning" | "end" | "release-adjacent";
+export type InsertionPosition = "beginning" | "end" | "release-adjacent" | "before" | "after";
 
 type ItemWithOrder = {
   id?: number;
@@ -14,6 +14,12 @@ type ItemWithOrder = {
 };
 
 type OrderedItem = ItemWithOrder & { newRank: number };
+
+export class InvalidInsertionReferenceError extends Error {
+  constructor(public referenceItemId: number) {
+    super(`Reference item ${referenceItemId} cannot anchor this insertion.`);
+  }
+}
 
 export function compareReleaseDates(
   left: Pick<WatchlistItem, "id" | "releaseDate">,
@@ -65,13 +71,14 @@ export function computeItemInsertionOrder(
   newItem: ItemWithOrder,
   position: InsertionPosition,
   itemOrderMode: WatchlistItemOrderMode,
+  referenceItemId?: number,
 ): OrderedItem[] {
   if (itemOrderMode === "release") {
     return [{ ...newItem, newRank: 1 }];
   }
 
   const sortedExisting = sortItemsByCustomOrder(existingItems);
-  return positionItem(sortedExisting, newItem, position);
+  return positionItem(sortedExisting, newItem, position, referenceItemId);
 }
 
 function sortItemsByCustomOrder(items: ItemWithOrder[]): ItemWithOrder[] {
@@ -103,15 +110,52 @@ function positionItem(
   sorted: ItemWithOrder[],
   newItem: ItemWithOrder,
   position: InsertionPosition,
+  referenceItemId?: number,
 ): OrderedItem[] {
-  return positionFunctions[position]?.(sorted, newItem) as OrderedItem[];
+  if (isAnchorPosition(position)) {
+    return spliceAroundReference(sorted, newItem, position, referenceItemId ?? NaN);
+  }
+  return positionFunctions[position](sorted, newItem);
+}
+
+function isAnchorPosition(position: InsertionPosition): position is "before" | "after" {
+  return position === "before" || position === "after";
+}
+
+function spliceAroundReference(
+  sorted: ItemWithOrder[],
+  newItem: ItemWithOrder,
+  position: "before" | "after",
+  referenceItemId: number,
+): OrderedItem[] {
+  const reference = sorted.find((item) => item.id === referenceItemId);
+  if (!reference || reference.customRank === null) {
+    throw new InvalidInsertionReferenceError(referenceItemId);
+  }
+  const nextOrder: (ItemWithOrder | OrderedItem)[] = [...sorted];
+  const spliceAt = anchorSpliceIndex(nextOrder, referenceItemId, position);
+  nextOrder.splice(spliceAt, 0, { ...newItem, customRank: reference.customRank });
+  return renumberOrder(nextOrder);
+}
+
+function anchorSpliceIndex(
+  currentOrder: (ItemWithOrder | OrderedItem)[],
+  referenceItemId: number,
+  position: "before" | "after",
+): number {
+  const referenceIndex = currentOrder.findIndex((item) => item.id === referenceItemId);
+  return position === "before" ? referenceIndex : referenceIndex + 1;
+}
+
+function renumberOrder<T extends ItemWithOrder>(order: T[]): (T & { newRank: number })[] {
+  return order.map((item, idx) => ({ ...item, newRank: idx + 1 }));
 }
 
 const positionFunctions = {
   beginning: positionAtBeginning,
   end: positionAtEnd,
   "release-adjacent": positionReleaseAdjacent,
-} satisfies Record<InsertionPosition, typeof positionAtBeginning>;
+} satisfies Record<Exclude<InsertionPosition, "before" | "after">, typeof positionAtBeginning>;
 
 function positionAtBeginning(sorted: ItemWithOrder[], newItem: ItemWithOrder): OrderedItem[] {
   const rankedNew = [{ ...newItem, newRank: 1 }];

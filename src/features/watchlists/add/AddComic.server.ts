@@ -5,7 +5,11 @@ import { getComicIssues } from "@/server/providers/Comicvine.server";
 import { getComicVolumeDetails } from "@/integrations/comicvine/ComicvineVolume.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
 import { persistAddedItems } from "./Insert.server";
-import { rejectAdd, type WatchlistWriteResult } from "./Shared.server";
+import {
+  rejectAdd,
+  type WatchlistWriteFailureCode,
+  type WatchlistWriteResult,
+} from "./Shared.server";
 
 const COMICVINE_UNAVAILABLE_MESSAGE =
   "Comic additions are unavailable because the ComicVine integration is not configured.";
@@ -16,6 +20,7 @@ export async function addComicToWatchlist(
   volumeId: string,
   media: WatchlistMedia,
   insertionPosition?: AddToWatchlistInsertionPosition,
+  referenceItemId?: number,
 ): Promise<WatchlistWriteResult> {
   const apiKey = getApiKey();
   if (!apiKey) {
@@ -27,7 +32,14 @@ export async function addComicToWatchlist(
     return rejectAdd(COMICVINE_FETCH_FAILURE_MESSAGE);
   }
 
-  return addFetchedComicIssues(watchlistId, volumeId, mediaWithTitle, apiKey, insertionPosition);
+  return addFetchedComicIssues(
+    watchlistId,
+    volumeId,
+    mediaWithTitle,
+    apiKey,
+    insertionPosition,
+    referenceItemId,
+  );
 }
 
 async function resolveVolumeTitle(
@@ -53,6 +65,7 @@ async function addFetchedComicIssues(
   media: WatchlistMedia,
   apiKey: string,
   insertionPosition?: AddToWatchlistInsertionPosition,
+  referenceItemId?: number,
 ): Promise<WatchlistWriteResult> {
   const existingIssueIds = await repository.getExistingComicsInWatchlist(watchlistId);
 
@@ -68,6 +81,7 @@ async function addFetchedComicIssues(
     issues,
     existingIssueIds,
     insertionPosition,
+    referenceItemId,
   );
 }
 
@@ -78,6 +92,7 @@ async function persistComicIssues(
   issues: Awaited<ReturnType<typeof getComicIssues>>,
   existingIssueIds: Set<string>,
   insertionPosition?: AddToWatchlistInsertionPosition,
+  referenceItemId?: number,
 ): Promise<WatchlistWriteResult> {
   if (issues.length === 0) {
     return { success: true, message: getNoNewIssuesMessage(existingIssueIds.size) };
@@ -88,10 +103,15 @@ async function persistComicIssues(
   const result = await persistAddedItems({
     watchlistId,
     insertionPosition,
+    referenceItemId,
     items,
   });
   if (!result.success) {
-    return result;
+    return {
+      success: false,
+      code: result.code as WatchlistWriteFailureCode,
+      message: result.message,
+    };
   }
 
   return {

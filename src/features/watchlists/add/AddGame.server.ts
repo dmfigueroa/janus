@@ -12,6 +12,7 @@ export async function addGameToWatchlist(
   watchlistId: number,
   media: WatchlistMedia,
   insertionPosition?: AddToWatchlistInsertionPosition,
+  referenceItemId?: number,
 ): Promise<WatchlistWriteResult> {
   const apiKey = process.env.RAWG_API_KEY;
   if (!apiKey) {
@@ -24,5 +25,5 @@ export async function addGameToWatchlist(
   } catch {
     return rejectAdd(RAWG_FETCH_FAILURE_MESSAGE);
   }
-  return addGenericItemToWatchlist(watchlistId, details, insertionPosition);
+  return addGenericItemToWatchlist(watchlistId, details, insertionPosition, referenceItemId);
 }

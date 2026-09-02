@@ -350,6 +350,193 @@ describe("move watchlist item mutation", () => {
       const movedItemInDest = detail?.items.find((i) => i.title === "New Item");
       expect(movedItemInDest?.customRank).toBeNull();
     });
+
+    it("moves item before a reference in a custom-ordered destination", async () => {
+      const [source, destination] = await db
+        .insert(watchlists)
+        .values([{ name: "Queue" }, { name: "Watched", itemOrderMode: "custom" }])
+        .returning();
+
+      const [, reference] = await db
+        .insert(watchlistItems)
+        .values([
+          {
+            watchlistId: destination.id,
+            tmdbId: "anchor-existing-1",
+            source: "tmdb",
+            mediaType: "movie",
+            title: "First",
+            customRank: 1,
+          },
+          {
+            watchlistId: destination.id,
+            tmdbId: "anchor-existing-2",
+            source: "tmdb",
+            mediaType: "movie",
+            title: "Reference",
+            customRank: 2,
+          },
+          {
+            watchlistId: destination.id,
+            tmdbId: "anchor-existing-3",
+            source: "tmdb",
+            mediaType: "movie",
+            title: "Third",
+            customRank: 3,
+          },
+        ])
+        .returning();
+
+      const [movedItem] = await db
+        .insert(watchlistItems)
+        .values({
+          watchlistId: source.id,
+          tmdbId: "anchor-move-1",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Moved Before Reference",
+        })
+        .returning();
+
+      const result = await moveItemToWatchlistMutation({
+        itemId: movedItem.id,
+        destinationWatchlistId: destination.id,
+        position: "before",
+        referenceItemId: reference!.id,
+      });
+
+      expect(result.success).toBe(true);
+      const destDetail = await readWatchlistDetailScreen({
+        watchlistId: destination!.id,
+        unwatchedOnly: false,
+      });
+      expect(destDetail?.items.map((i) => i.title)).toEqual([
+        "First",
+        "Moved Before Reference",
+        "Reference",
+        "Third",
+      ]);
+    });
+
+    it("moves item after a reference in a custom-ordered destination", async () => {
+      const [source, destination] = await db
+        .insert(watchlists)
+        .values([{ name: "Queue" }, { name: "Watched", itemOrderMode: "custom" }])
+        .returning();
+
+      const [, reference] = await db
+        .insert(watchlistItems)
+        .values([
+          {
+            watchlistId: destination.id,
+            tmdbId: "anchor-after-existing-1",
+            source: "tmdb",
+            mediaType: "movie",
+            title: "First",
+            customRank: 1,
+          },
+          {
+            watchlistId: destination.id,
+            tmdbId: "anchor-after-existing-2",
+            source: "tmdb",
+            mediaType: "movie",
+            title: "Reference",
+            customRank: 2,
+          },
+          {
+            watchlistId: destination.id,
+            tmdbId: "anchor-after-existing-3",
+            source: "tmdb",
+            mediaType: "movie",
+            title: "Third",
+            customRank: 3,
+          },
+        ])
+        .returning();
+
+      const [movedItem] = await db
+        .insert(watchlistItems)
+        .values({
+          watchlistId: source.id,
+          tmdbId: "anchor-after-move-1",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Moved After Reference",
+        })
+        .returning();
+
+      const result = await moveItemToWatchlistMutation({
+        itemId: movedItem.id,
+        destinationWatchlistId: destination.id,
+        position: "after",
+        referenceItemId: reference!.id,
+      });
+
+      expect(result.success).toBe(true);
+      const destDetail = await readWatchlistDetailScreen({
+        watchlistId: destination!.id,
+        unwatchedOnly: false,
+      });
+      expect(destDetail?.items.map((i) => i.title)).toEqual([
+        "First",
+        "Reference",
+        "Moved After Reference",
+        "Third",
+      ]);
+    });
+
+    it("rejects an anchored move whose reference item is unranked", async () => {
+      const [source, destination] = await db
+        .insert(watchlists)
+        .values([{ name: "Queue" }, { name: "Watched", itemOrderMode: "custom" }])
+        .returning();
+
+      const [unranked] = await db
+        .insert(watchlistItems)
+        .values({
+          watchlistId: destination.id,
+          tmdbId: "anchor-unranked",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Unranked",
+          customRank: null,
+        })
+        .returning();
+
+      const [movedItem] = await db
+        .insert(watchlistItems)
+        .values({
+          watchlistId: source.id,
+          tmdbId: "anchor-move-blocked",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Should Not Move",
+        })
+        .returning();
+
+      const result = await moveItemToWatchlistMutation({
+        itemId: movedItem.id,
+        destinationWatchlistId: destination.id,
+        position: "before",
+        referenceItemId: unranked!.id,
+      });
+
+      expect(result).toEqual({
+        success: false,
+        code: "invalid_reference",
+        message: expect.stringContaining("not in this watchlist"),
+      });
+      const sourceDetail = await readWatchlistDetailScreen({
+        watchlistId: source!.id,
+        unwatchedOnly: false,
+      });
+      expect(sourceDetail?.items.map((i) => i.title)).toEqual(["Should Not Move"]);
+      const destDetail = await readWatchlistDetailScreen({
+        watchlistId: destination!.id,
+        unwatchedOnly: false,
+      });
+      expect(destDetail?.items.map((i) => i.title)).toEqual(["Unranked"]);
+    });
   });
 
   it("moves single item from source to destination — item present in destination, absent from source, stats updated on both", async () => {
@@ -903,5 +1090,160 @@ describe("move parent to watchlist by parent ID mutation", () => {
       unwatchedOnly: false,
     });
     expect(destDetail?.items.map((i) => i.title)).toEqual(["Pilot", "Existing"]);
+  });
+
+  it("anchors a parent move so the first sibling lands at the reference and the rest trail", async () => {
+    const [source, destination] = await db
+      .insert(watchlists)
+      .values([{ name: "Queue" }, { name: "Watched", itemOrderMode: "custom" }])
+      .returning();
+
+    const [, reference] = await db
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: destination.id,
+          tmdbId: "anchor-parent-existing-1",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "First",
+          customRank: 1,
+        },
+        {
+          watchlistId: destination.id,
+          tmdbId: "anchor-parent-existing-2",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Reference",
+          customRank: 2,
+        },
+        {
+          watchlistId: destination.id,
+          tmdbId: "anchor-parent-existing-3",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Trailing",
+          customRank: 3,
+        },
+      ])
+      .returning();
+
+    const parentId = "tmdb:99";
+    const sourceParentId = (
+      await db
+        .insert(watchlistItems)
+        .values({
+          watchlistId: source.id,
+          tmdbId: "tv-99-parent",
+          source: "tmdb",
+          mediaType: "episode",
+          title: "Series 99",
+          parentId,
+          parentTitle: "Series 99",
+          customRank: 1,
+        })
+        .returning()
+    )[0]!.id;
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: source.id,
+        tmdbId: "tv-99-s1e1",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Pilot",
+        parentId,
+        parentTitle: "Series 99",
+        customRank: 2,
+      },
+      {
+        watchlistId: source.id,
+        tmdbId: "tv-99-s1e2",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Finale",
+        parentId,
+        parentTitle: "Series 99",
+        customRank: 3,
+      },
+    ]);
+
+    const result = await moveParentToWatchlistMutation({
+      watchlistId: source.id,
+      parentId,
+      destinationWatchlistId: destination.id,
+      position: "after",
+      referenceItemId: reference!.id,
+    });
+
+    expect(result.success).toBe(true);
+    const destDetail = await readWatchlistDetailScreen({
+      watchlistId: destination!.id,
+      unwatchedOnly: false,
+    });
+    expect(destDetail?.items.map((i) => i.title)).toEqual([
+      "First",
+      "Reference",
+      "Series 99",
+      "Pilot",
+      "Finale",
+      "Trailing",
+    ]);
+    expect(sourceParentId).toBeDefined();
+  });
+
+  it("errors when an anchored move targets the same list, steering the agent toward reorder_watchlist_items", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Self Move Anchor", itemOrderMode: "custom" })
+      .returning();
+
+    const [, reference, movedItem] = await db
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "self-existing-1",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "First",
+          customRank: 1,
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "self-existing-2",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Reference",
+          customRank: 2,
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "self-existing-3",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "To Move",
+          customRank: 3,
+        },
+      ])
+      .returning();
+
+    const result = await moveItemToWatchlistMutation({
+      itemId: movedItem!.id,
+      destinationWatchlistId: watchlist.id,
+      position: "before",
+      referenceItemId: reference!.id,
+    });
+
+    expect(result).toEqual({
+      success: false,
+      code: "invalid_reference",
+      message: expect.stringContaining("reorder_watchlist_items"),
+    });
+    const detail = await readWatchlistDetailScreen({
+      watchlistId: watchlist.id,
+      unwatchedOnly: false,
+    });
+    expect(detail?.items.map((i) => i.title)).toEqual(["First", "Reference", "To Move"]);
   });
 });

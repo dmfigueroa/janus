@@ -11,15 +11,21 @@ import type { AddToWatchlistInsertionPosition } from "./Mutation";
 
 type PendingWatchlistItem = typeof watchlistItems.$inferInsert;
 
+export type PersistAddedItemsResult =
+  | { success: true; insertedCount: number }
+  | { success: false; code: string; message: string };
+
 export async function persistAddedItems({
   watchlistId,
   items,
   insertionPosition,
+  referenceItemId,
 }: {
   watchlistId: number;
   items: PendingWatchlistItem[];
   insertionPosition?: AddToWatchlistInsertionPosition;
-}) {
+  referenceItemId?: number;
+}): Promise<PersistAddedItemsResult> {
   if (items.length === 0) {
     return { success: true, insertedCount: 0 } as const;
   }
@@ -27,7 +33,7 @@ export async function persistAddedItems({
   const db = getDb();
 
   return db.transaction((transaction) =>
-    persistWatchlistItems({ transaction, watchlistId, items, insertionPosition }),
+    persistWatchlistItems({ transaction, watchlistId, items, insertionPosition, referenceItemId }),
   );
 }
 
@@ -36,16 +42,18 @@ function persistWatchlistItems({
   watchlistId,
   items,
   insertionPosition,
+  referenceItemId,
 }: {
   transaction: DatabaseTransaction;
   watchlistId: number;
   items: PendingWatchlistItem[];
   insertionPosition?: AddToWatchlistInsertionPosition;
-}) {
+  referenceItemId?: number;
+}): PersistAddedItemsResult {
   const watchlist = getWatchlistById(watchlistId, transaction);
 
   if (!watchlist) {
-    return { success: false, message: "Watchlist not found." } as const;
+    return { success: false, code: "not_found", message: "Watchlist not found." } as const;
   }
 
   const result = insertItemsByOrderMode({
@@ -54,6 +62,7 @@ function persistWatchlistItems({
     items,
     itemOrderMode: watchlist.itemOrderMode,
     insertionPosition,
+    referenceItemId,
   });
 
   markLastItemAdded(transaction, watchlistId, result);
@@ -63,7 +72,7 @@ function persistWatchlistItems({
 function markLastItemAdded(
   transaction: DatabaseTransaction,
   watchlistId: number,
-  result: ReturnType<typeof persistWatchlistItems>,
+  result: PersistAddedItemsResult,
 ) {
   if (!result.success || result.insertedCount === 0) {
     return;
@@ -78,22 +87,65 @@ function insertItemsByOrderMode({
   items,
   itemOrderMode,
   insertionPosition,
+  referenceItemId,
 }: {
   transaction: DatabaseTransaction;
   watchlistId: number;
   items: PendingWatchlistItem[];
   itemOrderMode: typeof watchlists.$inferSelect.itemOrderMode;
   insertionPosition?: AddToWatchlistInsertionPosition;
-}) {
+  referenceItemId?: number;
+}): PersistAddedItemsResult {
   if (itemOrderMode !== "custom") {
-    return insertWithReleaseDateOrder({ transaction, items });
+    return insertForReleaseOrder({ transaction, items, insertionPosition });
   }
-
   if (!insertionPosition) {
-    return { success: false, message: CUSTOM_ORDER_INSERTION_REQUIRED_MESSAGE } as const;
+    return insertionChoiceRequired();
   }
+  return insertWithCustomOrder({
+    transaction,
+    watchlistId,
+    items,
+    insertionPosition,
+    referenceItemId,
+  });
+}
 
-  return insertWithCustomOrder({ transaction, watchlistId, items, insertionPosition });
+function insertForReleaseOrder({
+  transaction,
+  items,
+  insertionPosition,
+}: {
+  transaction: DatabaseTransaction;
+  items: PendingWatchlistItem[];
+  insertionPosition?: AddToWatchlistInsertionPosition;
+}): PersistAddedItemsResult {
+  if (isAnchorPosition(insertionPosition)) {
+    return notCustomModeFailure();
+  }
+  return insertWithReleaseDateOrder({ transaction, items });
+}
+
+function insertionChoiceRequired(): PersistAddedItemsResult {
+  return {
+    success: false,
+    code: "insertion_choice_required",
+    message: CUSTOM_ORDER_INSERTION_REQUIRED_MESSAGE,
+  };
+}
+
+function notCustomModeFailure(): PersistAddedItemsResult {
+  return {
+    success: false,
+    code: "not_custom_mode",
+    message: "Anchored insertion is only available in custom mode.",
+  };
+}
+
+function isAnchorPosition(
+  position: AddToWatchlistInsertionPosition | undefined,
+): position is "before" | "after" {
+  return position === "before" || position === "after";
 }
 
 function insertWithReleaseDateOrder({
@@ -102,7 +154,7 @@ function insertWithReleaseDateOrder({
 }: {
   transaction: DatabaseTransaction;
   items: PendingWatchlistItem[];
-}) {
+}): PersistAddedItemsResult {
   const inserted = transaction
     .insert(watchlistItems)
     .values(items)

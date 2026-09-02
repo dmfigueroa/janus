@@ -1,6 +1,10 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { moveItemToWatchlistMutation } from "@/features/watchlists/move/Mutation.server";
+import {
+  anchorReferenceRefinement,
+  moveInsertionPositionSchema,
+} from "@/features/watchlists/move/Schema";
 import { asMcpContent } from "./McpToolResponse.server";
 
 const moveItemResultSchema = z.object({
@@ -13,11 +17,14 @@ const moveItemResultSchema = z.object({
   affectedCount: z.number().optional(),
 });
 
-const moveItemInputSchema = z.object({
-  watchlistItemId: z.number().int().optional(),
-  destinationWatchlistId: z.number().int().optional(),
-  position: z.enum(["beginning", "end", "release-adjacent"]).optional(),
-});
+const moveItemInputSchema = z
+  .object({
+    watchlistItemId: z.number().int().optional(),
+    destinationWatchlistId: z.number().int().optional(),
+    position: moveInsertionPositionSchema.optional(),
+    referenceItemId: z.number().int().positive().optional(),
+  })
+  .superRefine(anchorReferenceRefinement);
 
 export function registerMoveWatchlistItemsTool(server: McpServer) {
   server.registerTool(
@@ -49,6 +56,7 @@ async function moveItemResult(input: z.infer<typeof moveItemInputSchema>, index:
     itemId: input.watchlistItemId!,
     destinationWatchlistId: input.destinationWatchlistId!,
     position: input.position,
+    referenceItemId: input.referenceItemId,
   });
 
   if (!result.success) {

@@ -19,13 +19,14 @@ export async function moveParentGroupToWatchlist(
   destination: MoveDestination,
   destinationWatchlistId: number,
   position: InsertionPosition | undefined,
+  referenceItemId?: number,
 ): Promise<MoveItemResult> {
   const duplicateFailure = await getGroupDuplicateFailure(db, groupItems, destinationWatchlistId);
   if (duplicateFailure) {
     return duplicateFailure;
   }
 
-  await executeGroupMove(db, groupItems, destination, position);
+  await executeGroupMove(db, groupItems, destination, position, referenceItemId);
 
   return {
     success: true,
