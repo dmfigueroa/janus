@@ -25,10 +25,20 @@ const createWatchlistInputSchema = z.object({
 });
 
 const updateWatchlistInputSchema = z.object({
-  watchlistId: z.number().optional(),
-  name: z.string().optional(),
-  description: z.string().nullable().optional(),
-  itemOrderMode: z.enum(["release", "custom"]).optional(),
+  watchlistId: z.number().optional().describe("Stable internal watchlist ID."),
+  name: z
+    .string()
+    .optional()
+    .describe("New name; omit to keep the existing name. Null is not allowed."),
+  description: z
+    .string()
+    .nullable()
+    .optional()
+    .describe("New description; omit to keep it, or null or an empty string to clear it."),
+  itemOrderMode: z
+    .enum(["release", "custom"])
+    .optional()
+    .describe("New order mode; omit to keep the existing mode."),
 });
 
 export function registerWatchlistWriteTools(server: McpServer) {
@@ -71,7 +81,7 @@ function registerUpdateWatchlists(server: McpServer) {
     {
       title: "Update watchlists",
       description:
-        "Update one or more watchlists. Each requested watchlist is processed independently and returns an ordered result.",
+        "Update one or more watchlists. Each requested watchlist is processed independently and returns an ordered result. Omit a field to keep its existing value; use null or an empty string only to clear the description. Name cannot be cleared, and each update must include at least one field to update.",
       inputSchema: { watchlists: z.array(updateWatchlistInputSchema).min(1) },
       outputSchema: { results: z.array(batchResultSchema) },
       annotations: { readOnlyHint: false, destructiveHint: false },

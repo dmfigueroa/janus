@@ -92,19 +92,20 @@ export async function updateWatchlist({
   itemOrderMode,
 }: {
   watchlistId: number;
-  name: string;
+  name?: string;
   description?: string | null;
-  itemOrderMode: WatchlistItemOrderMode;
+  itemOrderMode?: WatchlistItemOrderMode;
 }) {
-  const db = getDb();
-  await db
-    .update(watchlists)
-    .set({
+  const fieldsToUpdate = Object.fromEntries(
+    Object.entries({
       name,
       description: description === "" ? null : description,
       itemOrderMode,
-    })
-    .where(eq(watchlists.id, watchlistId));
+    }).filter(([, value]) => value !== undefined),
+  );
+
+  const db = getDb();
+  await db.update(watchlists).set(fieldsToUpdate).where(eq(watchlists.id, watchlistId));
 }
 
 export async function insertWatchlistItem(values: typeof watchlistItems.$inferInsert) {

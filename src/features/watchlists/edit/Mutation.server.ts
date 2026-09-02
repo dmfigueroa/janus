@@ -8,14 +8,18 @@ export type EditWatchlistItemResult = { success: true } | { success: false; mess
 export async function editWatchlistItemMutation(
   input: EditWatchlistItemInput,
 ): Promise<EditWatchlistItemResult> {
+  const fieldsToUpdate = Object.fromEntries(
+    Object.entries({
+      title: input.title?.trim(),
+      releaseDate: input.releaseDate,
+      posterPath: input.posterPath,
+    }).filter(([, value]) => value !== undefined),
+  );
+
   const db = getDb();
   const result = await db
     .update(watchlistItems)
-    .set({
-      title: input.title.trim(),
-      releaseDate: input.releaseDate,
-      posterPath: input.posterPath,
-    })
+    .set(fieldsToUpdate)
     .where(
       and(eq(watchlistItems.id, input.itemId), eq(watchlistItems.watchlistId, input.watchlistId)),
     )
