@@ -40,7 +40,7 @@ describe("CreateCustomItemDialog", () => {
         overview: "A short description",
       });
     });
-    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("closes without creating an item when cancelled", async () => {
