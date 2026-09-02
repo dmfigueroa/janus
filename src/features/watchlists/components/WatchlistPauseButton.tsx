@@ -17,26 +17,12 @@ export function WatchlistPauseButton({
     <Button
       type="button"
       size="sm"
-      variant={getPauseButtonVariant(isPaused)}
-      colorPalette={getPauseButtonColorPalette(isPaused)}
+      variant={isPaused ? "solid" : "ghost"}
+      colorPalette="pink"
       onClick={onTogglePause}
       disabled={disabled}
     >
       {label}
     </Button>
   );
-}
-
-function getPauseButtonVariant(isPaused: boolean) {
-  if (isPaused) {
-    return "solid" as const;
-  }
-  return "outline" as const;
-}
-
-function getPauseButtonColorPalette(isPaused: boolean) {
-  if (isPaused) {
-    return "pink" as const;
-  }
-  return "gray" as const;
 }
