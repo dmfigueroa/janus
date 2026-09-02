@@ -22,7 +22,8 @@ const customItemAdditionInputSchema = z.object({
   title: z.string().optional(),
   mediaType: z.enum(["movie", "tv", "book", "game", "comic"]).optional(),
   year: z.string().optional(),
-  insertionPosition: z.enum(["beginning", "end", "release-adjacent"]).optional(),
+  insertionPosition: z.enum(["beginning", "end", "release-adjacent", "before", "after"]).optional(),
+  referenceItemId: z.number().int().positive().optional(),
 });
 
 export function registerAddCustomItemsToWatchlistsTool(server: McpServer) {

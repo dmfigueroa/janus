@@ -23,7 +23,8 @@ const mediaAdditionInputSchema = z.object({
   provider: z.enum(["tmdb", "rawg", "google_books", "comicvine", "anilist"]).optional(),
   providerId: z.string().optional(),
   mediaType: z.enum(["movie", "tv", "game", "book", "comic", "anime", "manga"]).optional(),
-  insertionPosition: z.enum(["beginning", "end", "release-adjacent"]).optional(),
+  insertionPosition: z.enum(["beginning", "end", "release-adjacent", "before", "after"]).optional(),
+  referenceItemId: z.number().int().positive().optional(),
 });
 
 export function registerAddMediaToWatchlistsTool(server: McpServer) {

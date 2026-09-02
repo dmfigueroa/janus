@@ -18,7 +18,8 @@ const moveParentInputSchema = z.object({
   watchlistId: z.number().int().optional(),
   parentId: z.string().optional(),
   destinationWatchlistId: z.number().int().optional(),
-  position: z.enum(["beginning", "end", "release-adjacent"]).optional(),
+  position: z.enum(["beginning", "end", "release-adjacent", "before", "after"]).optional(),
+  referenceItemId: z.number().int().positive().optional(),
 });
 
 export function registerMoveWatchlistParentsTool(server: McpServer) {
@@ -52,6 +53,7 @@ async function moveParentResult(input: z.infer<typeof moveParentInputSchema>, in
     parentId: input.parentId!,
     destinationWatchlistId: input.destinationWatchlistId!,
     position: input.position,
+    referenceItemId: input.referenceItemId,
   });
 
   if (!result.success) {

@@ -2581,7 +2581,7 @@ describe("Janus MCP endpoint", () => {
     expect(moveItemsProperties).toMatchObject({
       watchlistItemId: { type: "integer" },
       destinationWatchlistId: { type: "integer" },
-      position: { enum: ["beginning", "end", "release-adjacent"] },
+      position: { enum: ["beginning", "end", "release-adjacent", "before", "after"] },
     });
     expect(moveItemsProperties).not.toHaveProperty("parentId");
     expect(moveItems?.outputSchema).toMatchObject({
@@ -2607,7 +2607,7 @@ describe("Janus MCP endpoint", () => {
       watchlistId: { type: "integer" },
       parentId: { type: "string" },
       destinationWatchlistId: { type: "integer" },
-      position: { enum: ["beginning", "end", "release-adjacent"] },
+      position: { enum: ["beginning", "end", "release-adjacent", "before", "after"] },
     });
     expect(moveParentsProperties).not.toHaveProperty("watchlistItemId");
     expect(moveParents?.outputSchema).toMatchObject({
@@ -3055,5 +3055,338 @@ describe("Janus MCP endpoint", () => {
       .from(watchlistItems)
       .where(eq(watchlistItems.watchlistId, source.id));
     expect(sourceItems.map((row) => row.title)).toEqual(["Finale"]);
+  });
+
+  describe("anchored insert and move contract", () => {
+    it("accepts referenceItemId and before/after on the four anchor-capable tools", async () => {
+      const tools = await client.listTools();
+      const anchorPositions = ["before", "after"];
+
+      for (const toolName of [
+        "add_media_to_watchlists",
+        "add_custom_items_to_watchlists",
+        "move_watchlist_items",
+        "move_watchlist_parents",
+      ]) {
+        const tool = tools.tools.find((entry) => entry.name === toolName);
+        expect(tool, `${toolName} should be registered`).toBeDefined();
+        const schema = tool?.inputSchema as {
+          properties?: Record<string, { enum?: string[]; type?: string }>;
+        };
+        const additionSchema = schema?.properties?.additions;
+        const itemSchema = schema?.properties?.items;
+        const moveSchema = schema?.properties?.moves;
+        const additionProps =
+          (additionSchema as { items?: { properties?: Record<string, unknown> } } | undefined)
+            ?.items?.properties ??
+          (itemSchema as { items?: { properties?: Record<string, unknown> } } | undefined)?.items
+            ?.properties ??
+          (moveSchema as { items?: { properties?: Record<string, unknown> } } | undefined)?.items
+            ?.properties;
+        expect(additionProps).toBeDefined();
+        const positionProp =
+          (additionProps as Record<string, { enum?: string[] }>).insertionPosition ??
+          (additionProps as Record<string, { enum?: string[] }>).position;
+        expect(positionProp?.enum).toEqual(expect.arrayContaining(anchorPositions));
+        expect((additionProps as Record<string, { type?: string }>).referenceItemId?.type).toBe(
+          "integer",
+        );
+      }
+    });
+
+    it("inserts a TMDB movie before an existing reference when called via MCP", async () => {
+      const { watchlistItems, watchlists } = await import("@/db/Schema");
+      process.env.TMDB_API_KEY = "test-tmdb-key";
+      const [watchlist] = await database
+        .getDb()
+        .insert(watchlists)
+        .values({ name: "MCP anchor add", itemOrderMode: "custom" })
+        .returning();
+      const [reference] = await database
+        .getDb()
+        .insert(watchlistItems)
+        .values({
+          watchlistId: watchlist.id,
+          tmdbId: "anchor-existing",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Existing Anchor",
+          customRank: 1,
+        })
+        .returning();
+      const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            title: "Inserted Before Existing",
+            poster_path: null,
+            release_date: "2024-04-01",
+            vote_average: 7.4,
+            runtime: 100,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+      const result = await client.callTool({
+        name: "add_media_to_watchlists",
+        arguments: {
+          additions: [
+            {
+              watchlistId: watchlist.id,
+              provider: "tmdb",
+              providerId: "700",
+              mediaType: "movie",
+              insertionPosition: "before",
+              referenceItemId: reference!.id,
+            },
+          ],
+        },
+      });
+
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        results: [
+          { index: 0, success: true, code: "added", watchlistId: watchlist.id, affectedCount: 1 },
+        ],
+      });
+
+      const items = await database
+        .getDb()
+        .select({ title: watchlistItems.title, customRank: watchlistItems.customRank })
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, watchlist.id))
+        .orderBy(watchlistItems.customRank);
+      expect(items.map((row) => row.title)).toEqual([
+        "Inserted Before Existing",
+        "Existing Anchor",
+      ]);
+      expect(items.map((row) => row.customRank)).toEqual([1, 2]);
+      fetchMock.mockRestore();
+    });
+
+    it("rejects an anchored MCP add on a release-ordered list with not_custom_mode", async () => {
+      const { watchlists } = await import("@/db/Schema");
+      const [watchlist] = await database
+        .getDb()
+        .insert(watchlists)
+        .values({ name: "MCP release anchor block", itemOrderMode: "release" })
+        .returning();
+
+      const result = await client.callTool({
+        name: "add_media_to_watchlists",
+        arguments: {
+          additions: [
+            {
+              watchlistId: watchlist.id,
+              provider: "tmdb",
+              providerId: "701",
+              mediaType: "movie",
+              insertionPosition: "before",
+              referenceItemId: 999_999,
+            },
+          ],
+        },
+      });
+
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        results: [
+          {
+            index: 0,
+            success: false,
+            code: "not_custom_mode",
+            affectedCount: 0,
+          },
+        ],
+      });
+    });
+
+    it("rejects an anchored MCP add whose reference item is unknown with invalid_reference", async () => {
+      const { watchlists } = await import("@/db/Schema");
+      const [watchlist] = await database
+        .getDb()
+        .insert(watchlists)
+        .values({ name: "MCP missing anchor reference", itemOrderMode: "custom" })
+        .returning();
+
+      const result = await client.callTool({
+        name: "add_custom_items_to_watchlists",
+        arguments: {
+          items: [
+            {
+              watchlistId: watchlist.id,
+              title: "Anchored pick",
+              mediaType: "movie",
+              year: "2025",
+              insertionPosition: "before",
+              referenceItemId: 424_242,
+            },
+          ],
+        },
+      });
+
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        results: [{ index: 0, success: false, code: "invalid_reference" }],
+      });
+    });
+
+    it("moves a watchlist item before an existing reference when called via MCP", async () => {
+      const { watchlistItems, watchlists } = await import("@/db/Schema");
+      const [source, destination] = await database
+        .getDb()
+        .insert(watchlists)
+        .values([
+          { name: "MCP anchor move source" },
+          { name: "MCP anchor move dest", itemOrderMode: "custom" },
+        ])
+        .returning();
+      const [reference] = await database
+        .getDb()
+        .insert(watchlistItems)
+        .values([
+          {
+            watchlistId: destination.id,
+            tmdbId: "anchor-move-existing-1",
+            source: "tmdb",
+            mediaType: "movie",
+            title: "Anchor",
+            customRank: 1,
+          },
+          {
+            watchlistId: destination.id,
+            tmdbId: "anchor-move-existing-2",
+            source: "tmdb",
+            mediaType: "movie",
+            title: "Tail",
+            customRank: 2,
+          },
+        ])
+        .returning();
+      const [movedItem] = await database
+        .getDb()
+        .insert(watchlistItems)
+        .values({
+          watchlistId: source.id,
+          tmdbId: "anchor-move-item",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Moved Before Anchor",
+        })
+        .returning();
+
+      const result = await client.callTool({
+        name: "move_watchlist_items",
+        arguments: {
+          moves: [
+            {
+              watchlistItemId: movedItem!.id,
+              destinationWatchlistId: destination.id,
+              position: "before",
+              referenceItemId: reference!.id,
+            },
+          ],
+        },
+      });
+
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        results: [{ index: 0, success: true, code: "moved", affectedCount: 1 }],
+      });
+
+      const titles = await database
+        .getDb()
+        .select({ title: watchlistItems.title })
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, destination.id))
+        .orderBy(watchlistItems.customRank);
+      expect(titles.map((row) => row.title)).toEqual(["Moved Before Anchor", "Anchor", "Tail"]);
+    });
+
+    it("moves a parent group so the first sibling lands at the anchor and the rest trail", async () => {
+      const { watchlistItems, watchlists } = await import("@/db/Schema");
+      const [source, destination] = await database
+        .getDb()
+        .insert(watchlists)
+        .values([
+          { name: "MCP anchor parent source" },
+          { name: "MCP anchor parent dest", itemOrderMode: "custom" },
+        ])
+        .returning();
+      const [reference] = await database
+        .getDb()
+        .insert(watchlistItems)
+        .values([
+          {
+            watchlistId: destination.id,
+            tmdbId: "anchor-parent-dest-1",
+            source: "tmdb",
+            mediaType: "movie",
+            title: "Head",
+            customRank: 1,
+          },
+          {
+            watchlistId: destination.id,
+            tmdbId: "anchor-parent-dest-2",
+            source: "tmdb",
+            mediaType: "movie",
+            title: "Tail",
+            customRank: 2,
+          },
+        ])
+        .returning();
+      const parentId = "tmdb:anchor-parent-source";
+      await database
+        .getDb()
+        .insert(watchlistItems)
+        .values([
+          {
+            watchlistId: source.id,
+            tmdbId: "anchor-parent-source-1",
+            source: "tmdb",
+            mediaType: "episode",
+            title: "Parent",
+            parentId,
+            parentTitle: "Series",
+          },
+          {
+            watchlistId: source.id,
+            tmdbId: "anchor-parent-source-2",
+            source: "tmdb",
+            mediaType: "episode",
+            title: "Pilot",
+            parentId,
+            parentTitle: "Series",
+          },
+        ]);
+
+      const result = await client.callTool({
+        name: "move_watchlist_parents",
+        arguments: {
+          moves: [
+            {
+              watchlistId: source.id,
+              parentId,
+              destinationWatchlistId: destination.id,
+              position: "after",
+              referenceItemId: reference!.id,
+            },
+          ],
+        },
+      });
+
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        results: [{ index: 0, success: true, code: "moved", affectedCount: 2 }],
+      });
+
+      const titles = await database
+        .getDb()
+        .select({ title: watchlistItems.title })
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, destination.id))
+        .orderBy(watchlistItems.customRank);
+      expect(titles.map((row) => row.title)).toEqual(["Head", "Parent", "Pilot", "Tail"]);
+    });
   });
 });

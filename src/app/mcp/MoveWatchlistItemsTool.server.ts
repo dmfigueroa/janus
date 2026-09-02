@@ -16,7 +16,8 @@ const moveItemResultSchema = z.object({
 const moveItemInputSchema = z.object({
   watchlistItemId: z.number().int().optional(),
   destinationWatchlistId: z.number().int().optional(),
-  position: z.enum(["beginning", "end", "release-adjacent"]).optional(),
+  position: z.enum(["beginning", "end", "release-adjacent", "before", "after"]).optional(),
+  referenceItemId: z.number().int().positive().optional(),
 });
 
 export function registerMoveWatchlistItemsTool(server: McpServer) {
@@ -49,6 +50,7 @@ async function moveItemResult(input: z.infer<typeof moveItemInputSchema>, index:
     itemId: input.watchlistItemId!,
     destinationWatchlistId: input.destinationWatchlistId!,
     position: input.position,
+    referenceItemId: input.referenceItemId,
   });
 
   if (!result.success) {
