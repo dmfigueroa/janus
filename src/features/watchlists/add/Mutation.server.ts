@@ -8,7 +8,7 @@ import { addBookToWatchlist } from "./AddBook.server";
 import { addGameToWatchlist } from "./AddGame.server";
 import { addGenericItemToWatchlist } from "./AddGeneric.server";
 
-const UNSUPPORTED_TV_SOURCE_MESSAGE =
+export const UNSUPPORTED_TV_SOURCE_MESSAGE =
   "TV shows must come from TMDB so Janus can expand them into episodes.";
 
 export async function addToWatchlistMutation({
