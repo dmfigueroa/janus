@@ -29,7 +29,7 @@ export function applyAnchoredGroupInsertion(
   const orderedExisting = fetchRankedExisting(transaction, destination.id);
   const slots = planGroupInsertionSlots({
     orderedExisting,
-    itemsToInsert: items.length,
+    itemsToInsert: items,
     position,
     referenceItemId,
   });
@@ -46,6 +46,7 @@ function fetchRankedExisting(
     .select({
       id: watchlistItems.id,
       customRank: watchlistItems.customRank,
+      releaseDate: watchlistItems.releaseDate,
     })
     .from(watchlistItems)
     .where(eq(watchlistItems.watchlistId, destinationId))
@@ -54,7 +55,11 @@ function fetchRankedExisting(
 
   return existingItems
     .filter((item) => item.customRank !== null)
-    .map((item) => ({ id: item.id, customRank: item.customRank! }));
+    .map((item) => ({
+      id: item.id,
+      customRank: item.customRank!,
+      releaseDate: item.releaseDate,
+    }));
 }
 
 function applyRankUpdates(

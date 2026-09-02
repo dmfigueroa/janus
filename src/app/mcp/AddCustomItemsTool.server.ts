@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { anchorInsertionRefinement } from "@/features/watchlists/add/InsertionRefinement";
 import {
   customItemAdditionSchema,
   type CustomItemAddition,
@@ -17,14 +18,18 @@ const customItemAdditionResultSchema = z.object({
   affectedCount: z.number().int().nonnegative(),
 });
 
-const customItemAdditionInputSchema = z.object({
-  watchlistId: z.number().optional(),
-  title: z.string().optional(),
-  mediaType: z.enum(["movie", "tv", "book", "game", "comic"]).optional(),
-  year: z.string().optional(),
-  insertionPosition: z.enum(["beginning", "end", "release-adjacent", "before", "after"]).optional(),
-  referenceItemId: z.number().int().positive().optional(),
-});
+const customItemAdditionInputSchema = z
+  .object({
+    watchlistId: z.number().optional(),
+    title: z.string().optional(),
+    mediaType: z.enum(["movie", "tv", "book", "game", "comic"]).optional(),
+    year: z.string().optional(),
+    insertionPosition: z
+      .enum(["beginning", "end", "release-adjacent", "before", "after"])
+      .optional(),
+    referenceItemId: z.number().int().positive().optional(),
+  })
+  .superRefine(anchorInsertionRefinement);
 
 export function registerAddCustomItemsToWatchlistsTool(server: McpServer) {
   server.registerTool(

@@ -1,6 +1,7 @@
 import { getDb } from "@/db/Db.server";
 import { watchlistItems } from "@/db/Schema";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
+import { customRankOrder } from "@/features/watchlists/Order.server";
 import {
   InsertItemReferenceError,
   type InsertionPosition,
@@ -45,6 +46,7 @@ export async function moveParentAndChildrenToWatchlistMutation({
       eq(watchlistItems.watchlistId, item.watchlistId),
       eq(watchlistItems.parentId, parentId),
     ),
+    orderBy: [...customRankOrder, asc(watchlistItems.id)],
   });
 
   return invokeGroupMove(siblings, destination, destinationWatchlistId, position, referenceItemId);

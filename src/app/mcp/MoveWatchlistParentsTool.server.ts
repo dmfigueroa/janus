@@ -1,6 +1,10 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { moveParentToWatchlistMutation } from "@/features/watchlists/move/ParentMutation.server";
+import {
+  anchorReferenceRefinement,
+  moveInsertionPositionSchema,
+} from "@/features/watchlists/move/Schema";
 import { asMcpContent } from "./McpToolResponse.server";
 
 const moveParentResultSchema = z.object({
@@ -14,13 +18,15 @@ const moveParentResultSchema = z.object({
   affectedCount: z.number().optional(),
 });
 
-const moveParentInputSchema = z.object({
-  watchlistId: z.number().int().optional(),
-  parentId: z.string().optional(),
-  destinationWatchlistId: z.number().int().optional(),
-  position: z.enum(["beginning", "end", "release-adjacent", "before", "after"]).optional(),
-  referenceItemId: z.number().int().positive().optional(),
-});
+const moveParentInputSchema = z
+  .object({
+    watchlistId: z.number().int().optional(),
+    parentId: z.string().optional(),
+    destinationWatchlistId: z.number().int().optional(),
+    position: moveInsertionPositionSchema.optional(),
+    referenceItemId: z.number().int().positive().optional(),
+  })
+  .superRefine(anchorReferenceRefinement);
 
 export function registerMoveWatchlistParentsTool(server: McpServer) {
   server.registerTool(

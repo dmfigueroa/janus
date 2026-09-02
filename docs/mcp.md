@@ -58,7 +58,7 @@ Reference: [Cloudflare Managed OAuth](https://developers.cloudflare.com/cloudfla
 
 `add_media_to_watchlists`, `add_custom_items_to_watchlists`, `move_watchlist_items`, and
 `move_watchlist_parents` accept the same anchor contract. Each addition or move may include
-`insertionPosition: "before" | "after"` together with `referenceItemId`, the stable Janus
+`insertionPosition: "before" | "after"` (or `position` for the move tools) together with `referenceItemId`, the stable Janus
 watchlist item ID returned by `get_watchlist` or `find_watchlist_items`. The new or moved
 item lands at the reference's rank and existing items shift to keep the order contiguous.
 

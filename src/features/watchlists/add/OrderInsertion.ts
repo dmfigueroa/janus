@@ -26,39 +26,85 @@ export function buildFinalOrder({
   pendingInsertions: readonly PendingInsertion[];
 }): OrderedWatchlistItem[] | AnchoredOrderFailure {
   const nextOrder: OrderedWatchlistItem[] = [...existingItems];
+  const lastAnchoredIndex = new Map<string, number>();
 
   for (const insertion of pendingInsertions) {
-    const spliceIndex = computeSpliceIndex(nextOrder, insertion);
-    if (typeof spliceIndex !== "number") {
-      return spliceIndex;
+    const result = insertPendingItem(nextOrder, insertion, lastAnchoredIndex);
+    if (!result.success) {
+      return result;
     }
-    nextOrder.splice(spliceIndex, 0, insertion.pendingItem);
   }
 
   return nextOrder;
 }
 
+function insertPendingItem(
+  nextOrder: OrderedWatchlistItem[],
+  insertion: PendingInsertion,
+  lastAnchoredIndex: Map<string, number>,
+): { success: true } | AnchoredOrderFailure {
+  const anchorKey = getAnchorKey(insertion);
+  const spliceIndex = computeSpliceIndex(
+    nextOrder,
+    insertion,
+    anchorKey === null ? undefined : lastAnchoredIndex.get(anchorKey),
+  );
+  if (typeof spliceIndex !== "number") {
+    return spliceIndex;
+  }
+  nextOrder.splice(spliceIndex, 0, insertion.pendingItem);
+  rememberAnchorIndex(lastAnchoredIndex, anchorKey, spliceIndex);
+  return { success: true };
+}
+
+function rememberAnchorIndex(
+  lastAnchoredIndex: Map<string, number>,
+  anchorKey: string | null,
+  spliceIndex: number,
+): void {
+  if (anchorKey !== null) {
+    lastAnchoredIndex.set(anchorKey, spliceIndex);
+  }
+}
+
 function computeSpliceIndex(
   currentOrder: OrderedWatchlistItem[],
   insertion: PendingInsertion,
+  lastInsertedIndex: number | undefined,
 ): number | AnchoredOrderFailure {
   if (insertion.insertionPosition === "before") {
-    return anchoredSpliceIndex(currentOrder, insertion, "before");
+    return anchoredSpliceIndex(currentOrder, insertion, "before", lastInsertedIndex);
   }
   if (insertion.insertionPosition === "after") {
-    return anchoredSpliceIndex(currentOrder, insertion, "after");
+    return anchoredSpliceIndex(currentOrder, insertion, "after", lastInsertedIndex);
   }
   return legacySpliceIndex(currentOrder, insertion);
+}
+
+function getAnchorKey(insertion: PendingInsertion): string | null {
+  const position = insertion.insertionPosition;
+  if (!isAnchorPosition(position) || insertion.referenceItemId === undefined) {
+    return null;
+  }
+  return `${position}:${insertion.referenceItemId}`;
+}
+
+function isAnchorPosition(position: InsertionPosition): position is "before" | "after" {
+  return position === "before" || position === "after";
 }
 
 function anchoredSpliceIndex(
   currentOrder: OrderedWatchlistItem[],
   insertion: PendingInsertion,
   direction: "before" | "after",
+  lastInsertedIndex: number | undefined,
 ): number | AnchoredOrderFailure {
   const { referenceItemId } = insertion;
   if (referenceItemId === undefined) {
     return missingReferenceFailure();
+  }
+  if (lastInsertedIndex !== undefined) {
+    return lastInsertedIndex + 1;
   }
   const referenceIndex = findRankedReference(currentOrder, referenceItemId);
   return spliceIndexForReference(referenceIndex, direction, referenceItemId);

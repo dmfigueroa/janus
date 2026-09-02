@@ -39,7 +39,7 @@ function forbidReferenceItemId(value: AnchorShape, ctx: z.RefinementCtx): void {
   });
 }
 
-function anchorReferenceRefinement(value: AnchorShape, ctx: z.RefinementCtx): void {
+export function anchorReferenceRefinement(value: AnchorShape, ctx: z.RefinementCtx): void {
   if (isAnchorPosition(value.position)) {
     requireReferenceItemId(value, ctx);
     return;
