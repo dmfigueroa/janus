@@ -1,7 +1,105 @@
 import { IconButton, Menu, Portal } from "@chakra-ui/react";
 import { EllipsisVertical } from "lucide-react";
+import { useRouter } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
+import { toaster } from "@/app/Toaster";
+import type { WatchlistSummary } from "@/features/watchlists/list/Query";
+import { deleteWatchlist } from "@/features/watchlists/delete/Mutation";
+import { skipWatchlist } from "@/features/watchlists/skip/Mutation";
+import { pauseWatchlist, resumeWatchlist } from "@/features/watchlists/pause/Mutation";
+import { DeleteWatchlistDialog } from "@/features/watchlists/components/DeleteWatchlistDialog";
 
 type WatchlistCardMenuProps = {
+  watchlist: WatchlistSummary;
+};
+
+export function WatchlistCardMenu({ watchlist }: WatchlistCardMenuProps) {
+  const router = useRouter();
+  const [deleting, setDeleting] = useState(false);
+  const [skipping, setSkipping] = useState(false);
+  const [pausePending, setPausePending] = useState(false);
+  const [isDeleteOpen, setDeleteOpen] = useState(false);
+  const deleteWatchlistFn = useServerFn(deleteWatchlist);
+  const skipWatchlistFn = useServerFn(skipWatchlist);
+  const pauseWatchlistFn = useServerFn(pauseWatchlist);
+  const resumeWatchlistFn = useServerFn(resumeWatchlist);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await deleteWatchlistFn({ data: { id: watchlist.id } });
+      await router.invalidate?.();
+      toaster.create({ type: "success", title: "Watchlist deleted successfully" });
+    } catch (error) {
+      console.error("Failed to delete", error);
+      toaster.create({ type: "error", title: "Failed to delete watchlist. Please try again." });
+      setDeleting(false);
+    }
+  };
+
+  const handleSkip = async () => {
+    setSkipping(true);
+    try {
+      const result = await skipWatchlistFn({ data: { watchlistId: watchlist.id } });
+      ensureSuccessfulResult(result);
+      await router.invalidate?.();
+    } catch (error) {
+      console.error("Failed to skip watchlist", error);
+      toaster.create({ type: "error", title: "Failed to skip watchlist. Please try again." });
+    } finally {
+      setSkipping(false);
+    }
+  };
+
+  const requestPauseToggle = () => {
+    if (watchlist.pausedAt) {
+      return resumeWatchlistFn({ data: { watchlistId: watchlist.id } });
+    }
+    return pauseWatchlistFn({ data: { watchlistId: watchlist.id } });
+  };
+
+  const handleTogglePause = async () => {
+    setPausePending(true);
+    try {
+      const result = await requestPauseToggle();
+      ensureSuccessfulResult(result);
+      await router.invalidate?.();
+    } catch (error) {
+      console.error("Failed to change watchlist pause state", error);
+      toaster.create({
+        type: "error",
+        title: "Failed to change the pause state. Please try again.",
+      });
+    } finally {
+      setPausePending(false);
+    }
+  };
+
+  return (
+    <>
+      <WatchlistActionMenu
+        watchlistName={watchlist.name}
+        hasNextUnwatched={Boolean(watchlist.stats.nextUnwatched)}
+        isPaused={watchlist.pausedAt !== null}
+        skipping={skipping}
+        pausePending={pausePending}
+        onSkip={() => void handleSkip()}
+        onTogglePause={() => void handleTogglePause()}
+        onDelete={() => setDeleteOpen(true)}
+      />
+      <DeleteWatchlistDialog
+        watchlist={watchlist}
+        open={isDeleteOpen}
+        onOpenChange={setDeleteOpen}
+        deleting={deleting}
+        handleDelete={() => void handleDelete()}
+      />
+    </>
+  );
+}
+
+type WatchlistActionMenuProps = {
   watchlistName: string;
   hasNextUnwatched: boolean;
   isPaused: boolean;
@@ -12,7 +110,7 @@ type WatchlistCardMenuProps = {
   onDelete: () => void;
 };
 
-export function WatchlistCardMenu({
+function WatchlistActionMenu({
   watchlistName,
   hasNextUnwatched,
   isPaused,
@@ -21,7 +119,7 @@ export function WatchlistCardMenu({
   onSkip,
   onTogglePause,
   onDelete,
-}: WatchlistCardMenuProps) {
+}: WatchlistActionMenuProps) {
   return (
     <Menu.Root positioning={{ placement: "bottom-end" }}>
       <Menu.Trigger asChild>
@@ -88,4 +186,8 @@ export function WatchlistCardMenu({
       </Portal>
     </Menu.Root>
   );
+}
+
+function ensureSuccessfulResult(result: { success: boolean }) {
+  if (!result.success) throw new Error("The watchlist action failed");
 }
