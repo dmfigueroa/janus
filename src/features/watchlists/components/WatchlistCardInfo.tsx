@@ -1,4 +1,5 @@
 import { Box, Flex, Heading, Text } from "@chakra-ui/react";
+import { format } from "date-fns";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query";
 import { formatNextItemDetail } from "@/features/watchlists/NextItemLabel";
 
@@ -84,15 +85,39 @@ function StandardCardInfo({ watchlist }: { watchlist: WatchlistSummary }) {
         <Text color={complete ? "green.500" : "accent.solid"}>{stats.progress}%</Text>
       </Flex>
 
-      <Box h={1} w="full" bg="bg.subtle" rounded="full" overflow="hidden">
-        <Box
-          h="full"
-          w={`${stats.progress}%`}
-          bg={complete ? "green.500" : "accent.solid"}
-          rounded="full"
-          transition="width 500ms"
-        />
-      </Box>
+      <CardProgress stats={stats} />
+
+      {watchlist.pausedAt ? <PausedSinceLine pausedAt={watchlist.pausedAt} /> : null}
     </Box>
   );
+}
+
+function CardProgress({ stats }: { stats: WatchlistSummary["stats"] }) {
+  const complete = stats.progress === 100;
+
+  return (
+    <Box h={1} w="full" bg="bg.subtle" rounded="full" overflow="hidden">
+      <Box
+        h="full"
+        w={`${stats.progress}%`}
+        bg={complete ? "green.500" : "accent.solid"}
+        rounded="full"
+        transition="width 500ms"
+      />
+    </Box>
+  );
+}
+
+function PausedSinceLine({ pausedAt }: { pausedAt: string }) {
+  const pausedDate = formatUtcTimestamp(pausedAt, "MMMM d, yyyy");
+  return (
+    <Text mt={1} fontSize="xs" color="fg.muted">
+      Paused since {pausedDate}
+    </Text>
+  );
+}
+
+function formatUtcTimestamp(timestamp: string, pattern: string) {
+  const utcDate = new Date(`${timestamp.replace(" ", "T")}Z`);
+  return format(utcDate, pattern);
 }

@@ -1,79 +1,47 @@
-import { Box, Heading, SimpleGrid } from "@chakra-ui/react";
-import { WatchlistCard } from "@/features/watchlists/components/WatchlistCard";
+import { Box, Heading } from "@chakra-ui/react";
 import type { WatchlistHomeData } from "@/features/watchlists/home/WatchlistHome";
-import { CreateWatchlistTile } from "@/features/watchlists/home/CreateWatchlistTile";
 import { useWatchlistMergeSelectionContext } from "@/features/watchlists/home/WatchlistMergeSelectionContext";
+import { WatchlistCollapsibleSection } from "@/features/watchlists/home/WatchlistCollapsibleSection";
+import { WatchlistGrid } from "@/features/watchlists/home/WatchlistGrid";
 
-type AllWatchlistsSectionProps = {
-  watchlists: WatchlistHomeData["allWatchlists"];
-};
+type AllWatchlistsSectionProps = WatchlistHomeData;
 
-export function AllWatchlistsSection({ watchlists }: AllWatchlistsSectionProps) {
+export function AllWatchlistsSection({
+  rotation,
+  completed,
+  paused,
+  allWatchlists,
+}: AllWatchlistsSectionProps) {
   const mergeSelection = useWatchlistMergeSelectionContext();
+
+  if (mergeSelection.selectionMode) {
+    return (
+      <Box as="section" px={6}>
+        <WatchlistGrid
+          watchlists={allWatchlists}
+          selectionMode
+          selectedIdSet={mergeSelection.selectedIdSet}
+          onToggle={mergeSelection.toggleSelectedWatchlist}
+          showCreateTile={false}
+        />
+      </Box>
+    );
+  }
 
   return (
     <Box as="section" px={6}>
-      {!mergeSelection.selectionMode ? (
-        <Heading as="h2" size="xl" fontWeight="bold" letterSpacing="tight" mb={4}>
-          All Watchlists
-        </Heading>
-      ) : null}
-      <SimpleGrid columns={{ base: 2, md: 4 }} gap={{ base: 4, md: 6 }}>
-        <WatchlistGridItems
-          watchlists={watchlists}
-          selectionMode={mergeSelection.selectionMode}
-          selectedIdSet={mergeSelection.selectedIdSet}
-          onToggle={mergeSelection.toggleSelectedWatchlist}
-        />
-      </SimpleGrid>
-    </Box>
-  );
-}
-
-type WatchlistGridItemProps = {
-  watchlist: AllWatchlistsSectionProps["watchlists"][number];
-  selectionMode: boolean;
-  isSelected: boolean;
-  onToggle: () => void;
-};
-
-function WatchlistGridItems({
-  watchlists,
-  selectionMode,
-  selectedIdSet,
-  onToggle,
-}: {
-  watchlists: AllWatchlistsSectionProps["watchlists"];
-  selectionMode: boolean;
-  selectedIdSet: Set<number>;
-  onToggle: (watchlistId: number) => void;
-}) {
-  const gridItems = watchlists.map((watchlist) => ({
-    watchlist,
-    selectionMode,
-    isSelected: selectedIdSet.has(watchlist.id),
-    onToggle: () => onToggle(watchlist.id),
-  }));
-
-  return selectionMode
-    ? gridItems.map(WatchlistGridItem)
-    : [...gridItems.map(WatchlistGridItem), <CreateWatchlistTile key="create-watchlist" />];
-}
-
-function WatchlistGridItem({
-  watchlist,
-  selectionMode,
-  isSelected,
-  onToggle,
-}: WatchlistGridItemProps) {
-  return (
-    <Box key={watchlist.id} w="full" maxW={{ md: "220px" }}>
-      <WatchlistCard
-        watchlist={watchlist}
-        selectionMode={selectionMode}
-        isSelected={isSelected}
-        onToggle={onToggle}
+      <Heading as="h2" size="xl" fontWeight="bold" letterSpacing="tight" mb={4}>
+        Rotation
+      </Heading>
+      <WatchlistGrid
+        watchlists={rotation}
+        selectionMode={false}
+        selectedIdSet={mergeSelection.selectedIdSet}
+        onToggle={mergeSelection.toggleSelectedWatchlist}
+        showCreateTile
       />
+      <WatchlistCollapsibleSection title="Completed" watchlists={completed} />
+      <WatchlistCollapsibleSection title="Paused" watchlists={paused} />
     </Box>
   );
 }

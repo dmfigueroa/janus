@@ -46,7 +46,7 @@ function WatchlistsHomeLayout({ initialData }: WatchlistsHomeRouteContentProps) 
           <FeaturedMediaSections sections={initialData.featuredSections} />
         ) : null}
 
-        <AllWatchlistsSection watchlists={initialData.allWatchlists} />
+        <AllWatchlistsSection {...initialData} />
 
         {!mergeSelection.selectionMode ? <CreateWatchlistFloatingButton /> : null}
 

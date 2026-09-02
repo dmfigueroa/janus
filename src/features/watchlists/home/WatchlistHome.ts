@@ -64,6 +64,26 @@ function buildWatchlistHomeTotals(watchlists: WatchlistSummary[]) {
   };
 }
 
+export function isWatchlistPaused(watchlist: WatchlistSummary) {
+  return watchlist.pausedAt !== null;
+}
+
+export function isWatchlistCompleted(watchlist: WatchlistSummary) {
+  return watchlist.stats.progress === 100;
+}
+
+function partitionWatchlistHomeSections(allWatchlists: WatchlistSummary[]) {
+  return {
+    rotation: allWatchlists.filter(
+      (watchlist) => !isWatchlistPaused(watchlist) && !isWatchlistCompleted(watchlist),
+    ),
+    completed: allWatchlists.filter(isWatchlistCompleted),
+    paused: allWatchlists.filter(
+      (watchlist) => isWatchlistPaused(watchlist) && !isWatchlistCompleted(watchlist),
+    ),
+  };
+}
+
 function buildFeaturedHomeSection(
   section: (typeof HOME_SECTION_ORDER)[number],
   buckets: Map<WatchlistHomeSectionKey, WatchlistSummary[]>,
@@ -91,11 +111,12 @@ function buildFeaturedHomeSections(buckets: Map<WatchlistHomeSectionKey, Watchli
 }
 
 export function buildWatchlistHome(allWatchlists: WatchlistSummary[]) {
-  const buckets = allWatchlists.reduce(addWatchlistToHomeBucket, new Map());
+  const sections = partitionWatchlistHomeSections(allWatchlists);
+  const buckets = sections.rotation.reduce(addWatchlistToHomeBucket, new Map());
   const totals = buildWatchlistHomeTotals(allWatchlists);
   const featuredSections = buildFeaturedHomeSections(buckets);
 
-  return { totals, featuredSections, allWatchlists };
+  return { totals, featuredSections, allWatchlists, ...sections };
 }
 
 export type WatchlistHomeData = ReturnType<typeof buildWatchlistHome>;
