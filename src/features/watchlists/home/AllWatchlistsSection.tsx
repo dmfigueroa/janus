@@ -31,7 +31,7 @@ export function AllWatchlistsSection({
   return (
     <Box as="section" px={6}>
       <Heading as="h2" size="xl" fontWeight="bold" letterSpacing="tight" mb={4}>
-        Rotation
+        Watchlists
       </Heading>
       <WatchlistGrid
         watchlists={rotation}

@@ -159,7 +159,7 @@ describe("WatchlistsHomeRouteContent", () => {
     expect(screen.getByText("2 watchlists, 2 items")).not.toBeNull();
     expect(screen.getByRole("heading", { name: "Up Next by Media" })).not.toBeNull();
     expect(screen.getByRole("heading", { name: "Movies" })).not.toBeNull();
-    expect(screen.getByRole("heading", { name: "Rotation" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "Watchlists" })).not.toBeNull();
     expect(screen.getAllByTestId("watchlist-card-1")[0]?.textContent).toContain("up-next");
     expect(screen.getAllByTestId("watchlist-card-1")[1]?.textContent).toContain("watchlist");
     expect(screen.getByTestId("watchlist-card-2").textContent).toContain("browse");
@@ -207,7 +207,7 @@ describe("WatchlistsHomeRouteContent", () => {
     expect(screen.getByRole("heading", { name: "0 Selected" })).not.toBeNull();
     expect(screen.queryByText("2 watchlists, 2 items")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Up Next by Media" })).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Rotation" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Watchlists" })).toBeNull();
     expect(screen.queryByText("Create New List")).toBeNull();
     expect(screen.getAllByText("selection")).toHaveLength(2);
   });
