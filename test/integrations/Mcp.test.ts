@@ -1723,4 +1723,291 @@ describe("Janus MCP endpoint", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
     fetchMock.mockRestore();
   });
+
+  it("edits watchlist item metadata through an ordered batch contract", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP item edits" })
+      .returning();
+    const [item] = await database
+      .getDb()
+      .insert(watchlistItems)
+      .values({
+        watchlistId: watchlist.id,
+        tmdbId: "edit-item",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Old title",
+        releaseDate: "2024-01-01",
+        posterPath: "/old-poster.jpg",
+      })
+      .returning();
+
+    const tools = await client.listTools();
+    const editWatchlistItems = tools.tools.find((tool) => tool.name === "edit_watchlist_items");
+
+    expect(editWatchlistItems).toMatchObject({
+      name: "edit_watchlist_items",
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    });
+    expect(editWatchlistItems?.description).toContain("title, release date, and poster image");
+    expect(editWatchlistItems?.inputSchema).toMatchObject({
+      properties: { edits: { type: "array" } },
+    });
+
+    const result = await client.callTool({
+      name: "edit_watchlist_items",
+      arguments: {
+        edits: [
+          {
+            watchlistId: watchlist.id,
+            watchlistItemId: item.id,
+            title: "Edited title",
+            releaseDate: "2025-02-03",
+            posterImage: "https://images.example.com/edited.jpg",
+          },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: true,
+          code: "edited",
+          message: "Watchlist item edited.",
+          watchlistId: watchlist.id,
+          watchlistItemId: item.id,
+        },
+      ],
+    });
+
+    const [persisted] = await database
+      .getDb()
+      .select()
+      .from(watchlistItems)
+      .where(eq(watchlistItems.id, item.id));
+    expect(persisted).toMatchObject({
+      title: "Edited title",
+      releaseDate: "2025-02-03",
+      posterPath: "https://images.example.com/edited.jpg",
+    });
+  });
+
+  it("preserves batch order across mixed edit outcomes", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP edit partial" })
+      .returning();
+    const [item] = await database
+      .getDb()
+      .insert(watchlistItems)
+      .values({
+        watchlistId: watchlist.id,
+        tmdbId: "edit-partial",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Valid edit target",
+      })
+      .returning();
+
+    const result = await client.callTool({
+      name: "edit_watchlist_items",
+      arguments: {
+        edits: [
+          {
+            watchlistId: watchlist.id,
+            watchlistItemId: item.id,
+            title: "Changed",
+            releaseDate: "2024-01-01",
+            posterImage: null,
+          },
+          {
+            watchlistId: watchlist.id,
+            watchlistItemId: 999_999,
+            title: "Missing",
+            releaseDate: null,
+            posterImage: null,
+          },
+          {
+            watchlistId: watchlist.id,
+            watchlistItemId: item.id,
+            title: "   ",
+            releaseDate: null,
+            posterImage: null,
+          },
+          {
+            watchlistId: watchlist.id,
+            watchlistItemId: item.id,
+            title: "Bad poster",
+            releaseDate: null,
+            posterImage: "not-a-url",
+          },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        { index: 0, success: true, code: "edited", watchlistItemId: item.id },
+        {
+          index: 1,
+          success: false,
+          code: "not_found",
+          message: "Watchlist item not found.",
+          watchlistItemId: 999_999,
+        },
+        { index: 2, success: false, code: "validation_error" },
+        { index: 3, success: false, code: "validation_error" },
+      ],
+    });
+
+    const [persisted] = await database
+      .getDb()
+      .select()
+      .from(watchlistItems)
+      .where(eq(watchlistItems.id, item.id));
+    expect(persisted?.title).toBe("Changed");
+  });
+
+  it("sets explicit watched state through an ordered batch contract", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP watched state", lastWatchedAt: null })
+      .returning();
+    const [item] = await database
+      .getDb()
+      .insert(watchlistItems)
+      .values({
+        watchlistId: watchlist.id,
+        tmdbId: "watched-item",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Watchable",
+        isWatched: false,
+      })
+      .returning();
+
+    const tools = await client.listTools();
+    const setWatched = tools.tools.find((tool) => tool.name === "set_watchlist_items_watched");
+
+    expect(setWatched).toMatchObject({
+      name: "set_watchlist_items_watched",
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    });
+    expect(setWatched?.description).toContain("isWatched");
+    expect(setWatched?.inputSchema).toMatchObject({
+      properties: { updates: { type: "array" } },
+    });
+
+    const result = await client.callTool({
+      name: "set_watchlist_items_watched",
+      arguments: {
+        updates: [
+          { watchlistItemId: item.id, isWatched: true },
+          { watchlistItemId: item.id, isWatched: false },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        { index: 0, success: true, code: "watched_updated", watchlistItemId: item.id },
+        { index: 1, success: true, code: "watched_updated", watchlistItemId: item.id },
+      ],
+    });
+
+    const [persisted] = await database
+      .getDb()
+      .select()
+      .from(watchlistItems)
+      .where(eq(watchlistItems.id, item.id));
+    expect(persisted?.isWatched).toBe(false);
+  });
+
+  it("rejects a watched-state update without an explicit isWatched flag", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP watched validation" })
+      .returning();
+    const [item] = await database
+      .getDb()
+      .insert(watchlistItems)
+      .values({
+        watchlistId: watchlist.id,
+        tmdbId: "watched-validation",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Needs state",
+      })
+      .returning();
+
+    const result = await client.callTool({
+      name: "set_watchlist_items_watched",
+      arguments: { updates: [{ watchlistItemId: item.id }] },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: false,
+          code: "validation_error",
+          message: "watchlistItemId and isWatched are required.",
+          watchlistItemId: item.id,
+        },
+      ],
+    });
+    const [persisted] = await database
+      .getDb()
+      .select()
+      .from(watchlistItems)
+      .where(eq(watchlistItems.id, item.id));
+    expect(persisted?.isWatched).toBe(false);
+  });
+
+  it("returns ordered watched-state outcomes for missing items", async () => {
+    const result = await client.callTool({
+      name: "set_watchlist_items_watched",
+      arguments: {
+        updates: [
+          { watchlistItemId: 999_999, isWatched: true },
+          { watchlistItemId: 999_998, isWatched: false },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: false,
+          code: "not_found",
+          message: "Item not found.",
+          watchlistItemId: 999_999,
+        },
+        {
+          index: 1,
+          success: false,
+          code: "not_found",
+          message: "Item not found.",
+          watchlistItemId: 999_998,
+        },
+      ],
+    });
+  });
 });
