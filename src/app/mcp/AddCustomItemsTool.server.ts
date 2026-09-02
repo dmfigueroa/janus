@@ -31,7 +31,7 @@ export function registerAddCustomItemsToWatchlistsTool(server: McpServer) {
     {
       title: "Add custom watchlist items without a provider source",
       description:
-        "Add one or more manually described items (movie, TV, book, game, or comic) to watchlists without a provider ID. Janus stores the supplied title and optional year directly and does not fetch canonical metadata. Custom TV items are rejected because TV shows must come from TMDB so Janus can expand them into episodes. Custom-ordered destinations require an explicit insertion position. Each requested addition is processed independently and returns an ordered result.",
+        "Add one or more manually described items (movie, TV, book, game, or comic) to watchlists without a provider ID. Janus stores the supplied title and optional release date (YYYY or YYYY-MM-DD) directly and does not fetch canonical metadata. Custom TV items are rejected because TV shows must come from TMDB so Janus can expand them into episodes. Custom-ordered destinations require an explicit insertion position. Each requested addition is processed independently and returns an ordered result.",
       inputSchema: { items: z.array(customItemAdditionInputSchema).min(1) },
       outputSchema: { results: z.array(customItemAdditionResultSchema) },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },

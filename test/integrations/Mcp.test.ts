@@ -621,6 +621,37 @@ describe("Janus MCP endpoint", () => {
     });
   });
 
+  it("rejects a malformed custom item year with a structured validation result", async () => {
+    const { watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP custom year" })
+      .returning();
+
+    const result = await client.callTool({
+      name: "add_custom_items_to_watchlists",
+      arguments: {
+        items: [
+          { watchlistId: watchlist.id, title: "Broken Year", mediaType: "movie", year: "20x5" },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: false,
+          code: "validation_error",
+          message: "Release date must be YYYY or YYYY-MM-DD.",
+          affectedCount: 0,
+        },
+      ],
+    });
+  });
+
   it("requires an insertion position for custom additions to custom-ordered watchlists", async () => {
     const { watchlists } = await import("@/db/Schema");
     const [watchlist] = await database

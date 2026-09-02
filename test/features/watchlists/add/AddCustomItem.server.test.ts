@@ -59,6 +59,33 @@ describe("custom item addition", () => {
     });
   });
 
+  it("persists a supplied full calendar date as the release date", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Dated picks" });
+    const result = await addCustomItemToWatchlist({
+      watchlistId: watchlist.id,
+      title: "Full Date Pick",
+      mediaType: "movie",
+      year: "2025-02-03",
+    });
+    const items = await db
+      .select()
+      .from(schema.watchlistItems)
+      .where(eq(schema.watchlistItems.watchlistId, watchlist.id));
+
+    expect(result).toEqual({
+      success: true,
+      code: "added",
+      message: "Added to watchlist",
+      affectedCount: 1,
+    });
+    expect(items[0]).toMatchObject({
+      source: "custom",
+      mediaType: "movie",
+      title: "Full Date Pick",
+      releaseDate: "2025-02-03",
+    });
+  });
+
   it.each(["movie", "book", "game", "comic"] as const)(
     "adds a custom %s item without a provider call",
     async (mediaType) => {
@@ -186,5 +213,28 @@ describe("custom item addition", () => {
       message: "TV shows must come from TMDB so Janus can expand them into episodes.",
       affectedCount: 0,
     });
+  });
+});
+
+describe("custom item schema validation", () => {
+  const baseInput = { watchlistId: 1, title: "Pick", mediaType: "movie" };
+
+  it("accepts a year-only or complete calendar date and an omitted date", async () => {
+    const { customItemAdditionSchema } = await import("@/features/watchlists/add/AddCustomItem");
+
+    expect(customItemAdditionSchema.safeParse({ ...baseInput, year: "2025" }).success).toBe(true);
+    expect(customItemAdditionSchema.safeParse({ ...baseInput, year: "2025-02-03" }).success).toBe(
+      true,
+    );
+    expect(customItemAdditionSchema.safeParse(baseInput).success).toBe(true);
+  });
+
+  it("rejects malformed and impossible dates", async () => {
+    const { customItemAdditionSchema } = await import("@/features/watchlists/add/AddCustomItem");
+
+    expect(customItemAdditionSchema.safeParse({ ...baseInput, year: "20x5" }).success).toBe(false);
+    expect(customItemAdditionSchema.safeParse({ ...baseInput, year: "2025-02-29" }).success).toBe(
+      false,
+    );
   });
 });
