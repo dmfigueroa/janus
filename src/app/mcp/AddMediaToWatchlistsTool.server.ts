@@ -13,16 +13,16 @@ const mediaAdditionResultSchema = z.object({
   code: z.string(),
   message: z.string(),
   watchlistId: z.number().optional(),
-  provider: z.literal("tmdb").optional(),
+  provider: z.enum(["tmdb", "rawg", "google_books", "comicvine", "anilist"]).optional(),
   providerId: z.string().optional(),
   affectedCount: z.number().int().nonnegative(),
 });
 
 const mediaAdditionInputSchema = z.object({
   watchlistId: z.number().optional(),
-  provider: z.literal("tmdb").optional(),
+  provider: z.enum(["tmdb", "rawg", "google_books", "comicvine", "anilist"]).optional(),
   providerId: z.string().optional(),
-  mediaType: z.enum(["movie", "tv"]).optional(),
+  mediaType: z.enum(["movie", "tv", "game", "book", "comic", "anime", "manga"]).optional(),
   insertionPosition: z.enum(["beginning", "end", "release-adjacent"]).optional(),
 });
 
@@ -30,9 +30,9 @@ export function registerAddMediaToWatchlistsTool(server: McpServer) {
   server.registerTool(
     "add_media_to_watchlists",
     {
-      title: "Add TMDB movies and TV shows to watchlists",
+      title: "Add provider-backed media to watchlists",
       description:
-        "Add one or more TMDB movies or TV shows by provider ID. Janus fetches canonical TMDB metadata before persisting each addition. TV additions expand into episodes, so they are consequential bulk actions requiring confirmation. Each requested addition is processed independently and returns an ordered result.",
+        "Add TMDB movies or TV, RAWG games, Google Books books, or ComicVine comics by provider ID. Janus fetches canonical provider metadata before persisting each addition. Anime and manga additions remain unavailable. TV additions expand into episodes, so they are consequential bulk actions requiring confirmation. Each requested addition is processed independently and returns an ordered result.",
       inputSchema: { additions: z.array(mediaAdditionInputSchema).min(1) },
       outputSchema: { results: z.array(mediaAdditionResultSchema) },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },

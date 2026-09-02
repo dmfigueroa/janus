@@ -2,6 +2,7 @@ import { watchlistItems } from "@/db/Schema";
 import type { WatchlistMedia } from "./Mutation";
 import * as repository from "@/features/watchlists/Repository.server";
 import { getComicIssues } from "@/server/providers/Comicvine.server";
+import { getComicVolumeDetails } from "@/integrations/comicvine/ComicvineVolume.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
 import { persistAddedItems } from "./Insert.server";
 import { rejectAdd, type WatchlistWriteResult } from "./Shared.server";
@@ -21,7 +22,29 @@ export async function addComicToWatchlist(
     return rejectAdd(COMICVINE_UNAVAILABLE_MESSAGE);
   }
 
-  return addFetchedComicIssues(watchlistId, volumeId, media, apiKey, insertionPosition);
+  const mediaWithTitle = await resolveVolumeTitle(media, volumeId, apiKey);
+  if (!mediaWithTitle) {
+    return rejectAdd(COMICVINE_FETCH_FAILURE_MESSAGE);
+  }
+
+  return addFetchedComicIssues(watchlistId, volumeId, mediaWithTitle, apiKey, insertionPosition);
+}
+
+async function resolveVolumeTitle(
+  media: WatchlistMedia,
+  volumeId: string,
+  apiKey: string,
+): Promise<WatchlistMedia | null> {
+  if (media.title) {
+    return media;
+  }
+
+  try {
+    const canonicalVolume = await getComicVolumeDetails(volumeId, apiKey);
+    return { ...media, title: canonicalVolume.title };
+  } catch {
+    return null;
+  }
 }
 
 async function addFetchedComicIssues(
@@ -121,6 +144,7 @@ function getNoNewIssuesMessage(existingCount: number) {
 }
 
 function getIssuesAddedMessage(newCount: number, existingCount: number) {
-  const suffix = existingCount > 0 ? "new issues" : "issues";
-  return `Added ${newCount} ${suffix} to watchlist`;
+  const prefix = existingCount > 0 ? "new " : "";
+  const label = newCount === 1 ? "issue" : "issues";
+  return `Added ${newCount} ${prefix}${label} to watchlist`;
 }

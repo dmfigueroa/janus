@@ -6,7 +6,19 @@ import {
   createTestWatchlistItem,
 } from "@test/features/watchlists/test/WatchlistTestData.server";
 
-const { getMovieDetailsMock, getSeasonDetailsMock, getTVDetailsMock } = vi.hoisted(() => ({
+const {
+  getBookDetailsMock,
+  getComicIssuesMock,
+  getComicVolumeDetailsMock,
+  getGameDetailsMock,
+  getMovieDetailsMock,
+  getSeasonDetailsMock,
+  getTVDetailsMock,
+} = vi.hoisted(() => ({
+  getBookDetailsMock: vi.fn(),
+  getComicIssuesMock: vi.fn(),
+  getComicVolumeDetailsMock: vi.fn(),
+  getGameDetailsMock: vi.fn(),
   getMovieDetailsMock: vi.fn(),
   getSeasonDetailsMock: vi.fn(),
   getTVDetailsMock: vi.fn(),
@@ -17,6 +29,14 @@ vi.mock("@/server/providers/TmdbApi.server", () => ({
   fetchTmdbMovie: getMovieDetailsMock,
   fetchTmdbSeason: getSeasonDetailsMock,
   fetchTmdbTv: getTVDetailsMock,
+}));
+vi.mock("@/server/providers/GoogleBooks.server", () => ({ getBookDetails: getBookDetailsMock }));
+vi.mock("@/server/providers/Rawg.server", () => ({ getGameDetails: getGameDetailsMock }));
+vi.mock("@/server/providers/Comicvine.server", () => ({
+  getComicIssues: getComicIssuesMock,
+}));
+vi.mock("@/integrations/comicvine/ComicvineVolume.server", () => ({
+  getComicVolumeDetails: getComicVolumeDetailsMock,
 }));
 vi.mock("@/db/Db.server", () => ({ getDb: () => dbState.db }));
 
@@ -228,6 +248,196 @@ describe("custom order add validation", () => {
 });
 
 describe("provider-backed add to watchlist mutation", () => {
+  it("resolves Google Books IDs to canonical book metadata", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Canonical books" });
+    getBookDetailsMock.mockResolvedValue({
+      id: "book-42",
+      source: "google_books",
+      mediaType: "book",
+      title: "Canonical Book",
+      poster: "https://example.test/book.jpg",
+      year: "1969",
+      releaseDate: "1969-03-01",
+      rating: 9,
+      authors: ["Ursula K. Le Guin"],
+    });
+
+    await expect(
+      addProviderMediaToWatchlist({
+        watchlistId: watchlist.id,
+        provider: "google_books",
+        providerId: "book-42",
+        mediaType: "book",
+      }),
+    ).resolves.toMatchObject({ success: true, code: "added" });
+
+    await expect(readWatchlistDetail({ watchlistId: watchlist.id })).resolves.toMatchObject({
+      items: [
+        expect.objectContaining({
+          tmdbId: "book-42",
+          source: "google_books",
+          title: "Canonical Book",
+          releaseDate: "1969-03-01",
+        }),
+      ],
+    });
+  });
+
+  it("resolves RAWG IDs to canonical game metadata", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Canonical games" });
+    process.env.RAWG_API_KEY = "test-rawg-key";
+    getGameDetailsMock.mockResolvedValue({
+      id: "3498",
+      source: "rawg",
+      mediaType: "game",
+      title: "Canonical Game",
+      poster: "https://example.test/game.jpg",
+      year: "2013",
+      releaseDate: "2013-09-17",
+      rating: 9,
+    });
+
+    await expect(
+      addProviderMediaToWatchlist({
+        watchlistId: watchlist.id,
+        provider: "rawg",
+        providerId: "3498",
+        mediaType: "game",
+      }),
+    ).resolves.toMatchObject({ success: true, code: "added" });
+
+    await expect(readWatchlistDetail({ watchlistId: watchlist.id })).resolves.toMatchObject({
+      items: [expect.objectContaining({ tmdbId: "3498", source: "rawg", title: "Canonical Game" })],
+    });
+  });
+
+  it("resolves ComicVine IDs to canonical volume metadata", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Canonical comics" });
+    process.env.COMICVINE_API_KEY = "test-comicvine-key";
+    getComicVolumeDetailsMock.mockResolvedValue({ title: "Canonical Volume" });
+    getComicIssuesMock.mockResolvedValue([
+      {
+        id: "issue-1",
+        title: "Canonical Issue",
+        issueNumber: "1",
+        poster: "https://example.test/issue.jpg",
+        coverDate: "2012-03-14",
+      },
+    ]);
+
+    await expect(
+      addProviderMediaToWatchlist({
+        watchlistId: watchlist.id,
+        provider: "comicvine",
+        providerId: "4050",
+        mediaType: "comic",
+      }),
+    ).resolves.toMatchObject({ success: true, code: "added" });
+
+    await expect(readWatchlistDetail({ watchlistId: watchlist.id })).resolves.toMatchObject({
+      items: [
+        expect.objectContaining({ parentTitle: "Canonical Volume", title: "Canonical Issue" }),
+      ],
+    });
+  });
+
+  it("reports the inserted issue count for bulk ComicVine additions", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Bulk comics" });
+    process.env.COMICVINE_API_KEY = "test-comicvine-key";
+    getComicVolumeDetailsMock.mockResolvedValue({ title: "Canonical Volume" });
+    getComicIssuesMock.mockResolvedValue([
+      {
+        id: "issue-1",
+        title: "Issue One",
+        issueNumber: "1",
+        poster: null,
+        coverDate: "2012-03-14",
+      },
+      {
+        id: "issue-2",
+        title: "Issue Two",
+        issueNumber: "2",
+        poster: null,
+        coverDate: "2012-04-14",
+      },
+      {
+        id: "issue-3",
+        title: "Issue Three",
+        issueNumber: "3",
+        poster: null,
+        coverDate: "2012-05-14",
+      },
+    ]);
+
+    const result = await addProviderMediaToWatchlist({
+      watchlistId: watchlist.id,
+      provider: "comicvine",
+      providerId: "4050",
+      mediaType: "comic",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      code: "added",
+      message: "Added 3 issues to watchlist",
+      affectedCount: 3,
+    });
+  });
+
+  it("reports a no-change outcome for a ComicVine volume with no issues", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Repeated comics" });
+    process.env.COMICVINE_API_KEY = "test-comicvine-key";
+    getComicVolumeDetailsMock.mockResolvedValue({ title: "Canonical Volume" });
+    getComicIssuesMock.mockResolvedValue([]);
+
+    const result = await addProviderMediaToWatchlist({
+      watchlistId: watchlist.id,
+      provider: "comicvine",
+      providerId: "4050",
+      mediaType: "comic",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      code: "no_new_episodes",
+      message: "No issues found for this volume",
+      affectedCount: 0,
+    });
+  });
+
+  it("skips the volume lookup when the supplied media already has a title", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Titled comics" });
+    process.env.COMICVINE_API_KEY = "test-comicvine-key";
+    getComicIssuesMock.mockResolvedValue([
+      {
+        id: "issue-1",
+        title: "Canonical Issue",
+        issueNumber: "1",
+        poster: null,
+        coverDate: "2012-03-14",
+      },
+    ]);
+
+    const result = await addToWatchlistMutation({
+      watchlistId: watchlist.id,
+      media: {
+        id: "4050",
+        mediaType: "comic",
+        source: "comicvine",
+        title: "Search Result Volume",
+        poster: null,
+      },
+    });
+    const detail = await readWatchlistDetail({ watchlistId: watchlist.id });
+
+    expect(result).toEqual({ success: true, message: "Added 1 issue to watchlist" });
+    expect(getComicVolumeDetailsMock).not.toHaveBeenCalled();
+    expect(detail?.items[0]).toMatchObject({
+      parentTitle: "Search Result Volume",
+      title: "Canonical Issue",
+    });
+  });
+
   it("resolves a provider-ID-only TMDB movie with canonical details", async () => {
     const watchlist = await createTestWatchlist(db, { name: "Canonical provider movie" });
     getMovieDetailsMock.mockResolvedValue({
