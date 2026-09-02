@@ -252,7 +252,9 @@ describe("WatchlistCard", () => {
       />,
     );
 
-    expect(screen.getByRole("group")).not.toBeNull();
+    const cardWrapper = screen.getByRole("group");
+    expect(cardWrapper).not.toBeNull();
+    expect(cardWrapper.className).toContain("group");
   });
 
   it("shows item titles instead of the watchlist name in featured up next cards", () => {
