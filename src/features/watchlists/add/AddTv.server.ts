@@ -4,8 +4,12 @@ import type { WatchlistMedia } from "./Mutation";
 import * as repository from "@/features/watchlists/Repository.server";
 import { fetchTmdbSeason, fetchTmdbTv } from "@/server/providers/TmdbApi.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
-import { persistAddedItems } from "./Insert.server";
-import { rejectAdd, type WatchlistWriteResult } from "./Shared.server";
+import { persistAddedItems, type PersistAddedItemsResult } from "./Insert.server";
+import {
+  rejectAdd,
+  type WatchlistWriteFailureCode,
+  type WatchlistWriteResult,
+} from "./Shared.server";
 
 const limit = pLimit(5);
 const TMDB_TV_FETCH_FAILURE_MESSAGE = "Failed to fetch TV details from TMDB.";
@@ -15,13 +19,21 @@ export async function addTVShowToWatchlist(
   tmdbId: number,
   media: WatchlistMedia,
   insertionPosition?: AddToWatchlistInsertionPosition,
+  referenceItemId?: number,
 ): Promise<WatchlistWriteResult> {
   const showDetails = await fetchShowDetails(tmdbId);
   if (!showDetails) {
     return rejectAdd(TMDB_TV_FETCH_FAILURE_MESSAGE);
   }
 
-  return addShowEpisodes(watchlistId, tmdbId, media, showDetails, insertionPosition);
+  return addShowEpisodes(
+    watchlistId,
+    tmdbId,
+    media,
+    showDetails,
+    insertionPosition,
+    referenceItemId,
+  );
 }
 
 async function addShowEpisodes(
@@ -30,6 +42,7 @@ async function addShowEpisodes(
   media: WatchlistMedia,
   showDetails: Awaited<ReturnType<typeof fetchTmdbTv>>,
   insertionPosition?: AddToWatchlistInsertionPosition,
+  referenceItemId?: number,
 ): Promise<WatchlistWriteResult> {
   const episodes = await fetchEpisodesAcrossSeasons(tmdbId, showDetails.seasons);
   if (episodes.length === 0) {
@@ -44,13 +57,14 @@ async function addShowEpisodes(
     showTitle,
     showDetails.poster_path,
   );
-  return addNewEpisodes(watchlistId, items, insertionPosition);
+  return addNewEpisodes(watchlistId, items, insertionPosition, referenceItemId);
 }
 
 async function addNewEpisodes(
   watchlistId: number,
   items: Array<typeof watchlistItems.$inferInsert>,
   insertionPosition?: AddToWatchlistInsertionPosition,
+  referenceItemId?: number,
 ): Promise<WatchlistWriteResult> {
   const newEpisodes = await filterNewEpisodes(watchlistId, items);
   if (newEpisodes.length === 0) {
@@ -60,13 +74,26 @@ async function addNewEpisodes(
   const result = await persistAddedItems({
     watchlistId,
     insertionPosition,
+    referenceItemId,
     items: newEpisodes,
   });
   if (!result.success) {
-    return result;
+    return unwrapPersistFailure(result);
   }
 
   return episodesAddedResult(result.insertedCount);
+}
+
+function unwrapPersistFailure(result: Extract<PersistAddedItemsResult, { success: false }>): {
+  success: false;
+  code: WatchlistWriteFailureCode;
+  message: string;
+} {
+  return {
+    success: false,
+    code: result.code as WatchlistWriteFailureCode,
+    message: result.message,
+  };
 }
 
 // --- Implementation Details ---

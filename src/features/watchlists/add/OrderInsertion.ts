@@ -1,44 +1,105 @@
-import { compareReleaseDates } from "@/features/watchlists/Order";
-import type { AddToWatchlistInsertionPosition } from "./Mutation";
+import { compareReleaseDates, type InsertionPosition } from "@/features/watchlists/Order";
 
 type HasReleaseDate = { releaseDate?: string | null };
-type ExistingItem = HasReleaseDate & { id: number };
+type ExistingItem = HasReleaseDate & { id: number; customRank: number | null };
 type PendingItem = HasReleaseDate & { pendingIndex: number };
 
 export type OrderedWatchlistItem = ExistingItem | PendingItem;
 
+export type AnchoredOrderFailure = {
+  success: false;
+  code: "invalid_reference";
+  referenceItemId: number;
+};
+
+export type PendingInsertion = {
+  pendingItem: PendingItem;
+  insertionPosition: InsertionPosition;
+  referenceItemId?: number;
+};
+
 export function buildFinalOrder({
   existingItems,
-  pendingItems,
-  insertionPosition,
+  pendingInsertions,
 }: {
   existingItems: readonly ExistingItem[];
-  pendingItems: readonly PendingItem[];
-  insertionPosition: AddToWatchlistInsertionPosition;
-}) {
-  if (insertionPosition === "beginning") {
-    return [...pendingItems, ...existingItems];
-  }
-
-  if (insertionPosition === "end") {
-    return [...existingItems, ...pendingItems];
-  }
-
-  return insertPendingItemsByRelease(existingItems, pendingItems);
-}
-
-function insertPendingItemsByRelease(
-  existingItems: readonly ExistingItem[],
-  pendingItems: readonly PendingItem[],
-) {
+  pendingInsertions: readonly PendingInsertion[];
+}): OrderedWatchlistItem[] | AnchoredOrderFailure {
   const nextOrder: OrderedWatchlistItem[] = [...existingItems];
 
-  for (const pendingItem of pendingItems) {
-    const insertionIndex = getReleaseAdjacentInsertionIndex(nextOrder, pendingItem);
-    nextOrder.splice(insertionIndex, 0, pendingItem);
+  for (const insertion of pendingInsertions) {
+    const spliceIndex = computeSpliceIndex(nextOrder, insertion);
+    if (typeof spliceIndex !== "number") {
+      return spliceIndex;
+    }
+    nextOrder.splice(spliceIndex, 0, insertion.pendingItem);
   }
 
   return nextOrder;
+}
+
+function computeSpliceIndex(
+  currentOrder: OrderedWatchlistItem[],
+  insertion: PendingInsertion,
+): number | AnchoredOrderFailure {
+  if (insertion.insertionPosition === "before") {
+    return anchoredSpliceIndex(currentOrder, insertion, "before");
+  }
+  if (insertion.insertionPosition === "after") {
+    return anchoredSpliceIndex(currentOrder, insertion, "after");
+  }
+  return legacySpliceIndex(currentOrder, insertion);
+}
+
+function anchoredSpliceIndex(
+  currentOrder: OrderedWatchlistItem[],
+  insertion: PendingInsertion,
+  direction: "before" | "after",
+): number | AnchoredOrderFailure {
+  const { referenceItemId } = insertion;
+  if (referenceItemId === undefined) {
+    return missingReferenceFailure();
+  }
+  const referenceIndex = findRankedReference(currentOrder, referenceItemId);
+  return spliceIndexForReference(referenceIndex, direction, referenceItemId);
+}
+
+function spliceIndexForReference(
+  referenceIndex: number,
+  direction: "before" | "after",
+  referenceItemId: number,
+): number | AnchoredOrderFailure {
+  if (referenceIndex === -1) {
+    return { success: false, code: "invalid_reference", referenceItemId };
+  }
+  return direction === "before" ? referenceIndex : referenceIndex + 1;
+}
+
+function findRankedReference(
+  currentOrder: OrderedWatchlistItem[],
+  referenceItemId: number,
+): number {
+  return currentOrder.findIndex(
+    (item): item is ExistingItem =>
+      "id" in item && item.id === referenceItemId && item.customRank !== null,
+  );
+}
+
+function missingReferenceFailure(): AnchoredOrderFailure {
+  return { success: false, code: "invalid_reference", referenceItemId: NaN };
+}
+
+function legacySpliceIndex(
+  currentOrder: OrderedWatchlistItem[],
+  insertion: PendingInsertion,
+): number {
+  if (insertion.insertionPosition === "beginning") {
+    return 0;
+  }
+  if (insertion.insertionPosition === "end") {
+    return currentOrder.length;
+  }
+  return getReleaseAdjacentInsertionIndex(currentOrder, insertion.pendingItem);
 }
 
 function normalizeReleaseDate(releaseDate: string | null | undefined) {
@@ -48,14 +109,14 @@ function normalizeReleaseDate(releaseDate: string | null | undefined) {
 
 function getReleaseAdjacentInsertionIndex(
   currentOrder: OrderedWatchlistItem[],
-  pendingItem: PendingItem,
+  pendingItem: HasReleaseDate,
 ) {
   const pendingReleaseDate = normalizeReleaseDate(pendingItem.releaseDate);
   if (!pendingReleaseDate) {
     return currentOrder.length;
   }
 
-  const lastMatchingIndex = currentOrder.reduce(
+  const lastMatchingIndex = currentOrder.reduce<number>(
     (lastIndex, item, index) =>
       updateReleaseAdjacentIndex(lastIndex, index, item, pendingReleaseDate),
     -1,

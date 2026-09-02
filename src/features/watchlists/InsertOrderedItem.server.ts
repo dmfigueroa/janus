@@ -1,10 +1,20 @@
 import { watchlistItems } from "@/db/Schema";
 import type { DatabaseTransaction } from "@/db/Db.server";
 import { and, asc, eq } from "drizzle-orm";
-import { computeItemInsertionOrder, type InsertionPosition } from "@/features/watchlists/Order";
+import {
+  computeItemInsertionOrder,
+  InvalidInsertionReferenceError,
+  type InsertionPosition,
+} from "@/features/watchlists/Order";
 import { customRankOrder } from "@/features/watchlists/Order.server";
 
 export type { InsertionPosition };
+
+export class InsertItemReferenceError extends Error {
+  constructor(public referenceItemId: number) {
+    super(`Reference item ${referenceItemId} cannot anchor this insertion.`);
+  }
+}
 
 export type ItemInsertFields = Omit<
   typeof watchlistItems.$inferSelect,
@@ -18,20 +28,30 @@ export function insertItemWithCustomOrder(
   insertFields: ItemInsertFields,
   destinationId: number,
   position: InsertionPosition,
+  referenceItemId?: number,
 ): void {
   const existingItems = fetchExistingItems(transaction, destinationId);
 
-  const orderedItems = computeItemInsertionOrder(
-    existingItems,
-    {
-      tmdbId: insertFields.tmdbId,
-      mediaType: insertFields.mediaType,
-      releaseDate: insertFields.releaseDate,
-      customRank: null,
-    },
-    position,
-    "custom",
-  );
+  let orderedItems;
+  try {
+    orderedItems = computeItemInsertionOrder(
+      existingItems,
+      {
+        tmdbId: insertFields.tmdbId,
+        mediaType: insertFields.mediaType,
+        releaseDate: insertFields.releaseDate,
+        customRank: null,
+      },
+      position,
+      "custom",
+      referenceItemId,
+    );
+  } catch (error) {
+    if (error instanceof InvalidInsertionReferenceError) {
+      throw new InsertItemReferenceError(error.referenceItemId);
+    }
+    throw error;
+  }
 
   applyRankUpdates(transaction, orderedItems, destinationId);
   insertNewItem(transaction, orderedItems, insertFields, destinationId);

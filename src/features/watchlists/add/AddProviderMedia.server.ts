@@ -12,6 +12,8 @@ export type ProviderMediaAdditionResult = {
     | "no_new_episodes"
     | "not_found"
     | "insertion_choice_required"
+    | "not_custom_mode"
+    | "invalid_reference"
     | "provider_unavailable";
   message: string;
   affectedCount: number;
@@ -28,6 +30,7 @@ export async function addProviderMediaToWatchlist(
   return addToWatchlistMutation({
     watchlistId: addition.watchlistId,
     insertionPosition: addition.insertionPosition,
+    referenceItemId: addition.referenceItemId,
     media: {
       id: addition.providerId,
       source: addition.provider,
@@ -52,15 +55,47 @@ function providerUnavailableResult(): ProviderMediaAdditionResult {
 function validateDestination(addition: ProviderMediaAddition): ProviderMediaAdditionResult | null {
   const watchlist = getWatchlistById(addition.watchlistId);
   if (!watchlist) {
-    return {
-      success: false,
-      code: "not_found",
-      message: "Watchlist not found.",
-      affectedCount: 0,
-    };
+    return notFoundFailure();
+  }
+
+  if (isAnchorPosition(addition.insertionPosition)) {
+    return anchoredDestinationCheck(watchlist.itemOrderMode);
   }
 
   return customInsertionFailure(watchlist.itemOrderMode, addition.insertionPosition);
+}
+
+function isAnchorPosition(
+  position: ProviderMediaAddition["insertionPosition"],
+): position is "before" | "after" {
+  return position === "before" || position === "after";
+}
+
+function anchoredDestinationCheck(
+  itemOrderMode: "release" | "custom",
+): ProviderMediaAdditionResult | null {
+  if (itemOrderMode !== "custom") {
+    return notCustomModeFailure();
+  }
+  return null;
+}
+
+function notFoundFailure(): ProviderMediaAdditionResult {
+  return {
+    success: false,
+    code: "not_found",
+    message: "Watchlist not found.",
+    affectedCount: 0,
+  };
+}
+
+function notCustomModeFailure(): ProviderMediaAdditionResult {
+  return {
+    success: false,
+    code: "not_custom_mode",
+    message: "Anchored insertion is only available in custom mode.",
+    affectedCount: 0,
+  };
 }
 
 function customInsertionFailure(
@@ -81,19 +116,55 @@ function customInsertionFailure(
 
 function providerMediaAdditionResult(result: WatchlistWriteResult): ProviderMediaAdditionResult {
   if (!result.success) {
-    return providerMediaFailure(result.message);
+    return providerMediaFailure(result);
   }
 
   return providerMediaSuccess(result.message);
 }
 
-function providerMediaFailure(message: string): ProviderMediaAdditionResult {
+function providerMediaFailure(
+  result: Extract<WatchlistWriteResult, { success: false }>,
+): ProviderMediaAdditionResult {
+  const codeFromResult = "code" in result ? result.code : undefined;
+  if (isKnownFailureCode(codeFromResult)) {
+    return forwardKnownCode(result, codeFromResult);
+  }
+  return forwardInferredCode(result);
+}
+
+function forwardKnownCode(
+  result: Extract<WatchlistWriteResult, { success: false }>,
+  code: ProviderMediaAdditionResult["code"],
+): ProviderMediaAdditionResult {
   return {
     success: false,
-    code: message === "Watchlist not found." ? "not_found" : "provider_unavailable",
-    message,
+    code,
+    message: result.message,
     affectedCount: 0,
   };
+}
+
+function forwardInferredCode(
+  result: Extract<WatchlistWriteResult, { success: false }>,
+): ProviderMediaAdditionResult {
+  const code = result.message === "Watchlist not found." ? "not_found" : "provider_unavailable";
+  return {
+    success: false,
+    code,
+    message: result.message,
+    affectedCount: 0,
+  };
+}
+
+const KNOWN_FAILURE_CODES: ProviderMediaAdditionResult["code"][] = [
+  "not_found",
+  "insertion_choice_required",
+  "not_custom_mode",
+  "invalid_reference",
+];
+
+function isKnownFailureCode(code: unknown): code is ProviderMediaAdditionResult["code"] {
+  return KNOWN_FAILURE_CODES.includes(code as ProviderMediaAdditionResult["code"]);
 }
 
 function providerMediaSuccess(message: string): ProviderMediaAdditionResult {

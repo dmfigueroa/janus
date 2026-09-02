@@ -2,7 +2,11 @@ import * as repository from "@/features/watchlists/Repository.server";
 import { fetchTmdbMovie } from "@/server/providers/TmdbApi.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
 import { persistAddedItems } from "./Insert.server";
-import { rejectAdd, type WatchlistWriteResult } from "./Shared.server";
+import {
+  rejectAdd,
+  type WatchlistWriteFailureCode,
+  type WatchlistWriteResult,
+} from "./Shared.server";
 
 const TMDB_MOVIE_FETCH_FAILURE_MESSAGE = "Failed to fetch movie details from TMDB.";
 const MOVIE_ALREADY_IN_WATCHLIST_RESULT = {
@@ -18,6 +22,7 @@ export async function addMovieToWatchlist(
   watchlistId: number,
   tmdbId: number,
   insertionPosition?: AddToWatchlistInsertionPosition,
+  referenceItemId?: number,
 ): Promise<WatchlistWriteResult> {
   const existing = await repository.getExistingMovieInWatchlist(watchlistId, tmdbId);
   if (existing.length > 0) {
@@ -29,7 +34,7 @@ export async function addMovieToWatchlist(
     return rejectAdd(TMDB_MOVIE_FETCH_FAILURE_MESSAGE);
   }
 
-  return persistMovie(watchlistId, tmdbId, details, insertionPosition);
+  return persistMovie(watchlistId, tmdbId, details, insertionPosition, referenceItemId);
 }
 
 async function persistMovie(
@@ -37,14 +42,20 @@ async function persistMovie(
   tmdbId: number,
   details: Awaited<ReturnType<typeof fetchTmdbMovie>>,
   insertionPosition?: AddToWatchlistInsertionPosition,
+  referenceItemId?: number,
 ): Promise<WatchlistWriteResult> {
   const result = await persistAddedItems({
     watchlistId,
     insertionPosition,
+    referenceItemId,
     items: [mapToWatchlistMovie(details, watchlistId, tmdbId)],
   });
   if (!result.success) {
-    return result;
+    return {
+      success: false,
+      code: result.code as WatchlistWriteFailureCode,
+      message: result.message,
+    };
   }
 
   if (result.insertedCount === 0) {

@@ -15,79 +15,102 @@ export async function addToWatchlistMutation({
   watchlistId,
   media,
   insertionPosition,
+  referenceItemId,
 }: AddToWatchlistInput): Promise<WatchlistWriteResult> {
   const deprecatedRejection = getDeprecatedWatchlistAddRejection(media.mediaType);
   if (deprecatedRejection) {
     return deprecatedRejection;
   }
 
-  return dispatchWatchlistAddition({ watchlistId, media, insertionPosition });
+  return dispatchWatchlistAddition({ watchlistId, media, insertionPosition, referenceItemId });
 }
 
 function dispatchWatchlistAddition({
   watchlistId,
   media,
   insertionPosition,
+  referenceItemId,
 }: AddToWatchlistInput): Promise<WatchlistWriteResult> {
   if (media.mediaType === "tv") {
-    return addTvMedia(watchlistId, media, insertionPosition);
+    return addTvMedia(watchlistId, media, insertionPosition, referenceItemId);
   }
 
-  return dispatchNonTvAddition(watchlistId, media, insertionPosition);
+  return dispatchNonTvAddition(watchlistId, media, insertionPosition, referenceItemId);
 }
 
 function addTvMedia(
   watchlistId: number,
   media: AddToWatchlistInput["media"],
   insertionPosition: AddToWatchlistInput["insertionPosition"],
+  referenceItemId: AddToWatchlistInput["referenceItemId"],
 ) {
   if (media.source !== "tmdb") {
-    return Promise.resolve(rejectAdd(UNSUPPORTED_TV_SOURCE_MESSAGE));
+    return Promise.resolve(rejectAdd(UNSUPPORTED_TV_SOURCE_MESSAGE, "unsupported"));
   }
-  return addTVShowToWatchlist(watchlistId, Number.parseInt(media.id, 10), media, insertionPosition);
+  return addTVShowToWatchlist(
+    watchlistId,
+    Number.parseInt(media.id, 10),
+    media,
+    insertionPosition,
+    referenceItemId,
+  );
 }
 
 function dispatchNonTvAddition(
   watchlistId: number,
   media: AddToWatchlistInput["media"],
   insertionPosition: AddToWatchlistInput["insertionPosition"],
+  referenceItemId: AddToWatchlistInput["referenceItemId"],
 ): Promise<WatchlistWriteResult> {
   if (media.source === "tmdb" && media.mediaType === "movie") {
-    return addMovieToWatchlist(watchlistId, Number.parseInt(media.id, 10), insertionPosition);
+    return addMovieToWatchlist(
+      watchlistId,
+      Number.parseInt(media.id, 10),
+      insertionPosition,
+      referenceItemId,
+    );
   }
-  return dispatchComicAddition(watchlistId, media, insertionPosition);
+  return dispatchComicAddition(watchlistId, media, insertionPosition, referenceItemId);
 }
 
 function dispatchComicAddition(
   watchlistId: number,
   media: AddToWatchlistInput["media"],
   insertionPosition: AddToWatchlistInput["insertionPosition"],
+  referenceItemId: AddToWatchlistInput["referenceItemId"],
 ): Promise<WatchlistWriteResult> {
   if (media.source === "comicvine" && media.mediaType === "comic") {
-    return addComicToWatchlist(watchlistId, media.id, media, insertionPosition);
+    return addComicToWatchlist(watchlistId, media.id, media, insertionPosition, referenceItemId);
   }
-  return dispatchBookAddition(watchlistId, media, insertionPosition);
+  return dispatchBookAddition(watchlistId, media, insertionPosition, referenceItemId);
 }
 
 function dispatchBookAddition(
   watchlistId: number,
   media: AddToWatchlistInput["media"],
   insertionPosition: AddToWatchlistInput["insertionPosition"],
+  referenceItemId: AddToWatchlistInput["referenceItemId"],
 ): Promise<WatchlistWriteResult> {
   if (media.source === "google_books" && media.mediaType === "book") {
-    return addBookToWatchlist(watchlistId, media, insertionPosition);
+    return addBookToWatchlist(watchlistId, media, insertionPosition, referenceItemId);
   }
-  return dispatchGameAddition(watchlistId, media, insertionPosition);
+  return dispatchGameAddition(watchlistId, media, insertionPosition, referenceItemId);
 }
 
 function dispatchGameAddition(
   watchlistId: number,
   media: AddToWatchlistInput["media"],
   insertionPosition: AddToWatchlistInput["insertionPosition"],
+  referenceItemId: AddToWatchlistInput["referenceItemId"],
 ): Promise<WatchlistWriteResult> {
   if (media.source === "rawg" && media.mediaType === "game") {
-    return addGameToWatchlist(watchlistId, media, insertionPosition);
+    return addGameToWatchlist(watchlistId, media, insertionPosition, referenceItemId);
   }
 
-  return addGenericItemToWatchlist(watchlistId, media as GenericMedia, insertionPosition);
+  return addGenericItemToWatchlist(
+    watchlistId,
+    media as GenericMedia,
+    insertionPosition,
+    referenceItemId,
+  );
 }

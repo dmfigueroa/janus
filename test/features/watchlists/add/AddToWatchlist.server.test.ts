@@ -242,8 +242,276 @@ describe("custom order add validation", () => {
 
     expect(result).toEqual({
       success: false,
+      code: "insertion_choice_required",
       message: "Choose where to insert this item in the custom order.",
     });
+  });
+});
+
+describe("anchored add to custom-ordered watchlist", () => {
+  it("places a new item before a reference and shifts later items down by one", async () => {
+    const watchlist = await createTestWatchlist(db, {
+      name: "Anchored Queue",
+      itemOrderMode: "custom",
+    });
+    const [first, second, third] = await Promise.all([
+      createTestWatchlistItem(db, {
+        watchlistId: watchlist.id,
+        tmdbId: "anchor-first",
+        source: "custom",
+        title: "First",
+        customRank: 1,
+      }),
+      createTestWatchlistItem(db, {
+        watchlistId: watchlist.id,
+        tmdbId: "anchor-second",
+        source: "custom",
+        title: "Second",
+        customRank: 2,
+      }),
+      createTestWatchlistItem(db, {
+        watchlistId: watchlist.id,
+        tmdbId: "anchor-third",
+        source: "custom",
+        title: "Third",
+        customRank: 3,
+      }),
+    ]);
+
+    const result = await addToWatchlistMutation({
+      watchlistId: watchlist.id,
+      insertionPosition: "before",
+      referenceItemId: second.id,
+      media: {
+        id: "anchor-new",
+        mediaType: "movie",
+        source: "custom",
+        title: "Inserted Before Second",
+        poster: null,
+        year: "2025",
+      },
+    });
+
+    expect(result.success).toBe(true);
+    const detail = await readWatchlistDetail({
+      watchlistId: watchlist.id,
+      unwatchedOnly: false,
+    });
+    expect(detail?.items.map((item) => item.title)).toEqual([
+      "First",
+      "Inserted Before Second",
+      "Second",
+      "Third",
+    ]);
+    expect(detail?.items.find((item) => item.title === "First")?.customRank).toBe(1);
+    expect(detail?.items.find((item) => item.title === "Inserted Before Second")?.customRank).toBe(
+      2,
+    );
+    expect(detail?.items.find((item) => item.title === "Second")?.customRank).toBe(3);
+    expect(detail?.items.find((item) => item.title === "Third")?.customRank).toBe(4);
+    expect(first.id).toBeDefined();
+    expect(second.id).toBeDefined();
+    expect(third.id).toBeDefined();
+  });
+
+  it("places a new item after a reference and shifts only later items down by one", async () => {
+    const watchlist = await createTestWatchlist(db, {
+      name: "Anchored After Queue",
+      itemOrderMode: "custom",
+    });
+    const [, second] = await Promise.all([
+      createTestWatchlistItem(db, {
+        watchlistId: watchlist.id,
+        tmdbId: "anchor-after-first",
+        source: "custom",
+        title: "First",
+        customRank: 1,
+      }),
+      createTestWatchlistItem(db, {
+        watchlistId: watchlist.id,
+        tmdbId: "anchor-after-second",
+        source: "custom",
+        title: "Second",
+        customRank: 2,
+      }),
+      createTestWatchlistItem(db, {
+        watchlistId: watchlist.id,
+        tmdbId: "anchor-after-third",
+        source: "custom",
+        title: "Third",
+        customRank: 3,
+      }),
+    ]);
+
+    const result = await addToWatchlistMutation({
+      watchlistId: watchlist.id,
+      insertionPosition: "after",
+      referenceItemId: second.id,
+      media: {
+        id: "anchor-after-new",
+        mediaType: "movie",
+        source: "custom",
+        title: "Inserted After Second",
+        poster: null,
+        year: "2025",
+      },
+    });
+
+    expect(result.success).toBe(true);
+    const detail = await readWatchlistDetail({
+      watchlistId: watchlist.id,
+      unwatchedOnly: false,
+    });
+    expect(detail?.items.map((item) => item.title)).toEqual([
+      "First",
+      "Second",
+      "Inserted After Second",
+      "Third",
+    ]);
+    expect(detail?.items.find((item) => item.title === "First")?.customRank).toBe(1);
+    expect(detail?.items.find((item) => item.title === "Second")?.customRank).toBe(2);
+    expect(detail?.items.find((item) => item.title === "Inserted After Second")?.customRank).toBe(
+      3,
+    );
+    expect(detail?.items.find((item) => item.title === "Third")?.customRank).toBe(4);
+  });
+
+  it("rejects an anchor whose reference item is unranked with invalid_reference", async () => {
+    const watchlist = await createTestWatchlist(db, {
+      name: "Unranked Reference",
+      itemOrderMode: "custom",
+    });
+    const [ranked, unranked] = await Promise.all([
+      createTestWatchlistItem(db, {
+        watchlistId: watchlist.id,
+        tmdbId: "ranked-anchor",
+        source: "custom",
+        title: "Ranked",
+        customRank: 1,
+      }),
+      createTestWatchlistItem(db, {
+        watchlistId: watchlist.id,
+        tmdbId: "unranked-anchor",
+        source: "custom",
+        title: "Unranked",
+        customRank: null,
+      }),
+    ]);
+
+    const result = await addToWatchlistMutation({
+      watchlistId: watchlist.id,
+      insertionPosition: "before",
+      referenceItemId: unranked.id,
+      media: {
+        id: "anchor-blocked",
+        mediaType: "movie",
+        source: "custom",
+        title: "Should Not Land",
+        poster: null,
+        year: "2025",
+      },
+    });
+
+    expect(result).toEqual({
+      success: false,
+      code: "invalid_reference",
+      message: expect.stringContaining("not in this watchlist"),
+    });
+    const detail = await readWatchlistDetail({
+      watchlistId: watchlist.id,
+      unwatchedOnly: false,
+    });
+    expect(detail?.items.map((item) => item.title)).toEqual(["Ranked", "Unranked"]);
+    expect(ranked.id).toBeDefined();
+    expect(unranked.id).toBeDefined();
+  });
+
+  it("rejects an anchor on a release-ordered watchlist with not_custom_mode", async () => {
+    const watchlist = await createTestWatchlist(db, {
+      name: "Release Ordered Anchor Block",
+      itemOrderMode: "release",
+    });
+    const existing = await createTestWatchlistItem(db, {
+      watchlistId: watchlist.id,
+      tmdbId: "release-anchor-existing",
+      source: "custom",
+      title: "Existing",
+    });
+
+    const result = await addToWatchlistMutation({
+      watchlistId: watchlist.id,
+      insertionPosition: "before",
+      referenceItemId: existing.id,
+      media: {
+        id: "release-anchor-blocked",
+        mediaType: "movie",
+        source: "custom",
+        title: "Should Not Land",
+        poster: null,
+        year: "2025",
+      },
+    });
+
+    expect(result).toEqual({
+      success: false,
+      code: "not_custom_mode",
+      message: "Anchored insertion is only available in custom mode.",
+    });
+    const detail = await readWatchlistDetail({
+      watchlistId: watchlist.id,
+      unwatchedOnly: false,
+    });
+    expect(detail?.items.map((item) => item.title)).toEqual(["Existing"]);
+  });
+
+  it("trails batch siblings after the anchor in customRank order", async () => {
+    const watchlist = await createTestWatchlist(db, {
+      name: "Trailing Siblings",
+      itemOrderMode: "custom",
+    });
+    const [, anchor] = await Promise.all([
+      createTestWatchlistItem(db, {
+        watchlistId: watchlist.id,
+        tmdbId: "trail-prev",
+        source: "custom",
+        title: "Pre Anchor",
+        customRank: 1,
+      }),
+      createTestWatchlistItem(db, {
+        watchlistId: watchlist.id,
+        tmdbId: "trail-anchor",
+        source: "custom",
+        title: "Anchor",
+        customRank: 2,
+      }),
+    ]);
+
+    process.env.TMDB_API_KEY = "test-tmdb-key";
+    getMovieDetailsMock.mockResolvedValue({
+      title: "Anchor Movie One",
+      poster_path: null,
+      release_date: "2024-02-03",
+      vote_average: 8.7,
+      runtime: 127,
+    });
+    await addProviderMediaToWatchlist({
+      watchlistId: watchlist.id,
+      provider: "tmdb",
+      providerId: "anchor-movie-1",
+      mediaType: "movie",
+      insertionPosition: "after",
+      referenceItemId: anchor.id,
+    });
+
+    const detail = await readWatchlistDetail({
+      watchlistId: watchlist.id,
+      unwatchedOnly: false,
+    });
+    expect(detail?.items.map((item) => item.title)).toEqual([
+      "Pre Anchor",
+      "Anchor",
+      "Anchor Movie One",
+    ]);
   });
 });
 
@@ -563,6 +831,7 @@ describe("TV add to watchlist mutation", () => {
 
     expect(result).toEqual({
       success: false,
+      code: "unsupported",
       message: "TV shows must come from TMDB so Janus can expand them into episodes.",
     });
     expect(getTVDetailsMock).not.toHaveBeenCalled();

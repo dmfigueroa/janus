@@ -10,6 +10,7 @@ export async function addBookToWatchlist(
   watchlistId: number,
   media: WatchlistMedia,
   insertionPosition?: AddToWatchlistInsertionPosition,
+  referenceItemId?: number,
 ): Promise<WatchlistWriteResult> {
   let details: Awaited<ReturnType<typeof getBookDetails>>;
   try {
@@ -17,5 +18,5 @@ export async function addBookToWatchlist(
   } catch {
     return rejectAdd(GOOGLE_BOOKS_FETCH_FAILURE_MESSAGE);
   }
-  return addGenericItemToWatchlist(watchlistId, details, insertionPosition);
+  return addGenericItemToWatchlist(watchlistId, details, insertionPosition, referenceItemId);
 }

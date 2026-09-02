@@ -2,18 +2,24 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { UnifiedMediaSchema } from "@/server/Media";
 import { addToWatchlistMutation } from "./Mutation.server";
+import { anchorInsertionRefinement } from "./InsertionRefinement";
 
 export const addToWatchlistInsertionPositionSchema = z.enum([
   "beginning",
   "end",
   "release-adjacent",
+  "before",
+  "after",
 ]);
 
-export const addToWatchlistSchema = z.object({
-  watchlistId: z.number(),
-  media: UnifiedMediaSchema,
-  insertionPosition: addToWatchlistInsertionPositionSchema.optional(),
-});
+export const addToWatchlistSchema = z
+  .object({
+    watchlistId: z.number(),
+    media: UnifiedMediaSchema,
+    insertionPosition: addToWatchlistInsertionPositionSchema.optional(),
+    referenceItemId: z.number().int().positive().optional(),
+  })
+  .superRefine(anchorInsertionRefinement);
 
 export type AddToWatchlistInput = z.infer<typeof addToWatchlistSchema>;
 export type AddToWatchlistInsertionPosition = z.infer<typeof addToWatchlistInsertionPositionSchema>;
