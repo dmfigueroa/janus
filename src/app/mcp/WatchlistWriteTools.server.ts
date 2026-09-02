@@ -14,6 +14,7 @@ import { registerEditWatchlistItemsTool } from "./EditWatchlistItemsTool.server"
 import { registerSetWatchlistItemsWatchedTool } from "./SetWatchlistItemsWatchedTool.server";
 import { registerRemoveWatchlistItemsTool } from "./RemoveWatchlistItemsTool.server";
 import { registerRemoveWatchlistParentsTool } from "./RemoveWatchlistParentsTool.server";
+import { registerReorderWatchlistItemsTool } from "./ReorderWatchlistItemsTool.server";
 
 const createWatchlistInputSchema = z.object({
   name: z.string().optional(),
@@ -38,6 +39,7 @@ export function registerWatchlistWriteTools(server: McpServer) {
   registerSetWatchlistItemsWatchedTool(server);
   registerRemoveWatchlistItemsTool(server);
   registerRemoveWatchlistParentsTool(server);
+  registerReorderWatchlistItemsTool(server);
   registerSkipWatchlists(server);
 }
 

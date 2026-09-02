@@ -96,6 +96,21 @@ describe("reorderItems mutation", () => {
     ]);
   });
 
+  it("fails when the watchlist does not exist", async () => {
+    const result = await reorderItems({
+      watchlistId: 999_999,
+      movedItemId: 1,
+      referenceItemId: 2,
+      position: "before",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      code: "not_found",
+      message: "Watchlist not found.",
+    });
+  });
+
   it("fails when the watchlist is not in custom mode", async () => {
     const [watchlist] = await db
       .insert(watchlists)
@@ -119,11 +134,12 @@ describe("reorderItems mutation", () => {
 
     expect(result).toEqual({
       success: false,
+      code: "not_custom_mode",
       message: "Reordering is only available in custom mode",
     });
   });
 
-  it("fails when either moved or reference item is outside the watchlist", async () => {
+  it("fails when the reference item is outside the watchlist", async () => {
     const [watchlist1] = await db
       .insert(watchlists)
       .values({ name: "Watchlist 1", itemOrderMode: "custom" })
@@ -151,7 +167,41 @@ describe("reorderItems mutation", () => {
 
     expect(result).toEqual({
       success: false,
-      message: "Some items do not belong to this watchlist",
+      code: "invalid_reference",
+      message: "Reference item does not belong to this watchlist",
+    });
+  });
+
+  it("fails when the moved item is outside the watchlist", async () => {
+    const [watchlist1] = await db
+      .insert(watchlists)
+      .values({ name: "Watchlist 1", itemOrderMode: "custom" })
+      .returning();
+    const [watchlist2] = await db
+      .insert(watchlists)
+      .values({ name: "Watchlist 2", itemOrderMode: "custom" })
+      .returning();
+
+    const [item1] = await db
+      .insert(watchlistItems)
+      .values({ watchlistId: watchlist1.id, tmdbId: "1", title: "Item 1", mediaType: "movie" })
+      .returning();
+    const [item2] = await db
+      .insert(watchlistItems)
+      .values({ watchlistId: watchlist2.id, tmdbId: "2", title: "Item 2", mediaType: "movie" })
+      .returning();
+
+    const result = await reorderItems({
+      watchlistId: watchlist2.id,
+      movedItemId: item1.id,
+      referenceItemId: item2.id,
+      position: "after",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      code: "invalid_item",
+      message: "Moved item does not belong to this watchlist",
     });
   });
 
@@ -190,6 +240,7 @@ describe("reorderItems mutation", () => {
 
     expect(result).toEqual({
       success: false,
+      code: "invalid_reorder",
       message: "Moved item and reference item must differ",
     });
 
