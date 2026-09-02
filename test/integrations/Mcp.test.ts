@@ -2557,4 +2557,503 @@ describe("Janus MCP endpoint", () => {
       results: [{ index: 0, success: false, code: "not_found" }],
     });
   });
+
+  it("discovers distinct move item and parent tools with item-versus-parent semantics", async () => {
+    const tools = await client.listTools();
+    const moveItems = tools.tools.find((tool) => tool.name === "move_watchlist_items");
+    const moveParents = tools.tools.find((tool) => tool.name === "move_watchlist_parents");
+
+    expect(moveItems).toMatchObject({
+      name: "move_watchlist_items",
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    });
+    expect(moveItems?.description).toContain("single item");
+    expect(moveItems?.description).toContain("move_watchlist_parents");
+    expect(moveItems?.inputSchema).toMatchObject({
+      properties: { moves: { type: "array" } },
+    });
+    const moveItemsInput = moveItems?.inputSchema;
+    const moveItemsProperties = (
+      moveItemsInput as {
+        properties?: { moves?: { items?: { properties?: Record<string, unknown> } } };
+      }
+    ).properties?.moves?.items?.properties;
+    expect(moveItemsProperties).toMatchObject({
+      watchlistItemId: { type: "integer" },
+      destinationWatchlistId: { type: "integer" },
+      position: { enum: ["beginning", "end", "release-adjacent"] },
+    });
+    expect(moveItemsProperties).not.toHaveProperty("parentId");
+    expect(moveItems?.outputSchema).toMatchObject({
+      properties: { results: { type: "array" } },
+    });
+
+    expect(moveParents).toMatchObject({
+      name: "move_watchlist_parents",
+      annotations: { readOnlyHint: false, destructiveHint: true },
+    });
+    expect(moveParents?.description).toContain("parent");
+    expect(moveParents?.description).toContain("move_watchlist_items");
+    expect(moveParents?.inputSchema).toMatchObject({
+      properties: { moves: { type: "array" } },
+    });
+    const moveParentsInput = moveParents?.inputSchema;
+    const moveParentsProperties = (
+      moveParentsInput as {
+        properties?: { moves?: { items?: { properties?: Record<string, unknown> } } };
+      }
+    ).properties?.moves?.items?.properties;
+    expect(moveParentsProperties).toMatchObject({
+      watchlistId: { type: "integer" },
+      parentId: { type: "string" },
+      destinationWatchlistId: { type: "integer" },
+      position: { enum: ["beginning", "end", "release-adjacent"] },
+    });
+    expect(moveParentsProperties).not.toHaveProperty("watchlistItemId");
+    expect(moveParents?.outputSchema).toMatchObject({
+      properties: { results: { type: "array" } },
+    });
+  });
+
+  it("moves a single watchlist item to a destination and persists the outcome", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [source, destination] = await database
+      .getDb()
+      .insert(watchlists)
+      .values([{ name: "MCP move source" }, { name: "MCP move destination" }])
+      .returning();
+    const [movedItem] = await database
+      .getDb()
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: source.id,
+          tmdbId: "move-target",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Target",
+        },
+        {
+          watchlistId: source.id,
+          tmdbId: "move-sibling",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Sibling",
+        },
+      ])
+      .returning();
+
+    const result = await client.callTool({
+      name: "move_watchlist_items",
+      arguments: {
+        moves: [{ watchlistItemId: movedItem.id, destinationWatchlistId: destination.id }],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: true,
+          code: "moved",
+          watchlistItemId: movedItem.id,
+          destinationWatchlistId: destination.id,
+          affectedCount: 1,
+        },
+      ],
+    });
+
+    const sourceItems = await database
+      .getDb()
+      .select({ id: watchlistItems.id, title: watchlistItems.title })
+      .from(watchlistItems)
+      .where(eq(watchlistItems.watchlistId, source.id));
+    expect(sourceItems.map((row) => row.title)).toEqual(["Sibling"]);
+
+    const destItems = await database
+      .getDb()
+      .select({ id: watchlistItems.id, title: watchlistItems.title })
+      .from(watchlistItems)
+      .where(eq(watchlistItems.watchlistId, destination.id));
+    expect(destItems.map((row) => row.title)).toEqual(["Target"]);
+  });
+
+  it("preserves batch order across item moves and blocks duplicates without corrupting sources", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [source, destination] = await database
+      .getDb()
+      .insert(watchlists)
+      .values([{ name: "MCP item move partial" }, { name: "MCP item move partial dest" }])
+      .returning();
+    const [moveTarget, duplicateTarget] = await database
+      .getDb()
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: source.id,
+          tmdbId: "move-partial",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Partial target",
+        },
+        {
+          watchlistId: source.id,
+          tmdbId: "move-duplicate",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Duplicate target",
+        },
+      ])
+      .returning();
+    await database.getDb().insert(watchlistItems).values({
+      watchlistId: destination.id,
+      tmdbId: "move-duplicate",
+      source: "tmdb",
+      mediaType: "movie",
+      title: "Existing duplicate",
+    });
+
+    const result = await client.callTool({
+      name: "move_watchlist_items",
+      arguments: {
+        moves: [
+          { watchlistItemId: moveTarget.id, destinationWatchlistId: destination.id },
+          { watchlistItemId: duplicateTarget.id, destinationWatchlistId: destination.id },
+          { watchlistItemId: 999_999, destinationWatchlistId: destination.id },
+          { destinationWatchlistId: destination.id },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        { index: 0, success: true, code: "moved", affectedCount: 1 },
+        { index: 1, success: false, code: "duplicate" },
+        { index: 2, success: false, code: "not_found" },
+        {
+          index: 3,
+          success: false,
+          code: "validation_error",
+          message: "watchlistItemId and destinationWatchlistId are required.",
+          affectedCount: 0,
+        },
+      ],
+    });
+
+    const sourceItems = await database
+      .getDb()
+      .select({ title: watchlistItems.title })
+      .from(watchlistItems)
+      .where(eq(watchlistItems.watchlistId, source.id));
+    expect(sourceItems.map((row) => row.title)).toEqual(["Duplicate target"]);
+  });
+
+  it("moves an item into a custom-ordered watchlist only when a position is provided", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [source, destination] = await database
+      .getDb()
+      .insert(watchlists)
+      .values([
+        { name: "MCP custom move source" },
+        { name: "MCP custom move destination", itemOrderMode: "custom" },
+      ])
+      .returning();
+    await database.getDb().insert(watchlistItems).values({
+      watchlistId: destination.id,
+      tmdbId: "move-existing",
+      source: "tmdb",
+      mediaType: "movie",
+      title: "Existing",
+      customRank: 1,
+    });
+    const [movedItem] = await database
+      .getDb()
+      .insert(watchlistItems)
+      .values({
+        watchlistId: source.id,
+        tmdbId: "move-custom",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Moved",
+      })
+      .returning();
+
+    const missingPosition = await client.callTool({
+      name: "move_watchlist_items",
+      arguments: {
+        moves: [{ watchlistItemId: movedItem.id, destinationWatchlistId: destination.id }],
+      },
+    });
+
+    expect(missingPosition.isError).not.toBe(true);
+    expect(missingPosition.structuredContent).toMatchObject({
+      results: [{ index: 0, success: false, code: "insertion_choice_required" }],
+    });
+
+    const withPosition = await client.callTool({
+      name: "move_watchlist_items",
+      arguments: {
+        moves: [
+          {
+            watchlistItemId: movedItem.id,
+            destinationWatchlistId: destination.id,
+            position: "beginning",
+          },
+        ],
+      },
+    });
+
+    expect(withPosition.isError).not.toBe(true);
+    expect(withPosition.structuredContent).toMatchObject({
+      results: [{ index: 0, success: true, code: "moved" }],
+    });
+
+    await expect(
+      database
+        .getDb()
+        .select({ title: watchlistItems.title })
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, destination.id))
+        .orderBy(watchlistItems.customRank),
+    ).resolves.toEqual([{ title: "Moved" }, { title: "Existing" }]);
+  });
+
+  it("moves a whole parent and its children as one operation and reports the affected count", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [source, destination] = await database
+      .getDb()
+      .insert(watchlists)
+      .values([{ name: "MCP parent move source" }, { name: "MCP parent move destination" }])
+      .returning();
+    const parentId = "tmdb:move-series";
+    await database
+      .getDb()
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: source.id,
+          tmdbId: "episode-a",
+          source: "tmdb",
+          mediaType: "episode",
+          title: "Pilot",
+          parentId,
+          parentTitle: "Move Series",
+        },
+        {
+          watchlistId: source.id,
+          tmdbId: "episode-b",
+          source: "tmdb",
+          mediaType: "episode",
+          title: "Finale",
+          parentId,
+          parentTitle: "Move Series",
+        },
+        {
+          watchlistId: source.id,
+          tmdbId: "episode-c",
+          source: "tmdb",
+          mediaType: "episode",
+          title: "Pilot",
+          parentId: "tmdb:other-series",
+          parentTitle: "Other Series",
+        },
+      ]);
+
+    const result = await client.callTool({
+      name: "move_watchlist_parents",
+      arguments: {
+        moves: [{ watchlistId: source.id, parentId, destinationWatchlistId: destination.id }],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: true,
+          code: "moved",
+          watchlistId: source.id,
+          parentId,
+          destinationWatchlistId: destination.id,
+          affectedCount: 2,
+        },
+      ],
+    });
+
+    const sourceItems = await database
+      .getDb()
+      .select({ parentId: watchlistItems.parentId, title: watchlistItems.title })
+      .from(watchlistItems)
+      .where(eq(watchlistItems.watchlistId, source.id));
+    expect(sourceItems.map((row) => row.parentId)).toEqual(["tmdb:other-series"]);
+
+    const destItems = await database
+      .getDb()
+      .select({ parentId: watchlistItems.parentId, title: watchlistItems.title })
+      .from(watchlistItems)
+      .where(eq(watchlistItems.watchlistId, destination.id));
+    expect(destItems.map((row) => row.parentId)).toEqual([parentId, parentId]);
+  });
+
+  it("preserves batch order across parent moves and reports duplicate and not-found outcomes", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [source, destination] = await database
+      .getDb()
+      .insert(watchlists)
+      .values([{ name: "MCP parent move partial" }, { name: "MCP parent move partial dest" }])
+      .returning();
+    const parentId = "tmdb:partial-series";
+    await database
+      .getDb()
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: source.id,
+          tmdbId: "episode-a",
+          source: "tmdb",
+          mediaType: "episode",
+          title: "Pilot",
+          parentId,
+          parentTitle: "Partial Series",
+        },
+        {
+          watchlistId: destination.id,
+          tmdbId: "episode-a",
+          source: "tmdb",
+          mediaType: "episode",
+          title: "Pilot",
+          parentId,
+          parentTitle: "Partial Series",
+        },
+      ]);
+
+    const result = await client.callTool({
+      name: "move_watchlist_parents",
+      arguments: {
+        moves: [
+          { watchlistId: source.id, parentId, destinationWatchlistId: destination.id },
+          { watchlistId: source.id, parentId, destinationWatchlistId: destination.id },
+          {
+            watchlistId: source.id,
+            parentId: "tmdb:missing",
+            destinationWatchlistId: destination.id,
+          },
+          { watchlistId: source.id },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        { index: 0, success: false, code: "duplicate" },
+        { index: 1, success: false, code: "duplicate" },
+        { index: 2, success: false, code: "not_found" },
+        {
+          index: 3,
+          success: false,
+          code: "validation_error",
+          message: "watchlistId, parentId, and destinationWatchlistId are required.",
+          affectedCount: 0,
+        },
+      ],
+    });
+
+    const sourceItems = await database
+      .getDb()
+      .select({ parentId: watchlistItems.parentId })
+      .from(watchlistItems)
+      .where(eq(watchlistItems.watchlistId, source.id));
+    expect(sourceItems.map((row) => row.parentId)).toEqual([parentId]);
+  });
+
+  it("moves a parent into a custom-ordered watchlist only when a position is provided", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [source, destination] = await database
+      .getDb()
+      .insert(watchlists)
+      .values([
+        { name: "MCP custom parent move source" },
+        { name: "MCP custom parent move destination", itemOrderMode: "custom" },
+      ])
+      .returning();
+    const parentId = "tmdb:custom-series";
+    await database.getDb().insert(watchlistItems).values({
+      watchlistId: source.id,
+      tmdbId: "episode-a",
+      source: "tmdb",
+      mediaType: "episode",
+      title: "Pilot",
+      parentId,
+      parentTitle: "Custom Series",
+    });
+
+    const missingPosition = await client.callTool({
+      name: "move_watchlist_parents",
+      arguments: {
+        moves: [{ watchlistId: source.id, parentId, destinationWatchlistId: destination.id }],
+      },
+    });
+
+    expect(missingPosition.isError).not.toBe(true);
+    expect(missingPosition.structuredContent).toMatchObject({
+      results: [{ index: 0, success: false, code: "insertion_choice_required" }],
+    });
+  });
+
+  it("moves an individual item without moving the whole parent group", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [source, destination] = await database
+      .getDb()
+      .insert(watchlists)
+      .values([{ name: "MCP item vs parent source" }, { name: "MCP item vs parent dest" }])
+      .returning();
+    const parentId = "tmdb:item-vs-parent";
+    const [episode] = await database
+      .getDb()
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: source.id,
+          tmdbId: "episode-a",
+          source: "tmdb",
+          mediaType: "episode",
+          title: "Pilot",
+          parentId,
+          parentTitle: "Series",
+        },
+        {
+          watchlistId: source.id,
+          tmdbId: "episode-b",
+          source: "tmdb",
+          mediaType: "episode",
+          title: "Finale",
+          parentId,
+          parentTitle: "Series",
+        },
+      ])
+      .returning();
+
+    const result = await client.callTool({
+      name: "move_watchlist_items",
+      arguments: {
+        moves: [{ watchlistItemId: episode.id, destinationWatchlistId: destination.id }],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [{ index: 0, success: true, code: "moved", affectedCount: 1 }],
+    });
+
+    const sourceItems = await database
+      .getDb()
+      .select({ title: watchlistItems.title })
+      .from(watchlistItems)
+      .where(eq(watchlistItems.watchlistId, source.id));
+    expect(sourceItems.map((row) => row.title)).toEqual(["Finale"]);
+  });
 });

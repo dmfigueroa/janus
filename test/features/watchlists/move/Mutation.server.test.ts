@@ -14,7 +14,8 @@ let testDb: Awaited<ReturnType<typeof createIsolatedTestDb>>;
 let db: IsolatedTestDb;
 const { watchlists, watchlistItems } = schema;
 let moveItemToWatchlistMutation: typeof import("@/features/watchlists/move/Mutation.server").moveItemToWatchlistMutation;
-let moveParentAndChildrenToWatchlistMutation: typeof import("@/features/watchlists/move/Mutation.server").moveParentAndChildrenToWatchlistMutation;
+let moveParentAndChildrenToWatchlistMutation: typeof import("@/features/watchlists/move/ParentMutation.server").moveParentAndChildrenToWatchlistMutation;
+let moveParentToWatchlistMutation: typeof import("@/features/watchlists/move/ParentMutation.server").moveParentToWatchlistMutation;
 let readWatchlistDetailScreen: typeof import("@/features/watchlists/Read.server").WatchlistsRead.detailScreen;
 
 beforeAll(async () => {
@@ -22,13 +23,16 @@ beforeAll(async () => {
   db = testDb.db;
   dbState.db = db;
 
-  const [moveModule, readModule] = await Promise.all([
+  const [moveModule, parentMoveModule, readModule] = await Promise.all([
     import("@/features/watchlists/move/Mutation.server"),
+    import("@/features/watchlists/move/ParentMutation.server"),
     import("@/features/watchlists/Read.server"),
   ]);
 
   moveItemToWatchlistMutation = moveModule.moveItemToWatchlistMutation;
-  moveParentAndChildrenToWatchlistMutation = moveModule.moveParentAndChildrenToWatchlistMutation;
+  moveParentAndChildrenToWatchlistMutation =
+    parentMoveModule.moveParentAndChildrenToWatchlistMutation;
+  moveParentToWatchlistMutation = parentMoveModule.moveParentToWatchlistMutation;
   readWatchlistDetailScreen = readModule.WatchlistsRead.detailScreen;
 });
 
@@ -89,7 +93,11 @@ describe("move watchlist item mutation", () => {
       destinationWatchlistId: 99999,
     });
 
-    expect(result).toEqual({ success: false, message: "Destination watchlist not found." });
+    expect(result).toEqual({
+      success: false,
+      code: "not_found",
+      message: "Destination watchlist not found.",
+    });
   });
 
   it("returns error when item does not exist", async () => {
@@ -100,7 +108,7 @@ describe("move watchlist item mutation", () => {
       destinationWatchlistId: watchlist.id,
     });
 
-    expect(result).toEqual({ success: false, message: "Item not found." });
+    expect(result).toEqual({ success: false, code: "not_found", message: "Item not found." });
   });
   it("blocks move to destination that already has the item — returns error, source unchanged, destination unchanged", async () => {
     const [source, destination] = await db
@@ -671,5 +679,229 @@ describe("move watchlist parent mutation", () => {
 
     expect(result.success).toBe(false);
     expect(result.message).toBe("Item has no parent group.");
+  });
+});
+
+describe("move parent to watchlist by parent ID mutation", () => {
+  it("moves a parent group selected by watchlist ID and parent ID", async () => {
+    const [source, destination] = await db
+      .insert(watchlists)
+      .values([{ name: "Queue" }, { name: "Watched" }])
+      .returning();
+
+    const parentId = "tmdb:55";
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: source.id,
+        tmdbId: "tv-55-s1e1",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Pilot",
+        parentId,
+        parentTitle: "Series 55",
+      },
+      {
+        watchlistId: source.id,
+        tmdbId: "tv-55-s1e2",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Finale",
+        parentId,
+        parentTitle: "Series 55",
+      },
+    ]);
+
+    await db.insert(watchlistItems).values({
+      watchlistId: source.id,
+      tmdbId: "movie-99",
+      source: "tmdb",
+      mediaType: "movie",
+      title: "Unrelated Movie",
+    });
+
+    const result = await moveParentToWatchlistMutation({
+      watchlistId: source.id,
+      parentId,
+      destinationWatchlistId: destination.id,
+    });
+
+    expect(result).toMatchObject({ success: true, movedCount: 2 });
+
+    const sourceDetail = await readWatchlistDetailScreen({
+      watchlistId: source.id,
+      unwatchedOnly: false,
+    });
+    expect(sourceDetail?.items.map((i) => i.title)).toEqual(["Unrelated Movie"]);
+
+    const destDetail = await readWatchlistDetailScreen({
+      watchlistId: destination.id,
+      unwatchedOnly: false,
+    });
+    expect(destDetail?.items.map((i) => i.title)).toEqual(["Pilot", "Finale"]);
+  });
+
+  it("blocks parent move when a sibling already exists in the destination", async () => {
+    const [source, destination] = await db
+      .insert(watchlists)
+      .values([{ name: "Queue" }, { name: "Watched" }])
+      .returning();
+
+    const parentId = "tmdb:55";
+    await db.insert(watchlistItems).values({
+      watchlistId: source.id,
+      tmdbId: "tv-55-s1e1",
+      source: "tmdb",
+      mediaType: "episode",
+      title: "Pilot",
+      parentId,
+      parentTitle: "Series 55",
+    });
+    await db.insert(watchlistItems).values({
+      watchlistId: destination.id,
+      tmdbId: "tv-55-s1e1",
+      source: "tmdb",
+      mediaType: "episode",
+      title: "Pilot",
+      parentId,
+      parentTitle: "Series 55",
+    });
+
+    const result = await moveParentToWatchlistMutation({
+      watchlistId: source.id,
+      parentId,
+      destinationWatchlistId: destination.id,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.message).toContain("already");
+
+    const sourceDetail = await readWatchlistDetailScreen({
+      watchlistId: source.id,
+      unwatchedOnly: false,
+    });
+    expect(sourceDetail?.items.map((i) => i.title)).toEqual(["Pilot"]);
+  });
+
+  it("returns not found when the parent ID has no items in the source watchlist", async () => {
+    const [source, destination] = await db
+      .insert(watchlists)
+      .values([{ name: "Queue" }, { name: "Watched" }])
+      .returning();
+
+    const result = await moveParentToWatchlistMutation({
+      watchlistId: source.id,
+      parentId: "tmdb:missing",
+      destinationWatchlistId: destination.id,
+    });
+
+    expect(result).toEqual({
+      success: false,
+      code: "not_found",
+      message: "Parent not found in this watchlist.",
+    });
+  });
+
+  it("returns not found when the destination watchlist does not exist", async () => {
+    const [source] = await db.insert(watchlists).values({ name: "Queue" }).returning();
+
+    const parentId = "tmdb:55";
+    await db.insert(watchlistItems).values({
+      watchlistId: source.id,
+      tmdbId: "tv-55-s1e1",
+      source: "tmdb",
+      mediaType: "episode",
+      title: "Pilot",
+      parentId,
+      parentTitle: "Series 55",
+    });
+
+    const result = await moveParentToWatchlistMutation({
+      watchlistId: source.id,
+      parentId,
+      destinationWatchlistId: 99999,
+    });
+
+    expect(result).toEqual({
+      success: false,
+      code: "not_found",
+      message: "Destination watchlist not found.",
+    });
+  });
+
+  it("requires an insertion position for a custom-ordered destination", async () => {
+    const [source, destination] = await db
+      .insert(watchlists)
+      .values([{ name: "Queue" }, { name: "Watched", itemOrderMode: "custom" }])
+      .returning();
+
+    const parentId = "tmdb:55";
+    await db.insert(watchlistItems).values({
+      watchlistId: source.id,
+      tmdbId: "tv-55-s1e1",
+      source: "tmdb",
+      mediaType: "episode",
+      title: "Pilot",
+      parentId,
+      parentTitle: "Series 55",
+    });
+
+    const result = await moveParentToWatchlistMutation({
+      watchlistId: source.id,
+      parentId,
+      destinationWatchlistId: destination.id,
+    });
+
+    expect(result).toEqual({
+      success: false,
+      code: "insertion_choice_required",
+      message: "Choose where to insert this item in the custom order.",
+    });
+
+    const sourceDetail = await readWatchlistDetailScreen({
+      watchlistId: source.id,
+      unwatchedOnly: false,
+    });
+    expect(sourceDetail?.items.map((i) => i.title)).toEqual(["Pilot"]);
+  });
+
+  it("honors an explicit insertion position for a custom-ordered destination", async () => {
+    const [source, destination] = await db
+      .insert(watchlists)
+      .values([{ name: "Queue" }, { name: "Watched", itemOrderMode: "custom" }])
+      .returning();
+
+    await db.insert(watchlistItems).values({
+      watchlistId: destination.id,
+      tmdbId: "movie-0",
+      source: "tmdb",
+      mediaType: "movie",
+      title: "Existing",
+      customRank: 1,
+    });
+
+    const parentId = "tmdb:55";
+    await db.insert(watchlistItems).values({
+      watchlistId: source.id,
+      tmdbId: "tv-55-s1e1",
+      source: "tmdb",
+      mediaType: "episode",
+      title: "Pilot",
+      parentId,
+      parentTitle: "Series 55",
+    });
+
+    const result = await moveParentToWatchlistMutation({
+      watchlistId: source.id,
+      parentId,
+      destinationWatchlistId: destination.id,
+      position: "beginning",
+    });
+
+    expect(result.success).toBe(true);
+    const destDetail = await readWatchlistDetailScreen({
+      watchlistId: destination.id,
+      unwatchedOnly: false,
+    });
+    expect(destDetail?.items.map((i) => i.title)).toEqual(["Pilot", "Existing"]);
   });
 });

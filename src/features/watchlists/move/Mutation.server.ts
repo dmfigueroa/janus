@@ -3,14 +3,27 @@ import { watchlistItems, watchlists } from "@/db/Schema";
 import { type WatchlistItemOrderMode } from "@/features/watchlists/Order";
 import { type InsertionPosition } from "@/features/watchlists/InsertOrderedItem.server";
 import { and, eq } from "drizzle-orm";
-import { MoveItemError } from "@/features/watchlists/Errors.server";
-import { executeGroupMove, executeMove } from "./MoveItems.server";
+import { MoveItemError, type MoveItemFailureCode } from "@/features/watchlists/Errors.server";
+import { CUSTOM_ORDER_INSERTION_REQUIRED_MESSAGE } from "@/features/watchlists/add/Constants";
+import { executeMove } from "./MoveItems.server";
 
 type WatchlistItemRow = typeof watchlistItems.$inferSelect;
 
-type MoveItemResult =
+export type MoveItemFailureResult = {
+  success: false;
+  code: MoveItemFailureCode;
+  message: string;
+};
+
+export type MoveItemResult =
   | { success: true; movedCount: number; message: string }
-  | { success: false; message: string };
+  | MoveItemFailureResult;
+
+export type MoveDestination = {
+  id: number;
+  name: string;
+  itemOrderMode: WatchlistItemOrderMode;
+};
 
 export async function moveItemToWatchlistMutation({
   itemId,
@@ -23,26 +36,22 @@ export async function moveItemToWatchlistMutation({
 }): Promise<MoveItemResult> {
   const db = getDb();
 
-  let item: WatchlistItemRow;
-  let destination: { id: number; name: string; itemOrderMode: WatchlistItemOrderMode };
-
-  try {
-    item = await fetchItemOrThrow(db, itemId);
-    destination = await fetchWatchlistOrThrow(db, destinationWatchlistId);
-    await ensureNoDuplicate(db, item, destinationWatchlistId);
-  } catch (e) {
-    if (e instanceof MoveItemError) {
-      return { success: false, message: e.message };
-    }
-    throw e;
+  const context = await loadItemMoveContext(db, itemId, destinationWatchlistId);
+  if (!context.success) {
+    return context;
   }
 
-  await executeMove(db, item, destination, position);
+  const insertionFailure = customInsertionFailure(context.destination.itemOrderMode, position);
+  if (insertionFailure) {
+    return insertionFailure;
+  }
+
+  await executeMove(db, context.item, context.destination, position);
 
   return {
     success: true,
     movedCount: 1,
-    message: `Moved ${item.title} to ${destination.name}.`,
+    message: `Moved ${context.item.title} to ${context.destination.name}.`,
   };
 }
 
@@ -54,25 +63,25 @@ async function fetchItemOrThrow(
     where: eq(watchlistItems.id, itemId),
   });
   if (!item) {
-    throw new MoveItemError("Item not found.");
+    throw new MoveItemError("Item not found.", "not_found");
   }
   return item;
 }
 
-async function fetchWatchlistOrThrow(
+export async function fetchWatchlistOrThrow(
   db: ReturnType<typeof getDb>,
   watchlistId: number,
-): Promise<{ id: number; name: string; itemOrderMode: WatchlistItemOrderMode }> {
+): Promise<MoveDestination> {
   const watchlist = await db.query.watchlists.findFirst({
     where: eq(watchlists.id, watchlistId),
   });
   if (!watchlist) {
-    throw new MoveItemError("Destination watchlist not found.");
+    throw new MoveItemError("Destination watchlist not found.", "not_found");
   }
   return watchlist;
 }
 
-async function ensureNoDuplicate(
+export async function ensureNoDuplicate(
   db: ReturnType<typeof getDb>,
   item: WatchlistItemRow,
   destinationWatchlistId: number,
@@ -85,68 +94,11 @@ async function ensureNoDuplicate(
     ),
   });
   if (duplicate) {
-    throw new MoveItemError("already in destination");
+    throw new MoveItemError("Item already exists in the destination watchlist.", "duplicate");
   }
 }
 
-export async function moveParentAndChildrenToWatchlistMutation({
-  itemId,
-  destinationWatchlistId,
-  position,
-}: {
-  itemId: number;
-  destinationWatchlistId: number;
-  position?: InsertionPosition;
-}): Promise<MoveItemResult> {
-  const db = getDb();
-  const context = await loadMoveContext(db, itemId, destinationWatchlistId);
-  if (!context.success) {
-    return context;
-  }
-  const { item, destination } = context;
-
-  if (!item.parentId) {
-    return { success: false, message: "Item has no parent group." };
-  }
-
-  return moveParentGroup(db, item, item.parentId, destination, destinationWatchlistId, position);
-}
-
-async function moveParentGroup(
-  db: ReturnType<typeof getDb>,
-  item: WatchlistItemRow,
-  parentId: string,
-  destination: { id: number; name: string; itemOrderMode: WatchlistItemOrderMode },
-  destinationWatchlistId: number,
-  position?: InsertionPosition,
-): Promise<MoveItemResult> {
-  const siblings = await db.query.watchlistItems.findMany({
-    where: and(
-      eq(watchlistItems.watchlistId, item.watchlistId),
-      eq(watchlistItems.parentId, parentId),
-    ),
-  });
-
-  const allGroupItems = siblings.length > 0 ? siblings : [item];
-  const duplicateFailure = await getGroupDuplicateFailure(
-    db,
-    allGroupItems,
-    destinationWatchlistId,
-  );
-  if (duplicateFailure) {
-    return duplicateFailure;
-  }
-
-  await executeGroupMove(db, allGroupItems, destination, position);
-
-  return {
-    success: true,
-    movedCount: allGroupItems.length,
-    message: `Moved ${groupMoveLabel(allGroupItems, item)} to ${destination.name}.`,
-  };
-}
-
-async function loadMoveContext(
+async function loadItemMoveContext(
   db: ReturnType<typeof getDb>,
   itemId: number,
   destinationWatchlistId: number,
@@ -154,41 +106,31 @@ async function loadMoveContext(
   try {
     const item = await fetchItemOrThrow(db, itemId);
     const destination = await fetchWatchlistOrThrow(db, destinationWatchlistId);
+    await ensureNoDuplicate(db, item, destinationWatchlistId);
     return { success: true as const, item, destination };
   } catch (error) {
     if (error instanceof MoveItemError) {
-      return { success: false as const, message: error.message };
+      return moveItemFailure(error);
     }
     throw error;
   }
 }
 
-async function getGroupDuplicateFailure(
-  db: ReturnType<typeof getDb>,
-  items: WatchlistItemRow[],
-  destinationWatchlistId: number,
-): Promise<MoveItemResult | null> {
-  try {
-    await ensureNoDuplicatesForGroup(db, items, destinationWatchlistId);
+export function customInsertionFailure(
+  itemOrderMode: WatchlistItemOrderMode,
+  position: InsertionPosition | undefined,
+): MoveItemFailureResult | null {
+  if (itemOrderMode !== "custom" || position) {
     return null;
-  } catch (error) {
-    if (error instanceof MoveItemError) {
-      return { success: false, message: error.message };
-    }
-    throw error;
   }
+
+  return {
+    success: false,
+    code: "insertion_choice_required",
+    message: CUSTOM_ORDER_INSERTION_REQUIRED_MESSAGE,
+  };
 }
 
-function groupMoveLabel(allGroupItems: WatchlistItemRow[], item: WatchlistItemRow) {
-  return allGroupItems.length > 1 ? `${allGroupItems.length} items` : item.title;
-}
-
-async function ensureNoDuplicatesForGroup(
-  db: ReturnType<typeof getDb>,
-  items: WatchlistItemRow[],
-  destinationWatchlistId: number,
-) {
-  for (const item of items) {
-    await ensureNoDuplicate(db, item, destinationWatchlistId);
-  }
+export function moveItemFailure(error: MoveItemError): MoveItemFailureResult {
+  return { success: false, code: error.code, message: error.message };
 }
