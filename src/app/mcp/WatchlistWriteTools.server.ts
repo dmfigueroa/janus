@@ -7,24 +7,11 @@ import { updateWatchlistSchema } from "@/features/watchlists/update/Mutation";
 import { deleteWatchlistMutation } from "@/features/watchlists/delete/Mutation.server";
 import { skipWatchlistMutation } from "@/features/watchlists/skip/Mutation.server";
 import { asMcpContent } from "./McpToolResponse.server";
+import { batchResultSchema, validationErrorResult } from "./BatchResult.server";
 import { registerAddMediaToWatchlistsTool } from "./AddMediaToWatchlistsTool.server";
 import { registerAddCustomItemsToWatchlistsTool } from "./AddCustomItemsTool.server";
-
-const watchlistSchema = z.object({
-  id: z.number(),
-  name: z.string(),
-  description: z.string().nullable(),
-  itemOrderMode: z.enum(["release", "custom"]),
-});
-
-const batchResultSchema = z.object({
-  index: z.number().int().nonnegative(),
-  success: z.boolean(),
-  code: z.string(),
-  message: z.string(),
-  watchlistId: z.number().optional(),
-  watchlist: watchlistSchema.optional(),
-});
+import { registerEditWatchlistItemsTool } from "./EditWatchlistItemsTool.server";
+import { registerSetWatchlistItemsWatchedTool } from "./SetWatchlistItemsWatchedTool.server";
 
 const createWatchlistInputSchema = z.object({
   name: z.string().optional(),
@@ -39,16 +26,14 @@ const updateWatchlistInputSchema = z.object({
   itemOrderMode: z.enum(["release", "custom"]).optional(),
 });
 
-const validationMessageOverrides: Record<string, string> = {
-  "name:Required": "Name is required",
-};
-
 export function registerWatchlistWriteTools(server: McpServer) {
   registerCreateWatchlists(server);
   registerUpdateWatchlists(server);
   registerDeleteWatchlists(server);
   registerAddMediaToWatchlistsTool(server);
   registerAddCustomItemsToWatchlistsTool(server);
+  registerEditWatchlistItemsTool(server);
+  registerSetWatchlistItemsWatchedTool(server);
   registerSkipWatchlists(server);
 }
 
@@ -202,19 +187,4 @@ async function skipWatchlistResult(watchlistId: number, index: number) {
   }
 
   return { index, success: true, code: "skipped", message: "Watchlist skipped.", watchlistId };
-}
-
-function validationErrorResult(index: number, error: z.ZodError, watchlistId?: number) {
-  return {
-    index,
-    success: false,
-    code: "validation_error",
-    message: validationMessage(error),
-    watchlistId,
-  };
-}
-
-function validationMessage(error: z.ZodError) {
-  const issue = error.issues[0]!;
-  return validationMessageOverrides[`${issue.path[0]}:${issue.message}`] ?? issue.message;
 }
