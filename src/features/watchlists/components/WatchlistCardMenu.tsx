@@ -7,7 +7,7 @@ import { toaster } from "@/app/Toaster";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query";
 import { deleteWatchlist } from "@/features/watchlists/delete/Mutation";
 import { skipWatchlist } from "@/features/watchlists/skip/Mutation";
-import { pauseWatchlist, resumeWatchlist } from "@/features/watchlists/pause/Mutation";
+import { pauseWatchlist, resumeWatchlist } from "@/features/watchlists/pause/PauseWatchlist";
 import { DeleteWatchlistDialog } from "@/features/watchlists/components/DeleteWatchlistDialog";
 
 type WatchlistCardMenuProps = {

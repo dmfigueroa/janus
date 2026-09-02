@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { pauseWatchlistMutation, resumeWatchlistMutation } from "./Mutation.server";
+import { pauseWatchlistMutation, resumeWatchlistMutation } from "./PauseWatchlist.server";
 
 const watchlistPauseSchema = z.object({
   watchlistId: z.number().int().positive(),

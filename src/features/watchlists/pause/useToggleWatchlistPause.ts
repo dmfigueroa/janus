@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { toaster } from "@/app/Toaster";
 import type { Watchlist } from "@/db/Schema";
 import { invalidateWatchlistQueries } from "@/features/watchlists/Cache";
-import { pauseWatchlist, resumeWatchlist } from "./Mutation";
+import { pauseWatchlist, resumeWatchlist } from "./PauseWatchlist";
 
 export function useToggleWatchlistPause(watchlist: Watchlist) {
   const queryClient = useQueryClient();

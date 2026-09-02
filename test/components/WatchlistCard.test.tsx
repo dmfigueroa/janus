@@ -36,7 +36,7 @@ vi.mock("@/features/watchlists/skip/Mutation", () => ({
   skipWatchlist: skipWatchlistServerFn,
 }));
 
-vi.mock("@/features/watchlists/pause/Mutation", () => ({
+vi.mock("@/features/watchlists/pause/PauseWatchlist", () => ({
   pauseWatchlist: pauseWatchlistServerFn,
   resumeWatchlist: resumeWatchlistServerFn,
 }));

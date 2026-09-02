@@ -147,4 +147,33 @@ describe("buildWatchlistHome", () => {
     expect(movieSection?.watchlists.map((watchlist) => watchlist.id)).toEqual([1, 2, 3]);
     expect(movieSection?.upcomingWatchlists.map((watchlist) => watchlist.id)).toEqual([4]);
   });
+
+  it("keeps a nearly finished list in the rotation despite rounded progress", () => {
+    const almostFinished = watchlistSummary({
+      id: 5,
+      name: "Almost Finished",
+      stats: {
+        totalItems: 200,
+        watchedItems: 199,
+        progress: 100,
+        nextUnwatched: { ...nextUnwatchedMovieFixture, id: 5, watchlistId: 5 },
+        coverImage: null,
+        coverMediaType: "movie",
+      },
+    });
+
+    const home = buildWatchlistHome([almostFinished]);
+
+    expect(home.rotation.map((watchlist) => watchlist.id)).toEqual([5]);
+    expect(home.completed).toEqual([]);
+  });
+
+  it("keeps an empty watchlist out of the completed section", () => {
+    const empty = watchlistSummary({ id: 6, name: "Empty" });
+
+    const home = buildWatchlistHome([empty]);
+
+    expect(home.rotation.map((watchlist) => watchlist.id)).toEqual([6]);
+    expect(home.completed).toEqual([]);
+  });
 });

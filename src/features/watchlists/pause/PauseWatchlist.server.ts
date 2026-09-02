@@ -1,4 +1,4 @@
-import type { PauseWatchlistInput, ResumeWatchlistInput } from "./Mutation";
+import type { PauseWatchlistInput, ResumeWatchlistInput } from "./PauseWatchlist";
 import {
   getWatchlistById,
   pauseWatchlist,

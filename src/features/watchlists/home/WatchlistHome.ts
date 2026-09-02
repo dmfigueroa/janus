@@ -69,7 +69,8 @@ export function isWatchlistPaused(watchlist: WatchlistSummary) {
 }
 
 export function isWatchlistCompleted(watchlist: WatchlistSummary) {
-  return watchlist.stats.progress === 100;
+  const { totalItems, watchedItems } = watchlist.stats;
+  return totalItems > 0 && watchedItems === totalItems;
 }
 
 function partitionWatchlistHomeSections(allWatchlists: WatchlistSummary[]) {
