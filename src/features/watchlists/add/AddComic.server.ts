@@ -22,17 +22,28 @@ export async function addComicToWatchlist(
     return rejectAdd(COMICVINE_UNAVAILABLE_MESSAGE);
   }
 
+  const mediaWithTitle = await resolveVolumeTitle(media, volumeId, apiKey);
+  if (!mediaWithTitle) {
+    return rejectAdd(COMICVINE_FETCH_FAILURE_MESSAGE);
+  }
+
+  return addFetchedComicIssues(watchlistId, volumeId, mediaWithTitle, apiKey, insertionPosition);
+}
+
+async function resolveVolumeTitle(
+  media: WatchlistMedia,
+  volumeId: string,
+  apiKey: string,
+): Promise<WatchlistMedia | null> {
+  if (media.title) {
+    return media;
+  }
+
   try {
     const canonicalVolume = await getComicVolumeDetails(volumeId, apiKey);
-    return addFetchedComicIssues(
-      watchlistId,
-      volumeId,
-      { ...media, title: canonicalVolume.title },
-      apiKey,
-      insertionPosition,
-    );
+    return { ...media, title: canonicalVolume.title };
   } catch {
-    return rejectAdd(COMICVINE_FETCH_FAILURE_MESSAGE);
+    return null;
   }
 }
 
@@ -133,6 +144,7 @@ function getNoNewIssuesMessage(existingCount: number) {
 }
 
 function getIssuesAddedMessage(newCount: number, existingCount: number) {
-  const suffix = existingCount > 0 ? "new issues" : "issues";
-  return `Added ${newCount} ${suffix} to watchlist`;
+  const prefix = existingCount > 0 ? "new " : "";
+  const label = newCount === 1 ? "issue" : "issues";
+  return `Added ${newCount} ${prefix}${label} to watchlist`;
 }

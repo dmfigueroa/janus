@@ -110,19 +110,23 @@ function noChangeProviderMediaResult(message: string): ProviderMediaAdditionResu
     "Already in watchlist": "duplicate",
     "No new episodes found for this show": "no_new_episodes",
     "No episodes found for this show": "no_new_episodes",
+    "No new issues found for this volume": "no_new_episodes",
+    "No issues found for this volume": "no_new_episodes",
   } as const;
   const code = codeByMessage[message as keyof typeof codeByMessage];
   return code ? { success: true, code, message, affectedCount: 0 } : null;
 }
 
 function addedProviderMediaResult(message: string): ProviderMediaAdditionResult {
-  const episodeCount = message.match(/^Added (\d+) new episodes? to watchlist$/)?.[1];
-  if (episodeCount) {
+  const addedCount = message.match(
+    /^Added (\d+) (?:new )?(?:episodes?|issues?) to watchlist$/,
+  )?.[1];
+  if (addedCount) {
     return {
       success: true,
       code: "added",
       message,
-      affectedCount: Number.parseInt(episodeCount, 10),
+      affectedCount: Number.parseInt(addedCount, 10),
     };
   }
 

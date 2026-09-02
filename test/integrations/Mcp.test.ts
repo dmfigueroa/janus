@@ -254,7 +254,7 @@ describe("Janus MCP endpoint", () => {
       results: [
         { index: 0, success: true, code: "added", provider: "google_books" },
         { index: 1, success: true, code: "added", provider: "rawg" },
-        { index: 2, success: true, code: "added", provider: "comicvine" },
+        { index: 2, success: true, code: "added", provider: "comicvine", affectedCount: 1 },
         { index: 3, success: false, code: "provider_unavailable", provider: "anilist" },
       ],
     });
