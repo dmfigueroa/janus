@@ -260,6 +260,7 @@ function createPage({
       updatedAt: null,
       lastWatchedAt: null,
       lastItemAddedAt: null,
+      pausedAt: null,
       stats: {
         totalItems: nextTotalItems,
         watchedItems,

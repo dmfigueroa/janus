@@ -63,6 +63,7 @@ function watchlistFixture(overrides?: Partial<Watchlist>): Watchlist {
     updatedAt: overrides?.updatedAt ?? null,
     lastWatchedAt: overrides?.lastWatchedAt ?? null,
     lastItemAddedAt: overrides?.lastItemAddedAt ?? null,
+    pausedAt: overrides?.pausedAt ?? null,
   };
 }
 

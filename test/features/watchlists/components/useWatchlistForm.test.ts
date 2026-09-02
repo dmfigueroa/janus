@@ -124,6 +124,7 @@ describe("useWatchlistForm", () => {
       updatedAt: null,
       lastWatchedAt: null,
       lastItemAddedAt: null,
+      pausedAt: null,
     };
 
     const { result } = renderHook(() => useWatchlistForm({ mode: "edit", watchlist }));
@@ -164,6 +165,7 @@ describe("useWatchlistForm", () => {
       updatedAt: null,
       lastWatchedAt: null,
       lastItemAddedAt: null,
+      pausedAt: null,
     };
 
     const { result } = renderHook(() => useWatchlistForm({ mode: "edit", watchlist }));

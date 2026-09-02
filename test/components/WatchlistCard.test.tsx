@@ -68,6 +68,7 @@ function createWatchlist(
     updatedAt: overrides.updatedAt ?? null,
     lastWatchedAt: overrides.lastWatchedAt ?? null,
     lastItemAddedAt: overrides.lastItemAddedAt ?? null,
+    pausedAt: overrides.pausedAt ?? null,
     stats: overrides.stats ?? {
       totalItems: 1,
       watchedItems: 0,

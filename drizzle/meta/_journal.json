@@ -71,6 +71,13 @@
       "when": 1778793022410,
       "tag": "0009_supreme_virginia_dare",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1788355164219,
+      "tag": "0010_add_paused_at_to_watchlists",
+      "breakpoints": true
     }
   ]
 }
