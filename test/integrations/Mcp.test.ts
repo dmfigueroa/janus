@@ -528,6 +528,157 @@ describe("Janus MCP endpoint", () => {
     });
   });
 
+  it("discovers and calls add_custom_items_to_watchlists for source-less items", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP custom additions" })
+      .returning();
+    const tools = await client.listTools();
+    const addCustomItems = tools.tools.find(
+      (tool) => tool.name === "add_custom_items_to_watchlists",
+    );
+
+    expect(addCustomItems).toMatchObject({
+      name: "add_custom_items_to_watchlists",
+      annotations: { readOnlyHint: false, destructiveHint: false },
+    });
+    expect(addCustomItems?.description).toContain("without a provider");
+    expect(addCustomItems?.inputSchema).toMatchObject({
+      properties: { items: { type: "array" } },
+    });
+    expect(addCustomItems?.outputSchema).toMatchObject({
+      properties: { results: { type: "array" } },
+    });
+
+    const result = await client.callTool({
+      name: "add_custom_items_to_watchlists",
+      arguments: {
+        items: [
+          {
+            watchlistId: watchlist.id,
+            title: "Local Screening",
+            mediaType: "movie",
+            year: "2025",
+          },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: true,
+          code: "added",
+          watchlistId: watchlist.id,
+          mediaType: "movie",
+          affectedCount: 1,
+        },
+      ],
+    });
+    const [item] = await database
+      .getDb()
+      .select()
+      .from(watchlistItems)
+      .where(eq(watchlistItems.watchlistId, watchlist.id));
+    expect(item).toMatchObject({
+      source: "custom",
+      mediaType: "movie",
+      title: "Local Screening",
+      releaseDate: "2025",
+    });
+  });
+
+  it("preserves batch order across custom addition failures", async () => {
+    const { watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP custom partial" })
+      .returning();
+
+    const result = await client.callTool({
+      name: "add_custom_items_to_watchlists",
+      arguments: {
+        items: [
+          { watchlistId: watchlist.id, title: "Valid pick", mediaType: "book", year: "2020" },
+          { watchlistId: watchlist.id, title: "   ", mediaType: "game" },
+          { watchlistId: 999_999, title: "Lost", mediaType: "comic" },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        { index: 0, success: true, code: "added", mediaType: "book", affectedCount: 1 },
+        { index: 1, success: false, code: "validation_error", affectedCount: 0 },
+        { index: 2, success: false, code: "not_found", affectedCount: 0 },
+      ],
+    });
+  });
+
+  it("requires an insertion position for custom additions to custom-ordered watchlists", async () => {
+    const { watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP custom order", itemOrderMode: "custom" })
+      .returning();
+
+    const result = await client.callTool({
+      name: "add_custom_items_to_watchlists",
+      arguments: {
+        items: [{ watchlistId: watchlist.id, title: "Needs position", mediaType: "movie" }],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          success: false,
+          code: "insertion_choice_required",
+          message: "Choose where to insert this item in the custom order.",
+          affectedCount: 0,
+        },
+      ],
+    });
+  });
+
+  it("rejects custom TV additions with the structured unsupported outcome", async () => {
+    const { watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP custom TV" })
+      .returning();
+
+    const result = await client.callTool({
+      name: "add_custom_items_to_watchlists",
+      arguments: {
+        items: [
+          { watchlistId: watchlist.id, title: "Local Series", mediaType: "tv", year: "2025" },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          success: false,
+          code: "unsupported",
+          message: "TV shows must come from TMDB so Janus can expand them into episodes.",
+          affectedCount: 0,
+        },
+      ],
+    });
+  });
+
   it("returns ordered structured validation failures without rolling back valid creates", async () => {
     const result = await client.callTool({
       name: "create_watchlists",
