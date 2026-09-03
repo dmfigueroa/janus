@@ -139,49 +139,7 @@ function legacySpliceIndex(
   currentOrder: OrderedWatchlistItem[],
   insertion: PendingInsertion,
 ): number {
-  if (insertion.insertionPosition === "beginning") {
-    return 0;
-  }
-  if (insertion.insertionPosition === "end") {
-    return currentOrder.length;
-  }
-  return getReleaseAdjacentInsertionIndex(currentOrder, insertion.pendingItem);
-}
-
-function normalizeReleaseDate(releaseDate: string | null | undefined) {
-  const normalized = releaseDate?.trim();
-  return normalized ? normalized : null;
-}
-
-function getReleaseAdjacentInsertionIndex(
-  currentOrder: OrderedWatchlistItem[],
-  pendingItem: HasReleaseDate,
-) {
-  const pendingReleaseDate = normalizeReleaseDate(pendingItem.releaseDate);
-  if (!pendingReleaseDate) {
-    return currentOrder.length;
-  }
-
-  const lastMatchingIndex = currentOrder.reduce<number>(
-    (lastIndex, item, index) =>
-      updateReleaseAdjacentIndex(lastIndex, index, item, pendingReleaseDate),
-    -1,
-  );
-
-  return lastMatchingIndex === -1 ? 0 : lastMatchingIndex + 1;
-}
-
-function updateReleaseAdjacentIndex(
-  lastIndex: number,
-  index: number,
-  item: OrderedWatchlistItem,
-  pendingReleaseDate: string,
-) {
-  const itemReleaseDate = normalizeReleaseDate(item.releaseDate);
-  if (!itemReleaseDate) {
-    return lastIndex;
-  }
-  return itemReleaseDate <= pendingReleaseDate ? index : lastIndex;
+  return insertion.insertionPosition === "beginning" ? 0 : currentOrder.length;
 }
 
 export function orderPendingItemsByReleaseDate<T extends HasReleaseDate>(

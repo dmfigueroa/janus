@@ -9,7 +9,6 @@ type PositionPickerProps = {
 const positions: Array<{ value: InsertionPosition; label: string }> = [
   { value: "beginning", label: "Beginning" },
   { value: "end", label: "End" },
-  { value: "release-adjacent", label: "Release-adjacent" },
 ];
 
 export function PositionPicker({ value, onChange }: PositionPickerProps) {

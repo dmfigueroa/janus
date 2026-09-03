@@ -1,12 +1,6 @@
 import { z } from "zod";
 
-export const moveInsertionPositionSchema = z.enum([
-  "beginning",
-  "end",
-  "release-adjacent",
-  "before",
-  "after",
-]);
+export const moveInsertionPositionSchema = z.enum(["beginning", "end", "before", "after"]);
 
 type AnchorShape = {
   position?: z.infer<typeof moveInsertionPositionSchema>;

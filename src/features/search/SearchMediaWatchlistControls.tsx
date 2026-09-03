@@ -20,7 +20,6 @@ interface SearchMediaWatchlistControlsProps {
 const insertionPositionOptions = [
   ["watchlist-insert-beginning", "beginning", "Beginning"],
   ["watchlist-insert-end", "end", "End"],
-  ["watchlist-insert-release-adjacent", "release-adjacent", "Release-adjacent"],
 ] as const;
 
 function getAddButtonLabel(isAdding: boolean) {

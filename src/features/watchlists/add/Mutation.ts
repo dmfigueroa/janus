@@ -7,7 +7,6 @@ import { anchorInsertionRefinement } from "./InsertionRefinement";
 export const addToWatchlistInsertionPositionSchema = z.enum([
   "beginning",
   "end",
-  "release-adjacent",
   "before",
   "after",
 ]);

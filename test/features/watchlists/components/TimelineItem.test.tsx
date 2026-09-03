@@ -284,34 +284,6 @@ describe("TimelineItem movement actions", () => {
       { onSuccess: expect.any(Function) },
     );
   });
-
-  it("moves a parent group with the current controlled position", async () => {
-    watchlistListState.data = createDestinationWatchlists();
-    renderTimelineItem({
-      id: 2,
-      title: "Pilot",
-      mediaType: "episode",
-      parentId: "tmdb:42",
-      parentTitle: "Great Show",
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "More actions for Pilot" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Move show" }));
-
-    const dialog = await screen.findByRole("dialog", { name: "Move show" });
-    fireEvent.click(within(dialog).getByRole("button", { name: /Manual queue/ }));
-    const releaseAdjacentPosition = within(dialog).getByRole("radio", {
-      name: "Release-adjacent",
-    });
-    releaseAdjacentPosition.click();
-    await waitFor(() => expect(releaseAdjacentPosition).toHaveProperty("checked", true));
-    fireEvent.click(within(dialog).getByRole("button", { name: "Move" }));
-
-    expect(moveParentMutate).toHaveBeenCalledWith(
-      { destinationWatchlistId: 3, position: "release-adjacent" },
-      { onSuccess: expect.any(Function) },
-    );
-  });
 });
 
 function renderTimelineItem(overrides: Partial<WatchlistItem> = {}) {

@@ -65,9 +65,9 @@ item lands at the reference's rank and existing items shift to keep the order co
 Constraints:
 
 - `referenceItemId` is required when `insertionPosition` is `"before"` or `"after"`. It must
-  not be set for the legacy `"beginning"`, `"end"`, or `"release-adjacent"` positions.
+  not be set for `"beginning"` or `"end"` positions.
 - Anchors only work in custom-ordered watchlists. Anchoring against a release-ordered list
-  returns `not_custom_mode`. The legacy positions still silently ignore their anchor on
+  returns `not_custom_mode`. `beginning` and `end` silently ignore their anchor on
   release-ordered lists to preserve prior behavior.
 - An unranked reference or a reference that does not belong to the destination watchlist
   returns `invalid_reference` and leaves the destination unchanged.
