@@ -38,6 +38,7 @@ export function WatchlistTimelineGroupSection({
           <TimelineRows
             items={group.items}
             activeFilters={activeFilters}
+            itemOrderMode={itemOrderMode}
             showHandleSlot={showHandleSlot}
             reorderEnabled={reorderEnabled}
             interactionDisabled={interactionDisabled}
@@ -51,12 +52,14 @@ export function WatchlistTimelineGroupSection({
 function TimelineRows({
   items,
   activeFilters,
+  itemOrderMode,
   showHandleSlot,
   reorderEnabled,
   interactionDisabled,
 }: {
   items: WatchlistItem[];
   activeFilters: WatchlistDetailQueryFilters;
+  itemOrderMode: WatchlistItemOrderMode;
   showHandleSlot: boolean;
   reorderEnabled: boolean;
   interactionDisabled: boolean;
@@ -65,6 +68,7 @@ function TimelineRows({
     key: item.id,
     item,
     activeFilters,
+    itemOrderMode,
     showHandleSlot,
     showHandle: showHandleSlot && reorderEnabled,
     interactionDisabled,

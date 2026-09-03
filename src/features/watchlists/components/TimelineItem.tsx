@@ -2,6 +2,7 @@ import { Button, Flex } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import type { WatchlistItem } from "@/db/Schema";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
+import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
 import { useToggleWatchedItem } from "@/features/watchlists/detail/useToggleWatchedItem";
 import { TimelineItemActions } from "./TimelineItemActions";
 import { TimelineItemContent, TimelineItemPoster } from "./TimelineItemPresentation";
@@ -10,12 +11,19 @@ type TimelineItemProps = {
   item: WatchlistItem;
   activeFilters?: WatchlistDetailQueryFilters;
   interactionDisabled?: boolean;
+  itemOrderMode?: WatchlistItemOrderMode;
 };
 
-export function TimelineItem({ item, activeFilters, interactionDisabled }: TimelineItemProps) {
+export function TimelineItem({
+  item,
+  activeFilters,
+  interactionDisabled,
+  itemOrderMode,
+}: TimelineItemProps) {
   const toggleMutation = useToggleWatchedItem(item);
   const interactionsDisabled = Boolean(interactionDisabled);
-  const isDisabled = interactionsDisabled || toggleMutation.isPending;
+  const isDisabled = [interactionsDisabled, toggleMutation.isPending].some(Boolean);
+  const displayOrderMode = itemOrderMode ?? activeFilters?.itemOrderMode;
 
   return (
     <Flex
@@ -28,7 +36,7 @@ export function TimelineItem({ item, activeFilters, interactionDisabled }: Timel
       transition="opacity 200ms"
     >
       <TimelineItemPoster {...item} />
-      <TimelineItemContent {...item} />
+      <TimelineItemContent {...item} itemOrderMode={displayOrderMode} />
 
       <TimelineItemControls
         item={item}

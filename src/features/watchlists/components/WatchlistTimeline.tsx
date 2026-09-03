@@ -98,6 +98,7 @@ function WatchlistTimelineContent({
         {reorder.activeItem ? (
           <DragOverlayTimelineRow
             item={reorder.activeItem}
+            itemOrderMode={props.itemOrderMode}
             interactionDisabled={Boolean(props.interactionDisabled)}
           />
         ) : null}

@@ -4,6 +4,7 @@ import { GripVertical } from "lucide-react";
 import { Box, Button, Flex } from "@chakra-ui/react";
 import type { WatchlistItem } from "@/db/Schema";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
+import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
 import { TimelineItem } from "./TimelineItem";
 
 type ReorderableTimelineRowProps = {
@@ -12,6 +13,7 @@ type ReorderableTimelineRowProps = {
   showHandleSlot: boolean;
   showHandle: boolean;
   interactionDisabled: boolean;
+  itemOrderMode?: WatchlistItemOrderMode;
 };
 
 export function ReorderableTimelineRow({
@@ -20,6 +22,7 @@ export function ReorderableTimelineRow({
   showHandleSlot,
   showHandle,
   interactionDisabled,
+  itemOrderMode,
 }: ReorderableTimelineRowProps) {
   const {
     attributes,
@@ -52,6 +55,7 @@ export function ReorderableTimelineRow({
         showHandleSlot={showHandleSlot}
         showHandle={showHandle}
         interactionDisabled={interactionDisabled}
+        itemOrderMode={itemOrderMode}
         dragging={isDragging}
         handleProps={{
           ...attributes,
@@ -66,9 +70,11 @@ export function ReorderableTimelineRow({
 export function DragOverlayTimelineRow({
   item,
   interactionDisabled,
+  itemOrderMode,
 }: {
   item: WatchlistItem;
   interactionDisabled: boolean;
+  itemOrderMode: WatchlistItemOrderMode;
 }) {
   return (
     <Box
@@ -83,6 +89,7 @@ export function DragOverlayTimelineRow({
         showHandleSlot
         showHandle
         interactionDisabled={interactionDisabled}
+        itemOrderMode={itemOrderMode}
         dragging
       />
     </Box>
@@ -95,6 +102,7 @@ function TimelineRowShell({
   showHandleSlot,
   showHandle,
   interactionDisabled,
+  itemOrderMode,
   dragging,
   handleProps,
 }: {
@@ -103,6 +111,7 @@ function TimelineRowShell({
   showHandleSlot: boolean;
   showHandle: boolean;
   interactionDisabled: boolean;
+  itemOrderMode?: WatchlistItemOrderMode;
   dragging: boolean;
   handleProps?: Record<string, unknown>;
 }) {
@@ -121,6 +130,7 @@ function TimelineRowShell({
           item={item}
           activeFilters={activeFilters}
           interactionDisabled={interactionDisabled}
+          itemOrderMode={itemOrderMode}
         />
       </Box>
     </Flex>

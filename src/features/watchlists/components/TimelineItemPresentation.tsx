@@ -1,6 +1,7 @@
 import { Box, Flex, Image, Text } from "@chakra-ui/react";
 import { Book, BookOpen, Film, Gamepad2, Tv } from "lucide-react";
 import type { WatchlistItem } from "@/db/Schema";
+import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
 import { formatReleaseDate, formatRuntime } from "@/utils/Datetime";
 import { buildMediaPosterUrl } from "@/utils/Tmdb";
 
@@ -124,8 +125,9 @@ export function TimelineItemContent({
   releaseDate,
   runtime,
   authors,
-}: WatchlistItem) {
-  const formattedDate = formatReleaseDate(releaseDate);
+  itemOrderMode,
+}: WatchlistItem & { itemOrderMode?: WatchlistItemOrderMode }) {
+  const formattedDate = formatReleaseDate(releaseDate, itemOrderMode === "custom");
   const formattedRuntime = formatRuntime(runtime);
   const runtimeText = formattedRuntime ? `• ${formattedRuntime}` : null;
   return (
