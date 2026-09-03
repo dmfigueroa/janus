@@ -22,7 +22,8 @@ export function TimelineItem({
 }: TimelineItemProps) {
   const toggleMutation = useToggleWatchedItem(item);
   const interactionsDisabled = Boolean(interactionDisabled);
-  const isDisabled = interactionsDisabled || toggleMutation.isPending;
+  const isDisabled = [interactionsDisabled, toggleMutation.isPending].some(Boolean);
+  const displayOrderMode = itemOrderMode ?? activeFilters?.itemOrderMode;
 
   return (
     <Flex
@@ -35,10 +36,7 @@ export function TimelineItem({
       transition="opacity 200ms"
     >
       <TimelineItemPoster {...item} />
-      <TimelineItemContent
-        {...item}
-        itemOrderMode={getDisplayOrderMode(itemOrderMode, activeFilters)}
-      />
+      <TimelineItemContent {...item} itemOrderMode={displayOrderMode} />
 
       <TimelineItemControls
         item={item}
@@ -121,13 +119,6 @@ function WatchedButton({
       <Check size={16} strokeWidth={3} />
     </Button>
   );
-}
-
-function getDisplayOrderMode(
-  itemOrderMode: WatchlistItemOrderMode | undefined,
-  activeFilters: WatchlistDetailQueryFilters | undefined,
-) {
-  return itemOrderMode ?? activeFilters?.itemOrderMode;
 }
 
 function getWatchedOpacity(isWatched: WatchlistItem["isWatched"]) {
