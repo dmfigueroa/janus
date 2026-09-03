@@ -13,6 +13,20 @@ export const searchableMediaTypes = [
 
 export type SearchableMediaType = (typeof searchableMediaTypes)[number];
 
+export const searchableMediaLabels: Record<SearchableMediaType, string> = {
+  movie: "Movies",
+  tv: "TV",
+  game: "Games",
+  book: "Books",
+  comic: "Comics",
+  anime: "Anime",
+  manga: "Manga",
+};
+
+export const searchableMediaTabs = searchableMediaTypes
+  .filter((type) => type !== "anime" && type !== "manga")
+  .map((type) => ({ label: searchableMediaLabels[type], value: type }));
+
 const mediaSearchInputSchema = z.object({
   query: z.string().min(1),
   page: z.coerce.number().default(1),

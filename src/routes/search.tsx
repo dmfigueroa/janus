@@ -1,5 +1,10 @@
 import { SearchDiscoveryScreen } from "@/features/search/SearchDiscoveryScreen";
-import { searchUnified } from "@/features/search/search/MediaSearch";
+import {
+  searchableMediaLabels,
+  searchableMediaTypes,
+  searchUnified,
+  type SearchableMediaType,
+} from "@/features/search/search/MediaSearch";
 import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
 import { isDeprecatedMediaType } from "../server/Media";
@@ -7,13 +12,10 @@ import { isDeprecatedMediaType } from "../server/Media";
 const searchSchema = z.object({
   query: z.string().optional().default(""),
   page: z.coerce.number().optional().default(1),
-  type: z
-    .enum(["movie", "tv", "game", "book", "comic", "anime", "manga"])
-    .optional()
-    .default("movie"),
+  type: z.enum(searchableMediaTypes).optional().default("movie"),
 });
 
-export type SearchType = z.infer<typeof searchSchema>["type"];
+export type SearchType = SearchableMediaType;
 
 export const Route = createFileRoute("/search")({
   validateSearch: searchSchema,
@@ -35,6 +37,9 @@ export const Route = createFileRoute("/search")({
 
     return searchUnified({ data: { query, page: 1, type } });
   },
+  head: ({ match }) => ({
+    meta: [{ title: `Search ${searchableMediaLabels[match.search.type]} - Janus` }],
+  }),
   component: Search,
 });
 

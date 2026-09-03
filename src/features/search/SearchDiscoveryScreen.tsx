@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Box, Container, Heading, Stack, Tabs, Text } from "@chakra-ui/react";
 import { toaster } from "@/app/Toaster";
 import { SearchResults } from "@/features/search/SearchResults";
+import { searchableMediaTabs } from "@/features/search/search/MediaSearch";
 import { DEPRECATED_MEDIA_MESSAGE, isDeprecatedMediaType } from "@/server/Media";
 import type { UnifiedMedia } from "@/server/Media";
 import { SearchInput } from "./SearchInput";
@@ -22,6 +23,18 @@ interface SearchDiscoveryScreenProperties {
 }
 
 const PROVIDER_UNAVAILABLE_TOAST_ID = "media-search-provider-unavailable";
+
+function SearchMediaTabItems() {
+  return searchableMediaTabs.map(SearchMediaTabItem);
+}
+
+function SearchMediaTabItem(tab: (typeof searchableMediaTabs)[number]) {
+  return (
+    <Tabs.Trigger key={tab.value} value={tab.value}>
+      {tab.label}
+    </Tabs.Trigger>
+  );
+}
 
 function getActiveTab(type: UnifiedMedia["mediaType"]) {
   if (isDeprecatedMediaType(type)) return "movie";
@@ -120,11 +133,7 @@ export function SearchDiscoveryScreen({
             maxW="3xl"
           >
             <Tabs.List>
-              <Tabs.Trigger value="movie">Movies</Tabs.Trigger>
-              <Tabs.Trigger value="tv">TV</Tabs.Trigger>
-              <Tabs.Trigger value="game">Games</Tabs.Trigger>
-              <Tabs.Trigger value="book">Books</Tabs.Trigger>
-              <Tabs.Trigger value="comic">Comics</Tabs.Trigger>
+              <SearchMediaTabItems />
             </Tabs.List>
           </Tabs.Root>
         </Stack>

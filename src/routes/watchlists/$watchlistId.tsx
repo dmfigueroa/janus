@@ -29,6 +29,9 @@ export const Route = createFileRoute("/watchlists/$watchlistId")({
 
     return detail;
   },
+  head: ({ loaderData }) => ({
+    meta: [{ title: `${loaderData?.watchlist.name ?? "Watchlist"} - Janus` }],
+  }),
   component: WatchlistDetail,
 });
 
