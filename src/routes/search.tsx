@@ -15,6 +15,16 @@ const searchSchema = z.object({
 
 export type SearchType = z.infer<typeof searchSchema>["type"];
 
+const searchMediaTitle: Record<SearchType, string> = {
+  movie: "Movies",
+  tv: "TV",
+  game: "Games",
+  book: "Books",
+  comic: "Comics",
+  anime: "Anime",
+  manga: "Manga",
+};
+
 export const Route = createFileRoute("/search")({
   validateSearch: searchSchema,
   loaderDeps: ({ search: { query, type } }) => ({ query, type }),
@@ -35,12 +45,9 @@ export const Route = createFileRoute("/search")({
 
     return searchUnified({ data: { query, page: 1, type } });
   },
-  head: ({ match }) => {
-    const query = match.search.query.trim();
-    const title = query ? `Search ${query} - Janus` : "Search - Janus";
-
-    return { meta: [{ title }] };
-  },
+  head: ({ match }) => ({
+    meta: [{ title: `Search ${searchMediaTitle[match.search.type]} - Janus` }],
+  }),
   component: Search,
 });
 
