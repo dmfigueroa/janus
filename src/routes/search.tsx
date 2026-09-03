@@ -35,6 +35,12 @@ export const Route = createFileRoute("/search")({
 
     return searchUnified({ data: { query, page: 1, type } });
   },
+  head: ({ match }) => {
+    const query = match.search.query.trim();
+    const title = query ? `Search ${query} - Janus` : "Search - Janus";
+
+    return { meta: [{ title }] };
+  },
   component: Search,
 });
 
