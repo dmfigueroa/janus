@@ -32,7 +32,7 @@ export function registerMoveWatchlistItemsTool(server: McpServer) {
     {
       title: "Move watchlist items",
       description:
-        "Move one or more individual watchlist items from their current watchlist to an explicit destination watchlist by their stable internal Janus watchlist item ID. Each move targets a single item, never moves sibling items or the whole parent group, and is processed independently, returning an ordered result. Janus preserves its duplicate-prevention and destination-ordering rules: a custom-ordered destination requires an explicit position (beginning, end, or release-adjacent), and a duplicate target is rejected without changing the source. To move every item of a series or other parent together, use move_watchlist_parents instead.",
+        "Move one or more individual watchlist items from their current watchlist to an explicit destination watchlist by their stable internal Janus watchlist item ID. Each move targets a single item, never moves sibling items or the whole parent group, and is processed independently, returning an ordered result. Janus preserves its duplicate-prevention and destination-ordering rules: a custom-ordered destination requires an explicit position (beginning, end, before, or after), and a duplicate target is rejected without changing the source. To move every item of a series or other parent together, use move_watchlist_parents instead.",
       inputSchema: { moves: z.array(moveItemInputSchema).min(1) },
       outputSchema: { results: z.array(moveItemResultSchema) },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },

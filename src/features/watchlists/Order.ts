@@ -3,7 +3,7 @@ import type { WatchlistItem } from "@/db/Schema";
 
 export type WatchlistItemOrderMode = Watchlist["itemOrderMode"];
 
-export type InsertionPosition = "beginning" | "end" | "release-adjacent" | "before" | "after";
+export type InsertionPosition = "beginning" | "end" | "before" | "after";
 
 type ItemWithOrder = {
   id?: number;
@@ -154,7 +154,6 @@ function renumberOrder<T extends ItemWithOrder>(order: T[]): (T & { newRank: num
 const positionFunctions = {
   beginning: positionAtBeginning,
   end: positionAtEnd,
-  "release-adjacent": positionReleaseAdjacent,
 } satisfies Record<Exclude<InsertionPosition, "before" | "after">, typeof positionAtBeginning>;
 
 function positionAtBeginning(sorted: ItemWithOrder[], newItem: ItemWithOrder): OrderedItem[] {
@@ -170,34 +169,4 @@ function positionAtEnd(sorted: ItemWithOrder[], newItem: ItemWithOrder): Ordered
     .filter((item): item is ItemWithOrder & { id: number } => item.id !== undefined)
     .map((item, idx) => ({ ...item, newRank: idx + 1 }));
   return [...rankedExisting, { ...newItem, newRank: rankedExisting.length + 1 }];
-}
-
-function positionReleaseAdjacent(sorted: ItemWithOrder[], newItem: ItemWithOrder): OrderedItem[] {
-  const nextOrder: (ItemWithOrder | OrderedItem)[] = [...sorted];
-  const insertionIndex = findReleaseAdjacentInsertionIndex(nextOrder, newItem);
-  nextOrder.splice(insertionIndex, 0, newItem);
-  return nextOrder.map((item, idx) => ({
-    ...item,
-    newRank: idx + 1,
-  }));
-}
-
-function findReleaseAdjacentInsertionIndex(
-  currentOrder: (ItemWithOrder | OrderedItem)[],
-  pendingItem: ItemWithOrder,
-): number {
-  const pendingReleaseDate = normalizeReleaseDate(pendingItem.releaseDate);
-  if (!pendingReleaseDate) {
-    return currentOrder.length;
-  }
-
-  const lastMatchingIndex = currentOrder.reduce<number>((lastIndex, item, index) => {
-    const itemReleaseDate = normalizeReleaseDate(item.releaseDate);
-    if (!itemReleaseDate) {
-      return lastIndex;
-    }
-    return itemReleaseDate <= pendingReleaseDate ? index : lastIndex;
-  }, -1);
-
-  return lastMatchingIndex === -1 ? 0 : lastMatchingIndex + 1;
 }

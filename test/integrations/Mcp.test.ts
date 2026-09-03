@@ -2581,7 +2581,7 @@ describe("Janus MCP endpoint", () => {
     expect(moveItemsProperties).toMatchObject({
       watchlistItemId: { type: "integer" },
       destinationWatchlistId: { type: "integer" },
-      position: { enum: ["beginning", "end", "release-adjacent", "before", "after"] },
+      position: { enum: ["beginning", "end", "before", "after"] },
     });
     expect(moveItemsProperties).not.toHaveProperty("parentId");
     expect(moveItems?.outputSchema).toMatchObject({
@@ -2607,7 +2607,7 @@ describe("Janus MCP endpoint", () => {
       watchlistId: { type: "integer" },
       parentId: { type: "string" },
       destinationWatchlistId: { type: "integer" },
-      position: { enum: ["beginning", "end", "release-adjacent", "before", "after"] },
+      position: { enum: ["beginning", "end", "before", "after"] },
     });
     expect(moveParentsProperties).not.toHaveProperty("watchlistItemId");
     expect(moveParents?.outputSchema).toMatchObject({

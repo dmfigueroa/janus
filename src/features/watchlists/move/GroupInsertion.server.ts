@@ -34,7 +34,6 @@ export function planGroupInsertionSlots(args: {
       args.position,
       args.referenceItemId,
       lastInsertedIndex,
-      item,
     );
     lastInsertedIndex = applySplice(slots, spliceIndex, args.referenceItemId, item);
   }
@@ -47,12 +46,11 @@ function nextSpliceIndex(
   position: InsertionPosition | undefined,
   referenceItemId: number | undefined,
   lastInsertedIndex: number,
-  item: GroupInsertionItem,
 ): SpliceOutcome {
   if (position === "before" || position === "after") {
     return anchorSpliceIndex({ slots, referenceItemId, lastInsertedIndex }, position);
   }
-  return legacySpliceIndex(slots, position, item);
+  return legacySpliceIndex(slots, position);
 }
 
 function anchorSpliceIndex(args: AnchorArgs, direction: "before" | "after"): SpliceOutcome {
@@ -89,41 +87,8 @@ function findReferenceIndex(args: AnchorArgs): SpliceOutcome {
 function legacySpliceIndex(
   slots: InsertionSlot[],
   position: InsertionPosition | undefined,
-  item: GroupInsertionItem,
 ): number {
-  if (position === "beginning") {
-    return 0;
-  }
-  if (position === "release-adjacent") {
-    return releaseAdjacentSpliceIndex(slots, item);
-  }
-  return slots.length;
-}
-
-function releaseAdjacentSpliceIndex(slots: InsertionSlot[], item: GroupInsertionItem): number {
-  const releaseDate = item.releaseDate?.trim();
-  if (!releaseDate) {
-    return slots.length;
-  }
-  const lastMatchingIndex = slots.reduce(
-    (lastIndex, slot, index) => updateReleaseAdjacentIndex(lastIndex, slot, index, releaseDate),
-    -1,
-  );
-  return Math.max(lastMatchingIndex + 1, 0);
-}
-
-function updateReleaseAdjacentIndex(
-  lastIndex: number,
-  slot: InsertionSlot,
-  index: number,
-  releaseDate: string,
-): number {
-  return isReleaseDateAtOrBefore(slot, releaseDate) ? index : lastIndex;
-}
-
-function isReleaseDateAtOrBefore(slot: InsertionSlot, releaseDate: string): boolean {
-  const slotReleaseDate = slot.releaseDate?.trim();
-  return slotReleaseDate ? slotReleaseDate <= releaseDate : false;
+  return position === "beginning" ? 0 : slots.length;
 }
 
 function applySplice(

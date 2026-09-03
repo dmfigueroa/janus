@@ -24,9 +24,7 @@ const customItemAdditionInputSchema = z
     title: z.string().optional(),
     mediaType: z.enum(["movie", "tv", "book", "game", "comic"]).optional(),
     year: z.string().optional(),
-    insertionPosition: z
-      .enum(["beginning", "end", "release-adjacent", "before", "after"])
-      .optional(),
+    insertionPosition: z.enum(["beginning", "end", "before", "after"]).optional(),
     referenceItemId: z.number().int().positive().optional(),
   })
   .superRefine(anchorInsertionRefinement);
