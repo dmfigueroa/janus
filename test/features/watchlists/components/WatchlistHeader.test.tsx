@@ -43,6 +43,7 @@ function renderHeader(pausedAt: string | null, description: string | null = null
 describe("WatchlistHeader", () => {
   afterEach(() => {
     cleanup();
+    vi.clearAllMocks();
   });
 
   it("offers pausing for an active watchlist", () => {
@@ -80,5 +81,35 @@ describe("WatchlistHeader", () => {
 
     expect(description.parentElement).toBe(titleLayout);
     expect(getComputedStyle(titleLayout!).flexDirection).toBe("column");
+  });
+
+  it("expands and collapses descriptions that exceed three lines", () => {
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(80);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(60);
+
+    renderHeader(
+      null,
+      "A completionist chronology containing every release, overlapping collection, and omnibus.",
+    );
+
+    const description = screen.getByText(/A completionist chronology/);
+    const showMoreButton = screen.getByText("Show more");
+
+    expect(getComputedStyle(description).webkitLineClamp).toBe("3");
+    expect(showMoreButton.getAttribute("aria-expanded")).toBe("false");
+
+    fireEvent.click(showMoreButton);
+
+    expect(getComputedStyle(description).webkitLineClamp).not.toBe("3");
+    expect(screen.getByText("Show less").getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("does not show an expansion control when the description fits", () => {
+    vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(60);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(60);
+
+    renderHeader(null, "Short description");
+
+    expect(screen.queryByText("Show more")).toBeNull();
   });
 });

@@ -1,5 +1,6 @@
 import type { Watchlist } from "@/db/Schema";
-import { Flex, Heading, IconButton, Text } from "@chakra-ui/react";
+import { Flex, Heading, IconButton } from "@chakra-ui/react";
+import { ExpandableWatchlistDescription } from "@/features/watchlists/components/ExpandableWatchlistDescription";
 import { WatchlistFormDialog } from "@/features/watchlists/components/WatchlistFormDialog";
 import { WatchlistPauseButton } from "@/features/watchlists/components/WatchlistPauseButton";
 import { Pencil } from "lucide-react";
@@ -43,9 +44,10 @@ export function WatchlistTitle({
         />
       </Flex>
       {watchlist.description && (
-        <Text fontSize="sm" color="fg.muted" display={{ base: "none", md: "block" }}>
-          {watchlist.description}
-        </Text>
+        <ExpandableWatchlistDescription
+          key={watchlist.description}
+          description={watchlist.description}
+        />
       )}
     </Flex>
   );
