@@ -6,11 +6,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Watchlist } from "@/db/Schema";
 import { WatchlistHeader } from "@/features/watchlists/components/WatchlistHeader";
 
-function watchlistFixture(pausedAt: string | null): Watchlist {
+function watchlistFixture(pausedAt: string | null, description: string | null = null): Watchlist {
   return {
     id: 1,
     name: "Movie Night",
-    description: null,
+    description,
     itemOrderMode: "release",
     createdAt: "2024-01-01 00:00:00",
     updatedAt: null,
@@ -20,13 +20,13 @@ function watchlistFixture(pausedAt: string | null): Watchlist {
   };
 }
 
-function renderHeader(pausedAt: string | null) {
+function renderHeader(pausedAt: string | null, description: string | null = null) {
   const onTogglePause = vi.fn();
   const queryClient = new QueryClient();
   render(
     <QueryClientProvider client={queryClient}>
       <WatchlistHeader
-        watchlist={watchlistFixture(pausedAt)}
+        watchlist={watchlistFixture(pausedAt, description)}
         totalItems={3}
         watchedItems={1}
         showUnwatchedOnly={false}
@@ -65,5 +65,20 @@ describe("WatchlistHeader", () => {
     renderHeader("2024-06-01 00:00:00");
 
     expect(screen.queryByRole("button", { name: "Pause" })).toBeNull();
+  });
+
+  it("places a long description below the title controls", () => {
+    renderHeader(
+      null,
+      "A completionist chronology containing every release, overlapping collection, and omnibus.",
+    );
+
+    const heading = screen.getByRole("heading", { name: "Movie Night" });
+    const description = screen.getByText(/A completionist chronology/);
+
+    const titleLayout = heading.parentElement?.parentElement;
+
+    expect(description.parentElement).toBe(titleLayout);
+    expect(getComputedStyle(titleLayout!).flexDirection).toBe("column");
   });
 });

@@ -16,7 +16,7 @@ export function WatchlistTitle({
   interactionDisabled,
 }: WatchlistTitleProps) {
   return (
-    <Flex mb={2} align="center" justify="space-between" gap={2}>
+    <Flex mb={2} direction="column" gap={2}>
       <Flex align="center" gap={2} minW={0}>
         <Heading as="h1" size={{ base: "xl", md: "2xl" }} letterSpacing="tight" truncate>
           {watchlist.name}
