@@ -2558,6 +2558,93 @@ describe("Janus MCP endpoint", () => {
     });
   });
 
+  it("sets a complete watchlist order atomically with token protection", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP set order", itemOrderMode: "custom" })
+      .returning();
+    const [item1, item2, item3] = await database
+      .getDb()
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "so1",
+          title: "One",
+          mediaType: "movie",
+          customRank: 1,
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "so2",
+          title: "Two",
+          mediaType: "movie",
+          customRank: 2,
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "so3",
+          title: "Three",
+          mediaType: "movie",
+          customRank: 3,
+        },
+      ])
+      .returning();
+
+    const readResult = await client.callTool({
+      name: "get_watchlist",
+      arguments: { watchlistId: watchlist.id },
+    });
+    expect(readResult.isError).not.toBe(true);
+    const readContent = readResult.structuredContent as { orderToken?: string };
+    const orderToken = readContent.orderToken;
+    expect(orderToken).toEqual(expect.stringMatching(/^sha256:/));
+
+    const setResult = await client.callTool({
+      name: "set_watchlist_order",
+      arguments: {
+        watchlistId: watchlist.id,
+        orderedItemIds: [item3.id, item1.id, item2.id],
+        expectedOrderToken: orderToken,
+      },
+    });
+    expect(setResult.isError).not.toBe(true);
+    expect(setResult.structuredContent).toMatchObject({
+      success: true,
+      code: "order_set",
+      watchlistId: watchlist.id,
+    });
+    await expect(
+      database
+        .getDb()
+        .select({ id: watchlistItems.id })
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, watchlist.id))
+        .orderBy(watchlistItems.customRank),
+    ).resolves.toEqual([{ id: item3.id }, { id: item1.id }, { id: item2.id }]);
+
+    const staleResult = await client.callTool({
+      name: "set_watchlist_order",
+      arguments: {
+        watchlistId: watchlist.id,
+        orderedItemIds: [item1.id, item2.id, item3.id],
+        expectedOrderToken: orderToken,
+      },
+    });
+    expect(staleResult.isError).not.toBe(true);
+    expect(staleResult.structuredContent).toMatchObject({
+      success: false,
+      code: "stale_order",
+      watchlistId: watchlist.id,
+    });
+    const setContent = setResult.structuredContent as { orderToken?: string };
+    expect((staleResult.structuredContent as { orderToken?: string }).orderToken).toEqual(
+      setContent.orderToken,
+    );
+  });
+
   it("discovers distinct move item and parent tools with item-versus-parent semantics", async () => {
     const tools = await client.listTools();
     const moveItems = tools.tools.find((tool) => tool.name === "move_watchlist_items");

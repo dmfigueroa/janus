@@ -21,9 +21,12 @@ export const activeItemOrderExpression = sql`
   CASE WHEN ${watchlists.itemOrderMode} = 'custom' AND ${watchlistItems.customRank} IS NULL THEN 1 ELSE 0 END,
   CASE WHEN ${watchlists.itemOrderMode} = 'custom' THEN ${watchlistItems.customRank} END asc,
   CASE WHEN ${watchlistItems.releaseDate} IS NULL OR ${watchlistItems.releaseDate} = '' THEN 1 ELSE 0 END,
-  ${watchlistItems.releaseDate} asc
+  ${watchlistItems.releaseDate} asc,
+  ${watchlistItems.id} asc
 `;
 
 export function buildDetailOrderBy(itemOrderMode: WatchlistItemOrderMode) {
-  return itemOrderMode === "custom" ? customRankOrder : releaseDateOrder;
+  return itemOrderMode === "custom"
+    ? [...customRankOrder, asc(watchlistItems.id)]
+    : [...releaseDateOrder, asc(watchlistItems.id)];
 }
