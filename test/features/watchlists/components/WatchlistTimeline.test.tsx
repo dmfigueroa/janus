@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { ChakraProvider } from "@chakra-ui/react";
 import type { DndContextProps, DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,6 +16,7 @@ const activeFilters = {
 };
 
 let latestDndContextProps: Pick<DndContextProps, "onDragStart" | "onDragEnd"> = {};
+let sortableListeners: Record<string, () => void> = {};
 
 function activeDrag(id: number) {
   return {
@@ -69,7 +70,7 @@ vi.mock("@dnd-kit/sortable", () => ({
   verticalListSortingStrategy: {},
   useSortable: vi.fn(({ id, disabled }: { id: number; disabled: boolean }) => ({
     attributes: { "data-sortable-id": id },
-    listeners: {},
+    listeners: sortableListeners,
     setActivatorNodeRef: vi.fn(),
     setNodeRef: vi.fn(),
     transform: null,
@@ -124,6 +125,7 @@ describe("WatchlistTimeline reorder controls", () => {
   afterEach(() => {
     cleanup();
     latestDndContextProps = {};
+    sortableListeners = {};
   });
 
   it("renders a flat custom-mode list with reorder handles", () => {
@@ -146,6 +148,27 @@ describe("WatchlistTimeline reorder controls", () => {
     expect(firstHandle).toHaveProperty("disabled", false);
     expect(getComputedStyle(firstHandle).backgroundColor).toBe("rgba(0, 0, 0, 0)");
     expect(screen.getByRole("button", { name: "Move Second" })).toHaveProperty("disabled", false);
+  });
+
+  it("activates dragging without allowing native selection gestures", () => {
+    const onMouseDown = vi.fn();
+    sortableListeners = { onMouseDown };
+
+    renderWithProvider(
+      <WatchlistTimeline
+        items={[item({ id: 1, title: "First" })]}
+        activeFilters={activeFilters}
+        itemOrderMode="custom"
+        canReorder
+        onReorder={vi.fn()}
+      />,
+    );
+
+    const handle = screen.getByRole("button", { name: "Move First" });
+    fireEvent.mouseDown(handle);
+
+    expect(onMouseDown).toHaveBeenCalledOnce();
+    expect(handle.getAttribute("style")).toContain("user-select: none");
   });
 
   it("hides reorder handles in custom mode when reordering is unavailable", () => {
