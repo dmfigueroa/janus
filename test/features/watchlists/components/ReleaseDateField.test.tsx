@@ -64,17 +64,19 @@ describe("ReleaseDateField", () => {
     );
   });
 
-  it("uses a compact calendar icon in the date-picker trigger", () => {
+  it("uses a compact, centered calendar trigger", () => {
     renderWithProvider(
       <ReleaseDateField inputId="release-date" inputName="releaseDate" initialReleaseDate="" />,
     );
 
-    const calendarIcon = screen
-      .getByRole("button", { name: /open date picker/i })
-      .querySelector("svg");
+    const calendarTrigger = screen.getByRole("button", { name: /open date picker/i });
+    const calendarIcon = calendarTrigger.querySelector("svg");
 
     expect(calendarIcon?.getAttribute("width")).toBe("16");
     expect(calendarIcon?.getAttribute("height")).toBe("16");
+    expect(getComputedStyle(calendarTrigger).top).toBe("50%");
+    expect(getComputedStyle(calendarTrigger).transform).toBe("translateY(-50%)");
+    expect(getComputedStyle(calendarTrigger).borderRadius).toBe("var(--chakra-radii-full)");
   });
 
   it("allows direct navigation back to the invention of the printing press", async () => {

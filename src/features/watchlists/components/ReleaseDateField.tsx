@@ -158,17 +158,19 @@ export function ReleaseDateField({
           placeholder={`${datePlaceholder} or YYYY`}
           title={`Enter a date as ${datePlaceholder} or YYYY`}
           inputMode="numeric"
-          pe={10}
+          pe={12}
           onChange={handleDateInputChange}
         />
         <DatePicker.Trigger asChild>
           <IconButton
             type="button"
             variant="ghost"
-            size="sm"
+            size="xs"
             position="absolute"
-            insetEnd={1}
-            top={1}
+            insetEnd={2}
+            top="50%"
+            transform="translateY(-50%)"
+            rounded="full"
             shadow="none"
             color="accent.solid"
             aria-label="Open date picker"
