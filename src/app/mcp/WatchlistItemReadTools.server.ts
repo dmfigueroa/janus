@@ -1,7 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
-  discoverWatchlistPage,
   findWatchlistItemsByText,
   findWatchlistTitles,
 } from "@/features/watchlists/detail/DiscoverWatchlist.server";
@@ -9,8 +8,10 @@ import {
   findWatchlistItemById,
   findWatchlistItemByProvider,
 } from "@/features/watchlists/detail/FindWatchlistItem.server";
+import { getWatchlistResponse } from "./GetWatchlistResponse.server";
 import { asMcpContent, asMcpError } from "./McpToolResponse.server";
-import { respondToWatchlistTitles, toMcpWatchlistTitle } from "./WatchlistTitleResponse.server";
+import { toMcpWatchlistItem } from "./WatchlistItemResponse.server";
+import { toMcpWatchlistTitle } from "./WatchlistTitleResponse.server";
 
 const mediaTypeSchema = z.enum(["movie", "episode", "game", "book", "comic", "anime", "manga"]);
 
@@ -170,44 +171,11 @@ function registerGetWatchlist(server: McpServer, watchlistSummaryOutputSchema: z
           )
           .optional(),
         nextCursor: z.string().optional(),
+        orderToken: z.string().optional(),
       },
       annotations: { readOnlyHint: true, destructiveHint: false },
     },
-    async ({ watchlistId, pageSize, cursor, resultView }) => {
-      if (resultView === "titles")
-        return respondToWatchlistTitles({ watchlistId, pageSize, cursor });
-      const page = await discoverWatchlistPage({ watchlistId, pageSize, cursor });
-      if (!page) return asMcpError(`Watchlist ${watchlistId} was not found.`);
-      return asMcpContent({
-        watchlist: page.watchlist,
-        items: page.items.map(toMcpWatchlistItem),
-        nextCursor: page.nextCursor,
-      });
-    },
+    async ({ watchlistId, pageSize, cursor, resultView }) =>
+      getWatchlistResponse({ watchlistId, pageSize, cursor, resultView }),
   );
-}
-
-function toMcpWatchlistItem(item: {
-  id: number;
-  watchlistId: number;
-  source: string;
-  tmdbId: string;
-  mediaType: z.infer<typeof mediaTypeSchema>;
-  title: string;
-  parentId: string | null;
-  parentTitle: string | null;
-  episode: string | null;
-  isWatched: boolean | null;
-}) {
-  return {
-    id: item.id,
-    watchlistId: item.watchlistId,
-    provider: item.source,
-    providerId: item.tmdbId,
-    mediaType: item.mediaType,
-    title: item.title,
-    parent: { providerId: item.parentId, title: item.parentTitle },
-    episode: item.episode,
-    isWatched: item.isWatched,
-  };
 }
