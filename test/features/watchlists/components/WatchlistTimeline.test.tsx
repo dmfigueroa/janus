@@ -169,6 +169,7 @@ describe("WatchlistTimeline reorder controls", () => {
 
     expect(onMouseDown).toHaveBeenCalledOnce();
     expect(handle.getAttribute("style")).toContain("user-select: none");
+    expect(handle.style.touchAction).toBe("none");
   });
 
   it("hides reorder handles in custom mode when reordering is unavailable", () => {
