@@ -184,6 +184,7 @@ function DragHandleButton({
       flexShrink={0}
       rounded="md"
       color="fg.muted"
+      style={{ touchAction: "none", userSelect: "none" }}
       {...dragStyles}
       _hover={{ bg: "bg.subtle", color: "fg.default" }}
       {...handleProps}
