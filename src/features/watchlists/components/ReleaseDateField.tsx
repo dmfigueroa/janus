@@ -144,6 +144,7 @@ export function ReleaseDateField({
       focusedValue={focusedDate}
       min={releaseDateMinimum}
       max={releaseDateMaximum}
+      colorPalette="pink"
       positioning={{ placement: "bottom-end", gutter: 4 }}
       onFocusChange={({ focusedValue }) => setFocusedDate(focusedValue)}
       onValueChange={({ value }) => handleReleaseDateChange(value[0])}
@@ -166,18 +167,19 @@ export function ReleaseDateField({
             variant="ghost"
             size="sm"
             position="absolute"
-            insetEnd={0}
-            top={0}
+            insetEnd={1}
+            top={1}
             shadow="none"
+            color="accent.solid"
             aria-label="Open date picker"
           >
-            <CalendarIcon />
+            <CalendarIcon size={16} />
           </IconButton>
         </DatePicker.Trigger>
       </DatePicker.Control>
       <Portal>
         <DatePicker.Positioner>
-          <DatePicker.Content maxH="var(--available-height)" overflowY="auto">
+          <DatePicker.Content colorPalette="pink" maxH="var(--available-height)" overflowY="auto">
             <DatePicker.View view="day">
               <DatePicker.ViewControl>
                 <DatePicker.PrevTrigger />

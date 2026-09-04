@@ -64,6 +64,19 @@ describe("ReleaseDateField", () => {
     );
   });
 
+  it("uses a compact calendar icon in the date-picker trigger", () => {
+    renderWithProvider(
+      <ReleaseDateField inputId="release-date" inputName="releaseDate" initialReleaseDate="" />,
+    );
+
+    const calendarIcon = screen
+      .getByRole("button", { name: /open date picker/i })
+      .querySelector("svg");
+
+    expect(calendarIcon?.getAttribute("width")).toBe("16");
+    expect(calendarIcon?.getAttribute("height")).toBe("16");
+  });
+
   it("allows direct navigation back to the invention of the printing press", async () => {
     renderWithProvider(
       <ReleaseDateField inputId="release-date" inputName="releaseDate" initialReleaseDate="" />,
