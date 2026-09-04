@@ -1,4 +1,4 @@
-import { Box, Button, DatePicker, IconButton, Input, Portal } from "@chakra-ui/react";
+import { Button, DatePicker, IconButton, Input, Portal } from "@chakra-ui/react";
 import { CalendarDate, parseDate, type DateValue } from "@internationalized/date";
 import { format, isMatch, parse } from "date-fns";
 import { CalendarIcon } from "lucide-react";
@@ -148,7 +148,7 @@ export function ReleaseDateField({
       onFocusChange={({ focusedValue }) => setFocusedDate(focusedValue)}
       onValueChange={({ value }) => handleReleaseDateChange(value[0])}
     >
-      <Box position="relative" w="full">
+      <DatePicker.Control>
         <input type="hidden" name={inputName} value={releaseDate} readOnly />
         <Input
           ref={inputRef}
@@ -174,7 +174,7 @@ export function ReleaseDateField({
             <CalendarIcon />
           </IconButton>
         </DatePicker.Trigger>
-      </Box>
+      </DatePicker.Control>
       <Portal>
         <DatePicker.Positioner>
           <DatePicker.Content maxH="var(--available-height)" overflowY="auto">

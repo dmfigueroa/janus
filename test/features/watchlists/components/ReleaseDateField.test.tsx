@@ -49,6 +49,21 @@ describe("ReleaseDateField", () => {
     expect(document.querySelector('input[name="releaseDate"]')).toHaveProperty("value", "");
   });
 
+  it("uses the date picker control to anchor the calendar and position its trigger", () => {
+    renderWithProvider(
+      <ReleaseDateField inputId="release-date" inputName="releaseDate" initialReleaseDate="" />,
+    );
+
+    const datePickerControl = document.querySelector(
+      '[data-scope="date-picker"][data-part="control"]',
+    );
+
+    expect(datePickerControl).not.toBeNull();
+    expect(screen.getByRole("button", { name: /open date picker/i }).parentElement).toBe(
+      datePickerControl,
+    );
+  });
+
   it("allows direct navigation back to the invention of the printing press", async () => {
     renderWithProvider(
       <ReleaseDateField inputId="release-date" inputName="releaseDate" initialReleaseDate="" />,
