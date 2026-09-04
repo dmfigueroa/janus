@@ -4,6 +4,7 @@ import * as schema from "@/db/Schema";
 import { createIsolatedTestDb, type IsolatedTestDb } from "@test/IsolatedDb";
 import {
   createWatchlistOrderToken,
+  getWatchlistOrderState,
   setWatchlistOrder,
 } from "@/features/watchlists/order/SetWatchlistOrder.server";
 
@@ -67,6 +68,43 @@ describe("setWatchlistOrder", () => {
       { id: items[0].id, customRank: 2 },
       { id: items[1].id, customRank: 3 },
     ]);
+  });
+
+  it("changes the token when effective order changes through release dates", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Unranked", itemOrderMode: "custom" })
+      .returning();
+    const [firstItem, secondItem] = await db
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "1",
+          title: "One",
+          mediaType: "movie",
+          releaseDate: "2025-02-01",
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "2",
+          title: "Two",
+          mediaType: "movie",
+          releaseDate: "2025-01-01",
+        },
+      ])
+      .returning();
+
+    const before = await getWatchlistOrderState(watchlist.id);
+    await db
+      .update(watchlistItems)
+      .set({ releaseDate: "2024-01-01" })
+      .where(eq(watchlistItems.id, firstItem.id));
+    const after = await getWatchlistOrderState(watchlist.id);
+
+    expect(before?.orderedItemIds).toEqual([secondItem.id, firstItem.id]);
+    expect(after?.orderedItemIds).toEqual([firstItem.id, secondItem.id]);
+    expect(after?.orderToken).not.toBe(before?.orderToken);
   });
 
   it("rejects an incomplete order without changing ranks", async () => {

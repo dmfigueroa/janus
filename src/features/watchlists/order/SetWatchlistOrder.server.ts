@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { getDb, type DatabaseTransaction } from "@/db/Db.server";
 import { watchlistItems, watchlists } from "@/db/Schema";
+import { customRankOrder } from "@/features/watchlists/Order.server";
 import type { SetWatchlistOrderInput } from "./SetWatchlistOrderSchema";
 
 export type SetWatchlistOrderResult =
@@ -32,11 +33,7 @@ export async function getWatchlistOrderState(watchlistId: number) {
     .select({ id: watchlistItems.id })
     .from(watchlistItems)
     .where(eq(watchlistItems.watchlistId, watchlistId))
-    .orderBy(
-      sql`CASE WHEN ${watchlistItems.customRank} IS NULL THEN 1 ELSE 0 END`,
-      asc(watchlistItems.customRank),
-      asc(watchlistItems.id),
-    );
+    .orderBy(...customRankOrder, asc(watchlistItems.id));
   const orderedItemIds = items.map((item) => item.id);
   return { orderedItemIds, orderToken: createWatchlistOrderToken(watchlistId, orderedItemIds) };
 }
@@ -71,11 +68,7 @@ function setWatchlistOrderInTransaction(
     .select({ id: watchlistItems.id })
     .from(watchlistItems)
     .where(eq(watchlistItems.watchlistId, watchlistId))
-    .orderBy(
-      sql`CASE WHEN ${watchlistItems.customRank} IS NULL THEN 1 ELSE 0 END`,
-      asc(watchlistItems.customRank),
-      asc(watchlistItems.id),
-    )
+    .orderBy(...customRankOrder, asc(watchlistItems.id))
     .all();
   const currentItemIds = currentItems.map((item) => item.id);
   const currentOrderToken = createWatchlistOrderToken(watchlistId, currentItemIds);
