@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb, type DatabaseTransaction } from "@/db/Db.server";
 import { watchlistItems, watchlists } from "@/db/Schema";
-import { customRankOrder } from "@/features/watchlists/Order.server";
+import { buildDetailOrderBy } from "@/features/watchlists/Order.server";
 import type { SetWatchlistOrderInput } from "./SetWatchlistOrderSchema";
 
 export type SetWatchlistOrderResult =
@@ -15,16 +15,20 @@ export type SetWatchlistOrderFailureCode =
   | "invalid_order"
   | "stale_order";
 
-export function createWatchlistOrderToken(watchlistId: number, orderedItemIds: number[]) {
+export function createWatchlistOrderToken(
+  watchlistId: number,
+  orderedItemIds: number[],
+  itemOrderMode: "release" | "custom",
+) {
   return `sha256:${createHash("sha256")
-    .update(`${watchlistId}:${orderedItemIds.join(",")}`)
+    .update(`${watchlistId}:${itemOrderMode}:${orderedItemIds.join(",")}`)
     .digest("hex")}`;
 }
 
 export async function getWatchlistOrderState(watchlistId: number) {
   const db = getDb();
   const [watchlist] = await db
-    .select({ id: watchlists.id })
+    .select({ id: watchlists.id, itemOrderMode: watchlists.itemOrderMode })
     .from(watchlists)
     .where(eq(watchlists.id, watchlistId));
   if (!watchlist) return null;
@@ -33,9 +37,12 @@ export async function getWatchlistOrderState(watchlistId: number) {
     .select({ id: watchlistItems.id })
     .from(watchlistItems)
     .where(eq(watchlistItems.watchlistId, watchlistId))
-    .orderBy(...customRankOrder, asc(watchlistItems.id));
+    .orderBy(...buildDetailOrderBy(watchlist.itemOrderMode));
   const orderedItemIds = items.map((item) => item.id);
-  return { orderedItemIds, orderToken: createWatchlistOrderToken(watchlistId, orderedItemIds) };
+  return {
+    orderedItemIds,
+    orderToken: createWatchlistOrderToken(watchlistId, orderedItemIds, watchlist.itemOrderMode),
+  };
 }
 
 export async function setWatchlistOrder({
@@ -68,10 +75,14 @@ function setWatchlistOrderInTransaction(
     .select({ id: watchlistItems.id })
     .from(watchlistItems)
     .where(eq(watchlistItems.watchlistId, watchlistId))
-    .orderBy(...customRankOrder, asc(watchlistItems.id))
+    .orderBy(...buildDetailOrderBy(watchlist.itemOrderMode))
     .all();
   const currentItemIds = currentItems.map((item) => item.id);
-  const currentOrderToken = createWatchlistOrderToken(watchlistId, currentItemIds);
+  const currentOrderToken = createWatchlistOrderToken(
+    watchlistId,
+    currentItemIds,
+    watchlist.itemOrderMode,
+  );
 
   const orderFailure = validateRequestedOrder(
     orderedItemIds,
@@ -85,7 +96,7 @@ function setWatchlistOrderInTransaction(
 
   return {
     success: true,
-    orderToken: createWatchlistOrderToken(watchlistId, orderedItemIds),
+    orderToken: createWatchlistOrderToken(watchlistId, orderedItemIds, watchlist.itemOrderMode),
   };
 }
 
@@ -143,9 +154,10 @@ function isStaleOrderToken(expected: string | undefined, current: string) {
 }
 
 function isCompletePermutation(candidate: number[], current: number[]) {
+  const currentSet = new Set(current);
   return (
     candidate.length === current.length &&
     new Set(candidate).size === candidate.length &&
-    candidate.every((itemId) => current.includes(itemId))
+    candidate.every((itemId) => currentSet.has(itemId))
   );
 }

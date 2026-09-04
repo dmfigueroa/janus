@@ -29,11 +29,10 @@ async function getWatchlistItemsResponse({
   pageSize?: number;
   cursor?: string;
 }) {
-  const [page, orderState] = await Promise.all([
-    discoverWatchlistPage({ watchlistId, pageSize, cursor }),
-    getWatchlistOrderState(watchlistId),
-  ]);
-  if (!page || !orderState) return asMcpError(`Watchlist ${watchlistId} was not found.`);
+  const orderState = await getWatchlistOrderState(watchlistId);
+  if (!orderState) return asMcpError(`Watchlist ${watchlistId} was not found.`);
+  const page = await discoverWatchlistPage({ watchlistId, pageSize, cursor });
+  if (!page) return asMcpError(`Watchlist ${watchlistId} was not found.`);
   return asMcpContent({
     watchlist: page.watchlist,
     items: page.items.map(toMcpWatchlistItem),

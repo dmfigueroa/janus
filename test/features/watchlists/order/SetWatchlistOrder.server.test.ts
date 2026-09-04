@@ -56,7 +56,11 @@ describe("setWatchlistOrder", () => {
 
     expect(result).toEqual({
       success: true,
-      orderToken: createWatchlistOrderToken(watchlist.id, [items[2].id, items[0].id, items[1].id]),
+      orderToken: createWatchlistOrderToken(
+        watchlist.id,
+        [items[2].id, items[0].id, items[1].id],
+        "custom",
+      ),
     });
     const updatedItems = await db
       .select({ id: watchlistItems.id, customRank: watchlistItems.customRank })
@@ -127,6 +131,15 @@ describe("setWatchlistOrder", () => {
 
     expect(result.success).toBe(false);
     expect((result as { code: string }).code).toBe("invalid_order");
+    const unchangedItems = await db
+      .select({ id: watchlistItems.id, customRank: watchlistItems.customRank })
+      .from(watchlistItems)
+      .where(eq(watchlistItems.watchlistId, watchlist.id))
+      .orderBy(watchlistItems.customRank);
+    expect(unchangedItems).toEqual([
+      { id: items[0].id, customRank: 1 },
+      { id: items[1].id, customRank: 2 },
+    ]);
   });
 
   it("rejects a stale order token", async () => {
@@ -153,5 +166,44 @@ describe("setWatchlistOrder", () => {
 
     expect(result.success).toBe(false);
     expect((result as { code: string }).code).toBe("stale_order");
+    const unchangedItems = await db
+      .select({ id: watchlistItems.id, customRank: watchlistItems.customRank })
+      .from(watchlistItems)
+      .where(eq(watchlistItems.watchlistId, watchlist.id));
+    expect(unchangedItems).toEqual([{ id: item.id, customRank: 1 }]);
+  });
+
+  it("rejects ordering a release-mode watchlist", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Release", itemOrderMode: "release" })
+      .returning();
+    const [item] = await db
+      .insert(watchlistItems)
+      .values({
+        watchlistId: watchlist.id,
+        tmdbId: "1",
+        title: "One",
+        mediaType: "movie",
+      })
+      .returning();
+
+    const result = await setWatchlistOrder({
+      watchlistId: watchlist.id,
+      orderedItemIds: [item.id],
+    });
+
+    expect(result.success).toBe(false);
+    expect((result as { code: string }).code).toBe("not_custom_mode");
+  });
+
+  it("rejects ordering a missing watchlist", async () => {
+    const result = await setWatchlistOrder({
+      watchlistId: 999_999,
+      orderedItemIds: [1],
+    });
+
+    expect(result.success).toBe(false);
+    expect((result as { code: string }).code).toBe("not_found");
   });
 });

@@ -22,34 +22,19 @@ export function registerSetWatchlistOrderTool(server: McpServer) {
       title: "Set complete watchlist order",
       description:
         "Set the complete order of every item in a custom-ordered watchlist in one atomic operation. orderedItemIds must contain every watchlist item exactly once, from first to last. Use the orderToken returned by get_watchlist as expectedOrderToken to prevent overwriting a newer user change. This is consequential and requires confirmation before applying.",
-      inputSchema: {
-        watchlistId: z.number().int().positive(),
-        orderedItemIds: z.array(z.number().int().positive()).min(1),
-        expectedOrderToken: z.string().trim().min(1).optional(),
-      },
+      inputSchema: setWatchlistOrderSchema.shape,
       outputSchema: { ...resultSchema.shape },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     },
     async (input) => {
-      const parsedInput = setWatchlistOrderSchema.safeParse(input);
-      if (!parsedInput.success) {
-        return asMcpContent({
-          success: false,
-          code: "validation_error",
-          message: parsedInput.error.message,
-          watchlistId: input.watchlistId,
-        });
-      }
-
-      const result = await setWatchlistOrder(parsedInput.data);
-      if (!result.success)
-        return asMcpContent(toFailureResponse(parsedInput.data.watchlistId, result));
+      const result = await setWatchlistOrder(input);
+      if (!result.success) return asMcpContent(toFailureResponse(input.watchlistId, result));
 
       return asMcpContent({
         success: true,
         code: "order_set",
         message: "Watchlist order set.",
-        watchlistId: parsedInput.data.watchlistId,
+        watchlistId: input.watchlistId,
         orderToken: result.orderToken,
       });
     },
