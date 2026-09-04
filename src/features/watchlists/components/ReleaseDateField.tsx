@@ -1,4 +1,4 @@
-import { Box, Button, DatePicker, IconButton, Input, Portal } from "@chakra-ui/react";
+import { Button, DatePicker, IconButton, Input, Portal } from "@chakra-ui/react";
 import { CalendarDate, parseDate, type DateValue } from "@internationalized/date";
 import { format, isMatch, parse } from "date-fns";
 import { CalendarIcon } from "lucide-react";
@@ -144,11 +144,12 @@ export function ReleaseDateField({
       focusedValue={focusedDate}
       min={releaseDateMinimum}
       max={releaseDateMaximum}
+      colorPalette="pink"
       positioning={{ placement: "bottom-end", gutter: 4 }}
       onFocusChange={({ focusedValue }) => setFocusedDate(focusedValue)}
       onValueChange={({ value }) => handleReleaseDateChange(value[0])}
     >
-      <Box position="relative" w="full">
+      <DatePicker.Control>
         <input type="hidden" name={inputName} value={releaseDate} readOnly />
         <Input
           ref={inputRef}
@@ -157,27 +158,30 @@ export function ReleaseDateField({
           placeholder={`${datePlaceholder} or YYYY`}
           title={`Enter a date as ${datePlaceholder} or YYYY`}
           inputMode="numeric"
-          pe={10}
+          pe={12}
           onChange={handleDateInputChange}
         />
         <DatePicker.Trigger asChild>
           <IconButton
             type="button"
             variant="ghost"
-            size="sm"
+            size="xs"
             position="absolute"
-            insetEnd={0}
-            top={0}
+            insetEnd={2}
+            top="50%"
+            transform="translateY(-50%)"
+            rounded="full"
             shadow="none"
+            color="accent.solid"
             aria-label="Open date picker"
           >
-            <CalendarIcon />
+            <CalendarIcon size={16} />
           </IconButton>
         </DatePicker.Trigger>
-      </Box>
+      </DatePicker.Control>
       <Portal>
         <DatePicker.Positioner>
-          <DatePicker.Content maxH="var(--available-height)" overflowY="auto">
+          <DatePicker.Content colorPalette="pink" maxH="var(--available-height)" overflowY="auto">
             <DatePicker.View view="day">
               <DatePicker.ViewControl>
                 <DatePicker.PrevTrigger />
