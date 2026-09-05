@@ -24,7 +24,15 @@ const mediaAdditionInputSchema = z
     watchlistId: z.number().optional(),
     provider: z.enum(["tmdb", "rawg", "google_books", "comicvine", "anilist"]).optional(),
     providerId: z.string().optional(),
-    mediaType: z.enum(["movie", "tv", "game", "book", "comic", "anime", "manga"]).optional(),
+    mediaType: z
+      .enum(["movie", "tv", "episode", "game", "book", "comic", "comic_issue", "anime", "manga"])
+      .optional(),
+    parent: z
+      .object({
+        providerId: z.string().optional(),
+        title: z.string().optional(),
+      })
+      .optional(),
     insertionPosition: z.enum(["beginning", "end", "before", "after"]).optional(),
     referenceItemId: z.number().int().positive().optional(),
   })
@@ -36,16 +44,24 @@ export function registerAddMediaToWatchlistsTool(server: McpServer) {
     {
       title: "Add provider-backed media to watchlists",
       description:
-        "Add TMDB movies or TV, RAWG games, Google Books books, or ComicVine comics by provider ID. Janus fetches canonical provider metadata before persisting each addition. Anime and manga additions remain unavailable. TV additions expand into episodes, so they are consequential bulk actions requiring confirmation. Each requested addition is processed independently and returns an ordered result.",
+        "Add TMDB movies, TV, or individual episodes; RAWG games; Google Books books; or ComicVine volumes or individual issues by provider ID. Janus fetches canonical provider metadata before persisting each addition. TMDB episode additions require their parent show ID. Anime and manga additions remain unavailable. TV additions expand into episodes, and ComicVine volume additions expand into issues, so they are consequential bulk actions requiring confirmation. Each requested addition is processed independently in input order and returns an ordered result.",
       inputSchema: { additions: z.array(mediaAdditionInputSchema).min(1) },
       outputSchema: { results: z.array(mediaAdditionResultSchema) },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
     async ({ additions }) =>
       asMcpContent({
-        results: await Promise.all(additions.map(addMediaResult)),
+        results: await addMediaResults(additions),
       }),
   );
+}
+
+async function addMediaResults(additions: z.infer<typeof mediaAdditionInputSchema>[]) {
+  const results = [];
+  for (const [index, addition] of additions.entries()) {
+    results.push(await addMediaResult(addition, index));
+  }
+  return results;
 }
 
 async function addMediaResult(input: z.infer<typeof mediaAdditionInputSchema>, index: number) {

@@ -9,6 +9,7 @@ import {
   type ComicIssueItem,
 } from "./ComicvineIssuePages.server";
 import { mapIssueToComicIssue, type ComicIssue } from "./ComicvineIssueMapping.server";
+export { getComicIssue, type ComicIssueDetail } from "./ComicvineIssueDetail.server";
 export { ComicIssueSchema, type ComicIssue } from "./ComicvineIssueMapping.server";
 type ComicVineVolume = z.infer<typeof ComicVineVolumeSchema>;
 
@@ -128,9 +129,8 @@ async function collectNewVolumeIssues(
     const data = await fetchIssuePageWithRetry(volumeId, apiKey, offset, "desc");
     totalResults = data.number_of_total_results;
 
-    if (!appendNewIssues(data.results, knownIssueIds, newIssues)) {
-      break;
-    }
+    if (data.results.length === 0) break;
+    appendNewIssues(data.results, knownIssueIds, newIssues);
 
     offset += data.results.length;
   }

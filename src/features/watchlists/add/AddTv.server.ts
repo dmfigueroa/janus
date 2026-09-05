@@ -84,7 +84,9 @@ async function addNewEpisodes(
   return episodesAddedResult(result.insertedCount);
 }
 
-function unwrapPersistFailure(result: Extract<PersistAddedItemsResult, { success: false }>): {
+export function unwrapPersistFailure(
+  result: Extract<PersistAddedItemsResult, { success: false }>,
+): {
   success: false;
   code: WatchlistWriteFailureCode;
   message: string;
@@ -98,7 +100,7 @@ function unwrapPersistFailure(result: Extract<PersistAddedItemsResult, { success
 
 // --- Implementation Details ---
 
-type TMDBEpisode = {
+export type TMDBEpisode = {
   id: number;
   name: string;
   season_number: number;
@@ -109,7 +111,7 @@ type TMDBEpisode = {
   runtime?: number | null;
 };
 
-async function fetchShowDetails(tmdbId: number) {
+export async function fetchShowDetails(tmdbId: number) {
   try {
     return await fetchTmdbTv({ id: tmdbId });
   } catch {
@@ -117,7 +119,7 @@ async function fetchShowDetails(tmdbId: number) {
   }
 }
 
-async function fetchEpisodesAcrossSeasons(
+export async function fetchEpisodesAcrossSeasons(
   tmdbId: number,
   seasons: Array<{ season_number: number }> | undefined,
 ) {
@@ -136,7 +138,7 @@ async function fetchEpisodesAcrossSeasons(
   return results.flat();
 }
 
-function mapToWatchlistEpisodes(
+export function mapToWatchlistEpisodes(
   episodes: TMDBEpisode[],
   watchlistId: number,
   showId: number,
@@ -160,7 +162,7 @@ function mapToWatchlistEpisodes(
   }));
 }
 
-async function filterNewEpisodes(
+export async function filterNewEpisodes(
   watchlistId: number,
   episodes: Array<typeof watchlistItems.$inferInsert>,
 ) {

@@ -4,7 +4,7 @@ import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 describe("Janus MCP endpoint", () => {
@@ -386,6 +386,154 @@ describe("Janus MCP endpoint", () => {
     });
     expect(repeatedResult.structuredContent).toMatchObject({
       results: [{ success: true, code: "no_new_episodes", affectedCount: 0 }],
+    });
+    fetchMock.mockRestore();
+  });
+
+  it("adds selected ComicVine issues in input order to a custom-ordered watchlist", async () => {
+    process.env.COMICVINE_API_KEY = "test-comicvine-key";
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP selected issues", itemOrderMode: "custom" })
+      .returning();
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const issueId = input.toString().match(/issue\/4000-(\d+)/)?.[1];
+      if (issueId === "9001") {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+
+      return new Response(
+        JSON.stringify({
+          error: "OK",
+          results: {
+            id: Number(issueId),
+            name: issueId === "9001" ? "First Selected Issue" : "Second Selected Issue",
+            issue_number: issueId === "9001" ? "1" : "2",
+            volume: { id: 4050, name: "Canonical Volume" },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+
+    const result = await client.callTool({
+      name: "add_media_to_watchlists",
+      arguments: {
+        additions: [
+          {
+            watchlistId: watchlist.id,
+            provider: "comicvine",
+            providerId: "9001",
+            mediaType: "comic_issue",
+            parent: { title: "Agent supplied context" },
+            insertionPosition: "end",
+          },
+          {
+            watchlistId: watchlist.id,
+            provider: "comicvine",
+            providerId: "9002",
+            mediaType: "comic_issue",
+            insertionPosition: "end",
+          },
+          {
+            watchlistId: watchlist.id,
+            provider: "comicvine",
+            providerId: "9001",
+            mediaType: "comic_issue",
+            insertionPosition: "end",
+          },
+        ],
+      },
+    });
+
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        { index: 0, success: true, code: "added", affectedCount: 1 },
+        { index: 1, success: true, code: "added", affectedCount: 1 },
+        { index: 2, success: true, code: "duplicate", affectedCount: 0 },
+      ],
+    });
+    await expect(
+      database
+        .getDb()
+        .select({ title: watchlistItems.title })
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, watchlist.id))
+        .orderBy(asc(watchlistItems.customRank)),
+    ).resolves.toEqual([{ title: "First Selected Issue" }, { title: "Second Selected Issue" }]);
+    fetchMock.mockRestore();
+  });
+
+  it("adds a selected TMDB episode using its required parent show ID", async () => {
+    process.env.TMDB_API_KEY = "test-tmdb-key";
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP selected episode" })
+      .returning();
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = input.toString();
+      if (url.includes("/season/1")) {
+        return new Response(
+          JSON.stringify({
+            episodes: [
+              {
+                id: 1002,
+                name: "Canonical Episode",
+                season_number: 1,
+                episode_number: 2,
+                still_path: null,
+                air_date: "2024-01-17",
+                vote_average: 7.8,
+                runtime: 44,
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          name: "Canonical Show",
+          poster_path: "/show.jpg",
+          seasons: [{ season_number: 1 }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+
+    const result = await client.callTool({
+      name: "add_media_to_watchlists",
+      arguments: {
+        additions: [
+          {
+            watchlistId: watchlist.id,
+            provider: "tmdb",
+            providerId: "1002",
+            mediaType: "episode",
+            parent: { providerId: "1399", title: "Agent supplied title" },
+          },
+        ],
+      },
+    });
+
+    expect(result.structuredContent).toMatchObject({
+      results: [{ success: true, code: "added", affectedCount: 1 }],
+    });
+    const [item] = await database
+      .getDb()
+      .select()
+      .from(watchlistItems)
+      .where(eq(watchlistItems.watchlistId, watchlist.id));
+    expect(item).toMatchObject({
+      tmdbId: "1002",
+      mediaType: "episode",
+      title: "Canonical Episode",
+      parentId: "tmdb:1399",
+      parentTitle: "Canonical Show",
     });
     fetchMock.mockRestore();
   });
