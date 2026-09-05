@@ -28,11 +28,11 @@ export async function addComicIssueToWatchlist({
   const apiKey = process.env.COMICVINE_API_KEY;
   if (!apiKey) return rejectAdd(COMICVINE_UNAVAILABLE_MESSAGE);
 
-  return getComicIssue(issueId, apiKey)
-    .then((issue) =>
+  return getComicIssue(issueId, apiKey).then(
+    (issue) =>
       persistComicIssue({ watchlistId, issue, parent, insertionPosition, referenceItemId }),
-    )
-    .catch(() => rejectAdd(COMICVINE_FETCH_FAILURE_MESSAGE));
+    () => rejectAdd(COMICVINE_FETCH_FAILURE_MESSAGE),
+  );
 }
 
 async function persistComicIssue({

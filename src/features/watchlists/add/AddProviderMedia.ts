@@ -26,7 +26,14 @@ export const providerMediaAdditionSchema = z
       providerId: z.string().regex(/^\d+$/, "Provider ID must be a TMDB numeric ID."),
       mediaType: z.literal("episode"),
       parent: parentSchema.extend({
-        providerId: z.string().trim().min(1, "Parent provider ID is required for episodes."),
+        providerId: z
+          .string()
+          .trim()
+          .regex(/^(?:tmdb:)?\d+$/, "Parent provider ID must be a TMDB numeric ID.")
+          .refine((providerId) => {
+            const numericId = Number(providerId.replace(/^tmdb:/, ""));
+            return Number.isSafeInteger(numericId) && numericId > 0;
+          }, "Parent provider ID must be a positive safe integer."),
       }),
     }),
     providerMediaAdditionBaseSchema.extend({

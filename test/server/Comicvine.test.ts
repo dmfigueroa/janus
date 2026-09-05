@@ -102,14 +102,14 @@ describe("getComicIssues", () => {
       expect(sort).toBe("issue_number:desc");
 
       if (offset === 0) {
-        return Promise.resolve(okResponse([makeIssues(10, 10)[0], makeIssues(9, 9)[0]], 500));
+        return Promise.resolve(okResponse([makeIssues(10, 10)[0], makeIssues(9, 9)[0]], 5));
       }
 
       if (offset === 2) {
-        return Promise.resolve(okResponse([makeIssues(8, 8)[0], makeIssues(7, 7)[0]], 500));
+        return Promise.resolve(okResponse([makeIssues(8, 8)[0], makeIssues(7, 7)[0]], 5));
       }
 
-      return Promise.resolve(okResponse([], 500));
+      return Promise.resolve(okResponse([makeIssues(6, 6)[0]], 5));
     });
 
     const issues = await getComicIssues("123", "api-key", {
@@ -117,7 +117,7 @@ describe("getComicIssues", () => {
     });
 
     expect(fetch).toHaveBeenCalledTimes(3);
-    expect(issues.map((issue) => issue.id)).toEqual(["10"]);
+    expect(issues.map((issue) => issue.id)).toEqual(["10", "6"]);
   });
 });
 

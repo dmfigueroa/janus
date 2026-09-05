@@ -538,6 +538,67 @@ describe("Janus MCP endpoint", () => {
     fetchMock.mockRestore();
   });
 
+  it("rejects invalid TMDB episode parent show IDs", async () => {
+    const { watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP malformed episode parent" })
+      .returning();
+
+    const result = await client.callTool({
+      name: "add_media_to_watchlists",
+      arguments: {
+        additions: [
+          {
+            watchlistId: watchlist.id,
+            provider: "tmdb",
+            providerId: "1002",
+            mediaType: "episode",
+            parent: { providerId: "1399junk" },
+          },
+          {
+            watchlistId: watchlist.id,
+            provider: "tmdb",
+            providerId: "1002",
+            mediaType: "episode",
+            parent: { providerId: "0" },
+          },
+          {
+            watchlistId: watchlist.id,
+            provider: "tmdb",
+            providerId: "1002",
+            mediaType: "episode",
+            parent: { providerId: "9007199254740992" },
+          },
+        ],
+      },
+    });
+
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          success: false,
+          code: "validation_error",
+          message: "Parent provider ID must be a TMDB numeric ID.",
+          affectedCount: 0,
+        },
+        {
+          success: false,
+          code: "validation_error",
+          message: "Parent provider ID must be a positive safe integer.",
+          affectedCount: 0,
+        },
+        {
+          success: false,
+          code: "validation_error",
+          message: "Parent provider ID must be a positive safe integer.",
+          affectedCount: 0,
+        },
+      ],
+    });
+  });
+
   it("preserves batch order when a missing destination fails beside a valid addition", async () => {
     process.env.TMDB_API_KEY = "test-tmdb-key";
     const { watchlists } = await import("@/db/Schema");

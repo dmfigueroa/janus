@@ -113,7 +113,6 @@ function appendNewIssues(
 ) {
   const issuesToAppend = issues.filter((issue) => !knownIssueIds.has(issue.id.toString()));
   newIssues.push(...issuesToAppend);
-  return issuesToAppend.length > 0;
 }
 
 async function collectNewVolumeIssues(
