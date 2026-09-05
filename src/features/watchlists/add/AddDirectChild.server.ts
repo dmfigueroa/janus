@@ -10,7 +10,31 @@ export function addDirectChildToWatchlist(
 }
 
 function addComicIssue(addition: ProviderMediaAddition): Promise<WatchlistWriteResult> | null {
-  if (addition.provider !== "comicvine" || addition.mediaType !== "comic_issue") return null;
+  if (!isComicvineAddition(addition)) return null;
+  if (!isDirectComicIssue(addition)) return null;
+  return addSingleComicIssue(addition);
+}
+
+function isComicvineAddition(
+  addition: ProviderMediaAddition,
+): addition is Extract<ProviderMediaAddition, { provider: "comicvine" }> {
+  return addition.provider === "comicvine";
+}
+
+function isDirectComicIssue(addition: Extract<ProviderMediaAddition, { provider: "comicvine" }>) {
+  return (
+    addition.mediaType === "comic_issue" ||
+    (addition.mediaType === "comic" && hasComicParent(addition))
+  );
+}
+
+function hasComicParent(addition: Extract<ProviderMediaAddition, { provider: "comicvine" }>) {
+  return addition.parent !== undefined && addition.parent.providerId !== undefined;
+}
+
+function addSingleComicIssue(
+  addition: Extract<ProviderMediaAddition, { provider: "comicvine" }>,
+): Promise<WatchlistWriteResult> {
   return addComicIssueToWatchlist({
     watchlistId: addition.watchlistId,
     issueId: addition.providerId,

@@ -44,7 +44,7 @@ export function registerAddMediaToWatchlistsTool(server: McpServer) {
     {
       title: "Add provider-backed media to watchlists",
       description:
-        "Add TMDB movies, TV, or individual episodes; RAWG games; Google Books books; or ComicVine volumes or individual issues by provider ID. Janus fetches canonical provider metadata before persisting each addition. TMDB episode additions require their parent show ID. Anime and manga additions remain unavailable. TV additions expand into episodes, and ComicVine volume additions expand into issues, so they are consequential bulk actions requiring confirmation. Each requested addition is processed independently in input order and returns an ordered result.",
+        'Add TMDB movies, TV, or individual episodes; RAWG games; Google Books books; or ComicVine volumes or individual issues by provider ID. Janus fetches canonical provider metadata before persisting each addition. TMDB episode additions require their parent show ID. A ComicVine item copied from read tool results (mediaType "comic" with its parent volume) adds that single issue; a "comic" addition without a parent adds the whole volume. Anime and manga additions remain unavailable. TV additions expand into episodes, and ComicVine volume additions expand into issues, so they are consequential bulk actions requiring confirmation. Each requested addition is processed independently in input order and returns an ordered result.',
       inputSchema: { additions: z.array(mediaAdditionInputSchema).min(1) },
       outputSchema: { results: z.array(mediaAdditionResultSchema) },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },

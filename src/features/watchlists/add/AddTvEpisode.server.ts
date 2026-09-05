@@ -20,7 +20,7 @@ export async function addTvEpisodeToWatchlist({
 }: {
   watchlistId: number;
   episodeId: string;
-  parent: { providerId: string; title?: string };
+  parent: { providerId: string; title?: string | null };
   insertionPosition?: AddToWatchlistInsertionPosition;
   referenceItemId?: number;
 }): Promise<WatchlistWriteResult> {
@@ -39,7 +39,10 @@ export async function addTvEpisodeToWatchlist({
   );
 }
 
-async function resolveEpisode(episodeId: string, parent: { providerId: string; title?: string }) {
+async function resolveEpisode(
+  episodeId: string,
+  parent: { providerId: string; title?: string | null },
+) {
   const showId = Number.parseInt(parent.providerId.replace(/^tmdb:/, ""), 10);
   const showDetails = await fetchShowDetails(showId);
   if (!showDetails) throw new Error(TMDB_TV_FETCH_FAILURE_MESSAGE);
@@ -64,7 +67,7 @@ async function persistEpisode({
   episode: Awaited<ReturnType<typeof resolveEpisode>>["episode"];
   showDetails: Awaited<ReturnType<typeof resolveEpisode>>["showDetails"];
   showId: number;
-  parent: { providerId: string; title?: string };
+  parent: { providerId: string; title?: string | null };
   insertionPosition?: AddToWatchlistInsertionPosition;
   referenceItemId?: number;
 }): Promise<WatchlistWriteResult> {
@@ -86,7 +89,7 @@ async function persistEpisode({
       });
 }
 
-function showTitle(canonicalTitle: string | undefined, suppliedTitle: string | undefined) {
+function showTitle(canonicalTitle: string | undefined, suppliedTitle: string | null | undefined) {
   return canonicalTitle || suppliedTitle || "Unknown Show";
 }
 

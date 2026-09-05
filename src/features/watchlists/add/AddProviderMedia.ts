@@ -10,8 +10,8 @@ const providerMediaAdditionBaseSchema = z.object({
 });
 
 const parentSchema = z.object({
-  providerId: z.string().trim().min(1).optional(),
-  title: z.string().trim().min(1).optional(),
+  providerId: z.string().trim().min(1).nullable().optional(),
+  title: z.string().trim().min(1).nullable().optional(),
 });
 
 export const providerMediaAdditionSchema = z
@@ -47,6 +47,7 @@ export const providerMediaAdditionSchema = z
     providerMediaAdditionBaseSchema.extend({
       provider: z.literal("comicvine"),
       mediaType: z.literal("comic"),
+      parent: parentSchema.optional(),
     }),
     providerMediaAdditionBaseSchema.extend({
       provider: z.literal("comicvine"),

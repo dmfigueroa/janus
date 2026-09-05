@@ -563,6 +563,44 @@ describe("provider-backed add to watchlist mutation", () => {
     });
   });
 
+  it("adds a single ComicVine issue when a comic addition includes its parent volume", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Read result issues" });
+    process.env.COMICVINE_API_KEY = "test-comicvine-key";
+    getComicIssueMock.mockResolvedValue({
+      id: "9001",
+      title: "Read Back Issue",
+      issueNumber: "7",
+      poster: "https://example.test/issue.jpg",
+      coverDate: "2024-03-14",
+      parent: { id: "4050", title: "Canonical Volume" },
+    });
+
+    const result = await addProviderMediaToWatchlist({
+      watchlistId: watchlist.id,
+      provider: "comicvine",
+      providerId: "9001",
+      mediaType: "comic",
+      parent: { providerId: "comicvine:4050", title: "Canonical Volume" },
+    });
+
+    expect(result).toMatchObject({ success: true, code: "added", affectedCount: 1 });
+    expect(getComicIssueMock).toHaveBeenCalledTimes(1);
+    expect(getComicVolumeDetailsMock).not.toHaveBeenCalled();
+    expect(getComicIssuesMock).not.toHaveBeenCalled();
+    await expect(readWatchlistDetail({ watchlistId: watchlist.id })).resolves.toMatchObject({
+      items: [
+        expect.objectContaining({
+          tmdbId: "9001",
+          mediaType: "comic",
+          title: "Read Back Issue",
+          parentId: "comicvine:4050",
+          parentTitle: "Canonical Volume",
+          episode: "7",
+        }),
+      ],
+    });
+  });
+
   it("adds only missing issues when a selected issue is followed by its volume", async () => {
     const watchlist = await createTestWatchlist(db, { name: "Selected then volume" });
     process.env.COMICVINE_API_KEY = "test-comicvine-key";

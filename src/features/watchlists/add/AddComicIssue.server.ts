@@ -21,7 +21,7 @@ export async function addComicIssueToWatchlist({
 }: {
   watchlistId: number;
   issueId: string;
-  parent?: { providerId?: string; title?: string };
+  parent?: { providerId?: string | null; title?: string | null };
   insertionPosition?: AddToWatchlistInsertionPosition;
   referenceItemId?: number;
 }): Promise<WatchlistWriteResult> {
@@ -44,7 +44,7 @@ async function persistComicIssue({
 }: {
   watchlistId: number;
   issue: Awaited<ReturnType<typeof getComicIssue>>;
-  parent?: { providerId?: string; title?: string };
+  parent?: { providerId?: string | null; title?: string | null };
   insertionPosition?: AddToWatchlistInsertionPosition;
   referenceItemId?: number;
 }): Promise<WatchlistWriteResult> {
@@ -64,7 +64,7 @@ async function persistComicIssue({
 function mapIssueToWatchlistItem(
   watchlistId: number,
   issue: Awaited<ReturnType<typeof getComicIssue>>,
-  parent?: { providerId?: string; title?: string },
+  parent?: { providerId?: string | null; title?: string | null },
 ): typeof watchlistItems.$inferInsert {
   return {
     watchlistId,
@@ -85,14 +85,14 @@ function mapIssueToWatchlistItem(
 
 function parentProviderId(
   issue: Awaited<ReturnType<typeof getComicIssue>>,
-  parent?: { providerId?: string },
+  parent?: { providerId?: string | null },
 ) {
   return issue.parent.id || parent?.providerId;
 }
 
 function parentTitle(
   issue: Awaited<ReturnType<typeof getComicIssue>>,
-  parent?: { title?: string },
+  parent?: { title?: string | null },
 ) {
   return [issue.parent.title, parent?.title, "Unknown Volume"].find(Boolean) as string;
 }

@@ -466,6 +466,71 @@ describe("Janus MCP endpoint", () => {
     fetchMock.mockRestore();
   });
 
+  it("adds a single ComicVine issue when a read result is fed back with its parent volume", async () => {
+    process.env.COMICVINE_API_KEY = "test-comicvine-key";
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP comic read back" })
+      .returning();
+    await database.getDb().insert(watchlistItems).values({
+      watchlistId: watchlist.id,
+      tmdbId: "9001",
+      source: "comicvine",
+      mediaType: "comic",
+      title: "Read Back Issue",
+      parentId: "comicvine:4050",
+      parentTitle: "Canonical Volume",
+      episode: "7",
+    });
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = input.toString();
+      if (url.includes("/volume/")) {
+        throw new Error("Volume endpoint should not be reached for a parented comic addition");
+      }
+      const issueId = url.match(/issue\/4000-(\d+)/)?.[1];
+      return new Response(
+        JSON.stringify({
+          error: "OK",
+          results: {
+            id: Number(issueId),
+            name: "Read Back Issue",
+            issue_number: "7",
+            volume: { id: 4050, name: "Canonical Volume" },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    });
+
+    const readResult = await client.callTool({
+      name: "get_watchlist",
+      arguments: { watchlistId: watchlist.id },
+    });
+    const item = (readResult.structuredContent as { items: Record<string, unknown>[] }).items[0];
+
+    const addResult = await client.callTool({
+      name: "add_media_to_watchlists",
+      arguments: {
+        additions: [
+          {
+            watchlistId: watchlist.id,
+            provider: item.provider,
+            providerId: item.providerId,
+            mediaType: item.mediaType,
+            parent: item.parent,
+          },
+        ],
+      },
+    });
+
+    expect(addResult.structuredContent).toMatchObject({
+      results: [{ success: true, code: "duplicate", affectedCount: 0 }],
+    });
+    fetchMock.mockRestore();
+  });
+
   it("adds a selected TMDB episode using its required parent show ID", async () => {
     process.env.TMDB_API_KEY = "test-tmdb-key";
     const { watchlistItems, watchlists } = await import("@/db/Schema");
