@@ -9,7 +9,6 @@ import {
   type ComicIssueItem,
 } from "./ComicvineIssuePages.server";
 import { mapIssueToComicIssue, type ComicIssue } from "./ComicvineIssueMapping.server";
-export { getComicIssue, type ComicIssueDetail } from "./ComicvineIssueDetail.server";
 export { ComicIssueSchema, type ComicIssue } from "./ComicvineIssueMapping.server";
 type ComicVineVolume = z.infer<typeof ComicVineVolumeSchema>;
 

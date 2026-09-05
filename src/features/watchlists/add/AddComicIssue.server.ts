@@ -1,5 +1,5 @@
 import { watchlistItems } from "@/db/Schema";
-import { getComicIssue } from "@/server/providers/Comicvine.server";
+import { getComicIssue } from "@/integrations/comicvine/ComicvineIssueDetail.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
 import { persistAddedItems } from "./Insert.server";
 import {

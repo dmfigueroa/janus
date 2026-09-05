@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getComicIssue, getComicIssues } from "@/server/providers/Comicvine.server";
+import { getComicIssue } from "@/integrations/comicvine/ComicvineIssueDetail.server";
+import { getComicIssues } from "@/server/providers/Comicvine.server";
 
 vi.stubGlobal("fetch", vi.fn());
 

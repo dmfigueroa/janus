@@ -35,11 +35,13 @@ vi.mock("@/server/providers/TmdbApi.server", () => ({
 vi.mock("@/server/providers/GoogleBooks.server", () => ({ getBookDetails: getBookDetailsMock }));
 vi.mock("@/server/providers/Rawg.server", () => ({ getGameDetails: getGameDetailsMock }));
 vi.mock("@/server/providers/Comicvine.server", () => ({
-  getComicIssue: getComicIssueMock,
   getComicIssues: getComicIssuesMock,
 }));
 vi.mock("@/integrations/comicvine/ComicvineVolume.server", () => ({
   getComicVolumeDetails: getComicVolumeDetailsMock,
+}));
+vi.mock("@/integrations/comicvine/ComicvineIssueDetail.server", () => ({
+  getComicIssue: getComicIssueMock,
 }));
 vi.mock("@/db/Db.server", () => ({ getDb: () => dbState.db }));
 

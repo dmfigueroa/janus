@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { mapIssueToComicIssue, type ComicIssue } from "./ComicvineIssueMapping.server";
+import {
+  mapIssueToComicIssue,
+  type ComicIssue,
+} from "@/server/providers/ComicvineIssueMapping.server";
 
 const ComicVineIssueDetailSchema = z.object({
   id: z.number(),
@@ -28,8 +31,13 @@ export type ComicIssueDetail = ComicIssue & {
 
 export async function getComicIssue(issueId: string, apiKey: string): Promise<ComicIssueDetail> {
   const url = new URL(`https://comicvine.gamespot.com/api/issue/4000-${issueId}/`);
-  url.search = new URLSearchParams({ api_key: apiKey, format: "json" }).toString();
-  const response = await fetch(url, { headers: { "User-Agent": "JanusApp/1.0" } });
+  url.search = new URLSearchParams({
+    api_key: apiKey,
+    format: "json",
+  }).toString();
+  const response = await fetch(url, {
+    headers: { "User-Agent": "JanusApp/1.0" },
+  });
   if (!response.ok) throw new Error(`ComicVine issue request failed: ${response.status}`);
 
   const data = ComicVineIssueDetailResponseSchema.parse(await response.json());
