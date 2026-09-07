@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getComicIssue } from "@/integrations/comicvine/ComicvineIssueDetail.server";
 import { getComicIssues } from "@/server/providers/Comicvine.server";
 
 vi.stubGlobal("fetch", vi.fn());
@@ -93,7 +94,7 @@ describe("getComicIssues", () => {
     expect(issues[349].id).toBe("350");
   });
 
-  it("syncs incrementally for known issues and stops after fully known page", async () => {
+  it("syncs every page for known issues so it includes older missing issues", async () => {
     vi.mocked(fetch).mockImplementation((input) => {
       const url = new URL(input.toString());
       const offset = Number(url.searchParams.get("offset"));
@@ -102,21 +103,56 @@ describe("getComicIssues", () => {
       expect(sort).toBe("issue_number:desc");
 
       if (offset === 0) {
-        return Promise.resolve(okResponse([makeIssues(10, 10)[0], makeIssues(9, 9)[0]], 500));
+        return Promise.resolve(okResponse([makeIssues(10, 10)[0], makeIssues(9, 9)[0]], 5));
       }
 
       if (offset === 2) {
-        return Promise.resolve(okResponse([makeIssues(8, 8)[0], makeIssues(7, 7)[0]], 500));
+        return Promise.resolve(okResponse([makeIssues(8, 8)[0], makeIssues(7, 7)[0]], 5));
       }
 
-      return Promise.resolve(okResponse([], 500));
+      return Promise.resolve(okResponse([makeIssues(6, 6)[0]], 5));
     });
 
     const issues = await getComicIssues("123", "api-key", {
       knownIssueIds: new Set(["9", "8", "7"]),
     });
 
-    expect(fetch).toHaveBeenCalledTimes(2);
-    expect(issues.map((issue) => issue.id)).toEqual(["10"]);
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(issues.map((issue) => issue.id)).toEqual(["10", "6"]);
+  });
+});
+
+describe("getComicIssue", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("maps a provider issue ID with its canonical volume", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: "OK",
+          results: {
+            id: 9001,
+            name: "Selected Issue",
+            issue_number: "7",
+            cover_date: "2024-03-14",
+            volume: { id: 4050, name: "Canonical Volume" },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await expect(getComicIssue("9001", "api-key")).resolves.toMatchObject({
+      id: "9001",
+      title: "Selected Issue",
+      issueNumber: "7",
+      parent: { id: "4050", title: "Canonical Volume" },
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(new URL(vi.mocked(fetch).mock.calls[0]?.[0].toString()).pathname).toBe(
+      "/api/issue/4000-9001/",
+    );
   });
 });

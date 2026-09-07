@@ -3,6 +3,7 @@ import { addToWatchlistMutation } from "./Mutation.server";
 import type { ProviderMediaAddition } from "./AddProviderMedia";
 import { getWatchlistById } from "@/features/watchlists/Repository.server";
 import { CUSTOM_ORDER_INSERTION_REQUIRED_MESSAGE } from "./Constants";
+import { addDirectChildToWatchlist } from "./AddDirectChild.server";
 
 export type ProviderMediaAdditionResult = {
   success: boolean;
@@ -27,6 +28,9 @@ export async function addProviderMediaToWatchlist(
     return destinationFailure;
   }
 
+  const directAddition = addDirectChildToWatchlist(addition);
+  if (directAddition) return directAddition.then(providerMediaAdditionResult);
+
   return addToWatchlistMutation({
     watchlistId: addition.watchlistId,
     insertionPosition: addition.insertionPosition,
@@ -34,7 +38,10 @@ export async function addProviderMediaToWatchlist(
     media: {
       id: addition.providerId,
       source: addition.provider,
-      mediaType: addition.mediaType,
+      mediaType: addition.mediaType as Exclude<
+        typeof addition.mediaType,
+        "episode" | "comic_issue"
+      >,
       title: "",
       poster: null,
     },

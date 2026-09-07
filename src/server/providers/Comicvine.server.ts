@@ -112,7 +112,6 @@ function appendNewIssues(
 ) {
   const issuesToAppend = issues.filter((issue) => !knownIssueIds.has(issue.id.toString()));
   newIssues.push(...issuesToAppend);
-  return issuesToAppend.length > 0;
 }
 
 async function collectNewVolumeIssues(
@@ -128,9 +127,8 @@ async function collectNewVolumeIssues(
     const data = await fetchIssuePageWithRetry(volumeId, apiKey, offset, "desc");
     totalResults = data.number_of_total_results;
 
-    if (!appendNewIssues(data.results, knownIssueIds, newIssues)) {
-      break;
-    }
+    if (data.results.length === 0) break;
+    appendNewIssues(data.results, knownIssueIds, newIssues);
 
     offset += data.results.length;
   }
