@@ -832,6 +832,72 @@ describe("provider-backed add to watchlist mutation", () => {
     });
   });
 
+  it("reports a not-found result when an episode is absent from its parent show", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Mismatched episode" });
+    getTVDetailsMock.mockResolvedValue({
+      name: "Canonical Show",
+      poster_path: "/show.jpg",
+      seasons: [{ season_number: 1 }],
+    });
+    getSeasonDetailsMock.mockResolvedValue({
+      episodes: [
+        {
+          id: 1002,
+          name: "Canonical Episode",
+          season_number: 1,
+          episode_number: 2,
+          still_path: null,
+          air_date: "2024-01-17",
+          vote_average: 7.8,
+          runtime: 44,
+        },
+      ],
+    });
+
+    const result = await addProviderMediaToWatchlist({
+      watchlistId: watchlist.id,
+      provider: "tmdb",
+      providerId: "1001",
+      mediaType: "episode",
+      parent: { providerId: "tmdb:1399", title: "Agent supplied title" },
+    });
+
+    expect(result).toEqual({
+      success: false,
+      code: "not_found",
+      message: "TMDB episode was not found for this show.",
+      affectedCount: 0,
+    });
+    await expect(readWatchlistDetail({ watchlistId: watchlist.id })).resolves.toMatchObject({
+      items: [],
+    });
+  });
+
+  it("reports a provider failure when an episode's season cannot be resolved", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Unavailable episode provider" });
+    getTVDetailsMock.mockResolvedValue({
+      name: "Unavailable Show",
+      poster_path: null,
+      seasons: [{ season_number: 1 }],
+    });
+    getSeasonDetailsMock.mockRejectedValue(new Error("TMDB unavailable"));
+
+    const result = await addProviderMediaToWatchlist({
+      watchlistId: watchlist.id,
+      provider: "tmdb",
+      providerId: "1002",
+      mediaType: "episode",
+      parent: { providerId: "tmdb:1399" },
+    });
+
+    expect(result).toEqual({
+      success: false,
+      code: "provider_unavailable",
+      message: "Failed to fetch TV details from TMDB.",
+      affectedCount: 0,
+    });
+  });
+
   it("returns a provider failure when a TV season cannot be resolved", async () => {
     const watchlist = await createTestWatchlist(db, { name: "Unavailable TV provider" });
     getTVDetailsMock.mockResolvedValue({

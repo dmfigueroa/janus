@@ -6,10 +6,18 @@ import {
   filterNewEpisodes,
   mapToWatchlistEpisodes,
   unwrapPersistFailure,
+  type TMDBEpisode,
 } from "./AddTv.server";
 import { rejectAdd, type WatchlistWriteResult } from "./Shared.server";
 
 const TMDB_TV_FETCH_FAILURE_MESSAGE = "Failed to fetch TV details from TMDB.";
+const TMDB_EPISODE_NOT_FOUND_MESSAGE = "TMDB episode was not found for this show.";
+
+type ResolvedEpisode = {
+  episode: TMDBEpisode;
+  showDetails: NonNullable<Awaited<ReturnType<typeof fetchShowDetails>>>;
+  showId: number;
+};
 
 export async function addTvEpisodeToWatchlist({
   watchlistId,
@@ -25,16 +33,16 @@ export async function addTvEpisodeToWatchlist({
   referenceItemId?: number;
 }): Promise<WatchlistWriteResult> {
   return resolveEpisode(episodeId, parent).then(
-    ({ episode, showDetails, showId }) =>
-      persistEpisode({
-        watchlistId,
-        episode,
-        showDetails,
-        showId,
-        parent,
-        insertionPosition,
-        referenceItemId,
-      }),
+    (resolution) =>
+      resolution
+        ? persistEpisode({
+            watchlistId,
+            ...resolution,
+            parent,
+            insertionPosition,
+            referenceItemId,
+          })
+        : rejectAdd(TMDB_EPISODE_NOT_FOUND_MESSAGE, "not_found"),
     () => rejectAdd(TMDB_TV_FETCH_FAILURE_MESSAGE),
   );
 }
@@ -42,7 +50,7 @@ export async function addTvEpisodeToWatchlist({
 async function resolveEpisode(
   episodeId: string,
   parent: { providerId: string; title?: string | null },
-) {
+): Promise<ResolvedEpisode | null> {
   const showId = Number.parseInt(parent.providerId.replace(/^tmdb:/, ""), 10);
   const showDetails = await fetchShowDetails(showId);
   if (!showDetails) throw new Error(TMDB_TV_FETCH_FAILURE_MESSAGE);
@@ -50,8 +58,7 @@ async function resolveEpisode(
   const episode = (await fetchEpisodesAcrossSeasons(showId, showDetails.seasons)).find(
     (candidate) => candidate.id.toString() === episodeId,
   );
-  if (!episode) throw new Error("TMDB episode was not found for this show.");
-  return { episode, showDetails, showId };
+  return episode ? { episode, showDetails, showId } : null;
 }
 
 async function persistEpisode({
@@ -64,8 +71,8 @@ async function persistEpisode({
   referenceItemId,
 }: {
   watchlistId: number;
-  episode: Awaited<ReturnType<typeof resolveEpisode>>["episode"];
-  showDetails: Awaited<ReturnType<typeof resolveEpisode>>["showDetails"];
+  episode: ResolvedEpisode["episode"];
+  showDetails: ResolvedEpisode["showDetails"];
   showId: number;
   parent: { providerId: string; title?: string | null };
   insertionPosition?: AddToWatchlistInsertionPosition;
