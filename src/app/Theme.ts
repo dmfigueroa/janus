@@ -88,7 +88,7 @@ const janusConfig = defineConfig({
           value: { base: "#e5e5e5", _dark: "#28242e" },
         },
         "accent.solid": {
-          value: "#ff0055",
+          value: "{colors.pink.500}",
         },
         "accent.contrast": {
           value: "#ffffff",
