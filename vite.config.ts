@@ -39,7 +39,7 @@ const config = defineConfig({
         name: "Janus",
         start_url: "/",
         display: "standalone",
-        theme_color: "#ff0055",
+        theme_color: "#d53f8c",
         background_color: "#141218",
         icons: [
           {

@@ -48,13 +48,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     links: [
       {
         rel: "icon",
-        href: "/janus-logo-dark.png",
-        media: "(prefers-color-scheme: dark)",
-      },
-      {
-        rel: "icon",
-        href: "/janus-logo-light.png",
-        media: "(prefers-color-scheme: light)",
+        href: "/janus-logo.png",
       },
       ...getManifestLinks(pwaInfo?.webManifest),
     ],
