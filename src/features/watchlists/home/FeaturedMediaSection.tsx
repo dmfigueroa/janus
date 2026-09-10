@@ -12,7 +12,7 @@ export function FeaturedMediaSection({ section }: FeaturedMediaSectionProps) {
       <Heading as="h3" size="lg" fontWeight="semibold" mb={3}>
         {section.title}
       </Heading>
-      <SimpleGrid columns={{ base: 2, md: 4 }} gap={{ base: 4, md: 6 }}>
+      <SimpleGrid columns={{ base: 3, md: 4 }} gap={{ base: 4, md: 6 }}>
         <FeaturedWatchlistGridItems watchlists={section.watchlists} />
       </SimpleGrid>
       <UpcomingWatchlistChips watchlists={section.upcomingWatchlists} />

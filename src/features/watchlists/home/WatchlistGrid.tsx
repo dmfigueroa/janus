@@ -26,7 +26,7 @@ export function WatchlistGrid({
   }));
 
   return (
-    <SimpleGrid columns={{ base: 2, md: 4 }} gap={{ base: 4, md: 6 }}>
+    <SimpleGrid columns={{ base: 3, md: 4 }} gap={{ base: 4, md: 6 }}>
       <WatchlistGridItems gridItems={gridItems} />
       {showCreateTile ? <CreateWatchlistTile key="create-watchlist" /> : null}
     </SimpleGrid>
