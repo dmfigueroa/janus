@@ -27,7 +27,7 @@ export const getDeprecatedWatchlistAddRejection = (
 
 export const UnifiedMediaSchema = z.object({
   id: z.string(),
-  mediaType: z.enum(["movie", "tv", "game", "book", "comic", "anime", "manga"]),
+  mediaType: z.enum(["movie", "tv", "episode", "game", "book", "comic", "anime", "manga"]),
   title: z.string(),
   poster: z.string().nullable(),
   backdrop: z.string().nullable().optional(),
@@ -36,6 +36,9 @@ export const UnifiedMediaSchema = z.object({
   rating: z.number().optional(),
   overview: z.string().optional(),
   authors: z.array(z.string()).optional(),
+  parentId: z.string().optional(),
+  parentTitle: z.string().optional(),
+  episode: z.string().optional(),
   source: z.enum(["tmdb", "google_books", "rawg", "comicvine", "anilist", "custom"]),
 });
 

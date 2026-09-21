@@ -2,7 +2,10 @@ import { useEffect } from "react";
 import { Box, Container, Heading, Stack, Tabs, Text } from "@chakra-ui/react";
 import { toaster } from "@/app/Toaster";
 import { SearchResults } from "@/features/search/SearchResults";
-import { searchableMediaTabs } from "@/features/search/search/MediaSearch";
+import {
+  searchableMediaTabs,
+  type SearchableMediaType,
+} from "@/features/search/search/MediaSearch";
 import { DEPRECATED_MEDIA_MESSAGE, isDeprecatedMediaType } from "@/server/Media";
 import type { UnifiedMedia } from "@/server/Media";
 import { SearchInput } from "./SearchInput";
@@ -11,7 +14,7 @@ import { useSearchNavigation } from "./useSearchNavigation";
 
 interface SearchDiscoveryScreenProperties {
   query: string;
-  type: UnifiedMedia["mediaType"];
+  type: SearchableMediaType;
   initialData: {
     results: UnifiedMedia[];
     page: number;
@@ -36,7 +39,7 @@ function SearchMediaTabItem(tab: (typeof searchableMediaTabs)[number]) {
   );
 }
 
-function getActiveTab(type: UnifiedMedia["mediaType"]) {
+function getActiveTab(type: SearchableMediaType) {
   if (isDeprecatedMediaType(type)) return "movie";
   return type;
 }

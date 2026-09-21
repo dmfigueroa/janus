@@ -36,7 +36,7 @@ export async function addCustomItemToWatchlist(
 
 function buildCustomMedia(addition: CustomItemAddition) {
   const year = addition.year || undefined;
-  return {
+  const media = {
     id: `custom-${crypto.randomUUID()}`,
     source: "custom" as const,
     mediaType: addition.mediaType,
@@ -45,6 +45,19 @@ function buildCustomMedia(addition: CustomItemAddition) {
     year,
     releaseDate: year,
   };
+
+  if (addition.mediaType !== "episode") return media;
+
+  return {
+    ...media,
+    parentId: customParentId(addition.parentTitle!),
+    parentTitle: addition.parentTitle!,
+    episode: addition.episode!,
+  };
+}
+
+function customParentId(parentTitle: string) {
+  return `custom:${parentTitle.toLocaleLowerCase().replaceAll(/\s+/g, "-")}`;
 }
 
 function validateDestination(addition: CustomItemAddition): CustomItemAdditionResult | null {
