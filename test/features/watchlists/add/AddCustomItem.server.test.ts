@@ -59,13 +59,13 @@ describe("custom item addition", () => {
     });
   });
 
-  it("persists a supplied full calendar date as the release date", async () => {
+  it("persists a supplied release date", async () => {
     const watchlist = await createTestWatchlist(db, { name: "Dated picks" });
     const result = await addCustomItemToWatchlist({
       watchlistId: watchlist.id,
       title: "Full Date Pick",
       mediaType: "movie",
-      year: "2025-02-03",
+      releaseDate: "2025-02-03",
     });
     const items = await db
       .select()
@@ -243,13 +243,16 @@ describe("custom item addition", () => {
 describe("custom item schema validation", () => {
   const baseInput = { watchlistId: 1, title: "Pick", mediaType: "movie" };
 
-  it("accepts a year-only or complete calendar date and an omitted date", async () => {
+  it("accepts a year-only or complete calendar release date and an omitted date", async () => {
     const { customItemAdditionSchema } = await import("@/features/watchlists/add/AddCustomItem");
 
     expect(customItemAdditionSchema.safeParse({ ...baseInput, year: "2025" }).success).toBe(true);
     expect(customItemAdditionSchema.safeParse({ ...baseInput, year: "2025-02-03" }).success).toBe(
       true,
     );
+    expect(
+      customItemAdditionSchema.safeParse({ ...baseInput, releaseDate: "2025-02-03" }).success,
+    ).toBe(true);
     expect(customItemAdditionSchema.safeParse(baseInput).success).toBe(true);
   });
 

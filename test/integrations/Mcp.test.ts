@@ -884,7 +884,7 @@ describe("Janus MCP endpoint", () => {
             parentTitle: "Local Series",
             title: "Pilot",
             episode: "S01E01",
-            year: "2026-10-04",
+            releaseDate: "2026-10-04",
           },
         ],
       },

@@ -24,6 +24,7 @@ const customItemAdditionInputSchema = z
     title: z.string().optional(),
     mediaType: z.enum(["movie", "tv", "episode", "book", "game", "comic"]).optional(),
     year: z.string().optional(),
+    releaseDate: z.string().optional(),
     parentTitle: z.string().optional(),
     episode: z.string().optional(),
     insertionPosition: z.enum(["beginning", "end", "before", "after"]).optional(),

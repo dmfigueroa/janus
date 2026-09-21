@@ -18,6 +18,7 @@ export const customItemAdditionSchema = z
     title: z.string().trim().min(1, "Title is required."),
     mediaType: customItemMediaTypeSchema,
     year: releaseDateSchema.optional(),
+    releaseDate: releaseDateSchema.optional(),
     parentTitle: z.string().trim().min(1, "Series title is required.").optional(),
     episode: z.string().trim().min(1, "Episode label is required.").optional(),
     insertionPosition: addToWatchlistInsertionPositionSchema.optional(),
