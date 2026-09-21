@@ -133,6 +133,30 @@ describe("custom item addition", () => {
     expect(items[0]?.tmdbId).not.toBe(items[1]?.tmdbId);
   });
 
+  it("uses distinct parent identities for custom series with similar titles", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Custom episodes" });
+    await addCustomItemToWatchlist({
+      watchlistId: watchlist.id,
+      mediaType: "episode",
+      parentTitle: "A B",
+      title: "First",
+      episode: "S01E01",
+    });
+    await addCustomItemToWatchlist({
+      watchlistId: watchlist.id,
+      mediaType: "episode",
+      parentTitle: "A-B",
+      title: "First",
+      episode: "S01E01",
+    });
+    const items = await db
+      .select()
+      .from(schema.watchlistItems)
+      .where(eq(schema.watchlistItems.watchlistId, watchlist.id));
+
+    expect(items.map((item) => item.parentId)).toEqual(["custom:a%20b", "custom:a-b"]);
+  });
+
   it("requires an insertion position for a custom-ordered watchlist", async () => {
     const watchlist = await createTestWatchlist(db, {
       name: "Priority Queue",
@@ -234,6 +258,14 @@ describe("custom item schema validation", () => {
 
     expect(customItemAdditionSchema.safeParse({ ...baseInput, year: "20x5" }).success).toBe(false);
     expect(customItemAdditionSchema.safeParse({ ...baseInput, year: "2025-02-29" }).success).toBe(
+      false,
+    );
+  });
+
+  it("requires series metadata for custom episodes", async () => {
+    const { customItemAdditionSchema } = await import("@/features/watchlists/add/AddCustomItem");
+
+    expect(customItemAdditionSchema.safeParse({ ...baseInput, mediaType: "episode" }).success).toBe(
       false,
     );
   });

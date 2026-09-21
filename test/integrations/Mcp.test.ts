@@ -912,7 +912,7 @@ describe("Janus MCP endpoint", () => {
       source: "custom",
       mediaType: "episode",
       title: "Pilot",
-      parentId: "custom:local-series",
+      parentId: "custom:local%20series",
       parentTitle: "Local Series",
       episode: "S01E01",
       releaseDate: "2026-10-04",

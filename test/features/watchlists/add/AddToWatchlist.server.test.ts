@@ -74,6 +74,27 @@ beforeEach(async () => {
 });
 
 describe("add to watchlist mutation", () => {
+  it("requires episode metadata in the shared media schema", async () => {
+    const { UnifiedMediaSchema } = await import("@/server/Media");
+    const baseEpisode = {
+      id: "custom-episode-1",
+      mediaType: "episode" as const,
+      source: "custom" as const,
+      title: "Pilot",
+      poster: null,
+    };
+
+    expect(UnifiedMediaSchema.safeParse(baseEpisode).success).toBe(false);
+    expect(
+      UnifiedMediaSchema.safeParse({
+        ...baseEpisode,
+        parentId: "custom:local-series",
+        parentTitle: "Local Series",
+        episode: "S01E01",
+      }).success,
+    ).toBe(true);
+  });
+
   it("adds a custom item", async () => {
     const watchlist = await createTestWatchlist(db, { name: "Custom Picks" });
     const result = await addToWatchlistMutation({
