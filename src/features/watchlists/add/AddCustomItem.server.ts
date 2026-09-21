@@ -35,16 +35,39 @@ export async function addCustomItemToWatchlist(
 }
 
 function buildCustomMedia(addition: CustomItemAddition) {
-  const year = addition.year || undefined;
+  const releaseDate = customReleaseDate(addition);
+  if (addition.mediaType === "episode") {
+    return {
+      id: `custom-${crypto.randomUUID()}`,
+      source: "custom" as const,
+      mediaType: addition.mediaType,
+      title: addition.title,
+      parentId: customParentId(addition.parentTitle!),
+      parentTitle: addition.parentTitle!,
+      episode: addition.episode!,
+      poster: null,
+      year: releaseDate,
+      releaseDate,
+    };
+  }
+
   return {
     id: `custom-${crypto.randomUUID()}`,
     source: "custom" as const,
     mediaType: addition.mediaType,
     title: addition.title,
     poster: null,
-    year,
-    releaseDate: year,
+    year: releaseDate,
+    releaseDate,
   };
+}
+
+function customReleaseDate(addition: CustomItemAddition) {
+  return addition.releaseDate || addition.year || undefined;
+}
+
+function customParentId(parentTitle: string) {
+  return `custom:${encodeURIComponent(parentTitle.toLocaleLowerCase())}`;
 }
 
 function validateDestination(addition: CustomItemAddition): CustomItemAdditionResult | null {

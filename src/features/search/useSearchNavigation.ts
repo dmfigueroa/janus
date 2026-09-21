@@ -1,8 +1,11 @@
 import { useCallback } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { UnifiedMediaSchema, type UnifiedMedia } from "@/server/Media";
+import {
+  searchableMediaTypes,
+  type SearchableMediaType,
+} from "@/features/search/search/MediaSearch";
 
-export function useSearchNavigation(query: string, type: UnifiedMedia["mediaType"]) {
+export function useSearchNavigation(query: string, type: SearchableMediaType) {
   const navigate = useNavigate();
 
   const handleSearch = useCallback(
@@ -20,9 +23,8 @@ export function useSearchNavigation(query: string, type: UnifiedMedia["mediaType
 
   const handleTabChange = useCallback(
     (newType: string) => {
-      const parsedType = UnifiedMediaSchema.shape.mediaType.safeParse(newType);
-
-      if (!parsedType.success) {
+      const parsedType = searchableMediaTypes.find((type) => type === newType);
+      if (!parsedType) {
         return;
       }
 
@@ -30,7 +32,7 @@ export function useSearchNavigation(query: string, type: UnifiedMedia["mediaType
         to: "/search",
         search: {
           query,
-          type: parsedType.data,
+          type: parsedType,
         },
       });
     },

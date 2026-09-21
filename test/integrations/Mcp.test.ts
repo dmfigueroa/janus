@@ -866,6 +866,86 @@ describe("Janus MCP endpoint", () => {
     });
   });
 
+  it("adds a custom episode with its supplied series metadata", async () => {
+    const { watchlistItems, watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP custom episode" })
+      .returning();
+
+    const result = await client.callTool({
+      name: "add_custom_items_to_watchlists",
+      arguments: {
+        items: [
+          {
+            watchlistId: watchlist.id,
+            mediaType: "episode",
+            parentTitle: "Local Series",
+            title: "Pilot",
+            episode: "S01E01",
+            releaseDate: "2026-10-04",
+          },
+        ],
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: true,
+          code: "added",
+          watchlistId: watchlist.id,
+          mediaType: "episode",
+          affectedCount: 1,
+        },
+      ],
+    });
+    const [item] = await database
+      .getDb()
+      .select()
+      .from(watchlistItems)
+      .where(eq(watchlistItems.watchlistId, watchlist.id));
+    expect(item).toMatchObject({
+      source: "custom",
+      mediaType: "episode",
+      title: "Pilot",
+      parentId: "custom:local%20series",
+      parentTitle: "Local Series",
+      episode: "S01E01",
+      releaseDate: "2026-10-04",
+    });
+  });
+
+  it("requires series metadata for custom episodes", async () => {
+    const { watchlists } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "MCP incomplete custom episode" })
+      .returning();
+
+    const result = await client.callTool({
+      name: "add_custom_items_to_watchlists",
+      arguments: {
+        items: [{ watchlistId: watchlist.id, mediaType: "episode", title: "Pilot" }],
+      },
+    });
+
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          success: false,
+          code: "validation_error",
+          message: "Series title is required.",
+          affectedCount: 0,
+        },
+      ],
+    });
+  });
+
   it("preserves batch order across custom addition failures", async () => {
     const { watchlists } = await import("@/db/Schema");
     const [watchlist] = await database

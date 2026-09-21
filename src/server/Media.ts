@@ -25,9 +25,8 @@ export const getDeprecatedWatchlistAddRejection = (
   };
 };
 
-export const UnifiedMediaSchema = z.object({
+const unifiedMediaBaseSchema = z.object({
   id: z.string(),
-  mediaType: z.enum(["movie", "tv", "game", "book", "comic", "anime", "manga"]),
   title: z.string(),
   poster: z.string().nullable(),
   backdrop: z.string().nullable().optional(),
@@ -36,7 +35,22 @@ export const UnifiedMediaSchema = z.object({
   rating: z.number().optional(),
   overview: z.string().optional(),
   authors: z.array(z.string()).optional(),
+  parentId: z.string().optional(),
+  parentTitle: z.string().optional(),
+  episode: z.string().optional(),
   source: z.enum(["tmdb", "google_books", "rawg", "comicvine", "anilist", "custom"]),
 });
+
+export const UnifiedMediaSchema = z.discriminatedUnion("mediaType", [
+  unifiedMediaBaseSchema.extend({
+    mediaType: z.literal("episode"),
+    parentId: z.string().trim().min(1, "Parent identity is required for episodes."),
+    parentTitle: z.string().trim().min(1, "Parent title is required for episodes."),
+    episode: z.string().trim().min(1, "Episode label is required."),
+  }),
+  unifiedMediaBaseSchema.extend({
+    mediaType: z.enum(["movie", "tv", "game", "book", "comic", "anime", "manga"]),
+  }),
+]);
 
 export type UnifiedMedia = z.infer<typeof UnifiedMediaSchema>;

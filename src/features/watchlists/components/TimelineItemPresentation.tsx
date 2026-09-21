@@ -4,6 +4,7 @@ import type { WatchlistItem } from "@/db/Schema";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
 import { formatReleaseDate, formatRuntime } from "@/utils/Datetime";
 import { buildMediaPosterUrl } from "@/utils/Tmdb";
+import { ItemSequence } from "./ItemSequence";
 
 const mediaConfig = {
   movie: {
@@ -120,6 +121,7 @@ export function TimelineItemContent({
   parentTitle,
   title,
   mediaType,
+  source,
   season,
   episode,
   releaseDate,
@@ -149,7 +151,7 @@ export function TimelineItemContent({
         fontSize={{ base: "xs", md: "sm" }}
         color="fg.muted"
       >
-        <ItemSequence mediaType={mediaType} season={season} episode={episode} />
+        <ItemSequence mediaType={mediaType} source={source} season={season} episode={episode} />
         <Text as="span">{formattedDate}</Text>
         <Text as="span">{runtimeText}</Text>
       </Flex>
@@ -183,30 +185,6 @@ function Authors({ authors }: Pick<WatchlistItem, "authors">) {
   return (
     <Text fontSize="xs" color="fg.muted">
       {authorNames}
-    </Text>
-  );
-}
-
-function ItemSequence({
-  mediaType,
-  season,
-  episode,
-}: Pick<WatchlistItem, "mediaType" | "season" | "episode">) {
-  if (mediaType === "movie") return null;
-  if (mediaType === "comic") return <ComicSequence episode={episode} />;
-  return <EpisodeSequence season={season} episode={episode} />;
-}
-
-function ComicSequence({ episode }: Pick<WatchlistItem, "episode">) {
-  if (!episode) return null;
-  return <Text as="span">Issue #{episode}</Text>;
-}
-
-function EpisodeSequence({ season, episode }: Pick<WatchlistItem, "season" | "episode">) {
-  if (!season || !episode) return null;
-  return (
-    <Text as="span">
-      S{season} E{episode}
     </Text>
   );
 }

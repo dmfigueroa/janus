@@ -19,9 +19,11 @@ interface CreateCustomItemDialogProps {
   onOpenChange?: (open: boolean) => void;
 }
 
+type CreatableCustomMediaType = Exclude<UnifiedMedia["mediaType"], "episode">;
+
 function createCustomMedia(
   title: string,
-  mediaType: UnifiedMedia["mediaType"],
+  mediaType: CreatableCustomMediaType,
   year: string,
   overview: string,
 ): UnifiedMedia {
@@ -44,7 +46,7 @@ function createCustomMediaFromForm(form: HTMLFormElement): UnifiedMedia {
 
   return createCustomMedia(
     getFormValue(formData, "title"),
-    getFormValue(formData, "mediaType", "movie") as UnifiedMedia["mediaType"],
+    getFormValue(formData, "mediaType", "movie") as CreatableCustomMediaType,
     getFormValue(formData, "year"),
     getFormValue(formData, "overview"),
   );

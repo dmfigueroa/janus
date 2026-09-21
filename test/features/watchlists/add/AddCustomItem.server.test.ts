@@ -59,13 +59,13 @@ describe("custom item addition", () => {
     });
   });
 
-  it("persists a supplied full calendar date as the release date", async () => {
+  it("persists a supplied release date", async () => {
     const watchlist = await createTestWatchlist(db, { name: "Dated picks" });
     const result = await addCustomItemToWatchlist({
       watchlistId: watchlist.id,
       title: "Full Date Pick",
       mediaType: "movie",
-      year: "2025-02-03",
+      releaseDate: "2025-02-03",
     });
     const items = await db
       .select()
@@ -131,6 +131,30 @@ describe("custom item addition", () => {
 
     expect(items).toHaveLength(2);
     expect(items[0]?.tmdbId).not.toBe(items[1]?.tmdbId);
+  });
+
+  it("uses distinct parent identities for custom series with similar titles", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Custom episodes" });
+    await addCustomItemToWatchlist({
+      watchlistId: watchlist.id,
+      mediaType: "episode",
+      parentTitle: "A B",
+      title: "First",
+      episode: "S01E01",
+    });
+    await addCustomItemToWatchlist({
+      watchlistId: watchlist.id,
+      mediaType: "episode",
+      parentTitle: "A-B",
+      title: "First",
+      episode: "S01E01",
+    });
+    const items = await db
+      .select()
+      .from(schema.watchlistItems)
+      .where(eq(schema.watchlistItems.watchlistId, watchlist.id));
+
+    expect(items.map((item) => item.parentId)).toEqual(["custom:a%20b", "custom:a-b"]);
   });
 
   it("requires an insertion position for a custom-ordered watchlist", async () => {
@@ -219,13 +243,16 @@ describe("custom item addition", () => {
 describe("custom item schema validation", () => {
   const baseInput = { watchlistId: 1, title: "Pick", mediaType: "movie" };
 
-  it("accepts a year-only or complete calendar date and an omitted date", async () => {
+  it("accepts a year-only or complete calendar release date and an omitted date", async () => {
     const { customItemAdditionSchema } = await import("@/features/watchlists/add/AddCustomItem");
 
     expect(customItemAdditionSchema.safeParse({ ...baseInput, year: "2025" }).success).toBe(true);
     expect(customItemAdditionSchema.safeParse({ ...baseInput, year: "2025-02-03" }).success).toBe(
       true,
     );
+    expect(
+      customItemAdditionSchema.safeParse({ ...baseInput, releaseDate: "2025-02-03" }).success,
+    ).toBe(true);
     expect(customItemAdditionSchema.safeParse(baseInput).success).toBe(true);
   });
 
@@ -234,6 +261,14 @@ describe("custom item schema validation", () => {
 
     expect(customItemAdditionSchema.safeParse({ ...baseInput, year: "20x5" }).success).toBe(false);
     expect(customItemAdditionSchema.safeParse({ ...baseInput, year: "2025-02-29" }).success).toBe(
+      false,
+    );
+  });
+
+  it("requires series metadata for custom episodes", async () => {
+    const { customItemAdditionSchema } = await import("@/features/watchlists/add/AddCustomItem");
+
+    expect(customItemAdditionSchema.safeParse({ ...baseInput, mediaType: "episode" }).success).toBe(
       false,
     );
   });

@@ -134,6 +134,19 @@ afterEach(() => {
 });
 
 describe("TimelineItem watched actions", () => {
+  it("renders a custom episode label verbatim", () => {
+    renderTimelineItem({
+      mediaType: "episode",
+      source: "custom",
+      parentId: "custom:local-series",
+      parentTitle: "Local Series",
+      season: null,
+      episode: "S01E01",
+    });
+
+    expect(screen.getByText("S01E01")).not.toBeNull();
+  });
+
   it("offers a quiet watched action for unwatched items and runs it immediately", async () => {
     renderTimelineItem();
 
