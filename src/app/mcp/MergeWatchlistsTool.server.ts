@@ -45,7 +45,16 @@ export function registerMergeWatchlistsTool(server: McpServer) {
 
 async function mergeResult(merge: z.infer<typeof mergeInputSchema>, index: number) {
   const sourceWatchlistIds = merge.sourceWatchlistIds ?? [];
-  const result = await mergeWatchlistsMutation({ ...merge, sourceWatchlistIds });
+  const result = await mergeWatchlistsMutation({ ...merge, sourceWatchlistIds }).catch(
+    (error: unknown) => {
+      console.error("Watchlist merge failed", error);
+      return {
+        success: false as const,
+        code: "internal_error",
+        message: "The merge failed. No changes were made for this operation.",
+      };
+    },
+  );
   if (!result.success) return { index, ...result };
   return {
     index,

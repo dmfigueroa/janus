@@ -184,10 +184,15 @@ describe("Janus MCP endpoint", () => {
 
   it("rolls back target changes when source deletion fails", async () => {
     const { watchlists, watchlistItems } = await import("@/db/Schema");
-    const [target, source] = await database
+    const [target, source, beforeSource, afterSource] = await database
       .getDb()
       .insert(watchlists)
-      .values([{ name: "Rollback target" }, { name: "Rollback source" }])
+      .values([
+        { name: "Rollback target" },
+        { name: "Rollback source" },
+        { name: "Before failure" },
+        { name: "After failure" },
+      ])
       .returning();
     await database.getDb().insert(watchlistItems).values({
       watchlistId: source.id,
@@ -207,9 +212,33 @@ describe("Janus MCP endpoint", () => {
     try {
       const result = await client.callTool({
         name: "merge_watchlists",
-        arguments: { merges: [{ sourceWatchlistIds: [source.id], targetWatchlistId: target.id }] },
+        arguments: {
+          merges: [
+            { sourceWatchlistIds: [beforeSource.id], newWatchlistName: "Before merged" },
+            { sourceWatchlistIds: [source.id], targetWatchlistId: target.id },
+            { sourceWatchlistIds: [afterSource.id], newWatchlistName: "After merged" },
+          ],
+        },
       });
-      expect(result.isError).toBe(true);
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        results: [
+          { index: 0, success: true, code: "merged", deletedSourceWatchlistIds: [beforeSource.id] },
+          {
+            index: 1,
+            success: false,
+            code: "internal_error",
+            message: "The merge failed. No changes were made for this operation.",
+          },
+          { index: 2, success: true, code: "merged", deletedSourceWatchlistIds: [afterSource.id] },
+        ],
+      });
+      const remainingWatchlists = await database.getDb().select().from(watchlists);
+      expect(remainingWatchlists.map((entry) => entry.id)).not.toContain(beforeSource.id);
+      expect(remainingWatchlists.map((entry) => entry.id)).not.toContain(afterSource.id);
+      expect(remainingWatchlists.map((entry) => entry.name)).toEqual(
+        expect.arrayContaining(["Before merged", "After merged"]),
+      );
       expect(
         await database
           .getDb()
