@@ -69,6 +69,10 @@ vi.mock("@tanstack/react-start", () => ({
   },
 }));
 
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+}));
+
 vi.mock("@/app/Toaster", () => ({ toaster: { create: vi.fn() } }));
 
 vi.mock("@/features/watchlists/components/DeleteWatchlistDialog", () => ({

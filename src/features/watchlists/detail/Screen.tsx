@@ -3,6 +3,7 @@ import { Box, Container } from "@chakra-ui/react";
 import { useInfiniteQuery, useIsMutating, type InfiniteData } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toaster } from "@/app/Toaster";
+import { DeleteWatchlistDialog } from "@/features/watchlists/components/DeleteWatchlistDialog";
 import { WatchlistHeader } from "@/features/watchlists/components/WatchlistHeader";
 import { WatchlistTimeline } from "@/features/watchlists/components/WatchlistTimeline";
 import {
@@ -10,6 +11,7 @@ import {
   watchlistDetailInfiniteQueryOptions,
   type WatchlistDetailQueryData,
 } from "@/features/watchlists/detail/Query";
+import { useDeleteWatchlistDetail } from "@/features/watchlists/detail/useDeleteWatchlistDetail";
 import { useReorderWatchlistItemsMutation } from "@/features/watchlists/detail/useReorderWatchlistItemsMutation";
 import { canReorderWatchlistItems } from "@/features/watchlists/detail/Reorder";
 import { useToggleWatchlistPause } from "@/features/watchlists/pause/useToggleWatchlistPause";
@@ -20,19 +22,13 @@ interface WatchlistDetailScreenProps {
 
 export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProps) {
   const watchlistId = initialData.watchlist.id;
+  const { deleteOpen, setDeleteOpen, deleting, handleDelete } =
+    useDeleteWatchlistDetail(watchlistId);
   const [showUnwatchedOnly, setShowUnwatchedOnly] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedSearchQuery(searchQuery);
 
   const getWatchlistDetailPageFn = useServerFn(getWatchlistDetailPage);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
 
   const normalizedSearchQuery = normalizeSearchQuery(debouncedSearchQuery);
 
@@ -63,14 +59,19 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
   const { allItems, latestWatchlist } = getCurrentDetailData(data, initialData.watchlist);
   const latestItemOrderMode = latestWatchlist.itemOrderMode;
 
-  const reorderItemsMutation = useReorderWatchlistItemsMutation({
-    watchlistId,
-    activeFilters: {
+  const activeFilters = useMemo(
+    () => ({
       watchlistId,
       itemOrderMode: latestItemOrderMode,
       query: normalizedSearchQuery,
       unwatchedOnly: showUnwatchedOnly,
-    },
+    }),
+    [watchlistId, latestItemOrderMode, normalizedSearchQuery, showUnwatchedOnly],
+  );
+
+  const reorderItemsMutation = useReorderWatchlistItemsMutation({
+    watchlistId,
+    activeFilters,
   });
   const isWatchedTogglePending =
     useIsMutating({ mutationKey: ["watchlists", "toggle-watched", watchlistId] }) > 0;
@@ -87,16 +88,6 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
   const totalItems = latestWatchlist.stats.totalItems;
   const watchedItems = latestWatchlist.stats.watchedItems;
 
-  const activeFilters = useMemo(
-    () => ({
-      watchlistId,
-      itemOrderMode: latestItemOrderMode,
-      query: normalizedSearchQuery,
-      unwatchedOnly: showUnwatchedOnly,
-    }),
-    [watchlistId, latestItemOrderMode, normalizedSearchQuery, showUnwatchedOnly],
-  );
-
   return (
     <Container maxW="3xl" minH="100vh" px={{ base: 4, md: 8 }} pt={6} pb={32}>
       <WatchlistHeader
@@ -108,7 +99,16 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onTogglePause={() => void togglePauseMutation.mutateAsync()}
+        onDelete={() => setDeleteOpen(true)}
         interactionDisabled={isReorderPending}
+      />
+
+      <DeleteWatchlistDialog
+        watchlist={latestWatchlist}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        deleting={deleting}
+        handleDelete={() => void handleDelete()}
       />
 
       <Box mt={8}>
@@ -157,4 +157,17 @@ function getCurrentDetailData(
 
 function getLoadMoreHandler(isReorderPending: boolean, fetchNextPage: () => Promise<unknown>) {
   return isReorderPending ? undefined : fetchNextPage;
+}
+
+function useDebouncedSearchQuery(searchQuery: string) {
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  return debouncedSearchQuery;
 }

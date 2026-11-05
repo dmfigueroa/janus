@@ -124,3 +124,17 @@ skills:
 - task: "createServerFn, server/client execution boundaries, and server-only imports"
 load: "node_modules/@tanstack/start-client-core/skills/start-core/server-functions/SKILL.md"
 <!-- intent-skills:end -->
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues for `dmfigueroa/janus`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the five default triage labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repository. See `docs/agents/domain.md`.

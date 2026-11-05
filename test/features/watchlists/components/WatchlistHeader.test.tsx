@@ -22,6 +22,7 @@ function watchlistFixture(pausedAt: string | null, description: string | null = 
 
 function renderHeader(pausedAt: string | null, description: string | null = null) {
   const onTogglePause = vi.fn();
+  const onDelete = vi.fn();
   const queryClient = new QueryClient();
   render(
     <QueryClientProvider client={queryClient}>
@@ -34,10 +35,11 @@ function renderHeader(pausedAt: string | null, description: string | null = null
         searchQuery=""
         onSearchChange={() => {}}
         onTogglePause={onTogglePause}
+        onDelete={onDelete}
       />
     </QueryClientProvider>,
   );
-  return onTogglePause;
+  return { onTogglePause, onDelete };
 }
 
 describe("WatchlistHeader", () => {
@@ -46,8 +48,14 @@ describe("WatchlistHeader", () => {
     vi.clearAllMocks();
   });
 
+  it("wires the delete action to its callback", () => {
+    const { onDelete } = renderHeader(null);
+    fireEvent.click(screen.getByRole("button", { name: "Delete watchlist" }));
+    expect(onDelete).toHaveBeenCalledOnce();
+  });
+
   it("offers pausing for an active watchlist", () => {
-    const onTogglePause = renderHeader(null);
+    const { onTogglePause } = renderHeader(null);
 
     fireEvent.click(screen.getByRole("button", { name: "Pause" }));
 
@@ -55,7 +63,7 @@ describe("WatchlistHeader", () => {
   });
 
   it("offers resuming for a paused watchlist", () => {
-    const onTogglePause = renderHeader("2024-06-01 00:00:00");
+    const { onTogglePause } = renderHeader("2024-06-01 00:00:00");
 
     fireEvent.click(screen.getByRole("button", { name: "Resume" }));
 
