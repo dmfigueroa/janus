@@ -1,3 +1,4 @@
+import { registerMergeWatchlistsTool } from "./MergeWatchlistsTool.server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { createWatchlistMutation } from "@/features/watchlists/create/Mutation.server";
@@ -56,6 +57,7 @@ export function registerWatchlistWriteTools(server: McpServer) {
   registerSetWatchlistOrderTool(server);
   registerMoveWatchlistItemsTool(server);
   registerMoveWatchlistParentsTool(server);
+  registerMergeWatchlistsTool(server);
   registerSkipWatchlists(server);
 }
 

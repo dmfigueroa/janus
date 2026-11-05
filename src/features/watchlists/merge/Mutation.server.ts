@@ -2,22 +2,13 @@ import { getDb } from "@/db/Db.server";
 import type { DatabaseTransaction } from "@/db/Db.server";
 import { watchlistItems, watchlists } from "@/db/Schema";
 import type { MergeWatchlistsInput } from "./Mutation";
-import {
-  hasCustomOrderMergeParticipant,
-  markLastItemAddedInTransaction,
-} from "@/features/watchlists/Repository.server";
+import { markLastItemAddedInTransaction } from "@/features/watchlists/Repository.server";
 import { eq, inArray, sql } from "drizzle-orm";
 import { buildCustomMergedItems, uniqueMergeParticipantIds } from "./MergeCustomOrder.server";
 
 type MergeWatchlistsResult =
   | { success: true; targetId: number }
-  | { success: false; message: string };
-
-function assertMergeHasSources(sourceWatchlistIds: number[]) {
-  if (sourceWatchlistIds.length === 0) {
-    throw new Error("At least one source watchlist must be selected");
-  }
-}
+  | { success: false; code: "validation_error" | "not_found"; message: string };
 
 function createMergedWatchlist(transaction: DatabaseTransaction, name: string) {
   const [newWatchlist] = transaction
@@ -136,47 +127,98 @@ function updateTargetOrderMode(
   transaction.update(watchlists).set({ itemOrderMode }).where(eq(watchlists.id, targetId)).run();
 }
 
-export async function mergeWatchlistsMutation({
-  targetWatchlistId,
-  sourceWatchlistIds,
-  newWatchlistName,
-}: MergeWatchlistsInput): Promise<MergeWatchlistsResult> {
-  assertMergeHasSources(sourceWatchlistIds);
+function validWatchlistId(id: number) {
+  return Number.isInteger(id) && id > 0;
+}
 
-  const shouldUseCustomOrder = await hasCustomOrderMergeParticipant({
-    targetWatchlistId,
-    sourceWatchlistIds,
+function validateMergeSources(sourceWatchlistIds: number[]) {
+  return sourceWatchlistIds.length > 0 && sourceWatchlistIds.every(validWatchlistId);
+}
+
+function validateExistingTarget(targetWatchlistId: number, newWatchlistName?: string) {
+  return newWatchlistName === undefined && validWatchlistId(targetWatchlistId);
+}
+
+function validateMergeTarget({ targetWatchlistId, newWatchlistName }: MergeWatchlistsInput) {
+  if (targetWatchlistId !== undefined)
+    return validateExistingTarget(targetWatchlistId, newWatchlistName);
+  return Boolean(newWatchlistName?.trim());
+}
+
+function mergeParticipantIds({ targetWatchlistId, sourceWatchlistIds }: MergeWatchlistsInput) {
+  const sources = uniqueMergeParticipantIds(sourceWatchlistIds);
+  if (targetWatchlistId === undefined || sources.includes(targetWatchlistId)) return sources;
+  return [targetWatchlistId, ...sources];
+}
+
+function mergeCustomItems(
+  transaction: DatabaseTransaction,
+  input: MergeWatchlistsInput,
+  targetId: number,
+) {
+  const mergedItemValues = buildCustomMergedItems({
+    orderedWatchlistIds: mergeParticipantIds(input),
+    targetId,
+    transaction,
   });
+  clearTargetItems(transaction, targetId);
+  if (mergedItemValues.length > 0)
+    transaction.insert(watchlistItems).values(mergedItemValues).run();
+  updateTargetOrderMode(transaction, targetId, "custom");
+  return mergedItemValues.length > 0;
+}
 
-  const db = getDb();
-  return db.transaction((transaction) => {
-    const targetId = resolveMergeTarget(transaction, { targetWatchlistId, newWatchlistName });
-    const sourceIds = sourceIdsToMove(sourceWatchlistIds, targetId);
-    const mergedItems = shouldUseCustomOrder
-      ? (() => {
-          const mergedItemValues = buildCustomMergedItems({
-            orderedWatchlistIds: uniqueMergeParticipantIds(sourceWatchlistIds),
-            targetId,
-            transaction,
-          });
+function mergeInTransaction(
+  transaction: DatabaseTransaction,
+  input: MergeWatchlistsInput,
+): MergeWatchlistsResult {
+  const participantIds = mergeParticipantIds(input);
+  const participants = transaction
+    .select()
+    .from(watchlists)
+    .where(inArray(watchlists.id, participantIds))
+    .all();
+  if (participants.length !== participantIds.length) {
+    return { success: false, code: "not_found", message: "One or more watchlists were not found." };
+  }
+  return mergeValidatedParticipants(
+    transaction,
+    input,
+    participants.some((watchlist) => watchlist.itemOrderMode === "custom"),
+  );
+}
 
-          clearTargetItems(transaction, targetId);
+function mergeValidatedParticipants(
+  transaction: DatabaseTransaction,
+  input: MergeWatchlistsInput,
+  shouldUseCustomOrder: boolean,
+): MergeWatchlistsResult {
+  const targetId = resolveMergeTarget(transaction, input);
+  const sourceIds = sourceIdsToMove(input.sourceWatchlistIds, targetId);
+  const mergedItems = shouldUseCustomOrder
+    ? mergeCustomItems(transaction, input, targetId)
+    : mergeSourceItemsIntoTarget(transaction, sourceIds, targetId);
+  if (mergedItems) markLastItemAddedInTransaction(transaction, targetId);
+  deleteMergedSources(transaction, sourceIds);
+  return { success: true, targetId };
+}
 
-          if (mergedItemValues.length > 0) {
-            transaction.insert(watchlistItems).values(mergedItemValues).run();
-          }
-
-          updateTargetOrderMode(transaction, targetId, "custom");
-          return mergedItemValues.length > 0;
-        })()
-      : mergeSourceItemsIntoTarget(transaction, sourceIds, targetId);
-
-    if (mergedItems) {
-      markLastItemAddedInTransaction(transaction, targetId);
-    }
-
-    deleteMergedSources(transaction, sourceIds);
-
-    return { success: true, targetId };
-  });
+export async function mergeWatchlistsMutation(
+  input: MergeWatchlistsInput,
+): Promise<MergeWatchlistsResult> {
+  if (!validateMergeSources(input.sourceWatchlistIds)) {
+    return {
+      success: false,
+      code: "validation_error",
+      message: "At least one valid source watchlist is required.",
+    };
+  }
+  if (!validateMergeTarget(input)) {
+    return {
+      success: false,
+      code: "validation_error",
+      message: "Provide either an existing target watchlist ID or a new target name.",
+    };
+  }
+  return getDb().transaction((transaction) => mergeInTransaction(transaction, input));
 }

@@ -188,7 +188,7 @@ describe("merge validation", () => {
   it("rejects a merge without source watchlists", async () => {
     await expect(
       mergeWatchlistsMutation({ sourceWatchlistIds: [], newWatchlistName: "Should Not Exist" }),
-    ).rejects.toThrow("At least one source watchlist must be selected");
+    ).resolves.toMatchObject({ success: false, code: "validation_error" });
     await expect(db.select().from(schema.watchlists)).resolves.toEqual([]);
   });
 });
