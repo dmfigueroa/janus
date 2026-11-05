@@ -31,6 +31,7 @@ function watchlist(): EnrichedWatchlist {
 describe("DeleteWatchlistDialog", () => {
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
   });
 
   it("lets users confirm deletion from an accessible alert dialog", async () => {
@@ -63,6 +64,29 @@ describe("DeleteWatchlistDialog", () => {
     expect(handleDelete).toHaveBeenCalledOnce();
   });
 
+  it("copies the watchlist name for pasting into the confirmation", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+    render(
+      <Provider>
+        <DeleteWatchlistDialog
+          watchlist={watchlist()}
+          open
+          onOpenChange={vi.fn()}
+          deleting={false}
+          handleDelete={vi.fn()}
+        />
+      </Provider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Copy name" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("Movie Night"));
+    expect(await screen.findByText("Watchlist name copied")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Delete" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    vi.unstubAllGlobals();
+  });
+
   it("keeps confirmation and controls disabled while deletion is pending", async () => {
     const { rerender } = render(
       <Provider>
@@ -91,6 +115,9 @@ describe("DeleteWatchlistDialog", () => {
       </Provider>,
     );
     expect(input.disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Copy name" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
     expect(
       (screen.getByRole("button", { name: "Deleting..." }) as HTMLButtonElement).disabled,
     ).toBe(true);

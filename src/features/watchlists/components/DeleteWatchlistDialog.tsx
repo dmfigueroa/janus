@@ -1,5 +1,5 @@
-import { Button, Dialog, Field, Input, Portal } from "@chakra-ui/react";
-import { X } from "lucide-react";
+import { Button, Dialog, Field, Input, Portal, Text } from "@chakra-ui/react";
+import { Copy, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type DeleteWatchlistDialogProps = {
@@ -18,11 +18,24 @@ export function DeleteWatchlistDialog({
   handleDelete,
 }: DeleteWatchlistDialogProps) {
   const [name, setName] = useState("");
+  const [copyStatus, setCopyStatus] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!open) setName("");
+    if (!open) {
+      setName("");
+      setCopyStatus("");
+    }
   }, [open]);
+
+  const copyName = async () => {
+    try {
+      await navigator.clipboard.writeText(watchlist.name);
+      setCopyStatus("Watchlist name copied");
+    } catch {
+      setCopyStatus("Could not copy the watchlist name. Please select and copy it manually.");
+    }
+  };
 
   const changeOpen = (nextOpen: boolean) => {
     if (deleting) return;
@@ -52,6 +65,18 @@ export function DeleteWatchlistDialog({
               </Dialog.Description>
             </Dialog.Header>
             <Dialog.Body>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={deleting}
+                onClick={() => void copyName()}
+              >
+                <Copy size={16} /> Copy name
+              </Button>
+              <Text role="status" fontSize="sm" color="fg.muted">
+                {copyStatus}
+              </Text>
               <Field.Root>
                 <Field.Label>Type the watchlist name to confirm</Field.Label>
                 <Input
