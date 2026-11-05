@@ -3,17 +3,19 @@ import { Flex, Heading, IconButton } from "@chakra-ui/react";
 import { ExpandableWatchlistDescription } from "@/features/watchlists/components/ExpandableWatchlistDescription";
 import { WatchlistFormDialog } from "@/features/watchlists/components/WatchlistFormDialog";
 import { WatchlistPauseButton } from "@/features/watchlists/components/WatchlistPauseButton";
-import { Pencil } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 
 type WatchlistTitleProps = {
   watchlist: Watchlist;
   onTogglePause: () => void;
+  onDelete: () => void;
   interactionDisabled: boolean;
 };
 
 export function WatchlistTitle({
   watchlist,
   onTogglePause,
+  onDelete,
   interactionDisabled,
 }: WatchlistTitleProps) {
   return (
@@ -42,6 +44,17 @@ export function WatchlistTitle({
             </IconButton>
           }
         />
+        <IconButton
+          type="button"
+          aria-label="Delete watchlist"
+          variant="ghost"
+          size="sm"
+          color="fg.muted"
+          disabled={interactionDisabled}
+          onClick={onDelete}
+        >
+          <Trash2 size={16} />
+        </IconButton>
       </Flex>
       {watchlist.description && (
         <ExpandableWatchlistDescription

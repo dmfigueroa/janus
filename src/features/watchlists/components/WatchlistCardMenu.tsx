@@ -1,5 +1,6 @@
 import { IconButton, Menu, Portal } from "@chakra-ui/react";
-import { EllipsisVertical } from "lucide-react";
+import { EllipsisVertical, Trash2 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
@@ -16,6 +17,7 @@ type WatchlistCardMenuProps = {
 
 export function WatchlistCardMenu({ watchlist }: WatchlistCardMenuProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [deleting, setDeleting] = useState(false);
   const [skipping, setSkipping] = useState(false);
   const [pausePending, setPausePending] = useState(false);
@@ -28,14 +30,19 @@ export function WatchlistCardMenu({ watchlist }: WatchlistCardMenuProps) {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      await deleteWatchlistFn({ data: { id: watchlist.id } });
-      await router.invalidate?.();
-      toaster.create({ type: "success", title: "Watchlist deleted successfully" });
+      const result = await deleteWatchlistFn({ data: { id: watchlist.id } });
+      ensureSuccessfulResult(result);
     } catch (error) {
       console.error("Failed to delete", error);
       toaster.create({ type: "error", title: "Failed to delete watchlist. Please try again." });
+      return;
+    } finally {
       setDeleting(false);
     }
+    setDeleteOpen(false);
+    toaster.create({ type: "success", title: "Watchlist deleted" });
+    await queryClient.invalidateQueries({ queryKey: ["watchlists"] });
+    await router.invalidate?.();
   };
 
   const handleSkip = async () => {
@@ -179,7 +186,7 @@ function WatchlistActionMenu({
                 onDelete();
               }}
             >
-              Delete
+              <Trash2 size={16} /> Delete
             </Menu.Item>
           </Menu.Content>
         </Menu.Positioner>

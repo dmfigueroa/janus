@@ -13,6 +13,7 @@ interface WatchlistHeaderProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onTogglePause: () => void;
+  onDelete: () => void;
   interactionDisabled?: boolean;
 }
 
@@ -29,6 +30,7 @@ export function WatchlistHeader({
   searchQuery,
   onSearchChange,
   onTogglePause,
+  onDelete,
   interactionDisabled = false,
 }: WatchlistHeaderProps) {
   return (
@@ -45,6 +47,7 @@ export function WatchlistHeader({
       <WatchlistTitle
         watchlist={watchlist}
         onTogglePause={onTogglePause}
+        onDelete={onDelete}
         interactionDisabled={interactionDisabled}
       />
 
