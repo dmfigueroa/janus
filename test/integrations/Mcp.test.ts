@@ -70,6 +70,168 @@ describe("Janus MCP endpoint", () => {
     });
   });
 
+  it("merges watchlists atomically through the MCP batch contract", async () => {
+    const { watchlists, watchlistItems } = await import("@/db/Schema");
+    const [target, source, newSource] = await database
+      .getDb()
+      .insert(watchlists)
+      .values([
+        { name: "Merge target", itemOrderMode: "custom" },
+        { name: "Merge source" },
+        { name: "New target source" },
+      ])
+      .returning();
+    await database
+      .getDb()
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: target.id,
+          tmdbId: "merge-shared",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Shared",
+          customRank: 1,
+          isWatched: false,
+        },
+        {
+          watchlistId: source.id,
+          tmdbId: "merge-shared",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Shared",
+          isWatched: true,
+        },
+        {
+          watchlistId: source.id,
+          tmdbId: "merge-other",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "Other",
+        },
+        {
+          watchlistId: newSource.id,
+          tmdbId: "new-target-item",
+          source: "tmdb",
+          mediaType: "movie",
+          title: "New target item",
+        },
+      ]);
+    const tool = (await client.listTools()).tools.find(
+      (entry) => entry.name === "merge_watchlists",
+    );
+    expect(tool?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+    expect(tool?.description).toContain("deleted");
+    const result = await client.callTool({
+      name: "merge_watchlists",
+      arguments: {
+        merges: [
+          { sourceWatchlistIds: [source.id], targetWatchlistId: target.id },
+          { sourceWatchlistIds: [newSource.id, 99999999], newWatchlistName: "Must not exist" },
+          { sourceWatchlistIds: [newSource.id], newWatchlistName: "New merged target" },
+          {
+            sourceWatchlistIds: [target.id],
+            targetWatchlistId: target.id,
+            newWatchlistName: "Invalid",
+          },
+          { sourceWatchlistIds: [target.id], targetWatchlistId: "invalid" },
+        ],
+      },
+    });
+    expect(result.structuredContent).toMatchObject({
+      results: [
+        {
+          index: 0,
+          success: true,
+          targetWatchlistId: target.id,
+          deletedSourceWatchlistIds: [source.id],
+        },
+        { index: 1, success: false, code: "not_found" },
+        {
+          index: 2,
+          success: true,
+          targetWatchlistId: expect.any(Number),
+          deletedSourceWatchlistIds: [newSource.id],
+        },
+        { index: 3, success: false, code: "validation_error" },
+        { index: 4, success: false, code: "validation_error" },
+      ],
+    });
+    const items = await database
+      .getDb()
+      .select()
+      .from(watchlistItems)
+      .where(eq(watchlistItems.watchlistId, target.id))
+      .orderBy(asc(watchlistItems.customRank));
+    expect(items.map((item) => [item.title, item.isWatched])).toEqual([
+      ["Shared", true],
+      ["Other", false],
+    ]);
+    const remaining = await database.getDb().select().from(watchlists);
+    expect(remaining.map((entry) => entry.id)).not.toContain(source.id);
+    expect(remaining.map((entry) => entry.id)).not.toContain(newSource.id);
+    expect(remaining.map((entry) => entry.name)).not.toContain("Must not exist");
+    const newTarget = remaining.find((entry) => entry.name === "New merged target");
+    expect(newTarget).toBeDefined();
+    expect(
+      await database
+        .getDb()
+        .select()
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, newTarget!.id)),
+    ).toMatchObject([{ title: "New target item" }]);
+  });
+
+  it("rolls back target changes when source deletion fails", async () => {
+    const { watchlists, watchlistItems } = await import("@/db/Schema");
+    const [target, source] = await database
+      .getDb()
+      .insert(watchlists)
+      .values([{ name: "Rollback target" }, { name: "Rollback source" }])
+      .returning();
+    await database.getDb().insert(watchlistItems).values({
+      watchlistId: source.id,
+      tmdbId: "rollback-item",
+      source: "tmdb",
+      mediaType: "movie",
+      title: "Rollback item",
+    });
+    const { sql } = await import("drizzle-orm");
+    database
+      .getDb()
+      .run(
+        sql.raw(
+          `CREATE TRIGGER prevent_merge_delete BEFORE DELETE ON watchlists WHEN OLD.id = ${source.id} BEGIN SELECT RAISE(ABORT, 'test deletion failure'); END`,
+        ),
+      );
+    try {
+      const result = await client.callTool({
+        name: "merge_watchlists",
+        arguments: { merges: [{ sourceWatchlistIds: [source.id], targetWatchlistId: target.id }] },
+      });
+      expect(result.isError).toBe(true);
+      expect(
+        await database
+          .getDb()
+          .select()
+          .from(watchlistItems)
+          .where(eq(watchlistItems.watchlistId, target.id)),
+      ).toHaveLength(0);
+      expect(
+        await database
+          .getDb()
+          .select()
+          .from(watchlistItems)
+          .where(eq(watchlistItems.watchlistId, source.id)),
+      ).toHaveLength(1);
+      expect(
+        await database.getDb().select().from(watchlists).where(eq(watchlists.id, source.id)),
+      ).toHaveLength(1);
+    } finally {
+      database.getDb().run(sql.raw("DROP TRIGGER prevent_merge_delete"));
+    }
+  });
+
   it("creates a watchlist through the ordered batch lifecycle contract", async () => {
     const tools = await client.listTools();
     const createWatchlists = tools.tools.find((tool) => tool.name === "create_watchlists");
