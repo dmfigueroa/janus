@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from "react";
 import type { Watchlist } from "@/db/Schema";
 import { Box, Button, Flex, Input, Text } from "@chakra-ui/react";
 import { WatchlistTitle } from "@/features/watchlists/components/WatchlistTitle";
@@ -33,8 +34,32 @@ export function WatchlistHeader({
   onDelete,
   interactionDisabled = false,
 }: WatchlistHeaderProps) {
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const container = header.parentElement;
+    if (!container) return;
+
+    const updateHeight = () => {
+      container.style.setProperty(
+        "--watchlist-header-height",
+        `${header.getBoundingClientRect().height}px`,
+      );
+    };
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(header);
+    return () => {
+      observer.disconnect();
+      container.style.removeProperty("--watchlist-header-height");
+    };
+  }, []);
+
   return (
     <Box
+      ref={headerRef}
       as="header"
       position="sticky"
       top={0}

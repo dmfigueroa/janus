@@ -85,7 +85,13 @@ function TimelineRow({
 
 function TimelineYearHeader({ year }: { year: string }) {
   return (
-    <Flex position="sticky" top={{ base: "11rem", md: "12rem" }} zIndex={10} mb={6} align="center">
+    <Flex
+      position="sticky"
+      top="calc(var(--watchlist-header-height, 0px) + 0.5rem)"
+      zIndex={10}
+      mb={6}
+      align="center"
+    >
       <Flex
         h={8}
         position="relative"
