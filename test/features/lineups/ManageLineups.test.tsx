@@ -44,6 +44,16 @@ it("saves accessible movement controls as a complete order", async () => {
     },
   ];
   render(<ManageLineups data={{ lineups, watchlists: [] }} />);
+  expect(
+    (screen.getByRole("checkbox", { name: "Show Movies on Watch Now" }) as HTMLInputElement)
+      .checked,
+  ).toBe(true);
+  expect(
+    (screen.getByRole("checkbox", { name: "Show Friends on Watch Now" }) as HTMLInputElement)
+      .checked,
+  ).toBe(false);
+  expect(screen.getByText("Custom · 0 lists · 0 available now")).not.toBeNull();
+  expect(screen.getByText("Automatic")).not.toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Move Friends up" }));
   await waitFor(() =>
     expect(submit).toHaveBeenCalledWith({
@@ -54,4 +64,5 @@ it("saves accessible movement controls as a complete order", async () => {
       ],
     }),
   );
+  await waitFor(() => expect(screen.getByText("Friends moved to position 1 of 2.")).not.toBeNull());
 });

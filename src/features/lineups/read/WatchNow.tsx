@@ -1,5 +1,15 @@
-import { Box, Button, Container, Heading, Link as ChakraLink, Stack, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Container,
+  Flex,
+  Heading,
+  Link as ChakraLink,
+  Stack,
+  Text,
+} from "@chakra-ui/react";
 import { Link } from "@tanstack/react-router";
+import { ChevronRight, SlidersHorizontal } from "lucide-react";
 import { UpcomingWatchlistChips } from "@/features/watchlists/home/UpcomingWatchlistChips";
 import type { LineupData } from "@/features/lineups/manage/Lineups";
 import { LineupCards } from "@/features/lineups/components/LineupCards";
@@ -8,12 +18,16 @@ export function WatchNow({ lineups }: { lineups: Lineup[] }) {
   const visible = lineups.filter((lineup) => lineup.enabled && lineup.eligibleWatchlists.length);
   return (
     <Container maxW="7xl" py={8} pb={24}>
-      <Heading as="h1" mb={4}>
-        Watch Now
-      </Heading>
-      <Button asChild variant="outline" mb={6}>
-        <Link to="/rotations">Customize</Link>
-      </Button>
+      <Flex as="header" align="center" justify="space-between" gap={3} wrap="wrap" mb={6}>
+        <Heading as="h1" size="3xl" fontWeight="extrabold" letterSpacing="tight">
+          Watch Now
+        </Heading>
+        <Button asChild variant="outline" minH="44px">
+          <Link to="/rotations">
+            <SlidersHorizontal size={16} aria-hidden="true" /> Customize
+          </Link>
+        </Button>
+      </Flex>
       {visible.length ? (
         <Stack gap={8}>
           <WatchNowLineups lineups={visible} />
@@ -55,9 +69,17 @@ function LineupTitle({ lineup }: { lineup: Lineup }) {
     );
   return (
     <Heading as="h2" size="lg" mb={3}>
-      <ChakraLink asChild>
+      <ChakraLink
+        asChild
+        display="inline-flex"
+        alignItems="center"
+        gap={1}
+        minH="44px"
+        _hover={{ color: "accent.solid" }}
+      >
         <Link to="/rotations/custom/$lineupId" params={{ lineupId: String(lineup.reference.id) }}>
           {lineup.name}
+          <ChevronRight size={20} aria-hidden="true" />
         </Link>
       </ChakraLink>
     </Heading>

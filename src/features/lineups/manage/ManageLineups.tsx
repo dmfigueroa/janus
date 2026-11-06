@@ -18,19 +18,27 @@ import type { LineupData } from "@/features/lineups/manage/Lineups";
 import { LineupEditor } from "@/features/lineups/components/LineupEditor";
 import { LineupRow, lineupKey } from "@/features/lineups/manage/ManageLineupRow";
 import { useLineupActions } from "@/features/lineups/manage/useLineupActions";
+import { useState } from "react";
+import { Plus } from "lucide-react";
 
 export function ManageLineups({ data }: { data: LineupData }) {
   const actions = useLineupActions();
+  const [announcement, setAnnouncement] = useState("");
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
   async function move(from: number, to: number) {
     if (!validMove(from, to, data.lineups.length)) return;
-    await actions.submit({
+    setAnnouncement("");
+    const saved = await actions.submit({
       action: "reorder",
       references: arrayMove(data.lineups, from, to).map((lineup) => lineup.reference),
     });
+    if (saved)
+      setAnnouncement(
+        `${data.lineups[from].name} moved to position ${to + 1} of ${data.lineups.length}.`,
+      );
   }
   function dragEnd(event: DragEndEvent) {
     if (!event.over) return;
@@ -41,10 +49,24 @@ export function ManageLineups({ data }: { data: LineupData }) {
   }
   return (
     <Container maxW="4xl" py={8} pb={24}>
-      <Heading as="h1" mb={4}>
+      <Heading as="h1" size="3xl" fontWeight="extrabold" letterSpacing="tight" mb={2}>
         Manage Lineups
       </Heading>
-      <LineupEditor watchlists={data.watchlists} trigger={<Button mb={4}>Create lineup</Button>} />
+      <Text color="fg.muted" mb={4}>
+        Choose what appears on Watch Now. Drag or use the arrows to reorder. Changes save
+        automatically.
+      </Text>
+      <LineupEditor
+        watchlists={data.watchlists}
+        trigger={
+          <Button mb={5} minH="44px" colorPalette="pink">
+            <Plus size={18} aria-hidden="true" /> Create lineup
+          </Button>
+        }
+      />
+      <Text srOnly aria-live="polite" role="status">
+        {announcement}
+      </Text>
       {actions.error && (
         <Text color="fg.error" role="alert">
           {actions.error}
