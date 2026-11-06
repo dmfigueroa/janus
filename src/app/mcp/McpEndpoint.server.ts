@@ -10,6 +10,7 @@ import { handleMcpSessionRequest } from "@/integrations/mcp/McpSessionTransport.
 import { asMcpContent } from "./McpToolResponse.server";
 import { registerWatchlistItemReadTools } from "./WatchlistItemReadTools.server";
 import { registerWatchlistWriteTools } from "./WatchlistWriteTools.server";
+import { registerLineupTools } from "./LineupTools.server";
 
 const watchlistSummaryOutputSchema = z.object({
   id: z.number(),
@@ -50,6 +51,7 @@ function createMcpServer() {
   registerWatchlistSummaryTools(server);
   registerSearchMedia(server);
   registerWatchlistWriteTools(server);
+  registerLineupTools(server);
   return server;
 }
 

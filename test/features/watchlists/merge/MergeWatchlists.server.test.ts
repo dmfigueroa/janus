@@ -192,3 +192,37 @@ describe("merge validation", () => {
     await expect(db.select().from(schema.watchlists)).resolves.toEqual([]);
   });
 });
+
+describe("lineup membership during merge", () => {
+  it.each(["existing", "new"] as const)(
+    "preserves the union for a %s target",
+    async (targetKind) => {
+      const { createLineup, setLineupWatchlists, readLineups } =
+        await import("@/features/lineups/manage/Lineups.server");
+      const first = await createTestWatchlist(db, { name: "First" });
+      const second = await createTestWatchlist(db, { name: "Second" });
+      const firstLineup = await createLineup(`First ${targetKind}`);
+      const secondLineup = await createLineup(`Second ${targetKind}`);
+      if (!firstLineup.success || !secondLineup.success) throw new Error("Lineup creation failed");
+      await setLineupWatchlists({ kind: "custom", id: firstLineup.id }, [first.id]);
+      await setLineupWatchlists({ kind: "custom", id: secondLineup.id }, [second.id]);
+      const result = await mergeWatchlistsMutation(
+        targetKind === "existing"
+          ? { targetWatchlistId: first.id, sourceWatchlistIds: [second.id] }
+          : { newWatchlistName: "Merged", sourceWatchlistIds: [first.id, second.id] },
+      );
+      const targetId = getMergeTargetId(result);
+      const lineups = await readLineups();
+      expect(
+        lineups
+          .find((lineup) => lineup.id === firstLineup.id)
+          ?.configuredWatchlists?.map((list) => list.id),
+      ).toEqual([targetId]);
+      expect(
+        lineups
+          .find((lineup) => lineup.id === secondLineup.id)
+          ?.configuredWatchlists?.map((list) => list.id),
+      ).toEqual([targetId]);
+    },
+  );
+});

@@ -1,3 +1,4 @@
+import { mergeLineupMemberships } from "./MergeLineupMemberships.server";
 import { getDb } from "@/db/Db.server";
 import type { DatabaseTransaction } from "@/db/Db.server";
 import { watchlistItems, watchlists } from "@/db/Schema";
@@ -44,16 +45,13 @@ function resolveMergeTargetCandidate(
   targetWatchlistId: number | null | undefined,
   newWatchlistName: string | null | undefined,
 ) {
-  if (hasTargetWatchlistId(targetWatchlistId)) {
+  if (targetWatchlistId !== null && targetWatchlistId !== undefined) {
     return targetWatchlistId;
   }
-  return newWatchlistName ? createMergedWatchlist(transaction, newWatchlistName) : null;
+  return createTargetByName(transaction, newWatchlistName);
 }
-
-function hasTargetWatchlistId(
-  targetWatchlistId: number | null | undefined,
-): targetWatchlistId is number {
-  return targetWatchlistId !== null && targetWatchlistId !== undefined;
+function createTargetByName(transaction: DatabaseTransaction, name: string | null | undefined) {
+  return name ? createMergedWatchlist(transaction, name) : null;
 }
 
 function sourceIdsToMove(sourceWatchlistIds: number[], targetId: number) {
@@ -195,6 +193,7 @@ function mergeValidatedParticipants(
 ): MergeWatchlistsResult {
   const targetId = resolveMergeTarget(transaction, input);
   const sourceIds = sourceIdsToMove(input.sourceWatchlistIds, targetId);
+  mergeLineupMemberships(transaction, sourceIds, targetId);
   const mergedItems = shouldUseCustomOrder
     ? mergeCustomItems(transaction, input, targetId)
     : mergeSourceItemsIntoTarget(transaction, sourceIds, targetId);

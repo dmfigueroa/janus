@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@test/utils/Render";
-import { within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EnrichedWatchlist } from "@/features/watchlists/components/WatchlistCard";
-import { WatchlistsHomeRouteContent } from "@/routes/index";
+import { WatchlistsHomeRouteContent } from "@/routes/watchlists.index";
+import { WatchNow } from "@/features/lineups/read/WatchNow";
 
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (config: unknown) => ({
@@ -18,12 +18,14 @@ vi.mock("@tanstack/react-router", () => ({
     ...props
   }: {
     children: React.ReactNode;
-    params: { watchlistId: string };
+    params?: { watchlistId?: string; lineupId?: string };
     to: string;
   }) => (
     <a
-      href={to.replace("$watchlistId", params.watchlistId)}
-      data-watchlist-id={params.watchlistId}
+      href={to
+        .replace("$watchlistId", params?.watchlistId ?? "")
+        .replace("$lineupId", params?.lineupId ?? "")}
+      data-watchlist-id={params?.watchlistId}
       {...props}
     >
       {children}
@@ -152,16 +154,14 @@ describe("WatchlistsHomeRouteContent", () => {
     cleanup();
   });
 
-  it("renders featured media sections above the full watchlist grid without dead search or settings controls", () => {
+  it("renders the My Lists administration page without featured sections", () => {
     render(<WatchlistsHomeRouteContent initialData={homeData()} />);
 
     expect(screen.getByRole("heading", { name: "My Lists" })).not.toBeNull();
     expect(screen.getByText("2 watchlists, 2 items")).not.toBeNull();
-    expect(screen.getByRole("heading", { name: "Up Next by Media" })).not.toBeNull();
-    expect(screen.getByRole("heading", { name: "Movies" })).not.toBeNull();
+    expect(screen.queryByRole("heading", { name: "Up Next by Media" })).toBeNull();
     expect(screen.getByRole("heading", { name: "Watchlists" })).not.toBeNull();
-    expect(screen.getAllByTestId("watchlist-card-1")[0]?.textContent).toContain("up-next");
-    expect(screen.getAllByTestId("watchlist-card-1")[1]?.textContent).toContain("watchlist");
+    expect(screen.getByTestId("watchlist-card-1").textContent).toContain("watchlist");
     expect(screen.getByTestId("watchlist-card-2").textContent).toContain("browse");
     expect(screen.queryByPlaceholderText("Find a list, movie, or show...")).toBeNull();
     expect(screen.queryByRole("button", { name: "Settings" })).toBeNull();
@@ -211,67 +211,82 @@ describe("WatchlistsHomeRouteContent", () => {
     expect(screen.queryByText("Create New List")).toBeNull();
     expect(screen.getAllByText("selection")).toHaveLength(2);
   });
+});
 
-  it("renders incoming watchlist chips after the featured cards with explanatory copy", () => {
-    const firstIncoming = watchlist({
-      id: 3,
-      name: "Incoming One",
-      stats: {
-        totalItems: 1,
-        watchedItems: 0,
-        progress: 0,
-        nextUnwatched: nextUnwatchedFixture({
-          id: 3,
-          watchlistId: 3,
-          title: "Arrival",
-        }),
-        coverImage: null,
-        coverMediaType: "movie",
-      },
-    });
-    const secondIncoming = watchlist({
-      id: 4,
-      name: "Incoming Two",
-      stats: {
-        totalItems: 1,
-        watchedItems: 0,
-        progress: 0,
-        nextUnwatched: nextUnwatchedFixture({
-          id: 4,
-          watchlistId: 4,
-          mediaType: "episode",
-          parentTitle: "Arrow",
-          title: "Open House",
-          season: 2,
-          episode: "4",
-        }),
-        coverImage: null,
-        coverMediaType: "episode",
-      },
-    });
-
-    render(
-      <WatchlistsHomeRouteContent
-        initialData={homeData({
-          featuredSections: [
-            {
-              key: "movie",
-              title: "Movies",
-              watchlists: [watchlist({ id: 1, name: "Movie Night" })],
-              upcomingWatchlists: [firstIncoming, secondIncoming],
-            },
-          ],
-        })}
-      />,
+describe("Watch Now", () => {
+  afterEach(cleanup);
+  it("hides disabled and empty lineups and links custom lineups with more than six members", () => {
+    const lists = Array.from({ length: 7 }, (_, index) =>
+      watchlist({
+        id: index + 1,
+        name: `List ${index + 1}`,
+        stats: {
+          totalItems: 1,
+          watchedItems: 0,
+          progress: 0,
+          nextUnwatched: nextUnwatchedFixture({ title: `Next ${index + 1}` }),
+          coverImage: null,
+          coverMediaType: "movie",
+        },
+      }),
     );
-
-    const sectionHeading = screen.getByRole("heading", { name: "Movies" });
-    const section = sectionHeading.parentElement;
-
-    expect(section).not.toBeNull();
-    expect(within(section!).getByText("Coming up after these")).not.toBeNull();
-    expect(within(section!).getByRole("link", { name: "Arrival" })).not.toBeNull();
-    expect(within(section!).getByRole("link", { name: "Arrow • S2:E4" })).not.toBeNull();
-    expect(within(section!).getByTestId("watchlist-card-1")).not.toBeNull();
+    const lineups: Parameters<typeof WatchNow>[0]["lineups"] = [
+      {
+        id: 7,
+        kind: "custom",
+        systemKey: null,
+        name: "Friends",
+        enabled: true,
+        rank: 0,
+        reference: { kind: "custom", id: 7 },
+        configuredWatchlists: lists,
+        eligibleWatchlists: lists,
+        configuredCount: 7,
+        eligibleCount: 7,
+      },
+      {
+        id: 8,
+        kind: "custom",
+        systemKey: null,
+        name: "Hidden",
+        enabled: false,
+        rank: 1,
+        reference: { kind: "custom", id: 8 },
+        configuredWatchlists: lists,
+        eligibleWatchlists: lists,
+        configuredCount: 7,
+        eligibleCount: 7,
+      },
+      {
+        id: 9,
+        kind: "custom",
+        systemKey: null,
+        name: "Empty",
+        enabled: true,
+        rank: 2,
+        reference: { kind: "custom", id: 9 },
+        configuredWatchlists: [],
+        eligibleWatchlists: [],
+        configuredCount: 0,
+        eligibleCount: 0,
+      },
+    ];
+    render(<WatchNow lineups={lineups} />);
+    expect(screen.getByRole("heading", { name: "Watch Now" })).not.toBeNull();
+    expect(screen.getByRole("link", { name: "Friends" }).getAttribute("href")).toBe(
+      "/rotations/custom/7",
+    );
+    expect(screen.getByRole("link", { name: "View all" })).not.toBeNull();
+    expect(screen.queryByText("Hidden")).toBeNull();
+    expect(screen.queryByText("Empty")).toBeNull();
+    expect(screen.getAllByTestId(/watchlist-card-/)).toHaveLength(3);
+    expect(screen.getByRole("link", { name: "Next 4" })).not.toBeNull();
+    expect(screen.getByRole("link", { name: "Next 6" })).not.toBeNull();
+    expect(screen.queryByRole("link", { name: "Next 7" })).toBeNull();
+  });
+  it("offers recovery links when no lineup is visible", () => {
+    render(<WatchNow lineups={[]} />);
+    expect(screen.getByRole("link", { name: "Customize" })).not.toBeNull();
+    expect(screen.getByRole("link", { name: "View My Lists" })).not.toBeNull();
   });
 });

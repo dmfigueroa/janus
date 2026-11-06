@@ -12,7 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as RotationsIndexRouteImport } from './routes/rotations.index'
+import { Route as WatchlistsIndexRouteImport } from './routes/watchlists.index'
 import { Route as WatchlistsWatchlistIdRouteImport } from './routes/watchlists/$watchlistId'
+import { Route as RotationsCustomLineupIdRouteImport } from './routes/rotations.custom.$lineupId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -29,9 +32,24 @@ const SearchRoute = SearchRouteImport.update({
   path: '/search',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RotationsIndexRoute = RotationsIndexRouteImport.update({
+  id: '/rotations/',
+  path: '/rotations/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WatchlistsIndexRoute = WatchlistsIndexRouteImport.update({
+  id: '/watchlists/',
+  path: '/watchlists/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WatchlistsWatchlistIdRoute = WatchlistsWatchlistIdRouteImport.update({
   id: '/watchlists/$watchlistId',
   path: '/watchlists/$watchlistId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RotationsCustomLineupIdRoute = RotationsCustomLineupIdRouteImport.update({
+  id: '/rotations/custom/$lineupId',
+  path: '/rotations/custom/$lineupId',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -40,12 +58,18 @@ export interface FileRoutesByFullPath {
   '/mcp': typeof McpRoute
   '/search': typeof SearchRoute
   '/watchlists/$watchlistId': typeof WatchlistsWatchlistIdRoute
+  '/rotations/': typeof RotationsIndexRoute
+  '/watchlists/': typeof WatchlistsIndexRoute
+  '/rotations/custom/$lineupId': typeof RotationsCustomLineupIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/mcp': typeof McpRoute
   '/search': typeof SearchRoute
   '/watchlists/$watchlistId': typeof WatchlistsWatchlistIdRoute
+  '/rotations': typeof RotationsIndexRoute
+  '/watchlists': typeof WatchlistsIndexRoute
+  '/rotations/custom/$lineupId': typeof RotationsCustomLineupIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +77,38 @@ export interface FileRoutesById {
   '/mcp': typeof McpRoute
   '/search': typeof SearchRoute
   '/watchlists/$watchlistId': typeof WatchlistsWatchlistIdRoute
+  '/rotations/': typeof RotationsIndexRoute
+  '/watchlists/': typeof WatchlistsIndexRoute
+  '/rotations/custom/$lineupId': typeof RotationsCustomLineupIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/mcp' | '/search' | '/watchlists/$watchlistId'
+  fullPaths:
+    | '/'
+    | '/mcp'
+    | '/search'
+    | '/watchlists/$watchlistId'
+    | '/rotations/'
+    | '/watchlists/'
+    | '/rotations/custom/$lineupId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/mcp' | '/search' | '/watchlists/$watchlistId'
-  id: '__root__' | '/' | '/mcp' | '/search' | '/watchlists/$watchlistId'
+  to:
+    | '/'
+    | '/mcp'
+    | '/search'
+    | '/watchlists/$watchlistId'
+    | '/rotations'
+    | '/watchlists'
+    | '/rotations/custom/$lineupId'
+  id:
+    | '__root__'
+    | '/'
+    | '/mcp'
+    | '/search'
+    | '/watchlists/$watchlistId'
+    | '/rotations/'
+    | '/watchlists/'
+    | '/rotations/custom/$lineupId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +116,9 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   SearchRoute: typeof SearchRoute
   WatchlistsWatchlistIdRoute: typeof WatchlistsWatchlistIdRoute
+  RotationsIndexRoute: typeof RotationsIndexRoute
+  WatchlistsIndexRoute: typeof WatchlistsIndexRoute
+  RotationsCustomLineupIdRoute: typeof RotationsCustomLineupIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -92,11 +144,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SearchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/rotations/': {
+      id: '/rotations/'
+      path: '/rotations'
+      fullPath: '/rotations/'
+      preLoaderRoute: typeof RotationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/watchlists/': {
+      id: '/watchlists/'
+      path: '/watchlists'
+      fullPath: '/watchlists/'
+      preLoaderRoute: typeof WatchlistsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/watchlists/$watchlistId': {
       id: '/watchlists/$watchlistId'
       path: '/watchlists/$watchlistId'
       fullPath: '/watchlists/$watchlistId'
       preLoaderRoute: typeof WatchlistsWatchlistIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rotations/custom/$lineupId': {
+      id: '/rotations/custom/$lineupId'
+      path: '/rotations/custom/$lineupId'
+      fullPath: '/rotations/custom/$lineupId'
+      preLoaderRoute: typeof RotationsCustomLineupIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -107,6 +180,9 @@ const rootRouteChildren: RootRouteChildren = {
   McpRoute: McpRoute,
   SearchRoute: SearchRoute,
   WatchlistsWatchlistIdRoute: WatchlistsWatchlistIdRoute,
+  RotationsIndexRoute: RotationsIndexRoute,
+  WatchlistsIndexRoute: WatchlistsIndexRoute,
+  RotationsCustomLineupIdRoute: RotationsCustomLineupIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

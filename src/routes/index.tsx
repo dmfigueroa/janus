@@ -1,57 +1,8 @@
-import { Box, Container } from "@chakra-ui/react";
 import { createFileRoute } from "@tanstack/react-router";
-import { AllWatchlistsSection } from "@/features/watchlists/home/AllWatchlistsSection";
-import { CreateWatchlistFloatingButton } from "@/features/watchlists/home/CreateWatchlistFloatingButton";
-import { FeaturedMediaSections } from "@/features/watchlists/home/FeaturedMediaSections";
-import { HomeHeader } from "@/features/watchlists/home/HomeHeader";
-import { getWatchlistHomeData } from "@/features/watchlists/home/WatchlistHome";
-import { WatchlistMergeDialog } from "@/features/watchlists/home/WatchlistMergeDialog";
-import {
-  useWatchlistMergeSelectionContext,
-  WatchlistMergeSelectionProvider,
-} from "@/features/watchlists/home/WatchlistMergeSelectionContext";
-
-export const Route = createFileRoute("/")({
-  component: IndexRoute,
-  loader: async () => await getWatchlistHomeData(),
-});
-
+import { getLineupData } from "@/features/lineups/manage/Lineups";
+import { WatchNow } from "@/features/lineups/read/WatchNow";
+export const Route = createFileRoute("/")({ loader: () => getLineupData(), component: IndexRoute });
 function IndexRoute() {
-  const home = Route.useLoaderData();
-
-  return <WatchlistsHomeRouteContent initialData={home} />;
-}
-
-type WatchlistsHomeRouteContentProps = {
-  initialData: Awaited<ReturnType<typeof getWatchlistHomeData>>;
-};
-
-export function WatchlistsHomeRouteContent({ initialData }: WatchlistsHomeRouteContentProps) {
-  return (
-    <WatchlistMergeSelectionProvider>
-      <WatchlistsHomeLayout initialData={initialData} />
-    </WatchlistMergeSelectionProvider>
-  );
-}
-
-function WatchlistsHomeLayout({ initialData }: WatchlistsHomeRouteContentProps) {
-  const mergeSelection = useWatchlistMergeSelectionContext();
-
-  return (
-    <Box minH="100vh" pb={24}>
-      <Container position="relative" minH="100vh" maxW="7xl">
-        <HomeHeader totals={initialData.totals} />
-
-        {!mergeSelection.selectionMode ? (
-          <FeaturedMediaSections sections={initialData.featuredSections} />
-        ) : null}
-
-        <AllWatchlistsSection {...initialData} />
-
-        {!mergeSelection.selectionMode ? <CreateWatchlistFloatingButton /> : null}
-
-        <WatchlistMergeDialog allWatchlists={initialData.allWatchlists} />
-      </Container>
-    </Box>
-  );
+  const data = Route.useLoaderData();
+  return <WatchNow lineups={data.lineups} />;
 }
