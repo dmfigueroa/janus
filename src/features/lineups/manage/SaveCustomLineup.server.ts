@@ -16,7 +16,7 @@ function saveInTransaction(transaction: DatabaseTransaction, input: Input) {
   const existing = transaction.select().from(lineups).all();
   const target = findTarget(existing, input.id);
   const failure = validateInput(transaction, input, existing, target);
-  if (failure) return { success: false as const, message: failure };
+  if (failure) return { success: false as const, ...failure };
   const id = target
     ? updateName(transaction, target.id, input.name)
     : insertLineup(transaction, input.name, existing);
@@ -35,24 +35,28 @@ function validateInput(
   const nameFailure = validateIdentity(input, existing, target);
   if (nameFailure) return nameFailure;
   if (!validWatchlists(transaction, input.watchlistIds))
-    return "One or more watchlists no longer exist.";
+    return { message: "One or more watchlists no longer exist." };
   return null;
 }
 function validateIdentity(input: Input, existing: Record[], target: Record | undefined) {
-  if (missingTarget(input.id, target)) return "Lineup not found.";
-  return availableName(input, existing) ? null : "A unique lineup name is required.";
+  if (missingTarget(input.id, target)) return { message: "Lineup not found." };
+  return validateName(input, existing);
 }
 function missingTarget(id: number | undefined, target: Record | undefined) {
   return id !== undefined && !target;
 }
-function availableName(input: Input, existing: Record[]) {
-  return (
-    Boolean(input.name) &&
-    !existing.some(
-      (entry) =>
-        entry.id !== input.id && unicodeCaseFold(entry.name) === unicodeCaseFold(input.name),
-    )
+function validateName(input: Input, existing: Record[]) {
+  if (!input.name) return { field: "name" as const, message: "Enter a name for this lineup." };
+  const match = existing.find(
+    (entry) => entry.id !== input.id && unicodeCaseFold(entry.name) === unicodeCaseFold(input.name),
   );
+  if (!match) return null;
+  return { field: "name" as const, message: nameConflictMessage(match) };
+}
+function nameConflictMessage(match: Record) {
+  return match.kind === "system"
+    ? `${match.name} is reserved for an automatic lineup.`
+    : "That lineup name is already used.";
 }
 function validWatchlists(transaction: DatabaseTransaction, ids: number[]) {
   const count = transaction

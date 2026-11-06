@@ -7,14 +7,17 @@ export function useLineupActions() {
   const change = useServerFn(changeLineup);
   const router = useRouter();
   const [error, setError] = useState("");
+  const [errorField, setErrorField] = useState("");
   const [saving, setSaving] = useState(false);
   async function submit(data: LineupAction) {
     setSaving(true);
     setError("");
+    setErrorField("");
     try {
       const result = await change({ data });
       if (!result.success) {
         setError(result.message);
+        setErrorField(resultField(result));
         return false;
       }
       await router.invalidate();
@@ -26,5 +29,13 @@ export function useLineupActions() {
       setSaving(false);
     }
   }
-  return { submit, error, saving };
+  function clearError() {
+    setError("");
+    setErrorField("");
+  }
+  return { submit, error, errorField, saving, clearError };
+}
+function resultField(result: object) {
+  if ("field" in result && typeof result.field === "string") return result.field;
+  return "";
 }

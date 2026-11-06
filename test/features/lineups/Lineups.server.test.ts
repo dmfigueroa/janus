@@ -48,8 +48,16 @@ describe("lineups", () => {
 
   it("creates trimmed custom names at the end and rejects duplicate and reserved names", async () => {
     expect(await createLineup("  Weeknights  ")).toMatchObject({ success: true });
-    expect(await createLineup("WEEKNIGHTS")).toMatchObject({ success: false });
-    expect(await createLineup("movies")).toMatchObject({ success: false });
+    expect(await createLineup("WEEKNIGHTS")).toMatchObject({
+      success: false,
+      field: "name",
+      message: "That lineup name is already used.",
+    });
+    expect(await createLineup("movies")).toMatchObject({
+      success: false,
+      field: "name",
+      message: "Movies is reserved for an automatic lineup.",
+    });
     expect((await listLineups()).at(-1)).toMatchObject({ name: "Weeknights", enabled: true });
   });
 
