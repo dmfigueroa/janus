@@ -48,6 +48,21 @@ describe("WatchlistHeader", () => {
     vi.clearAllMocks();
   });
 
+  it("sets the timeline offset from the rendered header height", () => {
+    const measurement = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect");
+    measurement.mockReturnValue({ height: 320 } as DOMRect);
+    try {
+      renderHeader(null);
+      const header = screen.getByRole("banner");
+      const container = header.parentElement;
+      expect(container?.style.getPropertyValue("--watchlist-header-height")).toBe("320px");
+      cleanup();
+      expect(container?.style.getPropertyValue("--watchlist-header-height")).toBe("");
+    } finally {
+      measurement.mockRestore();
+    }
+  });
+
   it("wires the delete action to its callback", () => {
     const { onDelete } = renderHeader(null);
     fireEvent.click(screen.getByRole("button", { name: "Delete watchlist" }));
