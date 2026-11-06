@@ -20,6 +20,32 @@ export const watchlists = sqliteTable("watchlists", {
 export type Watchlist = typeof watchlists.$inferSelect;
 export type InsertWatchlist = typeof watchlists.$inferInsert;
 
+export const lineups = sqliteTable("lineups", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  kind: text("kind", { enum: ["system", "custom"] }).notNull(),
+  systemKey: text("system_key", {
+    enum: ["movie", "television", "game", "book", "comic"],
+  }).unique(),
+  name: text("name").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  rank: integer("rank").notNull(),
+});
+
+export const lineupWatchlists = sqliteTable(
+  "lineup_watchlists",
+  {
+    lineupId: integer("lineup_id")
+      .notNull()
+      .references(() => lineups.id, { onDelete: "cascade" }),
+    watchlistId: integer("watchlist_id")
+      .notNull()
+      .references(() => watchlists.id, { onDelete: "cascade" }),
+  },
+  (table) => ({
+    uniqueMembership: uniqueIndex("unique_lineup_watchlist").on(table.lineupId, table.watchlistId),
+  }),
+);
+
 export const watchlistItems = sqliteTable(
   "watchlist_items",
   {

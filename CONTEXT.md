@@ -21,8 +21,12 @@ The complete calendar date associated with an entry, always represented with a y
 _Avoid_: Release year
 
 **Rotation**:
-The ordered cycle of watchlists the home page uses to surface what to watch next. A watchlist leaves the rotation while it is paused or completed, and returns automatically once neither applies.
+The global recency order used to surface what to watch next. A watchlist leaves the rotation while it is paused or completed, and returns automatically once neither applies.
 _Avoid_: Active queue, cycle
+
+**Lineup**:
+A named grouping of watchlists on Watch Now. Automatic lineups group by the next unwatched item's media type; custom lineups contain explicitly selected watchlists. All lineups share the global rotation, and paused, completed, or empty members remain configured but are not eligible for display.
+_Avoid_: Separate rotation, independent viewing history
 
 **Paused**:
 The persisted on/off state that removes a watchlist from the rotation without deleting it. Pausing records when the pause began; resuming clears it and returns the list to its previous position in the rotation.

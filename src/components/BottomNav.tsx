@@ -1,4 +1,4 @@
-import { Search, List as ListIcon, type LucideIcon } from "lucide-react";
+import { Search, List as ListIcon, Play, type LucideIcon } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { HStack, Link as ChakraLink, Stack, Text } from "@chakra-ui/react";
 
@@ -18,7 +18,8 @@ export function BottomNav() {
       pb="env(safe-area-inset-bottom)"
     >
       <HStack maxW="md" w="full" mx="auto" px={6} h={16} justify="space-around">
-        <BottomNavItem item={{ icon: ListIcon, label: "My Lists", to: "/" }} />
+        <BottomNavItem item={{ icon: Play, label: "Watch Now", to: "/" }} />
+        <BottomNavItem item={{ icon: ListIcon, label: "My Lists", to: "/watchlists" }} />
         <BottomNavItem item={{ icon: Search, label: "Search", to: "/search" }} />
       </HStack>
     </Stack>

@@ -70,6 +70,54 @@ describe("Janus MCP endpoint", () => {
     });
   });
 
+  it("manages lineups through explicit MCP references and replacement operations", async () => {
+    const tools = (await client.listTools()).tools;
+    expect(tools.find((tool) => tool.name === "delete_lineups")?.annotations).toMatchObject({
+      destructiveHint: true,
+    });
+    expect(tools.find((tool) => tool.name === "list_lineups")?.annotations).toMatchObject({
+      readOnlyHint: true,
+    });
+    const created = await client.callTool({
+      name: "create_lineups",
+      arguments: { lineups: [{ name: "MCP context" }, { name: "movies" }] },
+    });
+    expect(created.structuredContent).toMatchObject({
+      results: [
+        { index: 0, success: true },
+        { index: 1, success: false },
+      ],
+    });
+    const list = await client.callTool({ name: "list_lineups", arguments: {} });
+    const content = list.structuredContent as {
+      lineups: Array<{ name: string; reference: { kind: "custom"; id: number } }>;
+    };
+    const reference = content.lineups.find((lineup) => lineup.name === "MCP context")!.reference;
+    expect(reference).toMatchObject({ kind: "custom", id: expect.any(Number) });
+    const replacement = await client.callTool({
+      name: "set_lineup_watchlists",
+      arguments: { reference, watchlistIds: [1, 2] },
+    });
+    expect(replacement.structuredContent).toMatchObject({ success: true });
+    const detail = await client.callTool({ name: "get_lineup", arguments: { reference } });
+    expect(detail.structuredContent).toMatchObject({
+      success: true,
+      lineup: { configuredCount: 2, eligibleCount: 0 },
+    });
+    const forbidden = await client.callTool({
+      name: "delete_lineups",
+      arguments: { lineups: [{ kind: "system", key: "movie" }] },
+    });
+    expect(forbidden.structuredContent).toMatchObject({
+      results: [{ index: 0, success: false, code: "forbidden" }],
+    });
+    const badOrder = await client.callTool({
+      name: "reorder_lineups",
+      arguments: { lineups: [reference] },
+    });
+    expect(badOrder.structuredContent).toMatchObject({ success: false, code: "validation_error" });
+  });
+
   it("merges watchlists atomically through the MCP batch contract", async () => {
     const { watchlists, watchlistItems } = await import("@/db/Schema");
     const [target, source, newSource] = await database
