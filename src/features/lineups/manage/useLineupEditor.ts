@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { LineupData, LineupAction } from "./Lineups";
-import { useLineupActions } from "./useLineupActions";
+import type { LineupData, LineupAction } from "@/features/lineups/manage/Lineups";
+import { useLineupActions } from "@/features/lineups/manage/useLineupActions";
 type Lineup = LineupData["lineups"][number];
 export function useLineupEditor(lineup: Lineup | undefined, watchlists: LineupData["watchlists"]) {
   const [open, setOpenState] = useState(false);

@@ -1,8 +1,8 @@
 import { Box, Button, Container, Heading, Link as ChakraLink, Stack, Text } from "@chakra-ui/react";
 import { Link } from "@tanstack/react-router";
 import { UpcomingWatchlistChips } from "@/features/watchlists/home/UpcomingWatchlistChips";
-import type { LineupData } from "./Lineups";
-import { LineupCards } from "./LineupCards";
+import type { LineupData } from "@/features/lineups/manage/Lineups";
+import { LineupCards } from "@/features/lineups/components/LineupCards";
 type Lineup = LineupData["lineups"][number];
 export function WatchNow({ lineups }: { lineups: Lineup[] }) {
   const visible = lineups.filter((lineup) => lineup.enabled && lineup.eligibleWatchlists.length);

@@ -198,7 +198,7 @@ describe("lineup membership during merge", () => {
     "preserves the union for a %s target",
     async (targetKind) => {
       const { createLineup, setLineupWatchlists, readLineups } =
-        await import("@/features/lineups/Lineups.server");
+        await import("@/features/lineups/manage/Lineups.server");
       const first = await createTestWatchlist(db, { name: "First" });
       const second = await createTestWatchlist(db, { name: "Second" });
       const firstLineup = await createLineup(`First ${targetKind}`);

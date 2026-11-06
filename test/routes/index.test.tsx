@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@test/utils/Render";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EnrichedWatchlist } from "@/features/watchlists/components/WatchlistCard";
 import { WatchlistsHomeRouteContent } from "@/routes/watchlists.index";
-import { WatchNow } from "@/features/lineups/WatchNow";
+import { WatchNow } from "@/features/lineups/read/WatchNow";
 
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (config: unknown) => ({
@@ -217,7 +217,18 @@ describe("Watch Now", () => {
   afterEach(cleanup);
   it("hides disabled and empty lineups and links custom lineups with more than six members", () => {
     const lists = Array.from({ length: 7 }, (_, index) =>
-      watchlist({ id: index + 1, name: `List ${index + 1}` }),
+      watchlist({
+        id: index + 1,
+        name: `List ${index + 1}`,
+        stats: {
+          totalItems: 1,
+          watchedItems: 0,
+          progress: 0,
+          nextUnwatched: nextUnwatchedFixture({ title: `Next ${index + 1}` }),
+          coverImage: null,
+          coverMediaType: "movie",
+        },
+      }),
     );
     const lineups: Parameters<typeof WatchNow>[0]["lineups"] = [
       {
@@ -269,6 +280,9 @@ describe("Watch Now", () => {
     expect(screen.queryByText("Hidden")).toBeNull();
     expect(screen.queryByText("Empty")).toBeNull();
     expect(screen.getAllByTestId(/watchlist-card-/)).toHaveLength(3);
+    expect(screen.getByRole("link", { name: "Next 4" })).not.toBeNull();
+    expect(screen.getByRole("link", { name: "Next 6" })).not.toBeNull();
+    expect(screen.queryByRole("link", { name: "Next 7" })).toBeNull();
   });
   it("offers recovery links when no lineup is visible", () => {
     render(<WatchNow lineups={[]} />);

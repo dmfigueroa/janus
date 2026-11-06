@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { changeLineup, type LineupAction } from "./Lineups";
+import { changeLineup, type LineupAction } from "@/features/lineups/manage/Lineups";
 
 export function useLineupActions() {
   const change = useServerFn(changeLineup);

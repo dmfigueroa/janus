@@ -2,7 +2,7 @@ import { eq, inArray } from "drizzle-orm";
 import { getDb, type DatabaseTransaction } from "@/db/Db.server";
 import { lineups, lineupWatchlists, watchlists } from "@/db/Schema";
 import { unicodeCaseFold } from "@/db/UnicodeCaseFold.server";
-import { listLineups } from "./Lineups.server";
+import { listLineups } from "@/features/lineups/manage/Lineups.server";
 
 type Input = { id?: number; name: string; watchlistIds: number[] };
 type Record = typeof lineups.$inferSelect;

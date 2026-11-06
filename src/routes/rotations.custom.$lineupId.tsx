@@ -1,8 +1,8 @@
 import { Container, Heading, Text, Button } from "@chakra-ui/react";
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { getLineupData } from "@/features/lineups/Lineups";
-import { LineupEditor } from "@/features/lineups/LineupEditor";
-import { LineupCards } from "@/features/lineups/LineupCards";
+import { getLineupData } from "@/features/lineups/manage/Lineups";
+import { LineupEditor } from "@/features/lineups/components/LineupEditor";
+import { LineupCards } from "@/features/lineups/components/LineupCards";
 export const Route = createFileRoute("/rotations/custom/$lineupId")({
   loader: async ({ params }) => {
     const id = Number(params.lineupId);

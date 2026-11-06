@@ -8,7 +8,7 @@ import {
   reorderLineups,
   setLineupWatchlists,
   updateLineup,
-} from "@/features/lineups/Lineups.server";
+} from "@/features/lineups/manage/Lineups.server";
 import { asMcpContent } from "./McpToolResponse.server";
 
 const reference = z.discriminatedUnion("kind", [
@@ -18,6 +18,49 @@ const reference = z.discriminatedUnion("kind", [
   }),
   z.object({ kind: z.literal("custom"), id: z.number().int().positive() }),
 ]);
+
+const createInput = z.object({ name: z.string() });
+const updateInput = z.object({
+  reference,
+  name: z.string().optional(),
+  enabled: z.boolean().optional(),
+});
+async function batchResult<T>(
+  input: unknown,
+  index: number,
+  schema: z.ZodType<T>,
+  operation: (value: T) => Promise<{ success: boolean; code?: string; message?: string }>,
+  successCode: string,
+) {
+  const parsed = schema.safeParse(input);
+  if (!parsed.success)
+    return {
+      index,
+      success: false,
+      code: "validation_error",
+      message: "Invalid lineup input.",
+    };
+  const outcome = await operation(parsed.data);
+  return formatBatchResult(index, outcome, successCode);
+}
+function formatBatchResult(
+  index: number,
+  outcome: { success: boolean; code?: string; message?: string },
+  successCode: string,
+) {
+  const defaults = batchDefaults(outcome.success, successCode);
+  return {
+    index,
+    ...outcome,
+    code: outcome.code ?? defaults.code,
+    message: outcome.message ?? defaults.message,
+  };
+}
+function batchDefaults(success: boolean, successCode: string) {
+  return success
+    ? { code: successCode, message: "Lineup updated." }
+    : { code: "validation_error", message: "Lineup change failed." };
+}
 
 export function registerLineupTools(server: McpServer) {
   server.registerTool(
@@ -48,13 +91,15 @@ export function registerLineupTools(server: McpServer) {
     "create_lineups",
     {
       description: "Create custom lineups in order.",
-      inputSchema: { lineups: z.array(z.object({ name: z.string() })).min(1) },
+      inputSchema: { lineups: z.array(z.union([createInput, z.unknown()])).min(1) },
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
     async ({ lineups }) => {
       const results = [];
       for (const [index, input] of lineups.entries())
-        results.push({ index, ...(await createLineup(input.name)) });
+        results.push(
+          await batchResult(input, index, createInput, ({ name }) => createLineup(name), "created"),
+        );
       return asMcpContent({ results });
     },
   );
@@ -63,18 +108,22 @@ export function registerLineupTools(server: McpServer) {
     {
       description: "Rename or enable lineups.",
       inputSchema: {
-        lineups: z
-          .array(
-            z.object({ reference, name: z.string().optional(), enabled: z.boolean().optional() }),
-          )
-          .min(1),
+        lineups: z.array(z.union([updateInput, z.unknown()])).min(1),
       },
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
     async ({ lineups }) => {
       const results = [];
       for (const [index, input] of lineups.entries())
-        results.push({ index, ...(await updateLineup(input.reference, input)) });
+        results.push(
+          await batchResult(
+            input,
+            index,
+            updateInput,
+            (value) => updateLineup(value.reference, value),
+            "updated",
+          ),
+        );
       return asMcpContent({ results });
     },
   );
@@ -92,13 +141,13 @@ export function registerLineupTools(server: McpServer) {
     "delete_lineups",
     {
       description: "Delete custom lineups without deleting watchlists.",
-      inputSchema: { lineups: z.array(reference).min(1) },
+      inputSchema: { lineups: z.array(z.union([reference, z.unknown()])).min(1) },
       annotations: { readOnlyHint: false, destructiveHint: true },
     },
     async ({ lineups }) => {
       const results = [];
       for (const [index, entry] of lineups.entries())
-        results.push({ index, ...(await deleteLineup(entry)) });
+        results.push(await batchResult(entry, index, reference, deleteLineup, "deleted"));
       return asMcpContent({ results });
     },
   );

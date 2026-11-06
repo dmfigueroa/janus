@@ -1,5 +1,5 @@
-import { asc } from "drizzle-orm";
-import { getDb } from "@/db/Db.server";
+import { asc, eq } from "drizzle-orm";
+import { getDb, type DatabaseTransaction } from "@/db/Db.server";
 import { lineups } from "@/db/Schema";
 import { unicodeCaseFold } from "@/db/UnicodeCaseFold.server";
 
@@ -22,43 +22,21 @@ export async function listLineups() {
         .run();
     });
   });
-  return db
-    .select()
-    .from(lineups)
-    .orderBy(asc(lineups.rank))
-    .all()
-    .map((lineup) => ({
-      ...lineup,
-      reference:
-        lineup.kind === "system"
-          ? { kind: "system" as const, key: lineup.systemKey! }
-          : { kind: "custom" as const, id: lineup.id },
-    }));
+  return db.select().from(lineups).orderBy(asc(lineups.rank)).all().map(asLineup);
+}
+export function asLineup(lineup: typeof lineups.$inferSelect) {
+  return {
+    ...lineup,
+    reference:
+      lineup.kind === "system"
+        ? { kind: "system" as const, key: lineup.systemKey! }
+        : { kind: "custom" as const, id: lineup.id },
+  };
 }
 
-export async function createLineup(input: string) {
-  const name = input.trim();
-  await listLineups();
-  return getDb().transaction((transaction) => {
-    const existing = transaction.select().from(lineups).all();
-    if (
-      !name ||
-      existing.some((lineup) => unicodeCaseFold(lineup.name) === unicodeCaseFold(name))
-    ) {
-      return {
-        success: false as const,
-        code: "validation_error",
-        message: "A unique lineup name is required.",
-      };
-    }
-    const rank = Math.max(-1, ...existing.map((lineup) => lineup.rank)) + 1;
-    const [lineup] = transaction
-      .insert(lineups)
-      .values({ kind: "custom", name, rank })
-      .returning()
-      .all();
-    return { success: true as const, id: lineup.id };
-  });
+export async function createLineup(name: string) {
+  const { saveCustomLineup } = await import("@/features/lineups/manage/SaveCustomLineup.server");
+  return saveCustomLineup({ name, watchlistIds: [] });
 }
 
 export type LineupReference =
@@ -79,16 +57,41 @@ export async function updateLineup(
   reference: LineupReference,
   changes: { name?: string; enabled?: boolean },
 ) {
-  const { eq } = await import("drizzle-orm");
-  const existing = await listLineups();
+  await listLineups();
+  return getDb().transaction((transaction) => updateInTransaction(transaction, reference, changes));
+}
+function updateInTransaction(
+  transaction: DatabaseTransaction,
+  reference: LineupReference,
+  changes: { name?: string; enabled?: boolean },
+) {
+  const existing = transaction.select().from(lineups).all().map(asLineup);
   const target = existing.find((lineup) => matchesReference(lineup, reference));
   if (!target) return { success: false as const, code: "not_found", message: "Lineup not found." };
-  const failure = validateUpdate(reference, changes.name, existing, target.id);
+  if (noChanges(changes))
+    return {
+      success: false as const,
+      code: "validation_error",
+      message: "Provide a name or enabled state.",
+    };
+  return applyUpdate(transaction, reference, changes, existing, target.id);
+}
+function noChanges(changes: { name?: string; enabled?: boolean }) {
+  return changes.name === undefined && changes.enabled === undefined;
+}
+function applyUpdate(
+  transaction: DatabaseTransaction,
+  reference: LineupReference,
+  changes: { name?: string; enabled?: boolean },
+  existing: Awaited<ReturnType<typeof listLineups>>,
+  id: number,
+) {
+  const failure = validateUpdate(reference, changes.name, existing, id);
   if (failure) return failure;
-  getDb()
+  transaction
     .update(lineups)
     .set({ name: trimOptional(changes.name), enabled: changes.enabled })
-    .where(eq(lineups.id, target.id))
+    .where(eq(lineups.id, id))
     .run();
   return { success: true as const };
 }
@@ -190,6 +193,6 @@ export async function deleteLineup(reference: LineupReference) {
   return { success: true as const };
 }
 
-export { reorderLineups } from "./ReorderLineups.server";
-export { readLineups } from "./LineupRead.server";
-export { saveCustomLineup } from "./SaveCustomLineup.server";
+export { reorderLineups } from "@/features/lineups/manage/ReorderLineups.server";
+export { readLineups } from "@/features/lineups/read/LineupRead.server";
+export { saveCustomLineup } from "@/features/lineups/manage/SaveCustomLineup.server";

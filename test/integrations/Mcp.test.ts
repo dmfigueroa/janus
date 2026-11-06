@@ -116,6 +116,23 @@ describe("Janus MCP endpoint", () => {
       arguments: { lineups: [reference] },
     });
     expect(badOrder.structuredContent).toMatchObject({ success: false, code: "validation_error" });
+    const mixedUpdates = await client.callTool({
+      name: "update_lineups",
+      arguments: {
+        lineups: [
+          { reference },
+          { reference, enabled: false },
+          { reference: { kind: "custom", id: "bad" }, name: "Invalid" },
+        ],
+      },
+    });
+    expect(mixedUpdates.structuredContent).toMatchObject({
+      results: [
+        { index: 0, success: false, code: "validation_error" },
+        { index: 1, success: true, code: "updated" },
+        { index: 2, success: false, code: "validation_error" },
+      ],
+    });
   });
 
   it("merges watchlists atomically through the MCP batch contract", async () => {

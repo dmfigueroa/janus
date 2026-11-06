@@ -1,6 +1,6 @@
 import { Button, Checkbox, Dialog, Field, Input, Portal, Stack, Text } from "@chakra-ui/react";
-import type { LineupData } from "./Lineups";
-import { useLineupEditor } from "./useLineupEditor";
+import type { LineupData } from "@/features/lineups/manage/Lineups";
+import { useLineupEditor } from "@/features/lineups/manage/useLineupEditor";
 type Lineup = LineupData["lineups"][number];
 type Props = { lineup?: Lineup; watchlists: LineupData["watchlists"]; trigger: React.ReactNode };
 export function LineupEditor({ lineup, watchlists, trigger }: Props) {

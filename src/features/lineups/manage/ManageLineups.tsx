@@ -14,10 +14,10 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import type { LineupData } from "./Lineups";
-import { LineupEditor } from "./LineupEditor";
-import { LineupRow, lineupKey } from "./ManageLineupRow";
-import { useLineupActions } from "./useLineupActions";
+import type { LineupData } from "@/features/lineups/manage/Lineups";
+import { LineupEditor } from "@/features/lineups/components/LineupEditor";
+import { LineupRow, lineupKey } from "@/features/lineups/manage/ManageLineupRow";
+import { useLineupActions } from "@/features/lineups/manage/useLineupActions";
 
 export function ManageLineups({ data }: { data: LineupData }) {
   const actions = useLineupActions();

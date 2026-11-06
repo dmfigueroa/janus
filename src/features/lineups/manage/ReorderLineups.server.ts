@@ -1,10 +1,19 @@
-import { getDb } from "@/db/Db.server";
+import { eq } from "drizzle-orm";
+import { getDb, type DatabaseTransaction } from "@/db/Db.server";
 import { lineups } from "@/db/Schema";
-import { listLineups, matchesReference, type LineupReference } from "./Lineups.server";
+import {
+  asLineup,
+  listLineups,
+  matchesReference,
+  type LineupReference,
+} from "@/features/lineups/manage/Lineups.server";
 
 export async function reorderLineups(references: LineupReference[]) {
-  const { eq } = await import("drizzle-orm");
-  const existing = await listLineups();
+  await listLineups();
+  return getDb().transaction((transaction) => reorderInTransaction(transaction, references));
+}
+function reorderInTransaction(transaction: DatabaseTransaction, references: LineupReference[]) {
+  const existing = transaction.select().from(lineups).all().map(asLineup);
   const ordered = references.map((reference) =>
     existing.find((lineup) => matchesReference(lineup, reference)),
   );
@@ -14,11 +23,9 @@ export async function reorderLineups(references: LineupReference[]) {
       code: "validation_error",
       message: "Provide every lineup exactly once.",
     };
-  getDb().transaction((transaction) =>
-    ordered.forEach((lineup, rank) => {
-      if (lineup) transaction.update(lineups).set({ rank }).where(eq(lineups.id, lineup.id)).run();
-    }),
-  );
+  ordered.forEach((lineup, rank) => {
+    if (lineup) transaction.update(lineups).set({ rank }).where(eq(lineups.id, lineup.id)).run();
+  });
   return { success: true as const };
 }
 

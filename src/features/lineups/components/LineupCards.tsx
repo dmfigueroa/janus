@@ -1,6 +1,6 @@
 import { SimpleGrid } from "@chakra-ui/react";
 import { WatchlistCard } from "@/features/watchlists/components/WatchlistCard";
-import type { LineupData } from "./Lineups";
+import type { LineupData } from "@/features/lineups/manage/Lineups";
 
 type Watchlist = LineupData["watchlists"][number];
 export function LineupCards({ watchlists }: { watchlists: Watchlist[] }) {

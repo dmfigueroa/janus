@@ -12,9 +12,9 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Link } from "@tanstack/react-router";
 import { ArrowDown, ArrowUp, GripVertical } from "lucide-react";
-import type { LineupData } from "./Lineups";
-import { LineupEditor } from "./LineupEditor";
-import { useLineupActions } from "./useLineupActions";
+import type { LineupData } from "@/features/lineups/manage/Lineups";
+import { LineupEditor } from "@/features/lineups/components/LineupEditor";
+import { useLineupActions } from "@/features/lineups/manage/useLineupActions";
 
 type Lineup = LineupData["lineups"][number];
 export function lineupKey(lineup: Lineup) {

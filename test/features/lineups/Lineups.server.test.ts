@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createIsolatedTestDb, type IsolatedTestDb } from "@test/IsolatedDb";
+import { eq } from "drizzle-orm";
+import { watchlists } from "@/db/Schema";
 import {
   createTestWatchlist,
   createTestWatchlistItem,
@@ -8,13 +10,13 @@ import {
 const state = vi.hoisted(() => ({ db: undefined as IsolatedTestDb | undefined }));
 vi.mock("@/db/Db.server", () => ({ getDb: () => state.db }));
 let testDb: Awaited<ReturnType<typeof createIsolatedTestDb>>;
-let listLineups: typeof import("@/features/lineups/Lineups.server").listLineups;
-let createLineup: typeof import("@/features/lineups/Lineups.server").createLineup;
-let readLineups: typeof import("@/features/lineups/Lineups.server").readLineups;
-let setLineupWatchlists: typeof import("@/features/lineups/Lineups.server").setLineupWatchlists;
-let reorderLineups: typeof import("@/features/lineups/Lineups.server").reorderLineups;
-let updateLineup: typeof import("@/features/lineups/Lineups.server").updateLineup;
-let deleteLineup: typeof import("@/features/lineups/Lineups.server").deleteLineup;
+let listLineups: typeof import("@/features/lineups/manage/Lineups.server").listLineups;
+let createLineup: typeof import("@/features/lineups/manage/Lineups.server").createLineup;
+let readLineups: typeof import("@/features/lineups/manage/Lineups.server").readLineups;
+let setLineupWatchlists: typeof import("@/features/lineups/manage/Lineups.server").setLineupWatchlists;
+let reorderLineups: typeof import("@/features/lineups/manage/Lineups.server").reorderLineups;
+let updateLineup: typeof import("@/features/lineups/manage/Lineups.server").updateLineup;
+let deleteLineup: typeof import("@/features/lineups/manage/Lineups.server").deleteLineup;
 
 beforeAll(async () => {
   testDb = await createIsolatedTestDb();
@@ -27,7 +29,7 @@ beforeAll(async () => {
     reorderLineups,
     updateLineup,
     deleteLineup,
-  } = await import("@/features/lineups/Lineups.server"));
+  } = await import("@/features/lineups/manage/Lineups.server"));
 });
 afterAll(() => testDb.close());
 
@@ -94,7 +96,50 @@ describe("lineups", () => {
       enabled: false,
       configuredCount: 2,
     });
+    expect(await updateLineup(reference, { enabled: true })).toMatchObject({ success: true });
+    expect((await listLineups()).map((entry) => entry.reference)).toEqual([...order].reverse());
     expect(await deleteLineup(reference)).toMatchObject({ success: true });
     expect((await readLineups()).find((entry) => entry.id === created.id)).toBeUndefined();
+  });
+
+  it("keeps overlapping memberships and removes only memberships when a watchlist is deleted", async () => {
+    const list = await createTestWatchlist(testDb.db, { name: "Overlap" });
+    const first = await createLineup("Overlap first");
+    const second = await createLineup("Overlap second");
+    if (!first.success || !second.success) throw new Error("Failed to create lineups");
+    await setLineupWatchlists({ kind: "custom", id: first.id }, [list.id]);
+    await setLineupWatchlists({ kind: "custom", id: second.id }, [list.id]);
+    expect(
+      (await readLineups())
+        .filter((entry) => [first.id, second.id].includes(entry.id))
+        .map((entry) => entry.configuredCount),
+    ).toEqual([1, 1]);
+    await testDb.db.delete(watchlists).where(eq(watchlists.id, list.id));
+    expect(
+      (await readLineups())
+        .filter((entry) => [first.id, second.id].includes(entry.id))
+        .map((entry) => entry.configuredCount),
+    ).toEqual([0, 0]);
+  });
+
+  it.each([
+    ["movie", "movie"],
+    ["episode", "television"],
+    ["anime", "television"],
+    ["game", "game"],
+    ["book", "book"],
+    ["comic", "comic"],
+    ["manga", "comic"],
+  ] as const)("maps next %s items to %s", async (mediaType, key) => {
+    const list = await createTestWatchlist(testDb.db, { name: `Mapping ${mediaType}` });
+    await createTestWatchlistItem(testDb.db, {
+      watchlistId: list.id,
+      tmdbId: `mapping-${mediaType}`,
+      source: "tmdb",
+      mediaType,
+      title: "Next",
+    });
+    const lineup = (await readLineups()).find((entry) => entry.systemKey === key)!;
+    expect(lineup.eligibleWatchlists.map((entry) => entry.id)).toContain(list.id);
   });
 });
