@@ -3,7 +3,11 @@ import { watchlistItems } from "@/db/Schema";
 import type { InsertionPosition } from "@/features/watchlists/Order";
 import { and, asc, eq } from "drizzle-orm";
 import { customRankOrder } from "@/features/watchlists/Order.server";
-import { planGroupInsertionSlots, type ExistingItemSlot } from "./GroupInsertion.server";
+import { InsertItemReferenceError } from "@/features/watchlists/InsertOrderedItem.server";
+
+const anchoredPositions = new Set<InsertionPosition | undefined>(["before", "after"]);
+
+type ExistingItemSlot = { id: number; customRank: number };
 
 type WatchlistItemRow = typeof watchlistItems.$inferSelect;
 
@@ -27,15 +31,51 @@ export function applyAnchoredGroupInsertion(
   buildItemInsertFields: (item: WatchlistItemRow) => GroupItemInsertFields,
 ): void {
   const orderedExisting = fetchRankedExisting(transaction, destination.id);
-  const slots = planGroupInsertionSlots({
-    orderedExisting,
-    itemsToInsert: items,
-    position,
-    referenceItemId,
-  });
+  // Empty groups historically normalize existing ranks without validating an anchor.
+  const insertionIndex =
+    items.length === 0 ? 0 : resolveInsertionIndex(orderedExisting, position, referenceItemId);
 
-  applyRankUpdates(transaction, orderedExisting, slots, destination.id);
-  applyInsertItems(transaction, items, slots, destination.id, buildItemInsertFields);
+  orderedExisting.forEach((item, index) => {
+    const rank = index + 1 + (index >= insertionIndex ? items.length : 0);
+    if (item.customRank !== rank) {
+      transaction
+        .update(watchlistItems)
+        .set({ customRank: rank })
+        .where(and(eq(watchlistItems.id, item.id), eq(watchlistItems.watchlistId, destination.id)))
+        .run();
+    }
+  });
+  items.forEach((item, index) => {
+    transaction
+      .insert(watchlistItems)
+      .values({
+        ...buildItemInsertFields(item),
+        watchlistId: destination.id,
+        customRank: insertionIndex + index + 1,
+      })
+      .run();
+  });
+}
+
+function resolveInsertionIndex(
+  existingItems: ExistingItemSlot[],
+  position: InsertionPosition | undefined,
+  referenceItemId: number | undefined,
+): number {
+  if (position === "beginning") return 0;
+  if (anchoredPositions.has(position)) {
+    return findAnchorIndex(existingItems, referenceItemId) + Number(position === "after");
+  }
+  return existingItems.length;
+}
+
+function findAnchorIndex(
+  existingItems: ExistingItemSlot[],
+  referenceItemId: number | undefined,
+): number {
+  const index = existingItems.findIndex((item) => item.id === referenceItemId);
+  if (index === -1) throw new InsertItemReferenceError(referenceItemId ?? NaN);
+  return index;
 }
 
 function fetchRankedExisting(
@@ -46,7 +86,6 @@ function fetchRankedExisting(
     .select({
       id: watchlistItems.id,
       customRank: watchlistItems.customRank,
-      releaseDate: watchlistItems.releaseDate,
     })
     .from(watchlistItems)
     .where(eq(watchlistItems.watchlistId, destinationId))
@@ -58,85 +97,5 @@ function fetchRankedExisting(
     .map((item) => ({
       id: item.id,
       customRank: item.customRank!,
-      releaseDate: item.releaseDate,
     }));
-}
-
-function applyRankUpdates(
-  transaction: DatabaseTransaction,
-  orderedExisting: ExistingItemSlot[],
-  slots: Array<{ id: number }>,
-  destinationId: number,
-) {
-  slots.forEach((slot, idx) => {
-    updateRankIfNeeded(transaction, orderedExisting, slot, idx, destinationId);
-  });
-}
-
-function updateRankIfNeeded(
-  transaction: DatabaseTransaction,
-  orderedExisting: ExistingItemSlot[],
-  slot: { id: number },
-  idx: number,
-  destinationId: number,
-) {
-  if (slot.id === 0) {
-    return;
-  }
-  const expectedRank = idx + 1;
-  const current = orderedExisting.find((row) => row.id === slot.id);
-  if (!isRankStale(current, expectedRank)) {
-    return;
-  }
-  writeRank(transaction, slot.id, expectedRank, destinationId);
-}
-
-function isRankStale(current: ExistingItemSlot | undefined, expectedRank: number): boolean {
-  if (!current) {
-    return false;
-  }
-  return current.customRank !== expectedRank;
-}
-
-function writeRank(
-  transaction: DatabaseTransaction,
-  itemId: number,
-  expectedRank: number,
-  destinationId: number,
-) {
-  transaction
-    .update(watchlistItems)
-    .set({ customRank: expectedRank })
-    .where(and(eq(watchlistItems.id, itemId), eq(watchlistItems.watchlistId, destinationId)))
-    .run();
-}
-
-function applyInsertItems(
-  transaction: DatabaseTransaction,
-  items: WatchlistItemRow[],
-  slots: Array<{ id: number }>,
-  destinationId: number,
-  buildItemInsertFields: (item: WatchlistItemRow) => GroupItemInsertFields,
-) {
-  let slotCursor = 0;
-  for (const item of items) {
-    slotCursor = advanceToInsertSlot(slots, slotCursor);
-    transaction
-      .insert(watchlistItems)
-      .values({
-        ...buildItemInsertFields(item),
-        watchlistId: destinationId,
-        customRank: slotCursor + 1,
-      })
-      .run();
-    slotCursor += 1;
-  }
-}
-
-function advanceToInsertSlot(slots: Array<{ id: number }>, startFrom: number): number {
-  let cursor = startFrom;
-  while (slots[cursor]?.id !== 0) {
-    cursor += 1;
-  }
-  return cursor;
 }
