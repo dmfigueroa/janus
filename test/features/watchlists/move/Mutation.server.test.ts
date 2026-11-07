@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "@/db/Schema";
 import { createIsolatedTestDb, type IsolatedTestDb } from "@test/IsolatedDb";
@@ -1026,6 +1027,90 @@ describe("move parent to watchlist by parent ID mutation", () => {
     });
     expect(destDetail?.items.map((i) => i.title)).toEqual(["Pilot", "Existing"]);
   });
+
+  it("rolls back grouped source deletion when the anchor is missing", async () => {
+    const { executeGroupMove } = await import("@/features/watchlists/move/MoveItems.server");
+    const [source, destination] = await db
+      .insert(watchlists)
+      .values([{ name: "Source" }, { name: "Destination", itemOrderMode: "custom" }])
+      .returning();
+    const items = await db
+      .insert(watchlistItems)
+      .values(
+        ["Pilot", "Finale"].map((title) => ({
+          watchlistId: source.id,
+          tmdbId: title,
+          source: "tmdb",
+          mediaType: "episode" as const,
+          title,
+        })),
+      )
+      .returning();
+    const before = await db.select().from(watchlistItems);
+
+    const { getDb } = await import("@/db/Db.server");
+    expect(() => executeGroupMove(getDb(), items, destination, "before", -1)).toThrow();
+
+    expect(await db.select().from(watchlistItems)).toEqual(before);
+  });
+
+  it.each([
+    ["beginning", ["Pilot", "Finale", "First", "Reference", "Trailing"]],
+    ["end", ["First", "Reference", "Trailing", "Pilot", "Finale"]],
+    ["before", ["First", "Pilot", "Finale", "Reference", "Trailing"]],
+    ["after", ["First", "Reference", "Pilot", "Finale", "Trailing"]],
+  ] as const)(
+    "preserves grouped order and persisted ranks at %s",
+    async (position, expectedTitles) => {
+      const [source, destination] = await db
+        .insert(watchlists)
+        .values([{ name: "Source" }, { name: "Destination", itemOrderMode: "custom" }])
+        .returning();
+      const existing = await db
+        .insert(watchlistItems)
+        .values(
+          ["First", "Reference", "Trailing"].map((title, index) => ({
+            watchlistId: destination.id,
+            tmdbId: title,
+            source: "tmdb",
+            mediaType: "movie" as const,
+            title,
+            customRank: index + 1,
+          })),
+        )
+        .returning();
+      await db.insert(watchlistItems).values(
+        ["Pilot", "Finale"].map((title, index) => ({
+          watchlistId: source.id,
+          tmdbId: title,
+          source: "tmdb",
+          mediaType: "episode" as const,
+          title,
+          parentId: "group",
+          parentTitle: "Group",
+          season: 1,
+          episode: String(index + 1),
+        })),
+      );
+
+      const result = await moveParentToWatchlistMutation({
+        watchlistId: source.id,
+        parentId: "group",
+        destinationWatchlistId: destination.id,
+        position,
+        referenceItemId: existing[1].id,
+      });
+
+      expect(result.success).toBe(true);
+      const persisted = await db
+        .select()
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, destination.id));
+      const ordered = persisted.toSorted((left, right) => left.customRank! - right.customRank!);
+      expect(ordered.map((item) => item.title)).toEqual(expectedTitles);
+      expect(ordered.map((item) => item.customRank)).toEqual([1, 2, 3, 4, 5]);
+    },
+  );
 
   it("anchors a parent move so the first sibling lands at the reference and the rest trail", async () => {
     const [source, destination] = await db
