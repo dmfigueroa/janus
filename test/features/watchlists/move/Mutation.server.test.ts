@@ -14,9 +14,9 @@ vi.mock("@/db/Db.server", () => ({
 let testDb: Awaited<ReturnType<typeof createIsolatedTestDb>>;
 let db: IsolatedTestDb;
 const { watchlists, watchlistItems } = schema;
-let moveItemToWatchlistMutation: typeof import("@/features/watchlists/move/Mutation.server").moveItemToWatchlistMutation;
-let moveParentAndChildrenToWatchlistMutation: typeof import("@/features/watchlists/move/ParentMutation.server").moveParentAndChildrenToWatchlistMutation;
-let moveParentToWatchlistMutation: typeof import("@/features/watchlists/move/ParentMutation.server").moveParentToWatchlistMutation;
+let moveItemToWatchlistMutation: typeof import("@/features/watchlists/move/MoveWatchlistItems.server").moveItemToWatchlistMutation;
+let moveParentAndChildrenToWatchlistMutation: typeof import("@/features/watchlists/move/MoveWatchlistItems.server").moveParentAndChildrenToWatchlistMutation;
+let moveParentToWatchlistMutation: typeof import("@/features/watchlists/move/MoveWatchlistItems.server").moveParentToWatchlistMutation;
 let readWatchlistDetailScreen: typeof import("@/features/watchlists/Read.server").WatchlistsRead.detailScreen;
 
 beforeAll(async () => {
@@ -24,16 +24,14 @@ beforeAll(async () => {
   db = testDb.db;
   dbState.db = db;
 
-  const [moveModule, parentMoveModule, readModule] = await Promise.all([
-    import("@/features/watchlists/move/Mutation.server"),
-    import("@/features/watchlists/move/ParentMutation.server"),
+  const [moveModule, readModule] = await Promise.all([
+    import("@/features/watchlists/move/MoveWatchlistItems.server"),
     import("@/features/watchlists/Read.server"),
   ]);
 
   moveItemToWatchlistMutation = moveModule.moveItemToWatchlistMutation;
-  moveParentAndChildrenToWatchlistMutation =
-    parentMoveModule.moveParentAndChildrenToWatchlistMutation;
-  moveParentToWatchlistMutation = parentMoveModule.moveParentToWatchlistMutation;
+  moveParentAndChildrenToWatchlistMutation = moveModule.moveParentAndChildrenToWatchlistMutation;
+  moveParentToWatchlistMutation = moveModule.moveParentToWatchlistMutation;
   readWatchlistDetailScreen = readModule.WatchlistsRead.detailScreen;
 });
 
@@ -1029,12 +1027,11 @@ describe("move parent to watchlist by parent ID mutation", () => {
   });
 
   it("rolls back grouped source deletion when the anchor is missing", async () => {
-    const { executeGroupMove } = await import("@/features/watchlists/move/MoveItems.server");
     const [source, destination] = await db
       .insert(watchlists)
       .values([{ name: "Source" }, { name: "Destination", itemOrderMode: "custom" }])
       .returning();
-    const items = await db
+    await db
       .insert(watchlistItems)
       .values(
         ["Pilot", "Finale"].map((title) => ({
@@ -1043,13 +1040,20 @@ describe("move parent to watchlist by parent ID mutation", () => {
           source: "tmdb",
           mediaType: "episode" as const,
           title,
+          parentId: "rollback-group",
         })),
       )
       .returning();
     const before = await db.select().from(watchlistItems);
 
-    const { getDb } = await import("@/db/Db.server");
-    expect(() => executeGroupMove(getDb(), items, destination, "before", -1)).toThrow();
+    const result = await moveParentToWatchlistMutation({
+      watchlistId: source.id,
+      parentId: "rollback-group",
+      destinationWatchlistId: destination.id,
+      position: "before",
+      referenceItemId: -1,
+    });
+    expect(result).toMatchObject({ success: false, code: "invalid_reference" });
 
     expect(await db.select().from(watchlistItems)).toEqual(before);
   });

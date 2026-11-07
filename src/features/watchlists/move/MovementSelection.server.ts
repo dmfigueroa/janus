@@ -1,10 +1,65 @@
+import { customRankOrder } from "@/features/watchlists/Order.server";
 import { getDb } from "@/db/Db.server";
 import { watchlistItems } from "@/db/Schema";
-import type { InsertionPosition } from "@/features/watchlists/InsertOrderedItem.server";
+import { and, asc, eq } from "drizzle-orm";
+import type { InsertionPosition } from "@/features/watchlists/Order";
 import { MoveItemError } from "@/features/watchlists/Errors.server";
 import { CUSTOM_ORDER_INSERTION_REQUIRED_MESSAGE } from "@/features/watchlists/add/Constants";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
-import { type MoveDestination, type MoveItemFailureResult } from "./MoveTypes";
+import type { MoveDestination, MoveItemFailureResult } from "./MoveWatchlistItems.server";
+type WatchlistItemRow = typeof watchlistItems.$inferSelect;
+export async function loadGroupDestination(
+  db: ReturnType<typeof getDb>,
+  destinationWatchlistId: number,
+  position: InsertionPosition | undefined,
+  referenceItemId: number | undefined,
+) {
+  try {
+    const destination = await fetchWatchlistOrThrow(db, destinationWatchlistId);
+    const insertionFailure = customInsertionFailure(
+      destination.itemOrderMode,
+      position,
+      referenceItemId,
+    );
+    if (insertionFailure) {
+      return insertionFailure;
+    }
+    return { success: true as const, destination };
+  } catch (error) {
+    return moveLoadFailure(error);
+  }
+}
+
+export function findParentGroupItems(
+  db: ReturnType<typeof getDb>,
+  watchlistId: number,
+  parentId: string,
+  ordered = false,
+) {
+  return db.query.watchlistItems.findMany({
+    where: and(eq(watchlistItems.watchlistId, watchlistId), eq(watchlistItems.parentId, parentId)),
+    ...(ordered ? { orderBy: [...customRankOrder, asc(watchlistItems.id)] } : {}),
+  });
+}
+
+function moveLoadFailure(error: unknown): MoveItemFailureResult {
+  if (error instanceof MoveItemError) {
+    return moveItemFailure(error);
+  }
+  throw error;
+}
+
+export function parentSelectionFailure(
+  item: WatchlistItemRow,
+  destination: MoveDestination,
+  position: InsertionPosition | undefined,
+  referenceItemId: number | undefined,
+): MoveItemFailureResult | null {
+  if (!item.parentId) {
+    return { success: false, code: "no_parent_group", message: "Item has no parent group." };
+  }
+  return customInsertionFailure(destination.itemOrderMode, position, referenceItemId);
+}
 
 export function customInsertionFailure(
   itemOrderMode: WatchlistItemOrderMode,
@@ -73,7 +128,7 @@ export function invalidReferenceFailure(referenceItemId: number): MoveItemFailur
   };
 }
 
-export type MoveItemLoadContext =
+type MoveItemLoadContext =
   | { success: true; item: typeof watchlistItems.$inferSelect; destination: MoveDestination }
   | MoveItemFailureResult;
 
@@ -94,7 +149,7 @@ export async function loadItemMoveContext(
   }
 }
 
-export async function fetchItemOrThrow(db: ReturnType<typeof getDb>, itemId: number) {
+async function fetchItemOrThrow(db: ReturnType<typeof getDb>, itemId: number) {
   const item = await db.query.watchlistItems.findFirst({
     where: (table, { eq }) => eq(table.id, itemId),
   });
@@ -104,7 +159,7 @@ export async function fetchItemOrThrow(db: ReturnType<typeof getDb>, itemId: num
   return item;
 }
 
-export async function fetchWatchlistOrThrow(
+async function fetchWatchlistOrThrow(
   db: ReturnType<typeof getDb>,
   watchlistId: number,
 ): Promise<MoveDestination> {
@@ -134,5 +189,3 @@ export async function ensureNoDuplicate(
     throw new MoveItemError("Item already exists in the destination watchlist.", "duplicate");
   }
 }
-
-export type { MoveItemFailureCode, MoveItemFailureResult, MoveItemResult } from "./MoveTypes";

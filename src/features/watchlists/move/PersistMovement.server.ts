@@ -1,25 +1,19 @@
-import type { DatabaseTransaction } from "@/db/Db.server";
-import { getDb } from "@/db/Db.server";
+import { getDb, type DatabaseTransaction } from "@/db/Db.server";
 import { watchlistItems } from "@/db/Schema";
+import { eq } from "drizzle-orm";
 import {
   insertItemWithCustomOrder,
   type InsertionPosition,
   type ItemInsertFields,
 } from "@/features/watchlists/InsertOrderedItem.server";
-import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
 import { markLastItemAddedInTransaction } from "@/features/watchlists/Repository.server";
-import { eq } from "drizzle-orm";
 import {
   applyAnchoredGroupInsertion,
   type GroupItemInsertFields,
 } from "./AnchoredGroupInsertion.server";
-
+import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
+type MoveDestination = { id: number; itemOrderMode: WatchlistItemOrderMode };
 type WatchlistItemRow = typeof watchlistItems.$inferSelect;
-
-type MoveDestination = {
-  id: number;
-  itemOrderMode: WatchlistItemOrderMode;
-};
 
 export function executeMove(
   db: ReturnType<typeof getDb>,

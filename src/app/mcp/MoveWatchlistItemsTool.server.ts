@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { moveItemToWatchlistMutation } from "@/features/watchlists/move/Mutation.server";
+import { moveItemToWatchlistMutation } from "@/features/watchlists/move/MoveWatchlistItems.server";
 import {
   anchorReferenceRefinement,
   moveInsertionPositionSchema,

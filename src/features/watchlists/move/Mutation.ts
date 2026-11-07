@@ -1,7 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { moveItemToWatchlistSchema, moveParentToWatchlistSchema } from "./Schema";
-import { moveItemToWatchlistMutation } from "./Mutation.server";
-import { moveParentAndChildrenToWatchlistMutation } from "./ParentMutation.server";
+import {
+  moveItemToWatchlistMutation,
+  moveParentAndChildrenToWatchlistMutation,
+} from "./MoveWatchlistItems.server";
 
 export const moveItemToWatchlist = createServerFn({ method: "POST" })
   .inputValidator((data) => moveItemToWatchlistSchema.parse(data))
