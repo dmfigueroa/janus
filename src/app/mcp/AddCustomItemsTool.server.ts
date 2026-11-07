@@ -1,3 +1,4 @@
+import { executeWriteBatch } from "./ExecuteWriteBatch.server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { anchorInsertionRefinement } from "@/features/watchlists/add/InsertionRefinement";
@@ -15,7 +16,14 @@ const customItemAdditionResultSchema = z.object({
   message: z.string(),
   watchlistId: z.number().optional(),
   mediaType: z.enum(["movie", "tv", "episode", "book", "game", "comic"]).optional(),
-  affectedCount: z.number().int().nonnegative(),
+  affectedCount: z
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .describe(
+      "Number of items added when known; omitted when an unexpected failure leaves the count unknown.",
+    ),
 });
 
 const customItemAdditionInputSchema = z
@@ -45,7 +53,7 @@ export function registerAddCustomItemsToWatchlistsTool(server: McpServer) {
     },
     async ({ items }) =>
       asMcpContent({
-        results: await Promise.all(items.map(addCustomItemResult)),
+        results: await executeWriteBatch(items, addCustomItemResult),
       }),
   );
 }

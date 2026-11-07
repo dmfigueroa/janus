@@ -1,3 +1,4 @@
+import { executeWriteBatch } from "./ExecuteWriteBatch.server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { anchorInsertionRefinement } from "@/features/watchlists/add/InsertionRefinement";
@@ -16,7 +17,14 @@ const mediaAdditionResultSchema = z.object({
   watchlistId: z.number().optional(),
   provider: z.enum(["tmdb", "rawg", "google_books", "comicvine", "anilist"]).optional(),
   providerId: z.string().optional(),
-  affectedCount: z.number().int().nonnegative(),
+  affectedCount: z
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .describe(
+      "Number of items added when known; omitted when an unexpected failure leaves the count unknown.",
+    ),
 });
 
 const mediaAdditionInputSchema = z
@@ -51,17 +59,9 @@ export function registerAddMediaToWatchlistsTool(server: McpServer) {
     },
     async ({ additions }) =>
       asMcpContent({
-        results: await addMediaResults(additions),
+        results: await executeWriteBatch(additions, addMediaResult),
       }),
   );
-}
-
-async function addMediaResults(additions: z.infer<typeof mediaAdditionInputSchema>[]) {
-  const results = [];
-  for (const [index, addition] of additions.entries()) {
-    results.push(await addMediaResult(addition, index));
-  }
-  return results;
 }
 
 async function addMediaResult(input: z.infer<typeof mediaAdditionInputSchema>, index: number) {

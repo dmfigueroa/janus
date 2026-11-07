@@ -1,3 +1,4 @@
+import { executeWriteBatch } from "./ExecuteWriteBatch.server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { setWatchedStateMutation } from "@/features/watchlists/watched/SetWatchedState.server";
@@ -30,7 +31,7 @@ export function registerSetWatchlistItemsWatchedTool(server: McpServer) {
     },
     async ({ updates }) =>
       asMcpContent({
-        results: await Promise.all(updates.map(setWatchedResult)),
+        results: await executeWriteBatch(updates, setWatchedResult),
       }),
   );
 }

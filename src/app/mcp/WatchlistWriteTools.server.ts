@@ -1,3 +1,4 @@
+import { executeWriteBatch } from "./ExecuteWriteBatch.server";
 import { registerMergeWatchlistsTool } from "./MergeWatchlistsTool.server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -74,7 +75,7 @@ function registerCreateWatchlists(server: McpServer) {
     },
     async ({ watchlists }) =>
       asMcpContent({
-        results: await Promise.all(watchlists.map(createWatchlistResult)),
+        results: await executeWriteBatch(watchlists, createWatchlistResult),
       }),
   );
 }
@@ -92,7 +93,7 @@ function registerUpdateWatchlists(server: McpServer) {
     },
     async ({ watchlists }) =>
       asMcpContent({
-        results: await Promise.all(watchlists.map(updateWatchlistResult)),
+        results: await executeWriteBatch(watchlists, updateWatchlistResult),
       }),
   );
 }
@@ -110,7 +111,7 @@ function registerDeleteWatchlists(server: McpServer) {
     },
     async ({ watchlistIds }) =>
       asMcpContent({
-        results: await Promise.all(watchlistIds.map(deleteWatchlistResult)),
+        results: await executeWriteBatch(watchlistIds, deleteWatchlistResult),
       }),
   );
 }
@@ -128,7 +129,7 @@ function registerSkipWatchlists(server: McpServer) {
     },
     async ({ watchlistIds }) =>
       asMcpContent({
-        results: await Promise.all(watchlistIds.map(skipWatchlistResult)),
+        results: await executeWriteBatch(watchlistIds, skipWatchlistResult),
       }),
   );
 }
