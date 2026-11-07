@@ -10,31 +10,30 @@ import {
 const state = vi.hoisted(() => ({ db: undefined as IsolatedTestDb | undefined }));
 vi.mock("@/db/Db.server", () => ({ getDb: () => state.db }));
 let testDb: Awaited<ReturnType<typeof createIsolatedTestDb>>;
-let listLineups: typeof import("@/features/lineups/manage/Lineups.server").listLineups;
-let createLineup: typeof import("@/features/lineups/manage/Lineups.server").createLineup;
-let readLineups: typeof import("@/features/lineups/manage/Lineups.server").readLineups;
-let setLineupWatchlists: typeof import("@/features/lineups/manage/Lineups.server").setLineupWatchlists;
-let reorderLineups: typeof import("@/features/lineups/manage/Lineups.server").reorderLineups;
-let updateLineup: typeof import("@/features/lineups/manage/Lineups.server").updateLineup;
-let deleteLineup: typeof import("@/features/lineups/manage/Lineups.server").deleteLineup;
+let listLineups: typeof import("@/features/lineups/read/LineupConfigurationRead.server").listLineups;
+let createLineup: typeof import("@/features/lineups/manage/LineupConfiguration.server").createLineup;
+let readLineups: typeof import("@/features/lineups/read/LineupRead.server").readLineups;
+let setLineupWatchlists: typeof import("@/features/lineups/manage/LineupConfiguration.server").setLineupWatchlists;
+let reorderLineups: typeof import("@/features/lineups/manage/ReorderLineups.server").reorderLineups;
+let updateLineup: typeof import("@/features/lineups/manage/LineupConfiguration.server").updateLineup;
+let deleteLineup: typeof import("@/features/lineups/manage/DeleteLineup.server").deleteLineup;
 
 beforeAll(async () => {
   testDb = await createIsolatedTestDb();
   state.db = testDb.db;
-  ({
-    listLineups,
-    createLineup,
-    readLineups,
-    setLineupWatchlists,
-    reorderLineups,
-    updateLineup,
-    deleteLineup,
-  } = await import("@/features/lineups/manage/Lineups.server"));
+  ({ deleteLineup } = await import("@/features/lineups/manage/DeleteLineup.server"));
+  ({ listLineups } = await import("@/features/lineups/read/LineupConfigurationRead.server"));
+  ({ readLineups } = await import("@/features/lineups/read/LineupRead.server"));
+  ({ reorderLineups } = await import("@/features/lineups/manage/ReorderLineups.server"));
+  ({ createLineup, setLineupWatchlists, updateLineup } =
+    await import("@/features/lineups/manage/LineupConfiguration.server"));
 });
 afterAll(() => testDb.close());
 
 describe("lineups", () => {
   it("starts with the five enabled automatic lineups in their existing order", async () => {
+    const initial = await listLineups();
+    expect(await listLineups()).toEqual(initial);
     expect((await listLineups()).map(({ reference, enabled }) => ({ reference, enabled }))).toEqual(
       [
         { reference: { kind: "system", key: "movie" }, enabled: true },
@@ -108,6 +107,61 @@ describe("lineups", () => {
     expect((await listLineups()).map((entry) => entry.reference)).toEqual([...order].reverse());
     expect(await deleteLineup(reference)).toMatchObject({ success: true });
     expect((await readLineups()).find((entry) => entry.id === created.id)).toBeUndefined();
+  });
+
+  it("retains empty and completed watchlists as configured members", async () => {
+    const { saveCustomLineup } =
+      await import("@/features/lineups/manage/LineupConfiguration.server");
+    const empty = await createTestWatchlist(testDb.db, { name: "Empty configured" });
+    const completed = await createTestWatchlist(testDb.db, { name: "Completed configured" });
+    await createTestWatchlistItem(testDb.db, { watchlistId: completed.id, isWatched: true });
+    const created = await saveCustomLineup({
+      name: "Hidden configured",
+      watchlistIds: [empty.id, completed.id],
+    });
+    if (!created.success) throw new Error(created.message);
+    expect((await readLineups()).find((entry) => entry.id === created.id)).toMatchObject({
+      configuredCount: 2,
+      eligibleCount: 0,
+    });
+  });
+
+  it("rejects invalid edits atomically through UI and MCP operations", async () => {
+    const { saveCustomLineup } =
+      await import("@/features/lineups/manage/LineupConfiguration.server");
+    const member = await createTestWatchlist(testDb.db, { name: "Atomic member" });
+    const created = await saveCustomLineup({ name: "Atomic original", watchlistIds: [member.id] });
+    if (!created.success) throw new Error(created.message);
+    const reference = { kind: "custom" as const, id: created.id };
+    for (const watchlistIds of [[member.id, member.id], [2147483647]]) {
+      expect(
+        await saveCustomLineup({ id: created.id, name: "Atomic changed", watchlistIds }),
+      ).toMatchObject({ success: false, message: "One or more watchlists no longer exist." });
+      expect(await setLineupWatchlists(reference, watchlistIds)).toEqual({
+        success: false,
+        code: "validation_error",
+        message: "Watchlist IDs must be distinct and exist.",
+      });
+      const stored = (await readLineups()).find((entry) => entry.id === created.id)!;
+      expect(stored.name).toBe("Atomic original");
+      expect(stored.configuredWatchlists?.map((entry) => entry.id)).toEqual([member.id]);
+    }
+    for (const name of [" Movies ", "WEEKNIGHTS", "   "]) {
+      expect(await saveCustomLineup({ id: created.id, name, watchlistIds: [] })).toMatchObject({
+        success: false,
+        field: "name",
+      });
+      expect(await updateLineup(reference, { name, enabled: false })).toEqual({
+        success: false,
+        code: "validation_error",
+        message: "A unique lineup name is required.",
+      });
+    }
+    expect((await readLineups()).find((entry) => entry.id === created.id)).toMatchObject({
+      name: "Atomic original",
+      enabled: true,
+      configuredCount: 1,
+    });
   });
 
   it("keeps overlapping memberships and removes only memberships when a watchlist is deleted", async () => {

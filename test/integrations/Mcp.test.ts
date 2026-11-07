@@ -99,6 +99,15 @@ describe("Janus MCP endpoint", () => {
       arguments: { reference, watchlistIds: [1, 2] },
     });
     expect(replacement.structuredContent).toMatchObject({ success: true });
+    const rejected = await client.callTool({
+      name: "set_lineup_watchlists",
+      arguments: { reference, watchlistIds: [1, 1] },
+    });
+    expect(rejected.structuredContent).toMatchObject({
+      success: false,
+      code: "validation_error",
+      message: "Watchlist IDs must be distinct and exist.",
+    });
     const detail = await client.callTool({ name: "get_lineup", arguments: { reference } });
     expect(detail.structuredContent).toMatchObject({
       success: true,

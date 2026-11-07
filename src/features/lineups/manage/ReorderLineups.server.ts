@@ -6,7 +6,7 @@ import {
   listLineups,
   matchesReference,
   type LineupReference,
-} from "@/features/lineups/manage/Lineups.server";
+} from "@/features/lineups/read/LineupConfigurationRead.server";
 
 export async function reorderLineups(references: LineupReference[]) {
   await listLineups();

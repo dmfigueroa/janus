@@ -1,14 +1,14 @@
+import { deleteLineup } from "@/features/lineups/manage/DeleteLineup.server";
+import { matchesReference } from "@/features/lineups/read/LineupConfigurationRead.server";
+import { readLineups } from "@/features/lineups/read/LineupRead.server";
+import { reorderLineups } from "@/features/lineups/manage/ReorderLineups.server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
   createLineup,
-  matchesReference,
-  deleteLineup,
-  readLineups,
-  reorderLineups,
   setLineupWatchlists,
   updateLineup,
-} from "@/features/lineups/manage/Lineups.server";
+} from "@/features/lineups/manage/LineupConfiguration.server";
 import { asMcpContent } from "./McpToolResponse.server";
 
 const reference = z.discriminatedUnion("kind", [

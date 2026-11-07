@@ -4,7 +4,7 @@ import {
   listWatchlistSummaries,
   type WatchlistSummary,
 } from "@/features/watchlists/list/Query.server";
-import { listLineups } from "@/features/lineups/manage/Lineups.server";
+import { listLineups } from "@/features/lineups/read/LineupConfigurationRead.server";
 type Lineup = Awaited<ReturnType<typeof listLineups>>[number];
 const mediaKeys: Record<string, string> = {
   movie: "movie",

@@ -1,10 +1,10 @@
+import { deleteLineup } from "@/features/lineups/manage/DeleteLineup.server";
+import { reorderLineups } from "@/features/lineups/manage/ReorderLineups.server";
 import type { LineupAction } from "@/features/lineups/manage/Lineups";
 import {
-  deleteLineup,
-  reorderLineups,
   saveCustomLineup,
   updateLineup,
-} from "@/features/lineups/manage/Lineups.server";
+} from "@/features/lineups/manage/LineupConfiguration.server";
 export function executeLineupAction(data: LineupAction) {
   if (data.action === "create") return saveCustomLineup(data);
   if (data.action === "edit") return editCustom(data);
