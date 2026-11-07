@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { toggleWatchedMutation } from "@/features/watchlists/toggle/Mutation.server";
+import { setWatchedStateMutation } from "@/features/watchlists/watched/SetWatchedState.server";
 import { asMcpContent } from "./McpToolResponse.server";
 
 const watchedUpdateResultSchema = z.object({
@@ -23,7 +23,7 @@ export function registerSetWatchlistItemsWatchedTool(server: McpServer) {
     {
       title: "Set watchlist items watched state",
       description:
-        "Set one or more watchlist items to an explicit watched or unwatched state using the required isWatched flag rather than a toggle. Each update targets a stable internal watchlist item ID and is processed independently, returning an ordered result. Optionally control whether marking an item watched updates the destination watchlist's recency behavior.",
+        "Set one or more watchlist items to an explicit watched or unwatched state using the required isWatched flag rather than a toggle. Each update targets a stable internal watchlist item ID and is processed independently, returning an ordered result. Optionally control whether changing an unwatched item to watched updates the destination watchlist's recency behavior. Setting an item to its existing state never refreshes recency.",
       inputSchema: { updates: z.array(watchedUpdateInputSchema).min(1) },
       outputSchema: { results: z.array(watchedUpdateResultSchema) },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
@@ -38,7 +38,7 @@ export function registerSetWatchlistItemsWatchedTool(server: McpServer) {
 async function setWatchedResult(input: z.infer<typeof watchedUpdateInputSchema>, index: number) {
   if (!isValidWatchedUpdate(input)) return invalidWatchedUpdateResult(input, index);
 
-  const result = await toggleWatchedMutation({
+  const result = await setWatchedStateMutation({
     itemId: input.watchlistItemId!,
     isWatched: input.isWatched!,
     updateWatchlistRecency: input.updateWatchlistRecency,

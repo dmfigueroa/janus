@@ -7,7 +7,7 @@ import {
   optimisticallyToggleWatchedItem,
   restoreWatchlistDetailSnapshot,
 } from "@/features/watchlists/detail/Cache";
-import { toggleWatched } from "@/features/watchlists/toggle/Mutation";
+import { setWatchedState } from "@/features/watchlists/watched/SetWatchedState";
 
 type UseToggleWatchedItemOptions = {
   updateWatchlistRecency?: boolean;
@@ -18,14 +18,14 @@ export function useToggleWatchedItem(
   { updateWatchlistRecency = true }: UseToggleWatchedItemOptions = {},
 ) {
   const queryClient = useQueryClient();
-  const toggleWatchedFn = useServerFn(toggleWatched);
+  const setWatchedStateFn = useServerFn(setWatchedState);
   const previousIsWatched = item.isWatched === true;
   const nextIsWatched = !previousIsWatched;
 
   return useMutation({
     mutationKey: ["watchlists", "toggle-watched", item.watchlistId],
     mutationFn: async () => {
-      const result = await toggleWatchedFn({
+      const result = await setWatchedStateFn({
         data: {
           itemId: item.id,
           isWatched: nextIsWatched,
