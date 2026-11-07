@@ -17,7 +17,14 @@ const mediaAdditionResultSchema = z.object({
   watchlistId: z.number().optional(),
   provider: z.enum(["tmdb", "rawg", "google_books", "comicvine", "anilist"]).optional(),
   providerId: z.string().optional(),
-  affectedCount: z.number().int().nonnegative(),
+  affectedCount: z
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .describe(
+      "Number of items added when known; omitted when an unexpected failure leaves the count unknown.",
+    ),
 });
 
 const mediaAdditionInputSchema = z

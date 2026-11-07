@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -39,6 +40,45 @@ describe("Janus MCP endpoint", () => {
     await client?.close();
     database?.closeDb();
     await rm(temporaryDirectory, { recursive: true, force: true });
+  });
+
+  it("preserves custom addition neighbors when a failed operation has an unknown affected count", async () => {
+    const addition = await import("@/features/watchlists/add/AddCustomItem.server");
+    const operation = vi
+      .spyOn(addition, "addCustomItemToWatchlist")
+      .mockResolvedValueOnce({ success: true, code: "added", message: "Added", affectedCount: 1 })
+      .mockRejectedValueOnce(new Error("private failure"))
+      .mockResolvedValueOnce({ success: true, code: "added", message: "Added", affectedCount: 1 });
+    const logging = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await client.callTool({
+        name: "add_custom_items_to_watchlists",
+        arguments: {
+          items: ["First", "Unknown", "Last"].map((title) => ({
+            watchlistId: 1,
+            title,
+            mediaType: "movie",
+          })),
+        },
+      });
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        results: [
+          { index: 0, success: true, affectedCount: 1 },
+          { index: 1, success: false, code: "internal_error" },
+          { index: 2, success: true, affectedCount: 1 },
+        ],
+      });
+      const content = z
+        .object({ results: z.array(z.record(z.unknown())) })
+        .parse(result.structuredContent);
+      expect(content.results[1]).not.toHaveProperty("affectedCount");
+      expect(JSON.stringify(result)).not.toContain("private failure");
+      expect(operation).toHaveBeenCalledTimes(3);
+    } finally {
+      operation.mockRestore();
+      logging.mockRestore();
+    }
   });
 
   it("keeps successful removal results around an unexpected batch failure", async () => {
