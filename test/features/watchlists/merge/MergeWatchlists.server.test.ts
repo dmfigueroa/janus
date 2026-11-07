@@ -197,8 +197,9 @@ describe("lineup membership during merge", () => {
   it.each(["existing", "new"] as const)(
     "preserves the union for a %s target",
     async (targetKind) => {
-      const { createLineup, setLineupWatchlists, readLineups } =
-        await import("@/features/lineups/manage/Lineups.server");
+      const { readLineups } = await import("@/features/lineups/read/LineupRead.server");
+      const { createLineup, setLineupWatchlists } =
+        await import("@/features/lineups/manage/LineupConfiguration.server");
       const first = await createTestWatchlist(db, { name: "First" });
       const second = await createTestWatchlist(db, { name: "Second" });
       const firstLineup = await createLineup(`First ${targetKind}`);
