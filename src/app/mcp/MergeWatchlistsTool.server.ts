@@ -1,3 +1,4 @@
+import { executeWriteBatch } from "./ExecuteWriteBatch.server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { mergeWatchlistsMutation } from "@/features/watchlists/merge/Mutation.server";
@@ -34,10 +35,7 @@ export function registerMergeWatchlistsTool(server: McpServer) {
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     },
     async ({ merges }) => {
-      const results = [];
-      for (const [index, merge] of merges.entries()) {
-        results.push(await mergeResult(merge, index));
-      }
+      const results = await executeWriteBatch(merges, mergeResult);
       return asMcpContent({ results });
     },
   );

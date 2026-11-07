@@ -1,3 +1,4 @@
+import { executeWriteBatch } from "./ExecuteWriteBatch.server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { removeWatchlistItemMutation } from "@/features/watchlists/remove/Mutation.server";
@@ -31,7 +32,7 @@ export function registerRemoveWatchlistItemsTool(server: McpServer) {
     },
     async ({ removals }) =>
       asMcpContent({
-        results: await Promise.all(removals.map(removeWatchlistItemResult)),
+        results: await executeWriteBatch(removals, removeWatchlistItemResult),
       }),
   );
 }

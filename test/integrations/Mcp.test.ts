@@ -41,6 +41,38 @@ describe("Janus MCP endpoint", () => {
     await rm(temporaryDirectory, { recursive: true, force: true });
   });
 
+  it("keeps successful removal results around an unexpected batch failure", async () => {
+    const removal = await import("@/features/watchlists/remove/Mutation.server");
+    const operation = vi
+      .spyOn(removal, "removeWatchlistItemMutation")
+      .mockResolvedValueOnce({ success: true, removedCount: 1, message: "Removed." })
+      .mockRejectedValueOnce(new Error("sensitive failure detail"))
+      .mockResolvedValueOnce({ success: true, removedCount: 0, message: "Already removed." });
+    const logging = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await client.callTool({
+        name: "remove_watchlist_items",
+        arguments: {
+          removals: [1, 2, 3].map((watchlistItemId) => ({ watchlistId: 1, watchlistItemId })),
+        },
+      });
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        results: [
+          { index: 0, success: true, code: "removed", affectedCount: 1 },
+          { index: 1, success: false, code: "internal_error" },
+          { index: 2, success: true, code: "removed", affectedCount: 0 },
+        ],
+      });
+      expect(JSON.stringify(result)).not.toContain("sensitive failure detail");
+      expect(logging).toHaveBeenCalledWith("MCP batch operation failed", { index: 1 });
+      expect(operation).toHaveBeenCalledTimes(3);
+    } finally {
+      operation.mockRestore();
+      logging.mockRestore();
+    }
+  });
+
   it("discovers and calls list_watchlists through the MCP protocol", async () => {
     const tools = await client.listTools();
     const listWatchlists = tools.tools.find((tool) => tool.name === "list_watchlists");

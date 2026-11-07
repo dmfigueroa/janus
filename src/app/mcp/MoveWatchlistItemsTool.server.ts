@@ -1,3 +1,4 @@
+import { executeWriteBatch } from "./ExecuteWriteBatch.server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { moveItemToWatchlistMutation } from "@/features/watchlists/move/MoveWatchlistItems.server";
@@ -38,10 +39,7 @@ export function registerMoveWatchlistItemsTool(server: McpServer) {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
     async ({ moves }) => {
-      const results: Array<Awaited<ReturnType<typeof moveItemResult>>> = [];
-      for (const [index, move] of moves.entries()) {
-        results.push(await moveItemResult(move, index));
-      }
+      const results = await executeWriteBatch(moves, moveItemResult);
       return asMcpContent({ results });
     },
   );

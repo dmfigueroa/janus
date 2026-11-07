@@ -1,3 +1,4 @@
+import { executeWriteBatch } from "./ExecuteWriteBatch.server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
@@ -36,7 +37,7 @@ export function registerReorderWatchlistItemsTool(server: McpServer) {
     },
     async ({ reorders }) =>
       asMcpContent({
-        results: await Promise.all(reorders.map(reorderResult)),
+        results: await executeWriteBatch(reorders, reorderResult),
       }),
   );
 }

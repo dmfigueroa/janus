@@ -1,3 +1,4 @@
+import { executeWriteBatch } from "./ExecuteWriteBatch.server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { editWatchlistItemSchema } from "@/features/watchlists/edit/Mutation";
@@ -45,7 +46,7 @@ export function registerEditWatchlistItemsTool(server: McpServer) {
     },
     async ({ edits }) =>
       asMcpContent({
-        results: await Promise.all(edits.map(editWatchlistItemResult)),
+        results: await executeWriteBatch(edits, editWatchlistItemResult),
       }),
   );
 }

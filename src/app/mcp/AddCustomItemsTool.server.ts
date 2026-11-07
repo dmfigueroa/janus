@@ -1,3 +1,4 @@
+import { executeWriteBatch } from "./ExecuteWriteBatch.server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { anchorInsertionRefinement } from "@/features/watchlists/add/InsertionRefinement";
@@ -45,7 +46,7 @@ export function registerAddCustomItemsToWatchlistsTool(server: McpServer) {
     },
     async ({ items }) =>
       asMcpContent({
-        results: await Promise.all(items.map(addCustomItemResult)),
+        results: await executeWriteBatch(items, addCustomItemResult),
       }),
   );
 }

@@ -1,3 +1,4 @@
+import { executeWriteBatch } from "./ExecuteWriteBatch.server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { anchorInsertionRefinement } from "@/features/watchlists/add/InsertionRefinement";
@@ -51,17 +52,9 @@ export function registerAddMediaToWatchlistsTool(server: McpServer) {
     },
     async ({ additions }) =>
       asMcpContent({
-        results: await addMediaResults(additions),
+        results: await executeWriteBatch(additions, addMediaResult),
       }),
   );
-}
-
-async function addMediaResults(additions: z.infer<typeof mediaAdditionInputSchema>[]) {
-  const results = [];
-  for (const [index, addition] of additions.entries()) {
-    results.push(await addMediaResult(addition, index));
-  }
-  return results;
 }
 
 async function addMediaResult(input: z.infer<typeof mediaAdditionInputSchema>, index: number) {
