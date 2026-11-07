@@ -91,7 +91,20 @@ function invalidMediaAdditionResult(
 }
 
 async function mediaAdditionResult(addition: ProviderMediaAddition, index: number) {
-  const result = await addProviderMediaToWatchlist(addition);
+  const result = await addProviderMediaToWatchlist(addition).catch((error: unknown) => {
+    // Provider URLs can contain credentials. Log identifiers, never raw request errors.
+    console.error("Provider watchlist addition failed", {
+      watchlistId: addition.watchlistId,
+      provider: addition.provider,
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+    return {
+      success: false as const,
+      code: "internal_error",
+      message: "The addition failed unexpectedly.",
+      affectedCount: 0,
+    };
+  });
   return {
     index,
     ...result,

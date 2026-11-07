@@ -196,13 +196,6 @@ export async function getComicIssues(
 ): Promise<ComicIssue[]> {
   const knownIssueIds = options.knownIssueIds;
   const concurrency = getComicIssueConcurrency(options);
-  try {
-    const issues = await collectVolumeIssues(volumeId, apiKey, knownIssueIds, concurrency);
-
-    return issues.map(mapIssueToComicIssue);
-  } catch (e) {
-    const errorMessage = getErrorMessage(e);
-    console.error("ComicVine Issues API Search Error:", errorMessage);
-    throw new Error(`ComicVine Issues API Search Error: ${errorMessage}`);
-  }
+  const issues = await collectVolumeIssues(volumeId, apiKey, knownIssueIds, concurrency);
+  return issues.map(mapIssueToComicIssue);
 }

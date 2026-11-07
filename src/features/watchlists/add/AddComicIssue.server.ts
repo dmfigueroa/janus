@@ -1,16 +1,12 @@
+import { providerAdditionFailure } from "./ProviderAdditionFailure.server";
 import { watchlistItems } from "@/db/Schema";
 import { getComicIssue } from "@/integrations/comicvine/ComicvineIssueDetail.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
 import { persistAddedItems } from "./Insert.server";
-import {
-  rejectAdd,
-  type WatchlistWriteFailureCode,
-  type WatchlistWriteResult,
-} from "./Shared.server";
+import { rejectAdd, addedItemsResult, type WatchlistWriteResult } from "./AdditionOutcome";
 
 const COMICVINE_UNAVAILABLE_MESSAGE =
   "Comic additions are unavailable because the ComicVine integration is not configured.";
-const COMICVINE_FETCH_FAILURE_MESSAGE = "Failed to fetch comic issues from ComicVine.";
 
 export async function addComicIssueToWatchlist({
   watchlistId,
@@ -26,12 +22,12 @@ export async function addComicIssueToWatchlist({
   referenceItemId?: number;
 }): Promise<WatchlistWriteResult> {
   const apiKey = process.env.COMICVINE_API_KEY;
-  if (!apiKey) return rejectAdd(COMICVINE_UNAVAILABLE_MESSAGE);
+  if (!apiKey) return rejectAdd(COMICVINE_UNAVAILABLE_MESSAGE, "provider_not_configured");
 
   return getComicIssue(issueId, apiKey).then(
     (issue) =>
       persistComicIssue({ watchlistId, issue, parent, insertionPosition, referenceItemId }),
-    () => rejectAdd(COMICVINE_FETCH_FAILURE_MESSAGE),
+    (error: unknown) => providerAdditionFailure(error, "ComicVine"),
   );
 }
 
@@ -54,11 +50,11 @@ async function persistComicIssue({
     referenceItemId,
     items: [mapIssueToWatchlistItem(watchlistId, issue, parent)],
   });
-  if (!result.success) return persistFailure(result);
-  return {
-    success: true,
-    message: result.insertedCount === 0 ? "Already in watchlist" : "Added 1 issue to watchlist",
-  };
+  if (!result.success) return { ...result, affectedCount: 0 };
+  return addedItemsResult(
+    result.insertedCount,
+    result.insertedCount === 0 ? "Already in watchlist" : "Added 1 issue to watchlist",
+  );
 }
 
 function mapIssueToWatchlistItem(
@@ -95,16 +91,4 @@ function parentTitle(
   parent?: { title?: string | null },
 ) {
   return [issue.parent.title, parent?.title, "Unknown Volume"].find(Boolean) as string;
-}
-
-function persistFailure(result: {
-  success: false;
-  code: string;
-  message: string;
-}): WatchlistWriteResult {
-  return {
-    success: false,
-    code: result.code as WatchlistWriteFailureCode,
-    message: result.message,
-  };
 }

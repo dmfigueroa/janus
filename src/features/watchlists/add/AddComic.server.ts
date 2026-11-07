@@ -1,3 +1,4 @@
+import { providerAdditionFailure } from "./ProviderAdditionFailure.server";
 import { watchlistItems } from "@/db/Schema";
 import type { WatchlistMedia } from "./Mutation";
 import * as repository from "@/features/watchlists/Repository.server";
@@ -5,15 +6,10 @@ import { getComicIssues } from "@/server/providers/Comicvine.server";
 import { getComicVolumeDetails } from "@/integrations/comicvine/ComicvineVolume.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
 import { persistAddedItems } from "./Insert.server";
-import {
-  rejectAdd,
-  type WatchlistWriteFailureCode,
-  type WatchlistWriteResult,
-} from "./Shared.server";
+import { rejectAdd, addedItemsResult, type WatchlistWriteResult } from "./AdditionOutcome";
 
 const COMICVINE_UNAVAILABLE_MESSAGE =
   "Comic additions are unavailable because the ComicVine integration is not configured.";
-const COMICVINE_FETCH_FAILURE_MESSAGE = "Failed to fetch comic issues from ComicVine.";
 
 export async function addComicToWatchlist(
   watchlistId: number,
@@ -24,65 +20,36 @@ export async function addComicToWatchlist(
 ): Promise<WatchlistWriteResult> {
   const apiKey = getApiKey();
   if (!apiKey) {
-    return rejectAdd(COMICVINE_UNAVAILABLE_MESSAGE);
+    return rejectAdd(COMICVINE_UNAVAILABLE_MESSAGE, "provider_not_configured");
   }
 
-  const mediaWithTitle = await resolveVolumeTitle(media, volumeId, apiKey);
-  if (!mediaWithTitle) {
-    return rejectAdd(COMICVINE_FETCH_FAILURE_MESSAGE);
-  }
-
-  return addFetchedComicIssues(
-    watchlistId,
-    volumeId,
-    mediaWithTitle,
-    apiKey,
-    insertionPosition,
-    referenceItemId,
-  );
-}
-
-async function resolveVolumeTitle(
-  media: WatchlistMedia,
-  volumeId: string,
-  apiKey: string,
-): Promise<WatchlistMedia | null> {
-  if (media.title) {
-    return media;
-  }
-
-  try {
-    const canonicalVolume = await getComicVolumeDetails(volumeId, apiKey);
-    return { ...media, title: canonicalVolume.title };
-  } catch {
-    return null;
-  }
-}
-
-async function addFetchedComicIssues(
-  watchlistId: number,
-  volumeId: string,
-  media: WatchlistMedia,
-  apiKey: string,
-  insertionPosition?: AddToWatchlistInsertionPosition,
-  referenceItemId?: number,
-): Promise<WatchlistWriteResult> {
   const existingIssueIds = await repository.getExistingComicsInWatchlist(watchlistId);
-
-  const issues = await fetchIssues(volumeId, apiKey, existingIssueIds);
-  if (!issues) {
-    return rejectAdd(COMICVINE_FETCH_FAILURE_MESSAGE);
-  }
-
-  return persistComicIssues(
-    watchlistId,
-    volumeId,
-    media,
-    issues,
-    existingIssueIds,
-    insertionPosition,
-    referenceItemId,
+  return fetchVolumeIssues(media, volumeId, apiKey, existingIssueIds).then(
+    ({ mediaWithTitle, issues }) =>
+      persistComicIssues(
+        watchlistId,
+        volumeId,
+        mediaWithTitle,
+        issues,
+        existingIssueIds,
+        insertionPosition,
+        referenceItemId,
+      ),
+    (error: unknown) => providerAdditionFailure(error, "ComicVine"),
   );
+}
+
+async function fetchVolumeIssues(
+  media: WatchlistMedia,
+  volumeId: string,
+  apiKey: string,
+  existingIssueIds: Set<string>,
+) {
+  const mediaWithTitle = media.title
+    ? media
+    : { ...media, title: (await getComicVolumeDetails(volumeId, apiKey)).title };
+  const issues = await getComicIssues(volumeId, apiKey, { knownIssueIds: existingIssueIds });
+  return { mediaWithTitle, issues };
 }
 
 async function persistComicIssues(
@@ -94,10 +61,6 @@ async function persistComicIssues(
   insertionPosition?: AddToWatchlistInsertionPosition,
   referenceItemId?: number,
 ): Promise<WatchlistWriteResult> {
-  if (issues.length === 0) {
-    return { success: true, message: getNoNewIssuesMessage(existingIssueIds.size) };
-  }
-
   const items = mapToWatchlistComics(issues, watchlistId, volumeId, media.title);
 
   const result = await persistAddedItems({
@@ -107,31 +70,22 @@ async function persistComicIssues(
     items,
   });
   if (!result.success) {
-    return {
-      success: false,
-      code: result.code as WatchlistWriteFailureCode,
-      message: result.message,
-    };
+    return { ...result, affectedCount: 0 };
   }
 
-  return {
-    success: true,
-    message: getIssuesAddedMessage(result.insertedCount, existingIssueIds.size),
-  };
+  return addedItemsResult(
+    result.insertedCount,
+    result.insertedCount > 0
+      ? getIssuesAddedMessage(result.insertedCount, existingIssueIds.size)
+      : getNoNewIssuesMessage(existingIssueIds.size),
+    "no_new_items",
+  );
 }
 
 // --- Implementation Details ---
 
 function getApiKey() {
   return process.env.COMICVINE_API_KEY;
-}
-
-async function fetchIssues(volumeId: string, apiKey: string, existingIssueIds: Set<string>) {
-  try {
-    return await getComicIssues(volumeId, apiKey, { knownIssueIds: existingIssueIds });
-  } catch {
-    return null;
-  }
 }
 
 function mapToWatchlistComics(

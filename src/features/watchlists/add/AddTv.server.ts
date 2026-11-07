@@ -1,18 +1,14 @@
+import { providerAdditionFailure } from "./ProviderAdditionFailure.server";
 import pLimit from "p-limit";
 import { watchlistItems } from "@/db/Schema";
 import type { WatchlistMedia } from "./Mutation";
 import * as repository from "@/features/watchlists/Repository.server";
-import { fetchTmdbSeason, fetchTmdbTv } from "@/server/providers/TmdbApi.server";
+import { fetchTmdbSeason, fetchTmdbTv, type TMDBEpisode } from "@/server/providers/TmdbApi.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
-import { persistAddedItems, type PersistAddedItemsResult } from "./Insert.server";
-import {
-  rejectAdd,
-  type WatchlistWriteFailureCode,
-  type WatchlistWriteResult,
-} from "./Shared.server";
+import { persistAddedItems } from "./Insert.server";
+import { addedItemsResult, type WatchlistWriteResult } from "./AdditionOutcome";
 
 const limit = pLimit(5);
-const TMDB_TV_FETCH_FAILURE_MESSAGE = "Failed to fetch TV details from TMDB.";
 
 export async function addTVShowToWatchlist(
   watchlistId: number,
@@ -21,43 +17,27 @@ export async function addTVShowToWatchlist(
   insertionPosition?: AddToWatchlistInsertionPosition,
   referenceItemId?: number,
 ): Promise<WatchlistWriteResult> {
-  const showDetails = await fetchShowDetails(tmdbId);
-  if (!showDetails) {
-    return rejectAdd(TMDB_TV_FETCH_FAILURE_MESSAGE);
-  }
-
-  return addShowEpisodes(
-    watchlistId,
-    tmdbId,
-    media,
-    showDetails,
-    insertionPosition,
-    referenceItemId,
+  return fetchShowEpisodes(tmdbId).then(
+    ({ showDetails, episodes }) => {
+      if (episodes.length === 0)
+        return addedItemsResult(0, "No episodes found for this show", "no_new_items");
+      const items = mapToWatchlistEpisodes(
+        episodes,
+        watchlistId,
+        tmdbId,
+        showDetails.name || media.title,
+        showDetails.poster_path,
+      );
+      return addNewEpisodes(watchlistId, items, insertionPosition, referenceItemId);
+    },
+    (error: unknown) => providerAdditionFailure(error, "TMDB"),
   );
 }
 
-async function addShowEpisodes(
-  watchlistId: number,
-  tmdbId: number,
-  media: WatchlistMedia,
-  showDetails: Awaited<ReturnType<typeof fetchTmdbTv>>,
-  insertionPosition?: AddToWatchlistInsertionPosition,
-  referenceItemId?: number,
-): Promise<WatchlistWriteResult> {
+export async function fetchShowEpisodes(tmdbId: number) {
+  const showDetails = await fetchTmdbTv({ id: tmdbId });
   const episodes = await fetchEpisodesAcrossSeasons(tmdbId, showDetails.seasons);
-  if (episodes.length === 0) {
-    return { success: true, message: "No episodes found for this show" };
-  }
-
-  const showTitle = showDetails.name || media.title;
-  const items = mapToWatchlistEpisodes(
-    episodes,
-    watchlistId,
-    tmdbId,
-    showTitle,
-    showDetails.poster_path,
-  );
-  return addNewEpisodes(watchlistId, items, insertionPosition, referenceItemId);
+  return { showDetails, episodes };
 }
 
 async function addNewEpisodes(
@@ -68,7 +48,7 @@ async function addNewEpisodes(
 ): Promise<WatchlistWriteResult> {
   const newEpisodes = await filterNewEpisodes(watchlistId, items);
   if (newEpisodes.length === 0) {
-    return { success: true, message: "No new episodes found for this show" };
+    return addedItemsResult(0, "No new episodes found for this show", "no_new_items");
   }
 
   const result = await persistAddedItems({
@@ -78,46 +58,13 @@ async function addNewEpisodes(
     items: newEpisodes,
   });
   if (!result.success) {
-    return unwrapPersistFailure(result);
+    return { ...result, affectedCount: 0 };
   }
 
   return episodesAddedResult(result.insertedCount);
 }
 
-export function unwrapPersistFailure(
-  result: Extract<PersistAddedItemsResult, { success: false }>,
-): {
-  success: false;
-  code: WatchlistWriteFailureCode;
-  message: string;
-} {
-  return {
-    success: false,
-    code: result.code as WatchlistWriteFailureCode,
-    message: result.message,
-  };
-}
-
 // --- Implementation Details ---
-
-export type TMDBEpisode = {
-  id: number;
-  name: string;
-  season_number: number;
-  episode_number: number;
-  still_path: string | null;
-  air_date?: string;
-  vote_average: number;
-  runtime?: number | null;
-};
-
-export async function fetchShowDetails(tmdbId: number) {
-  try {
-    return await fetchTmdbTv({ id: tmdbId });
-  } catch {
-    return null;
-  }
-}
 
 export async function fetchEpisodesAcrossSeasons(
   tmdbId: number,
@@ -172,8 +119,9 @@ export async function filterNewEpisodes(
 
 function episodesAddedResult(count: number): WatchlistWriteResult {
   const label = count === 1 ? "new episode" : "new episodes";
-  return {
-    success: true,
-    message: `Added ${count} ${label} to watchlist`,
-  };
+  return addedItemsResult(
+    count,
+    count > 0 ? `Added ${count} ${label} to watchlist` : "No new episodes found for this show",
+    "no_new_items",
+  );
 }

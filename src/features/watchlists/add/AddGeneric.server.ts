@@ -1,6 +1,6 @@
 import type { AddToWatchlistInsertionPosition, GenericMedia } from "./Mutation";
 import { persistAddedItems } from "./Insert.server";
-import { type WatchlistWriteFailureCode, type WatchlistWriteResult } from "./Shared.server";
+import { addedItemsResult, type WatchlistWriteResult } from "./AdditionOutcome";
 
 export async function addGenericItemToWatchlist(
   watchlistId: number,
@@ -15,18 +15,14 @@ export async function addGenericItemToWatchlist(
     items: [mapToWatchlistItem(watchlistId, media)],
   });
   if (!result.success) {
-    return {
-      success: false,
-      code: result.code as WatchlistWriteFailureCode,
-      message: result.message,
-    };
+    return { ...result, affectedCount: 0 };
   }
 
   if (result.insertedCount === 0) {
-    return { success: true, message: "Already in watchlist" };
+    return addedItemsResult(0, "Already in watchlist");
   }
 
-  return { success: true, message: "Added to watchlist" };
+  return addedItemsResult(result.insertedCount, "Added to watchlist");
 }
 
 function mapToWatchlistItem(watchlistId: number, media: GenericMedia) {

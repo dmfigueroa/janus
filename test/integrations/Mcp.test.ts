@@ -520,7 +520,7 @@ describe("Janus MCP endpoint", () => {
         { index: 0, success: true, code: "added", provider: "google_books" },
         { index: 1, success: true, code: "added", provider: "rawg" },
         { index: 2, success: true, code: "added", provider: "comicvine", affectedCount: 1 },
-        { index: 3, success: false, code: "provider_unavailable", provider: "anilist" },
+        { index: 3, success: false, code: "unsupported", provider: "anilist" },
       ],
     });
     await expect(
@@ -650,7 +650,7 @@ describe("Janus MCP endpoint", () => {
       results: [{ success: true, code: "added", affectedCount: 2 }],
     });
     expect(repeatedResult.structuredContent).toMatchObject({
-      results: [{ success: true, code: "no_new_episodes", affectedCount: 0 }],
+      results: [{ success: true, code: "no_new_items", affectedCount: 0 }],
     });
     fetchMock.mockRestore();
   });
@@ -1037,6 +1037,188 @@ describe("Janus MCP endpoint", () => {
     });
     fetchMock.mockRestore();
   });
+
+  it("isolates unexpected addition defects and continues the batch in order", async () => {
+    const { watchlists, watchlistItems } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "Independent addition failures" })
+      .returning();
+    vi.stubEnv("TMDB_API_KEY", "test-key");
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const id = String(input).split("/").at(-1);
+      return Response.json({
+        title: id === "701" ? "Fail this addition" : "Keep this addition",
+        poster_path: null,
+      });
+    });
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    database
+      .getDb()
+      .$client.exec(
+        "CREATE TEMP TRIGGER fail_one_addition BEFORE INSERT ON watchlist_items WHEN NEW.title = 'Fail this addition' BEGIN SELECT RAISE(ABORT, 'forced defect'); END",
+      );
+    try {
+      const result = await client.callTool({
+        name: "add_media_to_watchlists",
+        arguments: {
+          additions: ["700", "701", "702"].map((providerId) => ({
+            watchlistId: watchlist.id,
+            provider: "tmdb",
+            providerId,
+            mediaType: "movie",
+          })),
+        },
+      });
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        results: [
+          { index: 0, success: true, code: "added", affectedCount: 1 },
+          { index: 1, success: false, code: "internal_error", affectedCount: 0 },
+          { index: 2, success: true, code: "added", affectedCount: 1 },
+        ],
+      });
+      const items = await database
+        .getDb()
+        .select()
+        .from(watchlistItems)
+        .where(eq(watchlistItems.watchlistId, watchlist.id));
+      expect(items.map((item) => item.tmdbId)).toEqual(["700", "702"]);
+      expect(errorLog).toHaveBeenCalledWith(
+        "Provider watchlist addition failed",
+        expect.objectContaining({ watchlistId: watchlist.id, provider: "tmdb" }),
+      );
+    } finally {
+      database.getDb().$client.exec("DROP TRIGGER fail_one_addition");
+      fetchMock.mockRestore();
+      errorLog.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it.each([
+    { provider: "tmdb", mediaType: "movie", configuration: "TMDB_API_KEY" },
+    { provider: "google_books", mediaType: "book", configuration: "GOOGLE_BOOKS_API_KEY" },
+    { provider: "rawg", mediaType: "game", configuration: "RAWG_API_KEY" },
+    { provider: "comicvine", mediaType: "comic", configuration: "COMICVINE_API_KEY" },
+  ])(
+    "distinguishes missing $provider configuration from an outage",
+    async ({ provider, mediaType, configuration }) => {
+      vi.stubEnv(configuration, "");
+      try {
+        const result = await client.callTool({
+          name: "add_media_to_watchlists",
+          arguments: { additions: [{ watchlistId: 1, provider, mediaType, providerId: "891234" }] },
+        });
+        expect(result.structuredContent).toMatchObject({
+          results: [{ success: false, code: "provider_not_configured", affectedCount: 0 }],
+        });
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    },
+  );
+
+  it.each([
+    { provider: "tmdb", mediaType: "movie", configuration: "TMDB_API_KEY" },
+    { provider: "google_books", mediaType: "book", configuration: "GOOGLE_BOOKS_API_KEY" },
+    { provider: "rawg", mediaType: "game", configuration: "RAWG_API_KEY" },
+    { provider: "comicvine", mediaType: "comic_issue", configuration: "COMICVINE_API_KEY" },
+  ])(
+    "classifies $provider request and response failures without parsing messages",
+    async ({ provider, mediaType, configuration }) => {
+      vi.stubEnv(configuration, "test-key");
+      const fetchMock = vi.spyOn(globalThis, "fetch");
+      try {
+        const failureCases = ["http", "network", "json", "schema"];
+        for (const failure of failureCases) {
+          fetchMock.mockImplementation(async () => {
+            if (failure === "network") throw new TypeError("Transport unavailable");
+            if (failure === "http") return new Response("Provider failure", { status: 503 });
+            if (failure === "json") return new Response("Invalid JSON", { status: 200 });
+            return Response.json({ invalid: "provider response" });
+          });
+          const result = await client.callTool({
+            name: "add_media_to_watchlists",
+            arguments: {
+              additions: [{ watchlistId: 1, provider, mediaType, providerId: "891235" }],
+            },
+          });
+          expect(result.structuredContent).toMatchObject({
+            results: [{ success: false, code: "provider_unavailable", affectedCount: 0 }],
+          });
+        }
+      } finally {
+        fetchMock.mockRestore();
+        vi.unstubAllEnvs();
+      }
+    },
+  );
+
+  it.each(["tv", "episode"])(
+    "rejects malformed TMDB season responses before adding %s items",
+    async (mediaType) => {
+      const { watchlists, watchlistItems } = await import("@/db/Schema");
+      const [watchlist] = await database
+        .getDb()
+        .insert(watchlists)
+        .values({ name: `Malformed season ${mediaType}` })
+        .returning();
+      vi.stubEnv("TMDB_API_KEY", "test-key");
+      const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+        const url = String(input);
+        if (url.endsWith("/season/2")) return Response.json({ invalid: "missing episodes" });
+        if (url.endsWith("/season/1"))
+          return Response.json({
+            episodes: [
+              {
+                id: 891236,
+                name: "Valid episode",
+                season_number: 1,
+                episode_number: 1,
+                still_path: null,
+                vote_average: 0,
+              },
+            ],
+          });
+        return Response.json({
+          name: "Show",
+          poster_path: null,
+          seasons: [{ season_number: 1 }, { season_number: 2 }],
+        });
+      });
+      try {
+        const result = await client.callTool({
+          name: "add_media_to_watchlists",
+          arguments: {
+            additions: [
+              {
+                watchlistId: watchlist.id,
+                provider: "tmdb",
+                mediaType,
+                providerId: "891236",
+                parent: { providerId: "891237" },
+              },
+            ],
+          },
+        });
+        expect(result.structuredContent).toMatchObject({
+          results: [{ success: false, code: "provider_unavailable", affectedCount: 0 }],
+        });
+        expect(
+          await database
+            .getDb()
+            .select()
+            .from(watchlistItems)
+            .where(eq(watchlistItems.watchlistId, watchlist.id)),
+        ).toHaveLength(0);
+      } finally {
+        fetchMock.mockRestore();
+        vi.unstubAllEnvs();
+      }
+    },
+  );
 
   it("returns a structured insertion-choice result for custom-ordered destinations", async () => {
     const { watchlists } = await import("@/db/Schema");

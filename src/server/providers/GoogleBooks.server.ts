@@ -1,3 +1,8 @@
+import {
+  ProviderRequestError,
+  requestProviderJson,
+  parseProviderData,
+} from "@/integrations/ProviderRequest.server";
 import { z } from "zod";
 import { API_PAGE_SIZE } from "../Constants";
 import { type UnifiedMedia } from "../Media";
@@ -63,7 +68,7 @@ function formatBookSearch(data: z.infer<typeof GoogleBooksResponseSchema>) {
 
 const getGoogleBooksApiKey = () => {
   const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
-  if (!apiKey) throw new Error("GOOGLE_BOOKS_API_KEY is not configured");
+  if (!apiKey) throw new ProviderRequestError("provider_not_configured");
   return apiKey;
 };
 
@@ -93,11 +98,8 @@ async function getBookDetailsRequest(id: string) {
   const url = new URL(`https://www.googleapis.com/books/v1/volumes/${encodedId}`);
   url.search = new URLSearchParams({ key: apiKey }).toString();
 
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error("Failed to fetch book details");
-
-  const item = await res.json();
-  return mapBook(GoogleBookItemSchema.parse(item));
+  const item = await requestProviderJson(url.toString());
+  return mapBook(parseProviderData(GoogleBookItemSchema, item));
 }
 
 export async function searchBooks(
@@ -114,11 +116,5 @@ export async function searchBooks(
 }
 
 export async function getBookDetails(id: string) {
-  try {
-    return await getBookDetailsRequest(id);
-  } catch (e) {
-    const errorMessage = getErrorMessage(e);
-    console.error("Google Books Details Error:", errorMessage);
-    throw new Error(`Google Books Details Error: ${errorMessage}`);
-  }
+  return getBookDetailsRequest(id);
 }

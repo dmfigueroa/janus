@@ -1,10 +1,9 @@
+import { providerAdditionFailure } from "./ProviderAdditionFailure.server";
 import type { WatchlistMedia } from "./Mutation";
 import { getBookDetails } from "@/server/providers/GoogleBooks.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
-import { rejectAdd, type WatchlistWriteResult } from "./Shared.server";
+import { type WatchlistWriteResult } from "./AdditionOutcome";
 import { addGenericItemToWatchlist } from "./AddGeneric.server";
-
-const GOOGLE_BOOKS_FETCH_FAILURE_MESSAGE = "Failed to fetch book details from Google Books.";
 
 export async function addBookToWatchlist(
   watchlistId: number,
@@ -15,8 +14,8 @@ export async function addBookToWatchlist(
   let details: Awaited<ReturnType<typeof getBookDetails>>;
   try {
     details = await getBookDetails(media.id);
-  } catch {
-    return rejectAdd(GOOGLE_BOOKS_FETCH_FAILURE_MESSAGE);
+  } catch (error) {
+    return providerAdditionFailure(error, "Google Books");
   }
   return addGenericItemToWatchlist(watchlistId, details, insertionPosition, referenceItemId);
 }

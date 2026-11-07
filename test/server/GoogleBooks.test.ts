@@ -56,6 +56,7 @@ describe("google-books getBookDetails", () => {
 
     expect(fetch).toHaveBeenCalledWith(
       "https://www.googleapis.com/books/v1/volumes/zyTCAlFPjgYC?key=test-api-key",
+      undefined,
     );
   });
 
@@ -83,6 +84,7 @@ describe("google-books getBookDetails", () => {
     // Full URL check including API key
     expect(fetch).toHaveBeenCalledWith(
       "https://www.googleapis.com/books/v1/volumes/..%2Fvolumes%2Fother-endpoint?key=test-api-key",
+      undefined,
     );
   });
 
