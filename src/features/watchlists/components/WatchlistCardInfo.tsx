@@ -1,3 +1,4 @@
+import { isWatchlistCompleted } from "../lifecycle/WatchlistLifecycle";
 import { Box, Flex, Heading, Text } from "@chakra-ui/react";
 import { format, parseISO } from "date-fns";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query";
@@ -72,7 +73,7 @@ function FeaturedSubtitle({ subtitle }: { subtitle: string | null }) {
 
 function StandardCardInfo({ watchlist }: { watchlist: WatchlistSummary }) {
   const stats = watchlist.stats;
-  const complete = stats.progress === 100;
+  const complete = isWatchlistCompleted(stats);
 
   return (
     <Box px={1}>
@@ -93,7 +94,7 @@ function StandardCardInfo({ watchlist }: { watchlist: WatchlistSummary }) {
 }
 
 function CardProgress({ stats }: { stats: WatchlistSummary["stats"] }) {
-  const complete = stats.progress === 100;
+  const complete = isWatchlistCompleted(stats);
 
   return (
     <Box h={1} w="full" bg="bg.subtle" rounded="full" overflow="hidden">

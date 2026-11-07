@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { setWatchedStateMutation } from "./SetWatchedState.server";
+import { setWatchedStateMutation } from "../lifecycle/WatchlistLifecycle.server";
 
 export const setWatchedStateSchema = z.object({
   itemId: z.number(),

@@ -12,7 +12,7 @@ vi.mock("@/db/Db.server", () => ({ getDb: () => dbState.db }));
 
 let testDb: Awaited<ReturnType<typeof createIsolatedTestDb>>;
 let db: IsolatedTestDb;
-let setWatchedStateMutation: typeof import("@/features/watchlists/watched/SetWatchedState.server").setWatchedStateMutation;
+let setWatchedStateMutation: typeof import("@/features/watchlists/lifecycle/WatchlistLifecycle.server").setWatchedStateMutation;
 let readWatchlistDetail: typeof import("@/features/watchlists/Read.server").WatchlistsRead.detailScreen;
 
 beforeAll(async () => {
@@ -20,7 +20,7 @@ beforeAll(async () => {
   db = testDb.db;
   dbState.db = db;
   const [toggleModule, readModule] = await Promise.all([
-    import("@/features/watchlists/watched/SetWatchedState.server"),
+    import("@/features/watchlists/lifecycle/WatchlistLifecycle.server"),
     import("@/features/watchlists/Read.server"),
   ]);
   setWatchedStateMutation = toggleModule.setWatchedStateMutation;

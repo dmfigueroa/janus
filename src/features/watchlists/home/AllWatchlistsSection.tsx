@@ -10,6 +10,7 @@ export function AllWatchlistsSection({
   rotation,
   completed,
   paused,
+  empty,
   allWatchlists,
 }: AllWatchlistsSectionProps) {
   const mergeSelection = useWatchlistMergeSelectionContext();
@@ -41,6 +42,7 @@ export function AllWatchlistsSection({
         showCreateTile
       />
       <WatchlistCollapsibleSection title="Completed" watchlists={completed} />
+      <WatchlistCollapsibleSection title="Empty" watchlists={empty} />
       <WatchlistCollapsibleSection title="Paused" watchlists={paused} />
     </Box>
   );

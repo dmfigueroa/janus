@@ -169,11 +169,23 @@ describe("buildWatchlistHome", () => {
   });
 
   it("keeps an empty watchlist out of the completed section", () => {
-    const empty = watchlistSummary({ id: 6, name: "Empty" });
+    const empty = watchlistSummary({
+      id: 6,
+      name: "Empty",
+      stats: {
+        totalItems: 0,
+        watchedItems: 0,
+        progress: 0,
+        nextUnwatched: null,
+        coverImage: null,
+        coverMediaType: null,
+      },
+    });
 
     const home = buildWatchlistHome([empty]);
 
-    expect(home.rotation.map((watchlist) => watchlist.id)).toEqual([6]);
+    expect(home.rotation).toEqual([]);
+    expect(home.empty.map((watchlist) => watchlist.id)).toEqual([6]);
     expect(home.completed).toEqual([]);
   });
 });

@@ -1,7 +1,7 @@
 import { executeWriteBatch } from "./ExecuteWriteBatch.server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { setWatchedStateMutation } from "@/features/watchlists/watched/SetWatchedState.server";
+import { setWatchedStateMutation } from "@/features/watchlists/lifecycle/WatchlistLifecycle.server";
 import { asMcpContent } from "./McpToolResponse.server";
 
 const watchedUpdateResultSchema = z.object({
