@@ -1,3 +1,3 @@
 export { addToWatchlist } from "@/features/watchlists/add/Mutation";
-export { toggleWatched } from "@/features/watchlists/toggle/Mutation";
+export { setWatchedState } from "@/features/watchlists/watched/SetWatchedState";
 export type { Watchlist, WatchlistItem } from "../db/Schema";
