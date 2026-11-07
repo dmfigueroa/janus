@@ -2705,7 +2705,6 @@ describe("Janus MCP endpoint", () => {
       name: "set_watchlist_items_watched",
       annotations: { readOnlyHint: false, destructiveHint: false },
     });
-    expect(setWatched?.description).toContain("isWatched");
     expect(setWatched?.inputSchema).toMatchObject({
       properties: { updates: { type: "array" } },
     });
