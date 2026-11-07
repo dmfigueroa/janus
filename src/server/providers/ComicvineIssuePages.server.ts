@@ -1,3 +1,8 @@
+import {
+  ProviderRequestError,
+  requestProviderJson,
+  parseProviderData,
+} from "@/integrations/ProviderRequest.server";
 import { z } from "zod";
 
 const ComicIssueItemSchema = z.object({
@@ -62,24 +67,15 @@ async function fetchIssuePage(
   direction: ComicIssueSortDirection,
 ): Promise<ComicIssueResponse> {
   const url = buildIssuePageUrl(volumeId, apiKey, offset, direction);
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": "JanusApp/1.0",
-    },
-  });
-
-  if (!res.ok) {
-    throw new Error(`Status ${res.status}: ${res.statusText}`);
-  }
-
-  const rawData = await res.json();
-  const data = ComicIssueResponseSchema.parse(rawData);
-
-  if (data.error !== "OK") {
-    throw new Error(`Response: ${data.error}`);
-  }
+  const rawData = await requestProviderJson(url, { headers: { "User-Agent": "JanusApp/1.0" } });
+  const data = parseProviderData(ComicIssueResponseSchema, rawData);
+  if (data.error !== "OK") throw new ProviderRequestError();
 
   return data;
+}
+
+function canRetryIssueRequest(error: unknown, attempt: number, retries: number) {
+  return error instanceof ProviderRequestError && attempt < retries;
 }
 
 async function fetchIssuePageAttempt(
@@ -93,7 +89,7 @@ async function fetchIssuePageAttempt(
   try {
     return await fetchIssuePage(volumeId, apiKey, offset, direction);
   } catch (error) {
-    if (attempt >= retries) throw error;
+    if (!canRetryIssueRequest(error, attempt, retries)) throw error;
     await sleep(COMICVINE_RETRY_BASE_DELAY_MS * (attempt + 1));
   }
 }

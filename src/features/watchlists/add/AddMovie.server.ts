@@ -1,23 +1,16 @@
+import { providerAdditionFailure } from "./ProviderAdditionFailure.server";
 import * as repository from "@/features/watchlists/Repository.server";
 import { fetchTmdbMovie } from "@/server/providers/TmdbApi.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
 import { persistAddedItems } from "./Insert.server";
-import {
-  rejectAdd,
-  type WatchlistWriteFailureCode,
-  type WatchlistWriteResult,
-} from "./Shared.server";
+import { addedItemsResult, type WatchlistWriteResult } from "./AdditionOutcome";
 
-const TMDB_MOVIE_FETCH_FAILURE_MESSAGE = "Failed to fetch movie details from TMDB.";
 const MOVIE_ALREADY_IN_WATCHLIST_RESULT = {
   success: true,
+  code: "duplicate",
+  affectedCount: 0,
   message: "Already in watchlist",
 } as const satisfies WatchlistWriteResult;
-const MOVIE_ADDED_RESULT = {
-  success: true,
-  message: "Added to watchlist",
-} as const satisfies WatchlistWriteResult;
-
 export async function addMovieToWatchlist(
   watchlistId: number,
   tmdbId: number,
@@ -29,12 +22,10 @@ export async function addMovieToWatchlist(
     return MOVIE_ALREADY_IN_WATCHLIST_RESULT;
   }
 
-  const details = await fetchMovieDetails(tmdbId);
-  if (!details) {
-    return rejectAdd(TMDB_MOVIE_FETCH_FAILURE_MESSAGE);
-  }
-
-  return persistMovie(watchlistId, tmdbId, details, insertionPosition, referenceItemId);
+  return fetchTmdbMovie({ id: tmdbId }).then(
+    (details) => persistMovie(watchlistId, tmdbId, details, insertionPosition, referenceItemId),
+    (error: unknown) => providerAdditionFailure(error, "TMDB"),
+  );
 }
 
 async function persistMovie(
@@ -51,29 +42,17 @@ async function persistMovie(
     items: [mapToWatchlistMovie(details, watchlistId, tmdbId)],
   });
   if (!result.success) {
-    return {
-      success: false,
-      code: result.code as WatchlistWriteFailureCode,
-      message: result.message,
-    };
+    return { ...result, affectedCount: 0 };
   }
 
   if (result.insertedCount === 0) {
     return MOVIE_ALREADY_IN_WATCHLIST_RESULT;
   }
 
-  return MOVIE_ADDED_RESULT;
+  return addedItemsResult(result.insertedCount, "Added to watchlist");
 }
 
 // --- Implementation Details ---
-
-async function fetchMovieDetails(tmdbId: number) {
-  try {
-    return await fetchTmdbMovie({ id: tmdbId });
-  } catch {
-    return null;
-  }
-}
 
 function mapToWatchlistMovie(
   details: Awaited<ReturnType<typeof fetchTmdbMovie>>,

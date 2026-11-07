@@ -1,21 +1,15 @@
+import type { TMDBEpisode } from "@/server/providers/TmdbApi.server";
+import { providerAdditionFailure } from "./ProviderAdditionFailure.server";
 import { persistAddedItems } from "./Insert.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
-import {
-  fetchEpisodesAcrossSeasons,
-  fetchShowDetails,
-  filterNewEpisodes,
-  mapToWatchlistEpisodes,
-  unwrapPersistFailure,
-  type TMDBEpisode,
-} from "./AddTv.server";
-import { rejectAdd, type WatchlistWriteResult } from "./Shared.server";
+import { fetchShowEpisodes, filterNewEpisodes, mapToWatchlistEpisodes } from "./AddTv.server";
+import { addedItemsResult, rejectAdd, type WatchlistWriteResult } from "./AdditionOutcome";
 
-const TMDB_TV_FETCH_FAILURE_MESSAGE = "Failed to fetch TV details from TMDB.";
 const TMDB_EPISODE_NOT_FOUND_MESSAGE = "TMDB episode was not found for this show.";
 
 type ResolvedEpisode = {
   episode: TMDBEpisode;
-  showDetails: NonNullable<Awaited<ReturnType<typeof fetchShowDetails>>>;
+  showDetails: Awaited<ReturnType<typeof fetchShowEpisodes>>["showDetails"];
   showId: number;
 };
 
@@ -43,7 +37,7 @@ export async function addTvEpisodeToWatchlist({
             referenceItemId,
           })
         : rejectAdd(TMDB_EPISODE_NOT_FOUND_MESSAGE, "not_found"),
-    () => rejectAdd(TMDB_TV_FETCH_FAILURE_MESSAGE),
+    (error: unknown) => providerAdditionFailure(error, "TMDB"),
   );
 }
 
@@ -52,12 +46,8 @@ async function resolveEpisode(
   parent: { providerId: string; title?: string | null },
 ): Promise<ResolvedEpisode | null> {
   const showId = Number.parseInt(parent.providerId.replace(/^tmdb:/, ""), 10);
-  const showDetails = await fetchShowDetails(showId);
-  if (!showDetails) throw new Error(TMDB_TV_FETCH_FAILURE_MESSAGE);
-
-  const episode = (await fetchEpisodesAcrossSeasons(showId, showDetails.seasons)).find(
-    (candidate) => candidate.id.toString() === episodeId,
-  );
+  const { showDetails, episodes } = await fetchShowEpisodes(showId);
+  const episode = episodes.find((candidate) => candidate.id.toString() === episodeId);
   return episode ? { episode, showDetails, showId } : null;
 }
 
@@ -87,7 +77,7 @@ async function persistEpisode({
   );
   const newEpisodes = await filterNewEpisodes(watchlistId, items);
   return newEpisodes.length === 0
-    ? { success: true, message: "Already in watchlist" }
+    ? addedItemsResult(0, "Already in watchlist")
     : persistNewEpisode({
         watchlistId,
         insertionPosition,
@@ -118,6 +108,9 @@ async function persistNewEpisode({
     items,
   });
   return result.success
-    ? { success: true, message: "Added 1 episode to watchlist" }
-    : unwrapPersistFailure(result);
+    ? addedItemsResult(
+        result.insertedCount,
+        result.insertedCount > 0 ? "Added 1 episode to watchlist" : "Already in watchlist",
+      )
+    : { ...result, affectedCount: 0 };
 }

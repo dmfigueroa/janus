@@ -1,4 +1,4 @@
-import type { WatchlistWriteResult } from "./Shared.server";
+import type { WatchlistWriteResult } from "./AdditionOutcome";
 import { addToWatchlistMutation, UNSUPPORTED_TV_SOURCE_MESSAGE } from "./Mutation.server";
 import { getWatchlistById } from "@/features/watchlists/Repository.server";
 import { CUSTOM_ORDER_INSERTION_REQUIRED_MESSAGE } from "./Constants";

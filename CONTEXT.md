@@ -35,3 +35,11 @@ _Avoid_: Archived, hidden, snoozed
 **Completed**:
 The derived state of a watchlist whose items are all watched (progress is 100%). It is never stored; adding a new item un-completes the list automatically.
 _Avoid_: Finished, done, watched
+
+**Watchlist addition**:
+A request to collect media in a watchlist. Adding a TV show or comic volume expands it into individual watchlist items. An addition may succeed without changing the watchlist when its items are already present or no items are available.
+_Avoid_: Import job
+
+**Addition outcome**:
+The result of a watchlist addition, including whether it succeeded, why it changed or did not change the watchlist, and how many watchlist items were actually added.
+_Avoid_: Attempted count

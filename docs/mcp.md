@@ -75,3 +75,28 @@ Constraints:
   with a hint to use `reorder_watchlist_items` instead.
 - `move_watchlist_parents` lands the first sibling at the anchor and trails the rest
   consecutively in the source's existing customRank order.
+
+## Provider addition outcomes
+
+`add_media_to_watchlists` returns authoritative outcomes for each addition in input order:
+
+| Code                      | Meaning                                                  | `success` | `affectedCount`       |
+| ------------------------- | -------------------------------------------------------- | --------- | --------------------- |
+| `added`                   | Watchlist items were inserted                            | `true`    | Actual inserted count |
+| `duplicate`               | A single requested item was already present              | `true`    | `0`                   |
+| `no_new_items`            | A TV show or comic volume expansion inserted nothing     | `true`    | `0`                   |
+| `provider_unavailable`    | A provider request or response failed                    | `false`   | `0`                   |
+| `provider_not_configured` | Required provider configuration is missing               | `false`   | `0`                   |
+| `unsupported`             | The requested media addition is deliberately unavailable | `false`   | `0`                   |
+| `internal_error`          | An unexpected defect prevented this addition             | `false`   | `0`                   |
+
+Destination and insertion rejection codes remain unchanged. Expected failures and unexpected
+errors affect only their own addition; subsequent additions continue in input order.
+Unexpected errors are logged with operation identifiers without exposing provider credentials.
+Messages are for display and must not be parsed to determine outcomes or counts.
+
+Compatibility: result fields and inputs remain unchanged. `no_new_items` replaces
+`no_new_episodes` for both TV shows and comic volumes. Missing configuration now returns
+`provider_not_configured`, and deliberately unavailable anime/manga additions return
+`unsupported`, rather than `provider_unavailable`. Consumers branching on these older
+code values must accept the replacements.

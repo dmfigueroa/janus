@@ -1,6 +1,6 @@
 import type { AddToWatchlistInput, GenericMedia } from "./Mutation";
 import { getDeprecatedWatchlistAddRejection } from "@/server/Media";
-import { rejectAdd, type WatchlistWriteResult } from "./Shared.server";
+import { rejectAdd, type WatchlistWriteResult } from "./AdditionOutcome";
 import { addTVShowToWatchlist } from "./AddTv.server";
 import { addMovieToWatchlist } from "./AddMovie.server";
 import { addComicToWatchlist } from "./AddComic.server";
@@ -19,7 +19,7 @@ export async function addToWatchlistMutation({
 }: AddToWatchlistInput): Promise<WatchlistWriteResult> {
   const deprecatedRejection = getDeprecatedWatchlistAddRejection(media.mediaType);
   if (deprecatedRejection) {
-    return deprecatedRejection;
+    return rejectAdd(deprecatedRejection.message, "unsupported");
   }
 
   return dispatchWatchlistAddition({ watchlistId, media, insertionPosition, referenceItemId });

@@ -1,3 +1,5 @@
+import { sql } from "drizzle-orm";
+import { ProviderRequestError } from "@/integrations/ProviderRequest.server";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import * as schema from "@/db/Schema";
 import { createIsolatedTestDb, type IsolatedTestDb } from "@test/IsolatedDb";
@@ -111,7 +113,12 @@ describe("add to watchlist mutation", () => {
     });
     const detail = await readWatchlistDetail({ watchlistId: watchlist.id });
 
-    expect(result).toEqual({ success: true, message: "Added to watchlist" });
+    expect(result).toEqual({
+      success: true,
+      code: "added",
+      affectedCount: 1,
+      message: "Added to watchlist",
+    });
     expect(detail?.items[0]).toMatchObject({
       tmdbId: "custom-movie-1",
       title: "Local Screening",
@@ -184,6 +191,7 @@ describe("custom order add validation", () => {
 
     expect(result).toEqual({
       success: false,
+      affectedCount: 0,
       code: "insertion_choice_required",
       message: "Choose where to insert this item in the custom order.",
     });
@@ -356,6 +364,7 @@ describe("anchored add to custom-ordered watchlist", () => {
 
     expect(result).toEqual({
       success: false,
+      affectedCount: 0,
       code: "invalid_reference",
       message: expect.stringContaining("not in this watchlist"),
     });
@@ -396,6 +405,7 @@ describe("anchored add to custom-ordered watchlist", () => {
 
     expect(result).toEqual({
       success: false,
+      affectedCount: 0,
       code: "not_custom_mode",
       message: "Anchored insertion is only available in custom mode.",
     });
@@ -734,7 +744,7 @@ describe("provider-backed add to watchlist mutation", () => {
 
     expect(result).toEqual({
       success: true,
-      code: "no_new_episodes",
+      code: "no_new_items",
       message: "No issues found for this volume",
       affectedCount: 0,
     });
@@ -765,7 +775,12 @@ describe("provider-backed add to watchlist mutation", () => {
     });
     const detail = await readWatchlistDetail({ watchlistId: watchlist.id });
 
-    expect(result).toEqual({ success: true, message: "Added 1 issue to watchlist" });
+    expect(result).toEqual({
+      success: true,
+      code: "added",
+      affectedCount: 1,
+      message: "Added 1 issue to watchlist",
+    });
     expect(getComicVolumeDetailsMock).not.toHaveBeenCalled();
     expect(detail?.items[0]).toMatchObject({
       parentTitle: "Search Result Volume",
@@ -901,7 +916,7 @@ describe("provider-backed add to watchlist mutation", () => {
       poster_path: null,
       seasons: [{ season_number: 1 }],
     });
-    getSeasonDetailsMock.mockRejectedValue(new Error("TMDB unavailable"));
+    getSeasonDetailsMock.mockRejectedValue(new ProviderRequestError());
 
     const result = await addProviderMediaToWatchlist({
       watchlistId: watchlist.id,
@@ -914,7 +929,7 @@ describe("provider-backed add to watchlist mutation", () => {
     expect(result).toEqual({
       success: false,
       code: "provider_unavailable",
-      message: "Failed to fetch TV details from TMDB.",
+      message: "TMDB is temporarily unavailable. Please try again later.",
       affectedCount: 0,
     });
   });
@@ -926,7 +941,7 @@ describe("provider-backed add to watchlist mutation", () => {
       poster_path: null,
       seasons: [{ season_number: 1 }],
     });
-    getSeasonDetailsMock.mockRejectedValue(new Error("TMDB unavailable"));
+    getSeasonDetailsMock.mockRejectedValue(new ProviderRequestError());
 
     await expect(
       addProviderMediaToWatchlist({
@@ -960,7 +975,7 @@ describe("provider-backed add to watchlist mutation", () => {
 
     expect(result).toEqual({
       success: true,
-      code: "no_new_episodes",
+      code: "no_new_items",
       message: "No episodes found for this show",
       affectedCount: 0,
     });
@@ -989,7 +1004,12 @@ describe("provider-backed add to watchlist mutation", () => {
     });
     const detail = await readWatchlistDetail({ watchlistId: watchlist.id });
 
-    expect(result).toEqual({ success: true, message: "Added to watchlist" });
+    expect(result).toEqual({
+      success: true,
+      code: "added",
+      affectedCount: 1,
+      message: "Added to watchlist",
+    });
     expect(getMovieDetailsMock).toHaveBeenCalledWith({ id: 42 });
     expect(detail?.items[0]).toMatchObject({ title: "Fetched Title", runtime: 127 });
   });
@@ -1012,6 +1032,7 @@ describe("TV add to watchlist mutation", () => {
 
     expect(result).toEqual({
       success: false,
+      affectedCount: 0,
       code: "unsupported",
       message: "TV shows must come from TMDB so Janus can expand them into episodes.",
     });
@@ -1076,7 +1097,12 @@ describe("TV add to watchlist mutation", () => {
     });
     const detail = await readWatchlistDetail({ watchlistId: watchlist.id });
 
-    expect(result).toEqual({ success: true, message: "Added 1 new episode to watchlist" });
+    expect(result).toEqual({
+      success: true,
+      code: "added",
+      affectedCount: 1,
+      message: "Added 1 new episode to watchlist",
+    });
     expect(detail?.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -1088,5 +1114,168 @@ describe("TV add to watchlist mutation", () => {
         }),
       ]),
     );
+  });
+});
+
+describe("authoritative provider addition outcomes", () => {
+  it.each([
+    {
+      mediaType: "movie" as const,
+      provider: "tmdb" as const,
+      providerId: "500",
+      expectedCode: "duplicate",
+    },
+    {
+      mediaType: "episode" as const,
+      provider: "tmdb" as const,
+      providerId: "501",
+      parent: { providerId: "50" },
+      expectedCode: "duplicate",
+    },
+    {
+      mediaType: "tv" as const,
+      provider: "tmdb" as const,
+      providerId: "50",
+      expectedCode: "no_new_items",
+    },
+    {
+      mediaType: "comic_issue" as const,
+      provider: "comicvine" as const,
+      providerId: "502",
+      expectedCode: "duplicate",
+    },
+    {
+      mediaType: "comic" as const,
+      provider: "comicvine" as const,
+      providerId: "51",
+      expectedCode: "no_new_items",
+    },
+  ])("uses actual zero-insert outcomes for $mediaType", async ({ expectedCode, ...addition }) => {
+    vi.stubEnv("COMICVINE_API_KEY", "test-key");
+    const watchlist = await createTestWatchlist(db, { name: "Zero actual inserts" });
+    getMovieDetailsMock.mockResolvedValue({ title: "Candidate", poster_path: null });
+    getTVDetailsMock.mockResolvedValue({
+      name: "Show",
+      poster_path: null,
+      seasons: [{ season_number: 1 }],
+    });
+    getSeasonDetailsMock.mockResolvedValue({
+      episodes: [
+        {
+          id: 501,
+          name: "Candidate",
+          season_number: 1,
+          episode_number: 1,
+          still_path: null,
+          vote_average: 0,
+        },
+      ],
+    });
+    getComicIssueMock.mockResolvedValue({
+      id: "502",
+      title: "Candidate",
+      issueNumber: "1",
+      parent: { id: "51", title: "Volume" },
+    });
+    getComicVolumeDetailsMock.mockResolvedValue({ title: "Volume" });
+    getComicIssuesMock.mockResolvedValue([{ id: "502", title: "Candidate", issueNumber: "1" }]);
+    // A competing insert can make persistence insert zero after the duplicate check.
+    // Force that database outcome without mocking the persistence module.
+    db.run(
+      sql.raw(
+        "CREATE TEMP TRIGGER ignore_addition BEFORE INSERT ON watchlist_items BEGIN SELECT RAISE(IGNORE); END",
+      ),
+    );
+    try {
+      const result = await addProviderMediaToWatchlist({ watchlistId: watchlist.id, ...addition });
+      expect(result).toMatchObject({ success: true, code: expectedCode, affectedCount: 0 });
+      expect(await db.select().from(schema.watchlistItems)).toHaveLength(0);
+    } finally {
+      db.run(sql.raw("DROP TRIGGER ignore_addition"));
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it.each(["movie", "tv", "episode"] as const)(
+    "propagates persistence defects for %s",
+    async (mediaType) => {
+      const watchlist = await createTestWatchlist(db, { name: "Persistence defect" });
+      getMovieDetailsMock.mockResolvedValue({ title: "Candidate", poster_path: null });
+      getTVDetailsMock.mockResolvedValue({
+        name: "Show",
+        poster_path: null,
+        seasons: [{ season_number: 1 }],
+      });
+      getSeasonDetailsMock.mockResolvedValue({
+        episodes: [
+          {
+            id: 501,
+            name: "Candidate",
+            season_number: 1,
+            episode_number: 1,
+            still_path: null,
+            vote_average: 0,
+          },
+        ],
+      });
+      db.run(
+        sql.raw(
+          "CREATE TEMP TRIGGER fail_addition BEFORE INSERT ON watchlist_items BEGIN SELECT RAISE(ABORT, 'forced persistence defect'); END",
+        ),
+      );
+      try {
+        await expect(
+          addProviderMediaToWatchlist({
+            watchlistId: watchlist.id,
+            provider: "tmdb",
+            providerId: mediaType === "episode" ? "501" : "50",
+            mediaType,
+            parent: { providerId: "50" },
+          }),
+        ).rejects.toThrow();
+        expect(await db.select().from(schema.watchlistItems)).toHaveLength(0);
+      } finally {
+        db.run(sql.raw("DROP TRIGGER fail_addition"));
+      }
+    },
+  );
+
+  it("propagates unexpected provider implementation defects", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Provider defect" });
+    const defect = new TypeError("Unexpected mapping defect");
+    getMovieDetailsMock.mockRejectedValueOnce(defect);
+    await expect(
+      addProviderMediaToWatchlist({
+        watchlistId: watchlist.id,
+        provider: "tmdb",
+        providerId: "50",
+        mediaType: "movie",
+      }),
+    ).rejects.toBe(defect);
+  });
+
+  it("returns structured outcomes through the ordinary addition interface", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Shared outcomes" });
+    getMovieDetailsMock.mockResolvedValue({ title: "Canonical title", poster_path: null });
+    const input = {
+      watchlistId: watchlist.id,
+      media: {
+        id: "50",
+        source: "tmdb" as const,
+        mediaType: "movie" as const,
+        title: "Display text is not a code",
+        poster: null,
+      },
+    };
+    expect(await addToWatchlistMutation(input)).toMatchObject({
+      success: true,
+      code: "added",
+      affectedCount: 1,
+    });
+    expect(await addToWatchlistMutation(input)).toMatchObject({
+      success: true,
+      code: "duplicate",
+      affectedCount: 0,
+    });
   });
 });

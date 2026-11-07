@@ -1,3 +1,4 @@
+import type { WatchlistWriteFailureCode } from "./AdditionOutcome";
 import { getDb } from "@/db/Db.server";
 import type { DatabaseTransaction } from "@/db/Db.server";
 import { watchlistItems, watchlists } from "@/db/Schema";
@@ -13,7 +14,14 @@ type PendingWatchlistItem = typeof watchlistItems.$inferInsert;
 
 export type PersistAddedItemsResult =
   | { success: true; insertedCount: number }
-  | { success: false; code: string; message: string };
+  | {
+      success: false;
+      code: Extract<
+        WatchlistWriteFailureCode,
+        "not_found" | "insertion_choice_required" | "not_custom_mode" | "invalid_reference"
+      >;
+      message: string;
+    };
 
 export async function persistAddedItems({
   watchlistId,

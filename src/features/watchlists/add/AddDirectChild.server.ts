@@ -1,7 +1,7 @@
 import { addComicIssueToWatchlist } from "./AddComicIssue.server";
 import { addTvEpisodeToWatchlist } from "./AddTvEpisode.server";
 import type { ProviderMediaAddition } from "./AddProviderMedia";
-import type { WatchlistWriteResult } from "./Shared.server";
+import type { WatchlistWriteResult } from "./AdditionOutcome";
 
 export function addDirectChildToWatchlist(
   addition: ProviderMediaAddition,

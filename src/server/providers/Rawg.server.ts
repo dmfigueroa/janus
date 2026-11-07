@@ -1,3 +1,4 @@
+import { requestProviderJson, parseProviderData } from "@/integrations/ProviderRequest.server";
 import { z } from "zod";
 import { API_PAGE_SIZE } from "../Constants";
 import { type UnifiedMedia } from "../Media";
@@ -71,11 +72,8 @@ async function searchGamesRequest(query: string, apiKey: string, page: number) {
 
 async function getGameDetailsRequest(id: string, apiKey: string) {
   const url = `https://api.rawg.io/api/games/${id}?key=${apiKey}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("Failed to fetch game details");
-
-  const item = await res.json();
-  return mapGame(RawgGameSchema.parse(item));
+  const item = await requestProviderJson(url);
+  return mapGame(parseProviderData(RawgGameSchema, item));
 }
 
 export async function searchGames(
@@ -93,11 +91,5 @@ export async function searchGames(
 }
 
 export async function getGameDetails(id: string, apiKey: string) {
-  try {
-    return await getGameDetailsRequest(id, apiKey);
-  } catch (e) {
-    const errorMessage = getErrorMessage(e);
-    console.error("RAWG Details Error:", errorMessage);
-    throw new Error(`RAWG Details Error: ${errorMessage}`);
-  }
+  return getGameDetailsRequest(id, apiKey);
 }

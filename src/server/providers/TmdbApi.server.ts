@@ -1,3 +1,8 @@
+import {
+  ProviderRequestError,
+  requestProviderJson,
+  parseProviderData,
+} from "@/integrations/ProviderRequest.server";
 import { z } from "zod";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
@@ -28,48 +33,46 @@ export interface TMDBErrorResponse {
   success: boolean;
 }
 
+const tmdbMovieSchema = z.object({
+  title: z.string().optional(),
+  name: z.string().optional(),
+  poster_path: z.string().nullable(),
+  release_date: z.string().optional(),
+  vote_average: z.number().optional(),
+  runtime: z.number().nullable().optional(),
+});
+
+const tmdbTvSchema = z.object({
+  name: z.string().optional(),
+  poster_path: z.string().nullable(),
+  seasons: z.array(z.object({ season_number: z.number() })),
+});
+
+const tmdbEpisodeSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  season_number: z.number(),
+  episode_number: z.number(),
+  still_path: z.string().nullable(),
+  air_date: z.string().nullable().optional(),
+  vote_average: z.number(),
+  runtime: z.number().nullable().optional(),
+});
+
+const tmdbSeasonSchema = z.object({ episodes: z.array(tmdbEpisodeSchema) });
+export type TMDBEpisode = z.infer<typeof tmdbEpisodeSchema>;
+
 function getTmdbApiKey() {
   const apiKey = process.env.TMDB_API_KEY;
-  if (!apiKey) throw new Error("TMDB_API_KEY is not configured");
+  if (!apiKey) throw new ProviderRequestError("provider_not_configured");
   return apiKey;
-}
-
-function logTmdbErrorData(response: Response, errorData: TMDBErrorResponse) {
-  if (errorData.status_code && errorData.status_message) {
-    console.error(
-      `TMDB API Error: ${response.status} (Code: ${errorData.status_code}) - ${errorData.status_message}`,
-    );
-    return;
-  }
-  console.error(`TMDB API Error: ${response.status} ${response.statusText}`);
-}
-
-async function logTmdbError(response: Response) {
-  try {
-    const errorData = (await response.json()) as TMDBErrorResponse;
-    logTmdbErrorData(response, errorData);
-  } catch {
-    // Fallback if response is not JSON
-    console.error(`TMDB API Error: ${response.status} ${response.statusText}`);
-  }
 }
 
 async function fetchWithAuth(url: string) {
   const apiKey = getTmdbApiKey();
-
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      accept: "application/json",
-    },
+  return requestProviderJson(url, {
+    headers: { Authorization: `Bearer ${apiKey}`, accept: "application/json" },
   });
-
-  if (!response.ok) {
-    await logTmdbError(response);
-    throw new Error(`Failed to fetch data from TMDB: ${response.status}`);
-  }
-
-  return response.json();
 }
 
 export async function fetchTmdbSearch(data: { query: string; page: number; type: "movie" | "tv" }) {
@@ -101,17 +104,17 @@ export async function fetchTmdbSearch(data: { query: string; page: number; type:
 export async function fetchTmdbTv(data: { id: number }) {
   const input = z.object({ id: z.number() }).parse(data);
   const url = new URL(`${TMDB_BASE_URL}/tv/${input.id}`);
-  return fetchWithAuth(url.toString());
+  return parseProviderData(tmdbTvSchema, await fetchWithAuth(url.toString()));
 }
 
 export async function fetchTmdbSeason(data: { id: number; seasonNumber: number }) {
   const input = z.object({ id: z.number(), seasonNumber: z.number() }).parse(data);
   const url = new URL(`${TMDB_BASE_URL}/tv/${input.id}/season/${input.seasonNumber}`);
-  return fetchWithAuth(url.toString());
+  return parseProviderData(tmdbSeasonSchema, await fetchWithAuth(url.toString()));
 }
 
 export async function fetchTmdbMovie(data: { id: number }) {
   const input = z.object({ id: z.number() }).parse(data);
   const url = new URL(`${TMDB_BASE_URL}/movie/${input.id}`);
-  return fetchWithAuth(url.toString());
+  return parseProviderData(tmdbMovieSchema, await fetchWithAuth(url.toString()));
 }
