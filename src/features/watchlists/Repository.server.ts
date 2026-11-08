@@ -1,3 +1,4 @@
+import { initialWatchlistLifecycle } from "./lifecycle/WatchlistLifecycle.server";
 import { getDb, type DatabaseTransaction } from "@/db/Db.server";
 import { watchlists, watchlistItems } from "@/db/Schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
@@ -18,7 +19,7 @@ export async function createWatchlist({
   const db = getDb();
   const [watchlist] = await db
     .insert(watchlists)
-    .values({ name, description, itemOrderMode, lastWatchedAt: sql`CURRENT_TIMESTAMP` })
+    .values({ name, description, itemOrderMode, ...initialWatchlistLifecycle() })
     .returning();
   return watchlist;
 }
@@ -62,27 +63,6 @@ export async function markLastItemAdded(watchlistId: number) {
     .update(watchlists)
     .set({ lastItemAddedAt: sql`CURRENT_TIMESTAMP` })
     .where(eq(watchlists.id, watchlistId));
-}
-
-export async function markLastWatched(watchlistId: number) {
-  const db = getDb();
-  await db
-    .update(watchlists)
-    .set({ lastWatchedAt: sql`CURRENT_TIMESTAMP` })
-    .where(eq(watchlists.id, watchlistId));
-}
-
-export async function pauseWatchlist(watchlistId: number) {
-  const db = getDb();
-  await db
-    .update(watchlists)
-    .set({ pausedAt: sql`CURRENT_TIMESTAMP` })
-    .where(eq(watchlists.id, watchlistId));
-}
-
-export async function resumeWatchlist(watchlistId: number) {
-  const db = getDb();
-  await db.update(watchlists).set({ pausedAt: null }).where(eq(watchlists.id, watchlistId));
 }
 
 export async function updateWatchlist({

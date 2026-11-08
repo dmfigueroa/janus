@@ -39,6 +39,37 @@ beforeEach(async () => {
 });
 
 describe("merge watchlists mutation", () => {
+  it("preserves existing target lifecycle and creates new targets unpaused at the back", async () => {
+    const target = await createTestWatchlist(db, {
+      name: "Paused target",
+      pausedAt: "2001-01-01 00:00:00",
+      lastWatchedAt: "2000-01-01 00:00:00",
+    });
+    const source = await createTestWatchlist(db, {
+      name: "Source",
+      pausedAt: "2002-01-01 00:00:00",
+    });
+    await createTestWatchlistItem(db, { watchlistId: source.id, tmdbId: "source" });
+    const existing = await mergeWatchlistsMutation({
+      targetWatchlistId: target.id,
+      sourceWatchlistIds: [source.id],
+    });
+    expect(existing).toEqual({ success: true, targetId: target.id });
+    const existingDetail = await readWatchlistDetail({ watchlistId: target.id });
+    expect(existingDetail?.watchlist).toMatchObject({
+      pausedAt: target.pausedAt,
+      lastWatchedAt: target.lastWatchedAt,
+    });
+    const merged = await mergeWatchlistsMutation({
+      newWatchlistName: "New merge",
+      sourceWatchlistIds: [target.id],
+    });
+    const detail = await readWatchlistDetail({ watchlistId: getMergeTargetId(merged) });
+    expect(detail?.watchlist.pausedAt).toBeNull();
+    expect(detail?.watchlist.lastWatchedAt).not.toBeNull();
+    expect(detail?.watchlist.lastWatchedAt! > target.lastWatchedAt!).toBe(true);
+  });
+
   it("merges selected lists into an existing target and keeps watched duplicates", async () => {
     const target = await createTestWatchlist(db, { name: "Target" });
     const source = await createTestWatchlist(db, { name: "Source" });

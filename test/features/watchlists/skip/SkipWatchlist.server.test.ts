@@ -9,13 +9,14 @@ vi.mock("@/db/Db.server", () => ({ getDb: () => dbState.db }));
 
 let testDb: Awaited<ReturnType<typeof createIsolatedTestDb>>;
 let db: IsolatedTestDb;
-let skipWatchlistMutation: typeof import("@/features/watchlists/skip/Mutation.server").skipWatchlistMutation;
+let skipWatchlistMutation: typeof import("@/features/watchlists/lifecycle/WatchlistLifecycle.server").skipWatchlistMutation;
 
 beforeAll(async () => {
   testDb = await createIsolatedTestDb();
   db = testDb.db;
   dbState.db = db;
-  ({ skipWatchlistMutation } = await import("@/features/watchlists/skip/Mutation.server"));
+  ({ skipWatchlistMutation } =
+    await import("@/features/watchlists/lifecycle/WatchlistLifecycle.server"));
 });
 
 afterAll(() => testDb.close());

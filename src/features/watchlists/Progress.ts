@@ -1,3 +1,4 @@
+import { isWatchlistCompleted } from "./lifecycle/WatchlistLifecycle";
 export function calculateWatchlistProgress({
   totalItems,
   watchedItems,
@@ -5,5 +6,6 @@ export function calculateWatchlistProgress({
   totalItems: number;
   watchedItems: number;
 }) {
-  return totalItems > 0 ? Math.round((watchedItems / totalItems) * 100) : 0;
+  if (isWatchlistCompleted({ totalItems, watchedItems })) return 100;
+  return totalItems > 0 ? Math.min(99, Math.round((watchedItems / totalItems) * 100)) : 0;
 }

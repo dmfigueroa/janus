@@ -21,7 +21,7 @@ The complete calendar date associated with an entry, always represented with a y
 _Avoid_: Release year
 
 **Rotation**:
-The global recency order used to surface what to watch next. A watchlist leaves the rotation while it is paused or completed, and returns automatically once neither applies.
+The global recency order used to surface what to watch next. A watchlist leaves the rotation while it is paused, completed, or empty, and returns automatically once none of those apply.
 _Avoid_: Active queue, cycle
 
 **Lineup**:
@@ -29,11 +29,11 @@ A named grouping of watchlists on Watch Now. Automatic lineups group by the next
 _Avoid_: Separate rotation, independent viewing history
 
 **Paused**:
-The persisted on/off state that removes a watchlist from the rotation without deleting it. Pausing records when the pause began; resuming clears it and returns the list to its previous position in the rotation.
+The persisted on/off state that removes a watchlist from the rotation without deleting it. Pausing records when the pause began, and repeated pausing preserves that time; resuming clears it and returns the list to its previous position in the rotation.
 _Avoid_: Archived, hidden, snoozed
 
 **Completed**:
-The derived state of a watchlist whose items are all watched (progress is 100%). It is never stored; adding a new item un-completes the list automatically.
+The derived state of a watchlist with at least one item and every item watched. It is never stored; adding an unwatched item or unwatching an item un-completes the list automatically, without clearing its pause.
 _Avoid_: Finished, done, watched
 
 **Watchlist addition**:
@@ -43,3 +43,11 @@ _Avoid_: Import job
 **Addition outcome**:
 The result of a watchlist addition, including whether it succeeded, why it changed or did not change the watchlist, and how many watchlist items were actually added.
 _Avoid_: Attempted count
+
+**Empty**:
+A watchlist containing no watchlist items. It is not completed and is excluded from the rotation and Watch Now, while retaining its pause and configured lineup memberships.
+_Avoid_: Completed, deleted
+
+**Rotation position**:
+A watchlist's place in the global recency order. Watching an unwatched item or skipping moves it to the back; quiet watch, unwatch, pause, resume, and item additions, removals, or movements preserve its position. New watchlists enter at the back unpaused. A merge into an existing watchlist preserves the target's position and pause; a new merge target follows ordinary creation rules.
+_Avoid_: Viewing history

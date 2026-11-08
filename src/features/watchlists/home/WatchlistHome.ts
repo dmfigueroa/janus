@@ -1,3 +1,4 @@
+import { readWatchlistLifecycle } from "../lifecycle/WatchlistLifecycle";
 import { createServerFn } from "@tanstack/react-start";
 import { listWatchlistSummaries } from "@/features/watchlists/list/Query.server";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query";
@@ -64,23 +65,19 @@ function buildWatchlistHomeTotals(watchlists: WatchlistSummary[]) {
   };
 }
 
-export function isWatchlistPaused(watchlist: WatchlistSummary) {
-  return watchlist.pausedAt !== null;
-}
-
-export function isWatchlistCompleted(watchlist: WatchlistSummary) {
-  const { totalItems, watchedItems } = watchlist.stats;
-  return totalItems > 0 && watchedItems === totalItems;
-}
-
 function partitionWatchlistHomeSections(allWatchlists: WatchlistSummary[]) {
   return {
     rotation: allWatchlists.filter(
-      (watchlist) => !isWatchlistPaused(watchlist) && !isWatchlistCompleted(watchlist),
+      (watchlist) => readWatchlistLifecycle(watchlist).section === "rotation",
     ),
-    completed: allWatchlists.filter(isWatchlistCompleted),
+    completed: allWatchlists.filter(
+      (watchlist) => readWatchlistLifecycle(watchlist).section === "completed",
+    ),
     paused: allWatchlists.filter(
-      (watchlist) => isWatchlistPaused(watchlist) && !isWatchlistCompleted(watchlist),
+      (watchlist) => readWatchlistLifecycle(watchlist).section === "paused",
+    ),
+    empty: allWatchlists.filter(
+      (watchlist) => readWatchlistLifecycle(watchlist).section === "empty",
     ),
   };
 }

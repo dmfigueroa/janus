@@ -1,3 +1,4 @@
+import { readWatchlistLifecycle } from "@/features/watchlists/lifecycle/WatchlistLifecycle";
 import { getDb } from "@/db/Db.server";
 import { lineupWatchlists } from "@/db/Schema";
 import {
@@ -49,7 +50,7 @@ function configuredCount(watchlists: WatchlistSummary[] | null) {
   return watchlists?.length ?? null;
 }
 function isEligible(summary: WatchlistSummary) {
-  return summary.pausedAt === null && summary.stats.nextUnwatched !== null;
+  return readWatchlistLifecycle(summary).eligible && summary.stats.nextUnwatched !== null;
 }
 function belongs(lineup: Lineup, summary: WatchlistSummary, memberIds: number[]) {
   if (lineup.kind === "custom") return memberIds.includes(summary.id);

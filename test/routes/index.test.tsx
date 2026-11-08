@@ -145,6 +145,7 @@ function homeData(overrides?: Partial<HomeData>): HomeData {
     rotation: [featuredMovie, backlog],
     completed: [],
     paused: [],
+    empty: [],
     ...overrides,
   };
 }
@@ -167,7 +168,7 @@ describe("WatchlistsHomeRouteContent", () => {
     expect(screen.queryByRole("button", { name: "Settings" })).toBeNull();
   });
 
-  it("renders completed and paused lists in collapsed sections below the rotation grid", () => {
+  it("renders completed, empty, and paused lists in collapsed sections below the rotation grid", () => {
     const finished = watchlist({
       id: 3,
       name: "Finished List",
@@ -180,21 +181,25 @@ describe("WatchlistsHomeRouteContent", () => {
         coverMediaType: null,
       },
     });
+    const empty = watchlist({ id: 5, name: "Empty List", pausedAt: "2024-06-01 00:00:00" });
     const resting = watchlist({ id: 4, name: "Resting List", pausedAt: "2024-06-01 00:00:00" });
 
     render(
       <WatchlistsHomeRouteContent
         initialData={homeData({
-          allWatchlists: [resting, finished],
+          allWatchlists: [resting, finished, empty],
           rotation: [],
           completed: [finished],
           paused: [resting],
+          empty: [empty],
         })}
       />,
     );
 
     expect(screen.getByRole("heading", { name: "Completed (1)" })).not.toBeNull();
     expect(screen.getByRole("heading", { name: "Paused (1)" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "Empty (1)" })).not.toBeNull();
+    expect(screen.getByTestId("watchlist-card-5")).not.toBeNull();
     expect(screen.getByTestId("watchlist-card-3")).not.toBeNull();
     expect(screen.getByTestId("watchlist-card-4")).not.toBeNull();
   });

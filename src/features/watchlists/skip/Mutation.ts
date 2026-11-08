@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { skipWatchlistMutation } from "./Mutation.server";
+import { skipWatchlistMutation } from "../lifecycle/WatchlistLifecycle.server";
 
 export const skipWatchlistSchema = z.object({
   watchlistId: z.number().int().positive(),
