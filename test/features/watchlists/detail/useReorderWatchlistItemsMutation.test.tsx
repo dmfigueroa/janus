@@ -59,6 +59,39 @@ describe("reorder save lifecycle", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(mocks.restore).not.toHaveBeenCalled();
   });
+  it("prepares the drop after the cache update without waiting for the save", async () => {
+    let finishOptimistic = (_snapshot: []) => {};
+    mocks.optimistic.mockReturnValue(
+      new Promise<[]>((resolve) => {
+        finishOptimistic = resolve;
+      }),
+    );
+    mocks.save.mockReturnValue(new Promise(() => {}));
+    const { result } = setup();
+    let prepared: Promise<boolean> | undefined;
+    act(() => {
+      prepared = result.current.prepare(intent);
+    });
+    await waitFor(() => expect(mocks.optimistic).toHaveBeenCalledOnce());
+    expect(mocks.save).not.toHaveBeenCalled();
+    await act(async () => {
+      finishOptimistic([]);
+      expect(await prepared).toBe(true);
+    });
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledOnce());
+    expect(result.current.isPending).toBe(true);
+  });
+
+  it("cancels the drop when optimistic preparation fails", async () => {
+    mocks.optimistic.mockRejectedValue(new Error("Could not prepare reorder"));
+    const { result } = setup();
+    await act(async () => {
+      expect(await result.current.prepare(intent)).toBe(false);
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(mocks.save).not.toHaveBeenCalled();
+  });
+
   it("rolls back a failed save and permits a successful retry", async () => {
     const snapshot: [] = [];
     mocks.optimistic.mockResolvedValue(snapshot);

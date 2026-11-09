@@ -30,8 +30,8 @@ export function useReorderWatchlistItemsMutation({
 
   // The query cache owns the displayed order. Pending includes reconciliation,
   // so another drag cannot race the authoritative refresh or rollback.
-  return useMutation({
-    mutationFn: async (input: ReorderWatchlistItemsInput) => {
+  const mutation = useMutation({
+    mutationFn: async ({ input }: ReorderRequest) => {
       const result = await reorderWatchlistItemsFn({
         data: { watchlistId, ...input },
       });
@@ -40,13 +40,21 @@ export function useReorderWatchlistItemsMutation({
         throw new Error(result.message);
       }
     },
-    onMutate: (input) =>
-      optimisticallyReorderWatchlistItems({
-        queryClient,
-        watchlistId,
-        activeQueryKey,
-        ...input,
-      }),
+    onMutate: async ({ input, prepared = ignorePreparation }: ReorderRequest) => {
+      try {
+        const snapshot = await optimisticallyReorderWatchlistItems({
+          queryClient,
+          watchlistId,
+          activeQueryKey,
+          ...input,
+        });
+        prepared(true);
+        return snapshot;
+      } catch (error) {
+        prepared(false);
+        throw error;
+      }
+    },
     onSuccess: () => {
       toaster.create({ type: "success", title: "Order saved", duration: 2000 });
     },
@@ -62,4 +70,20 @@ export function useReorderWatchlistItemsMutation({
         queryKey: ["watchlists", "detail", watchlistId],
       }),
   });
+
+  return {
+    isPending: mutation.isPending,
+    isSuccess: mutation.isSuccess,
+    isError: mutation.isError,
+    mutate: (input: ReorderWatchlistItemsInput) => mutation.mutate({ input }),
+    prepare: (input: ReorderWatchlistItemsInput) =>
+      new Promise<boolean>((prepared) => mutation.mutate({ input, prepared })),
+  };
 }
+
+type ReorderRequest = {
+  input: ReorderWatchlistItemsInput;
+  prepared?: (ready: boolean) => void;
+};
+
+function ignorePreparation() {}

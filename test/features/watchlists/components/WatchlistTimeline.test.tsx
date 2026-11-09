@@ -15,7 +15,7 @@ const activeFilters = {
   query: "",
 };
 
-let latestDndContextProps: Pick<DndContextProps, "onDragStart" | "onDragEnd"> = {};
+let latestDndContextProps: Pick<DndContextProps, "onDragStart" | "onDragEnd" | "cancelDrop"> = {};
 let sortableListeners: Record<string, () => void> = {};
 
 function activeDrag(id: number) {
@@ -206,7 +206,7 @@ describe("WatchlistTimeline reorder controls", () => {
     expect(screen.queryByRole("button", { name: "Move First" })).toBeNull();
   });
 
-  it("renders cache updates without retaining a separate dropped order", () => {
+  it("renders cache updates without retaining a separate dropped order", async () => {
     const onReorder = vi.fn();
 
     const { rerender: rerenderBase } = renderWithProvider(
@@ -223,7 +223,8 @@ describe("WatchlistTimeline reorder controls", () => {
       latestDndContextProps.onDragStart?.(dragStart(1));
     });
 
-    act(() => {
+    await act(async () => {
+      await latestDndContextProps.cancelDrop?.(dragEnd(1, 2));
       latestDndContextProps.onDragEnd?.(dragEnd(1, 2));
     });
 

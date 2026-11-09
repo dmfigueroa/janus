@@ -1,5 +1,5 @@
 import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { CSS, type Transform } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { Box, Button, Flex } from "@chakra-ui/react";
 import type { WatchlistItem } from "@/db/Schema";
@@ -32,14 +32,13 @@ export function ReorderableTimelineRow({
     transform,
     transition,
     isDragging,
+    isSorting,
   } = useSortable({
     id: item.id,
     disabled: !showHandle,
+    animateLayoutChanges: ({ isSorting: sorting }) => sorting,
   });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+  const style = sortableRowStyle(isSorting, transform, transition);
 
   return (
     <Box
@@ -69,11 +68,11 @@ export function ReorderableTimelineRow({
 
 export function DragOverlayTimelineRow({
   item,
-  interactionDisabled,
+  activeFilters,
   itemOrderMode,
 }: {
   item: WatchlistItem;
-  interactionDisabled: boolean;
+  activeFilters: WatchlistDetailQueryFilters;
   itemOrderMode: WatchlistItemOrderMode;
 }) {
   return (
@@ -81,14 +80,16 @@ export function DragOverlayTimelineRow({
       rounded="xl"
       bg="bg.canvas/95"
       shadow="overlay"
-      borderWidth="1px"
-      borderColor="border.default"
+      outlineWidth="1px"
+      outlineStyle="solid"
+      outlineColor="border.default"
     >
       <TimelineRowShell
         item={item}
+        activeFilters={activeFilters}
         showHandleSlot
         showHandle
-        interactionDisabled={interactionDisabled}
+        interactionDisabled
         itemOrderMode={itemOrderMode}
         dragging
       />
@@ -196,4 +197,17 @@ function DragHandleButton({
 
 function EmptyHandleSlot({ show }: { show: boolean }) {
   return show ? <Box aria-hidden w={8} h={8} flexShrink={0} /> : null;
+}
+
+function sortableRowStyle(
+  isSorting: boolean,
+  transform: Transform | null,
+  transition: string | undefined,
+) {
+  // After release the cache owns row positions. Replaying layout transforms
+  // after its asynchronous update briefly overshoots the final slot.
+  return {
+    transform: isSorting ? CSS.Transform.toString(transform) : undefined,
+    transition: isSorting ? transition : undefined,
+  };
 }

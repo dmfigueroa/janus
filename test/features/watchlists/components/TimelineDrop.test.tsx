@@ -87,8 +87,12 @@ it.each(["mouse", "touch"])(
     const animate = vi.fn(() => ({ onfinish: null, cancel: vi.fn() }));
     // jsdom has no layout or Web Animations; keep a started animation pending.
     Object.defineProperty(HTMLElement.prototype, "animate", { configurable: true, value: animate });
-    const onReorder = vi.fn();
-    render(
+    let finishPreparation = (_ready: boolean) => {};
+    const preparation = new Promise<boolean>((resolve) => {
+      finishPreparation = resolve;
+    });
+    const onReorder = vi.fn(() => preparation);
+    const { rerender } = render(
       <ChakraProvider value={janusSystem}>
         <WatchlistTimeline
           items={[
@@ -120,7 +124,29 @@ it.each(["mouse", "touch"])(
       fireEvent.touchEnd(handle, { touches: [], changedTouches: [movedTouch] });
     }
     await waitFor(() => expect(onReorder).toHaveBeenCalledOnce());
+    // The floating row must survive release until the optimistic cache is ready.
+    expect(screen.getAllByText("Third")).toHaveLength(2);
+    rerender(
+      <ChakraProvider value={janusSystem}>
+        <WatchlistTimeline
+          items={[
+            item({ id: 3, title: "Third" }),
+            item({ id: 1, title: "First" }),
+            item({ id: 2, title: "Second" }),
+          ]}
+          activeFilters={{ watchlistId: 1, itemOrderMode: "custom" }}
+          itemOrderMode="custom"
+          canReorder={false}
+          interactionDisabled
+          onReorder={onReorder}
+        />
+      </ChakraProvider>,
+    );
+    finishPreparation(true);
     await waitFor(() => expect(screen.getAllByText("Third")).toHaveLength(1));
+    const droppedRow = screen.getByTestId("watchlist-timeline-row-3");
+    expect(droppedRow.style.transform).toBe("");
+    expect(droppedRow.style.transition).toBe("");
     expect(animate).not.toHaveBeenCalled();
     expect(onReorder).toHaveBeenCalledWith({
       movedItemId: 3,

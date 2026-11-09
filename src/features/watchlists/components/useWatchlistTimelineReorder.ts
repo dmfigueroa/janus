@@ -15,7 +15,7 @@ interface UseWatchlistTimelineReorderOptions {
   items: WatchlistItem[];
   itemOrderMode: WatchlistItemOrderMode;
   canReorder: boolean;
-  onReorder?: (intent: ReorderIntent) => void;
+  onReorder?: (intent: ReorderIntent) => Promise<boolean> | void;
 }
 
 export function useWatchlistTimelineReorder({
@@ -46,22 +46,17 @@ export function useWatchlistTimelineReorder({
     setActiveItemId(null);
   }
 
-  function handleDragEnd(event: DragEndEvent) {
-    if (!reorderEnabled) {
-      handleDragCancel();
-      return;
-    }
-
+  async function prepareDrop(event: DragEndEvent) {
+    if (!reorderEnabled) return true;
     const attempt = buildDragEventReorderAttempt(displayedItems, activeItemId, event);
+    if (!attempt) return true;
 
-    if (!attempt) {
-      handleDragCancel();
-      return;
-    }
+    return finishDropPreparation(onReorder, attempt);
+  }
 
+  function handleDragEnd() {
     blurActiveElement();
     setActiveItemId(null);
-    notifyReorder(onReorder, attempt);
   }
 
   return {
@@ -69,6 +64,7 @@ export function useWatchlistTimelineReorder({
     displayedItems,
     handleDragCancel,
     handleDragEnd,
+    prepareDrop,
     handleDragStart,
     reorderEnabled,
     sensors,
@@ -106,13 +102,6 @@ function buildDragEventReorderAttempt(
   return buildReorderAttempt(items, activeItemId, Number(event.over.id));
 }
 
-function notifyReorder(
-  onReorder: UseWatchlistTimelineReorderOptions["onReorder"],
-  intent: ReorderIntent,
-) {
-  onReorder?.(intent);
-}
-
 function buildReorderAttempt(items: WatchlistItem[], movedItemId: number, referenceItemId: number) {
   const movedIndex = items.findIndex((item) => item.id === movedItemId);
   const referenceIndex = items.findIndex((item) => item.id === referenceItemId);
@@ -148,4 +137,17 @@ function blurActiveElement() {
   if (document.activeElement instanceof HTMLElement) {
     document.activeElement.blur();
   }
+}
+
+async function finishDropPreparation(
+  onReorder: UseWatchlistTimelineReorderOptions["onReorder"],
+  intent: ReorderIntent,
+) {
+  const prepared = await onReorder?.(intent);
+  if (prepared === false) return true;
+  // Query observers notify asynchronously. Retain the overlay until React has
+  // committed the optimistic cache order before ending the drag.
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  return false;
 }
