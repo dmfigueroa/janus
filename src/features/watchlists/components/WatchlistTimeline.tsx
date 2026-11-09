@@ -25,7 +25,6 @@ interface WatchlistTimelineProps {
   onLoadMore?: () => void;
   canReorder?: boolean;
   interactionDisabled?: boolean;
-  reorderFailed?: boolean;
   onReorder?: (intent: ReorderIntent) => void;
 }
 
@@ -35,7 +34,6 @@ export function WatchlistTimeline(props: WatchlistTimelineProps) {
     items,
     itemOrderMode,
     canReorder: Boolean(props.canReorder),
-    reorderFailed: Boolean(props.reorderFailed),
     onReorder,
   });
   const groups = useMemo(

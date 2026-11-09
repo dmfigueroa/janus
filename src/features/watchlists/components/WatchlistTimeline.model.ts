@@ -32,26 +32,6 @@ export function buildWatchlistTimelineGroups(
   return grouped;
 }
 
-export function reorderItemsByIds(items: WatchlistItem[], itemIds: number[]) {
-  if (
-    areItemIdsEqual(
-      items.map((item) => item.id),
-      itemIds,
-    )
-  ) {
-    return items;
-  }
-
-  const rankByItemId = new Map(itemIds.map((itemId, index) => [itemId, index]));
-  const originalIndexByItemId = new Map(items.map((item, index) => [item.id, index]));
-
-  return [...items].sort(
-    (left, right) =>
-      getItemRank(left.id, rankByItemId, originalIndexByItemId, itemIds.length) -
-      getItemRank(right.id, rankByItemId, originalIndexByItemId, itemIds.length),
-  );
-}
-
 function getReleaseYear(item: WatchlistItem) {
   return item.releaseDate ? item.releaseDate.split("-")[0] : "TBA";
 }
@@ -79,39 +59,4 @@ function appendCompletedGroup(
   if (items.length > 0) {
     grouped.push({ year, items });
   }
-}
-
-function getItemRank(
-  itemId: number,
-  rankByItemId: Map<number, number>,
-  originalIndexByItemId: Map<number, number>,
-  orderedItemCount: number,
-) {
-  const rank = rankByItemId.get(itemId);
-  if (rank !== undefined) {
-    return rank;
-  }
-
-  return orderedItemCount + (originalIndexByItemId.get(itemId) ?? 0);
-}
-
-export function shouldResetOptimisticOrder(itemIds: number[], localOrderIds: number[] | null) {
-  if (!localOrderIds) {
-    return false;
-  }
-
-  return areItemIdsEqual(itemIds, localOrderIds) || !haveSameItemSet(itemIds, localOrderIds);
-}
-
-function areItemIdsEqual(left: number[], right: number[]) {
-  return left.length === right.length && left.every((itemId, index) => itemId === right[index]);
-}
-
-function haveSameItemSet(left: number[], right: number[]) {
-  if (left.length !== right.length) {
-    return false;
-  }
-
-  const rightIds = new Set(right);
-  return left.every((itemId) => rightIds.has(itemId));
 }

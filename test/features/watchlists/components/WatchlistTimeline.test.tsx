@@ -206,7 +206,7 @@ describe("WatchlistTimeline reorder controls", () => {
     expect(screen.queryByRole("button", { name: "Move First" })).toBeNull();
   });
 
-  it("keeps the dropped order locally until the reordered items arrive", () => {
+  it("renders cache updates without retaining a separate dropped order", () => {
     const onReorder = vi.fn();
 
     const { rerender: rerenderBase } = renderWithProvider(
@@ -236,7 +236,7 @@ describe("WatchlistTimeline reorder controls", () => {
     const rowLabels = screen
       .getAllByTestId(/watchlist-timeline-row-/)
       .map((row) => row.textContent?.trim());
-    expect(rowLabels).toEqual(["Second", "First"]);
+    expect(rowLabels).toEqual(["First", "Second"]);
 
     rerenderBase(
       <ChakraProvider value={janusSystem}>
@@ -250,6 +250,24 @@ describe("WatchlistTimeline reorder controls", () => {
         ,
       </ChakraProvider>,
     );
+    expect(
+      screen.getAllByTestId(/watchlist-timeline-row-/).map((row) => row.textContent?.trim()),
+    ).toEqual(["Second", "First"]);
+
+    rerenderBase(
+      <ChakraProvider value={janusSystem}>
+        <WatchlistTimeline
+          items={[item({ id: 1, title: "First" }), item({ id: 2, title: "Second" })]}
+          activeFilters={activeFilters}
+          itemOrderMode="custom"
+          canReorder
+          onReorder={onReorder}
+        />
+      </ChakraProvider>,
+    );
+    expect(
+      screen.getAllByTestId(/watchlist-timeline-row-/).map((row) => row.textContent?.trim()),
+    ).toEqual(["First", "Second"]);
   });
 });
 

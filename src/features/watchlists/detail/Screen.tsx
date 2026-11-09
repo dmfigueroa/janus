@@ -2,7 +2,6 @@ import { useEffect, useState, useMemo } from "react";
 import { Box, Container } from "@chakra-ui/react";
 import { useInfiniteQuery, useIsMutating, type InfiniteData } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { toaster } from "@/app/Toaster";
 import { DeleteWatchlistDialog } from "@/features/watchlists/components/DeleteWatchlistDialog";
 import { WatchlistHeader } from "@/features/watchlists/components/WatchlistHeader";
 import { WatchlistTimeline } from "@/features/watchlists/components/WatchlistTimeline";
@@ -121,11 +120,7 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
           onLoadMore={getLoadMoreHandler(isReorderPending, fetchNextPage)}
           canReorder={canReorderItems}
           interactionDisabled={isReorderPending}
-          reorderFailed={reorderItemsMutation.isError}
-          onReorder={async (intent) => {
-            await reorderItemsMutation.mutateAsync(intent);
-            toaster.create({ type: "success", title: "Order saved", duration: 2000 });
-          }}
+          onReorder={reorderItemsMutation.mutate}
         />
       </Box>
     </Container>

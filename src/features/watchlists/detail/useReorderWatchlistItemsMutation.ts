@@ -28,6 +28,8 @@ export function useReorderWatchlistItemsMutation({
   const reorderWatchlistItemsFn = useServerFn(reorderWatchlistItems);
   const activeQueryKey = watchlistDetailQueryKey(activeFilters);
 
+  // The query cache owns the displayed order. Pending includes reconciliation,
+  // so another drag cannot race the authoritative refresh or rollback.
   return useMutation({
     mutationFn: async (input: ReorderWatchlistItemsInput) => {
       const result = await reorderWatchlistItemsFn({
@@ -45,6 +47,9 @@ export function useReorderWatchlistItemsMutation({
         activeQueryKey,
         ...input,
       }),
+    onSuccess: () => {
+      toaster.create({ type: "success", title: "Order saved", duration: 2000 });
+    },
     onError: (error, _input, snapshot) => {
       restoreWatchlistDetailSnapshot({ queryClient, snapshot });
       toaster.create({
