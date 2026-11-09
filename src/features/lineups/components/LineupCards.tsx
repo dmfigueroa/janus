@@ -1,13 +1,19 @@
-import { SimpleGrid } from "@chakra-ui/react";
+import { Grid } from "@chakra-ui/react";
 import { WatchlistCard } from "@/features/watchlists/components/WatchlistCard";
 import type { LineupData } from "@/features/lineups/manage/Lineups";
 
 type Watchlist = LineupData["watchlists"][number];
 export function LineupCards({ watchlists }: { watchlists: Watchlist[] }) {
   return (
-    <SimpleGrid columns={{ base: 2, md: 3 }} gap={4}>
+    <Grid
+      templateColumns={{
+        base: "repeat(2, minmax(0, 1fr))",
+        md: "repeat(auto-fill, minmax(200px, 240px))",
+      }}
+      gap={4}
+    >
       <LineupCardItems watchlists={watchlists} />
-    </SimpleGrid>
+    </Grid>
   );
 }
 function LineupCardItems({ watchlists }: { watchlists: Watchlist[] }) {
