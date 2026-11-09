@@ -142,8 +142,20 @@ it.each(["mouse", "touch"])(
         />
       </ChakraProvider>,
     );
+    // Cache notifications must not change the sortable input during the active
+    // drag: otherwise the library displaces the newly ordered neighbors again.
+    expect(screen.getAllByTestId(/watchlist-timeline-row-/).map((row) => row.textContent)).toEqual([
+      "First",
+      "Second",
+      "Third",
+    ]);
     finishPreparation(true);
     await waitFor(() => expect(screen.getAllByText("Third")).toHaveLength(1));
+    expect(screen.getAllByTestId(/watchlist-timeline-row-/).map((row) => row.textContent)).toEqual([
+      "Third",
+      "First",
+      "Second",
+    ]);
     const droppedRow = screen.getByTestId("watchlist-timeline-row-3");
     expect(droppedRow.style.transform).toBe("");
     expect(droppedRow.style.transition).toBe("");

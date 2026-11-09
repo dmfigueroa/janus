@@ -24,10 +24,12 @@ export function useWatchlistTimelineReorder({
   canReorder,
   onReorder,
 }: UseWatchlistTimelineReorderOptions) {
-  const [activeItemId, setActiveItemId] = useState<number | null>(null);
+  const [drag, setDrag] = useState<{ itemId: number; items: WatchlistItem[] } | null>(null);
   const reorderEnabled = isReorderEnabled(canReorder && itemOrderMode === "custom", onReorder);
-  const displayedItems = items;
-  const activeItem = findActiveItem(items, activeItemId);
+  // Keep the sortable input stable until drag end. A cache notification during
+  // drop preparation must not apply the drag displacement to the new order.
+  const { items: displayedItems, itemId: activeItemId } = drag ?? { items, itemId: null };
+  const activeItem = findActiveItem(displayedItems, activeItemId);
   const sensors = useSensors(
     useSensor(MouseSensor),
     useSensor(TouchSensor, {
@@ -39,11 +41,11 @@ export function useWatchlistTimelineReorder({
   );
 
   function handleDragStart(event: DragStartEvent) {
-    if (reorderEnabled) setActiveItemId(Number(event.active.id));
+    if (reorderEnabled) setDrag({ itemId: Number(event.active.id), items });
   }
 
   function handleDragCancel() {
-    setActiveItemId(null);
+    setDrag(null);
   }
 
   async function prepareDrop(event: DragEndEvent) {
@@ -56,7 +58,7 @@ export function useWatchlistTimelineReorder({
 
   function handleDragEnd() {
     blurActiveElement();
-    setActiveItemId(null);
+    setDrag(null);
   }
 
   return {
