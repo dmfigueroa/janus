@@ -207,9 +207,9 @@ describe("WatchlistsHomeRouteContent", () => {
   it("hides featured sections and internal headings in selection mode", () => {
     render(<WatchlistsHomeRouteContent initialData={homeData()} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Select watchlists" }));
+    fireEvent.click(screen.getByRole("button", { name: "Select watchlists to merge" }));
 
-    expect(screen.getByRole("heading", { name: "0 Selected" })).not.toBeNull();
+    expect(screen.getByRole("heading", { name: "0 selected" })).not.toBeNull();
     expect(screen.queryByText("2 watchlists, 2 items")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Up Next by Media" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Watchlists" })).toBeNull();

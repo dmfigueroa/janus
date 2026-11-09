@@ -49,17 +49,15 @@ function getSurfaceStyles(selectionMode: boolean, isSelected: boolean) {
     aspectRatio: "2 / 3",
     overflow: "hidden" as const,
     rounded: "card",
-    shadow: "2xl",
-    transition: "transform 300ms, box-shadow 300ms",
+    shadow: "sm",
+
     ...getSelectionSurfaceStyles(selectionMode),
     ...getSelectedSurfaceStyles(isSelected),
   };
 }
 
 function getSelectionSurfaceStyles(selectionMode: boolean) {
-  return selectionMode
-    ? { transform: "scale(0.98)" }
-    : { _groupHover: { transform: "scale(1.02)" } };
+  return selectionMode ? { transform: "scale(0.98)" } : {};
 }
 
 function getSelectedSurfaceStyles(isSelected: boolean) {

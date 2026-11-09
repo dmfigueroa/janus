@@ -71,6 +71,7 @@ export function WatchlistCardMenu({ watchlist }: WatchlistCardMenuProps) {
     try {
       const result = await requestPauseToggle();
       ensureSuccessfulResult(result);
+      showPauseFeedback(Boolean(watchlist.pausedAt));
       await router.invalidate?.();
     } catch (error) {
       console.error("Failed to change watchlist pause state", error);
@@ -138,7 +139,8 @@ function WatchlistActionMenu({
           right={2}
           zIndex={10}
           size="sm"
-          minW="8"
+          minW="44px"
+          minH="44px"
           p={0}
           rounded="full"
           variant="solid"
@@ -165,7 +167,7 @@ function WatchlistActionMenu({
                   onSkip();
                 }}
               >
-                Skip
+                Move to back of rotation
               </Menu.Item>
             ) : null}
             <Menu.Item
@@ -176,8 +178,9 @@ function WatchlistActionMenu({
                 onTogglePause();
               }}
             >
-              {isPaused ? "Resume" : "Pause"}
+              {isPaused ? "Resume watchlist" : "Pause watchlist"}
             </Menu.Item>
+            <Menu.Separator />
             <Menu.Item
               value="delete"
               color="fg.error"
@@ -186,7 +189,7 @@ function WatchlistActionMenu({
                 onDelete();
               }}
             >
-              <Trash2 size={16} /> Delete
+              <Trash2 size={16} /> Delete watchlist
             </Menu.Item>
           </Menu.Content>
         </Menu.Positioner>
@@ -197,4 +200,10 @@ function WatchlistActionMenu({
 
 function ensureSuccessfulResult(result: { success: boolean }) {
   if (!result.success) throw new Error("The watchlist action failed");
+}
+
+function showPauseFeedback(wasPaused: boolean) {
+  const title = wasPaused ? "Watchlist returned to rotation" : "Watchlist paused";
+  const description = wasPaused ? undefined : "Removed from active rotation. Find it under Paused.";
+  toaster.create({ type: "success", title, description });
 }

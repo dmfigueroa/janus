@@ -78,7 +78,7 @@ function updateLifecycle(
 
 // lastWatchedAt is the legacy storage name for rotation position, including skips.
 // Millisecond monotonicity makes separate actions advance even within one clock tick.
-function nextRotationPosition() {
+export function nextRotationPosition() {
   return sql`strftime('%Y-%m-%d %H:%M:%f', MAX(
     julianday('now'),
     COALESCE((SELECT MAX(julianday(${watchlists.lastWatchedAt})) FROM ${watchlists}), 0)

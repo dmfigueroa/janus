@@ -7,6 +7,10 @@ import type { EnrichedWatchlist } from "@/features/watchlists/components/Watchli
 import { WatchlistCard } from "@/features/watchlists/components/WatchlistCard";
 
 const {
+  rotateMock,
+  undoMock,
+  rotateServerFn,
+  undoServerFn,
   invalidateMock,
   deleteWatchlistFnMock,
   skipWatchlistFnMock,
@@ -17,6 +21,10 @@ const {
   pauseWatchlistServerFn,
   resumeWatchlistServerFn,
 } = vi.hoisted(() => ({
+  rotateMock: vi.fn(),
+  undoMock: vi.fn(),
+  rotateServerFn: Symbol("rotate"),
+  undoServerFn: Symbol("undo"),
   invalidateMock: vi.fn(),
   deleteWatchlistFnMock: vi.fn(),
   skipWatchlistFnMock: vi.fn(),
@@ -26,6 +34,11 @@ const {
   skipWatchlistServerFn: Symbol("skipWatchlist"),
   pauseWatchlistServerFn: Symbol("pauseWatchlist"),
   resumeWatchlistServerFn: Symbol("resumeWatchlist"),
+}));
+
+vi.mock("@/features/watchlists/rotation/CardRotation", () => ({
+  rotateWatchlistCard: rotateServerFn,
+  undoWatchlistCard: undoServerFn,
 }));
 
 vi.mock("@/features/watchlists/delete/Mutation", () => ({
@@ -52,6 +65,8 @@ vi.mock("@tanstack/react-router", () => ({
 
 vi.mock("@tanstack/react-start", () => ({
   useServerFn: (serverFn: symbol) => {
+    if (serverFn === rotateServerFn) return rotateMock;
+    if (serverFn === undoServerFn) return undoMock;
     if (serverFn === deleteWatchlistServerFn) {
       return deleteWatchlistFnMock;
     }
@@ -161,7 +176,7 @@ describe("WatchlistCard", () => {
     );
 
     await openCardMenu("Movie Night");
-    fireEvent.click(screen.getByRole("menuitem", { name: "Skip" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Move to back of rotation" }));
 
     await waitFor(() => {
       expect(skipWatchlistFnMock).toHaveBeenCalledWith({
@@ -180,7 +195,7 @@ describe("WatchlistCard", () => {
     );
 
     await openCardMenu("Movie Night");
-    fireEvent.click(screen.getByRole("menuitem", { name: "Pause" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Pause watchlist" }));
 
     await waitFor(() => {
       expect(pauseWatchlistFnMock).toHaveBeenCalledWith({
@@ -199,7 +214,7 @@ describe("WatchlistCard", () => {
     );
 
     await openCardMenu("Movie Night");
-    fireEvent.click(screen.getByRole("menuitem", { name: "Resume" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Resume watchlist" }));
 
     await waitFor(() => {
       expect(resumeWatchlistFnMock).toHaveBeenCalledWith({
@@ -230,8 +245,8 @@ describe("WatchlistCard", () => {
 
     await openCardMenu("Movie Night");
 
-    expect(screen.queryByRole("menuitem", { name: "Skip" })).toBeNull();
-    expect(screen.getByRole("menuitem", { name: "Pause" })).not.toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Move to back of rotation" })).toBeNull();
+    expect(screen.getByRole("menuitem", { name: "Pause watchlist" })).not.toBeNull();
   });
 
   it("opens the delete confirmation dialog from the card menu", async () => {
@@ -243,7 +258,7 @@ describe("WatchlistCard", () => {
     );
 
     await openCardMenu("Movie Night");
-    fireEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete watchlist" }));
 
     expect(screen.getByText("Delete confirmation dialog")).not.toBeNull();
   });
@@ -359,4 +374,41 @@ describe("WatchlistCard", () => {
     expect(document.activeElement).toBe(selectionButton);
     expect(onToggle).toHaveBeenCalledOnce();
   });
+});
+
+it("marks the displayed next item directly and shares the pending lock across cards", async () => {
+  let finish: ((value: unknown) => void) | undefined;
+  rotateMock.mockReturnValue(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  render(
+    <>
+      <WatchlistCard watchlist={createWatchlist({ id: 1, name: "First" })} />
+      <WatchlistCard watchlist={createWatchlist({ id: 2, name: "Second" })} />
+    </>,
+  );
+  const buttons = screen.getAllByRole("button", { name: "Mark Next Movie watched" });
+  fireEvent.click(buttons[0]);
+  fireEvent.click(buttons[1]);
+  expect(rotateMock).toHaveBeenCalledTimes(1);
+  expect(rotateMock).toHaveBeenCalledWith({
+    data: { watchlistId: 1, itemId: 10, action: "watched" },
+  });
+  expect((buttons[1] as HTMLButtonElement).disabled).toBe(true);
+  finish?.({ success: false, message: "Changed" });
+  await waitFor(() => expect((buttons[1] as HTMLButtonElement).disabled).toBe(false));
+  cleanup();
+});
+
+it("keeps quick-action buttons outside the artwork navigation link", () => {
+  render(<WatchlistCard watchlist={createWatchlist({ id: 1, name: "Movie Night" })} />);
+  const watched = screen.getByRole("button", { name: "Mark Next Movie watched" });
+  const skip = screen.getByRole("button", { name: "Skip turn for Movie Night" });
+  expect(watched.closest("a")).toBeNull();
+  expect(skip.closest("a")).toBeNull();
+  expect(watched.textContent).toBe("");
+  expect(skip.textContent).toBe("");
+  cleanup();
 });
