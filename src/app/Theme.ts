@@ -24,6 +24,9 @@ const janusConfig = defineConfig({
         slots: toastAnatomy.keys(),
         base: {
           root: {
+            width: "fit-content",
+            alignItems: "center",
+            gap: "4",
             "&[data-type=success]": { bg: "bg.surface", color: "fg.default" },
           },
           actionTrigger: {
