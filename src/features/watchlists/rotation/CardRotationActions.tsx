@@ -8,7 +8,7 @@ export function CardRotationActions({ watchlist }: { watchlist: WatchlistSummary
   const nextItem = watchlist.stats.nextUnwatched;
   if (!nextItem || watchlist.pausedAt) return null;
   return (
-    <Flex gap={1} wrap="wrap">
+    <Flex gap={1}>
       <Button
         transition="transform 120ms cubic-bezier(0.23, 1, 0.32, 1)"
         _active={{ transform: "scale(0.98)" }}
@@ -18,7 +18,11 @@ export function CardRotationActions({ watchlist }: { watchlist: WatchlistSummary
         gap={1}
         minH="44px"
         flex="1"
+        minW={0}
         px={2}
+        bg="accent.solid"
+        color="accent.contrast"
+        _hover={{ opacity: 0.9 }}
         disabled={pending}
         aria-label={`Mark ${nextItem.title} watched`}
         onClick={() => void perform("watched")}
@@ -34,8 +38,11 @@ export function CardRotationActions({ watchlist }: { watchlist: WatchlistSummary
         gap={1}
         minH="44px"
         flex="1"
+        minW={0}
         px={2}
-        variant="outline"
+        variant="ghost"
+        color="fg.muted"
+        _hover={{ bg: "bg.subtle", color: "fg.default" }}
         disabled={pending}
         aria-label={`Skip turn for ${watchlist.name}`}
         onClick={() => void perform("skip")}

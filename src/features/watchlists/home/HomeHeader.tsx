@@ -71,7 +71,7 @@ function HeaderActions({
       aria-label="Select watchlists to merge"
       title="Select watchlists"
     >
-      Select
+      Merge lists
     </Button>
   );
 }

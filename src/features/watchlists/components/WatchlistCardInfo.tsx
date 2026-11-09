@@ -142,7 +142,7 @@ function NextItemLabel({ item }: { item: WatchlistSummary["stats"]["nextUnwatche
   if (!item) return null;
   const label = `Next: ${formatNextItemDetail(item)}`;
   return (
-    <Text mt={1} fontSize="xs" color="fg.muted" lineClamp={2} title={label}>
+    <Text mt={1} fontSize="xs" color="fg.muted" lineClamp={2} minH="2lh" title={label}>
       {label}
     </Text>
   );
