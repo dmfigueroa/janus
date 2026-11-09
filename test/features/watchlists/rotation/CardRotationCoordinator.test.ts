@@ -1,11 +1,11 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { createCardRotationCoordinator } from "@/features/watchlists/rotation/CardRotationCoordinator";
+import { CardRotationCoordinator } from "@/features/watchlists/rotation/CardRotationCoordinator";
 
 const input = { watchlistId: 1, itemId: 2, action: "skip" as const };
 const receipt = { ...input, previousPosition: null, appliedPosition: "position" };
 afterEach(() => vi.useRealTimers());
 function setup() {
-  const coordinator = createCardRotationCoordinator();
+  const coordinator = new CardRotationCoordinator();
   const notices: { title: string; undo?: () => void }[] = [];
   const effects = {
     rotate: vi.fn().mockResolvedValue({ success: true, receipt }),

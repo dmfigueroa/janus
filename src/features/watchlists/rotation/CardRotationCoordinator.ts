@@ -13,26 +13,26 @@ type RotationEffects = {
 };
 
 // One coordinator per mounted application, shared by all card hooks.
-export function createCardRotationCoordinator() {
-  let pending = false;
-  let tail = Promise.resolve();
-  const listeners = new Set<() => void>();
-  function publish(value: boolean) {
-    pending = value;
-    listeners.forEach((listener) => listener());
+export class CardRotationCoordinator {
+  private pending = false;
+  private tail = Promise.resolve();
+  private readonly listeners = new Set<() => void>();
+  private publish(value: boolean) {
+    this.pending = value;
+    this.listeners.forEach((listener) => listener());
   }
-  function enqueue(operation: () => Promise<void>) {
-    const wasPending = pending;
-    publish(true);
-    const work = wasPending ? tail.then(operation) : operation();
-    tail = work.catch(() => {});
-    const settled = tail;
-    void tail.then(() => {
-      if (tail === settled) publish(false);
+  private enqueue(operation: () => Promise<void>) {
+    const wasPending = this.pending;
+    this.publish(true);
+    const work = wasPending ? this.tail.then(operation) : operation();
+    this.tail = work.catch(() => {});
+    const settled = this.tail;
+    void this.tail.then(() => {
+      if (this.tail === settled) this.publish(false);
     });
     return work;
   }
-  async function refresh(effects: RotationEffects) {
+  private async refresh(effects: RotationEffects) {
     try {
       await effects.refresh();
       return true;
@@ -40,8 +40,8 @@ export function createCardRotationCoordinator() {
       return false;
     }
   }
-  function undo(receipt: CardRotationReceipt, effects: RotationEffects) {
-    return enqueue(async () => {
+  private undo(receipt: CardRotationReceipt, effects: RotationEffects) {
+    return this.enqueue(async () => {
       let result: Result;
       try {
         result = await effects.undo(receipt);
@@ -49,53 +49,48 @@ export function createCardRotationCoordinator() {
         effects.notify({ type: "error", title: "Could not undo. Please try again." });
         return;
       }
-      const refreshed = await refresh(effects);
+      const refreshed = await this.refresh(effects);
       effects.notify(undoNotice(result, refreshed));
     });
   }
-  return {
-    subscribe(listener: () => void) {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-    getSnapshot: () => pending,
-    perform(input: CardRotationInput, title: string, effects: RotationEffects) {
-      if (pending) return Promise.resolve();
-      return enqueue(async () => {
-        try {
-          let result: RotationResult;
-          try {
-            result = await effects.rotate(input);
-          } catch {
-            effects.notify({
-              type: "error",
-              title: "Could not update watchlist. Please try again.",
-            });
-            return;
-          }
-          const refreshed = await refresh(effects);
-          if (!result.success) {
-            effects.notify({ type: "error", title: result.message });
-            return;
-          }
-          const receipt = result.receipt;
-          effects.notify({
-            ...savedNotice(refreshed, title),
-            undo: () => {
-              void undo(receipt, effects);
-            },
-          });
-        } finally {
-          await new Promise<void>((resolve) => setTimeout(resolve, 600));
-        }
-      });
-    },
+  subscribe = (listener: () => void) => {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   };
+  getSnapshot = () => this.pending;
+  perform(input: CardRotationInput, title: string, effects: RotationEffects) {
+    if (this.pending) return Promise.resolve();
+    return this.enqueue(async () => {
+      try {
+        let result: RotationResult;
+        try {
+          result = await effects.rotate(input);
+        } catch {
+          effects.notify({ type: "error", title: "Could not update watchlist. Please try again." });
+          return;
+        }
+        const refreshed = await this.refresh(effects);
+        if (!result.success) {
+          effects.notify({ type: "error", title: result.message });
+          return;
+        }
+        const receipt = result.receipt;
+        effects.notify({
+          ...savedNotice(refreshed, title),
+          undo: () => {
+            void this.undo(receipt, effects);
+          },
+        });
+      } finally {
+        await new Promise<void>((resolve) => setTimeout(resolve, 600));
+      }
+    });
+  }
 }
 
-export const cardRotationCoordinator = createCardRotationCoordinator();
+export const cardRotationCoordinator = new CardRotationCoordinator();
 
 function savedNotice(refreshed: boolean, title: string): Notice {
   if (!refreshed)
