@@ -13,10 +13,11 @@ describe("CreateWatchlistTile", () => {
     cleanup();
   });
 
-  it("keeps the create action in the same poster-shaped tile as watchlist cards", () => {
+  it("hides the duplicate creation tile on mobile while preserving its desktop poster shape", () => {
     render(<CreateWatchlistTile />);
 
-    const createButton = screen.getByRole("button", { name: "Create New List" });
+    expect(screen.queryByRole("button", { name: "Create New List" })).toBeNull();
+    const createButton = screen.getByRole("button", { name: "Create New List", hidden: true });
     const styles = window.getComputedStyle(createButton);
 
     expect(styles.aspectRatio).toBe("2/3");

@@ -27,8 +27,6 @@ export function WatchlistCardCover({ watchlist }: { watchlist: WatchlistSummary 
         w="full"
         h="full"
         objectFit="cover"
-        transition="transform 500ms"
-        _groupHover={{ transform: "scale(1.05)" }}
       />
     );
   }
@@ -55,7 +53,7 @@ export function WatchlistCardCover({ watchlist }: { watchlist: WatchlistSummary 
         transform="scale(1.5)"
         opacity={0.8}
       />
-      <Box position="relative" zIndex={10} w="full" aspectRatio="16 / 9" shadow="2xl">
+      <Box position="relative" zIndex={10} w="full" aspectRatio="16 / 9" shadow="sm">
         <Image
           src={coverImageUrl}
           alt={watchlist.name}

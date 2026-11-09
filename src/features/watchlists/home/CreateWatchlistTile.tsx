@@ -4,7 +4,7 @@ import { WatchlistFormDialog } from "@/features/watchlists/components/WatchlistF
 
 export function CreateWatchlistTile() {
   return (
-    <Box w="full" maxW={{ md: "220px" }}>
+    <Box display={{ base: "none", md: "block" }} w="full" maxW={{ md: "220px" }}>
       <Box display="flex" h="full" flexDirection="column" gap={2}>
         <WatchlistFormDialog
           mode="create"

@@ -6,6 +6,7 @@ import {
   type WatchlistCardInfoVariant,
 } from "@/features/watchlists/components/WatchlistCardInfo";
 import { WatchlistCardArtwork } from "@/features/watchlists/components/WatchlistCardArtwork";
+import { CardRotationActions } from "../rotation/CardRotationActions";
 import { WatchlistCardMenu } from "@/features/watchlists/components/WatchlistCardMenu";
 
 export type EnrichedWatchlist = WatchlistSummary;
@@ -38,10 +39,11 @@ function CardArtworkLink({
     <ChakraLink
       asChild
       display="block"
-      h="full"
+      textDecoration="none"
       cursor="pointer"
-      transition="transform 300ms"
-      _active={{ transform: "scale(0.95)" }}
+      transition="transform 120ms cubic-bezier(0.23, 1, 0.32, 1)"
+      _motionReduce={{ transition: "none", _active: { transform: "none" } }}
+      _active={{ transform: "scale(0.98)" }}
     >
       <Link
         to="/watchlists/$watchlistId"
@@ -59,25 +61,28 @@ export function WatchlistCard(cardProps: WatchlistCardProps) {
     ...cardProps,
     selectionMode: withDefault(cardProps.selectionMode, false),
     isSelected: withDefault(cardProps.isSelected, false),
-    showUpNextBadge: withDefault(cardProps.showUpNextBadge, true),
+    showUpNextBadge: withDefault(cardProps.showUpNextBadge, false),
     infoVariant: withDefault(cardProps.infoVariant, "watchlist"),
   };
 
   return (
     <Flex direction="column" gap={2} position="relative" role="group" className="group">
       <CardArtworkLink selectionMode={selectionMode} watchlistId={watchlist.id}>
-        <WatchlistCardArtwork
-          watchlist={watchlist}
-          selectionMode={selectionMode}
-          isSelected={isSelected}
-          showUpNextBadge={showUpNextBadge}
-          onToggle={onToggle}
-        />
+        <Flex direction="column" gap={2}>
+          <WatchlistCardArtwork
+            watchlist={watchlist}
+            selectionMode={selectionMode}
+            isSelected={isSelected}
+            showUpNextBadge={showUpNextBadge}
+            onToggle={onToggle}
+          />
+          <WatchlistCardInfo watchlist={watchlist} infoVariant={infoVariant} />
+        </Flex>
       </CardArtworkLink>
 
       {!selectionMode ? <WatchlistCardMenu watchlist={watchlist} /> : null}
 
-      <WatchlistCardInfo watchlist={watchlist} infoVariant={infoVariant} />
+      {!selectionMode ? <CardRotationActions watchlist={watchlist} /> : null}
     </Flex>
   );
 }

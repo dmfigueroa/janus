@@ -73,7 +73,6 @@ function FeaturedSubtitle({ subtitle }: { subtitle: string | null }) {
 
 function StandardCardInfo({ watchlist }: { watchlist: WatchlistSummary }) {
   const stats = watchlist.stats;
-  const complete = isWatchlistCompleted(stats);
 
   return (
     <Box px={1}>
@@ -81,12 +80,15 @@ function StandardCardInfo({ watchlist }: { watchlist: WatchlistSummary }) {
         {watchlist.name}
       </Heading>
       <Flex align="center" gap={2} mt={0.5} mb={1} fontSize="xs" color="fg.muted">
-        <Text>{stats.totalItems} items</Text>
+        <Text>
+          {stats.watchedItems} of {stats.totalItems} watched
+        </Text>
         <Text aria-hidden="true">•</Text>
-        <Text color={complete ? "green.500" : "accent.solid"}>{stats.progress}%</Text>
+        <ProgressPercentage stats={stats} />
       </Flex>
 
       <CardProgress stats={stats} />
+      <NextItemLabel item={stats.nextUnwatched} />
 
       {watchlist.pausedAt ? <PausedSinceLine pausedAt={watchlist.pausedAt} /> : null}
     </Box>
@@ -95,15 +97,25 @@ function StandardCardInfo({ watchlist }: { watchlist: WatchlistSummary }) {
 
 function CardProgress({ stats }: { stats: WatchlistSummary["stats"] }) {
   const complete = isWatchlistCompleted(stats);
-
+  if (stats.watchedItems === 0) return null;
   return (
-    <Box h={1} w="full" bg="bg.subtle" rounded="full" overflow="hidden">
+    <Box
+      role="progressbar"
+      aria-label="Watchlist progress"
+      aria-valuenow={stats.progress}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      h={1}
+      w="full"
+      bg="bg.subtle"
+      rounded="full"
+      overflow="hidden"
+    >
       <Box
         h="full"
         w={`${stats.progress}%`}
         bg={complete ? "green.500" : "accent.solid"}
         rounded="full"
-        transition="width 500ms"
       />
     </Box>
   );
@@ -120,4 +132,18 @@ function PausedSinceLine({ pausedAt }: { pausedAt: string }) {
 
 function formatUtcTimestamp(timestamp: string, pattern: string) {
   return format(parseISO(`${timestamp}Z`), pattern);
+}
+
+function ProgressPercentage({ stats }: { stats: WatchlistSummary["stats"] }) {
+  const color = isWatchlistCompleted(stats) ? "green.500" : "accent.solid";
+  return <Text color={color}>{stats.progress}%</Text>;
+}
+function NextItemLabel({ item }: { item: WatchlistSummary["stats"]["nextUnwatched"] }) {
+  if (!item) return null;
+  const label = `Next: ${formatNextItemDetail(item)}`;
+  return (
+    <Text mt={1} fontSize="xs" color="fg.muted" lineClamp={2} title={label}>
+      {label}
+    </Text>
+  );
 }

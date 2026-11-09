@@ -39,7 +39,7 @@ it("requires the typed name from the card and preserves it after a failed deleti
     </QueryClientProvider>,
   );
   fireEvent.click(screen.getByRole("button", { name: "Watchlist actions for Movie Night" }));
-  fireEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Delete watchlist" }));
   const input = (await screen.findByRole("textbox", {
     name: /watchlist name/i,
   })) as HTMLInputElement;
