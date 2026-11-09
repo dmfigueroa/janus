@@ -19,9 +19,7 @@ export function applyCardRotation(input: CardRotationInput) {
       .select({ id: watchlistItems.id })
       .from(watchlistItems)
       .innerJoin(watchlists, eq(watchlists.id, watchlistItems.watchlistId))
-      .where(
-        and(eq(watchlistItems.watchlistId, input.watchlistId), isUnwatchedExpression),
-      )
+      .where(and(eq(watchlistItems.watchlistId, input.watchlistId), isUnwatchedExpression))
       .orderBy(activeItemOrderExpression)
       .get();
     if (!matchesNextItem(nextItem, input.itemId))
