@@ -401,3 +401,14 @@ it("marks the displayed next item directly and shares the pending lock across ca
   await waitFor(() => expect((buttons[1] as HTMLButtonElement).disabled).toBe(false));
   cleanup();
 });
+
+it("keeps quick-action buttons outside the artwork navigation link", () => {
+  render(<WatchlistCard watchlist={createWatchlist({ id: 1, name: "Movie Night" })} />);
+  const watched = screen.getByRole("button", { name: "Mark Next Movie watched" });
+  const skip = screen.getByRole("button", { name: "Skip turn for Movie Night" });
+  expect(watched.closest("a")).toBeNull();
+  expect(skip.closest("a")).toBeNull();
+  expect(watched.textContent).toBe("");
+  expect(skip.textContent).toBe("");
+  cleanup();
+});

@@ -1,5 +1,5 @@
-import { Button, Flex } from "@chakra-ui/react";
-import { Check } from "lucide-react";
+import { Box, Flex, IconButton } from "@chakra-ui/react";
+import { Check, SkipForward } from "lucide-react";
 import type { WatchlistSummary } from "../list/Query";
 import { useCardRotation } from "./useCardRotation";
 
@@ -8,47 +8,57 @@ export function CardRotationActions({ watchlist }: { watchlist: WatchlistSummary
   const nextItem = watchlist.stats.nextUnwatched;
   if (!nextItem || watchlist.pausedAt) return null;
   return (
-    <Flex gap={1}>
-      <Button
-        transition="transform 120ms cubic-bezier(0.23, 1, 0.32, 1)"
-        _active={{ transform: "scale(0.98)" }}
-        _motionReduce={{ transition: "none", _active: { transform: "none" } }}
-        size="sm"
-        fontSize="xs"
-        gap={1}
-        minH="44px"
-        flex="1"
-        minW={0}
-        px={2}
-        bg="accent.solid"
-        color="accent.contrast"
-        _hover={{ opacity: 0.9 }}
+    <Flex position="absolute" bottom={1} right={1} zIndex={20} gap={1}>
+      <IconButton
+        variant="plain"
+        w="44px"
+        h="44px"
+        minW="44px"
+        rounded="full"
+        color="accent.solid"
         disabled={pending}
         aria-label={`Mark ${nextItem.title} watched`}
+        title={`Mark ${nextItem.title} watched`}
         onClick={() => void perform("watched")}
       >
-        <Check size={14} /> Watched
-      </Button>
-      <Button
-        transition="transform 120ms cubic-bezier(0.23, 1, 0.32, 1)"
-        _active={{ transform: "scale(0.98)" }}
-        _motionReduce={{ transition: "none", _active: { transform: "none" } }}
-        size="sm"
-        fontSize="xs"
-        gap={1}
-        minH="44px"
-        flex="1"
-        minW={0}
-        px={2}
-        variant="ghost"
-        color="fg.muted"
-        _hover={{ bg: "bg.subtle", color: "fg.default" }}
+        <ActionDisc>
+          <Check size={18} strokeWidth={2.5} />
+        </ActionDisc>
+      </IconButton>
+      <IconButton
+        variant="plain"
+        w="44px"
+        h="44px"
+        minW="44px"
+        rounded="full"
+        color="white"
         disabled={pending}
         aria-label={`Skip turn for ${watchlist.name}`}
+        title="Skip turn: move to back of rotation"
         onClick={() => void perform("skip")}
       >
-        Skip turn
-      </Button>
+        <ActionDisc>
+          <SkipForward size={18} />
+        </ActionDisc>
+      </IconButton>
     </Flex>
+  );
+}
+
+function ActionDisc({ children }: { children: React.ReactNode }) {
+  return (
+    <Box
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      w={8}
+      h={8}
+      bg="blackAlpha.800"
+      rounded="full"
+      borderWidth="1px"
+      borderColor="whiteAlpha.300"
+    >
+      {children}
+    </Box>
   );
 }

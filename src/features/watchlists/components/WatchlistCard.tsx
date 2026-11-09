@@ -1,4 +1,4 @@
-import { Link as ChakraLink, Flex } from "@chakra-ui/react";
+import { Link as ChakraLink, Flex, Box } from "@chakra-ui/react";
 import { Link } from "@tanstack/react-router";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query";
 import {
@@ -67,8 +67,8 @@ export function WatchlistCard(cardProps: WatchlistCardProps) {
 
   return (
     <Flex direction="column" gap={2} position="relative" role="group" className="group">
-      <CardArtworkLink selectionMode={selectionMode} watchlistId={watchlist.id}>
-        <Flex direction="column" gap={2}>
+      <Box position="relative">
+        <CardArtworkLink selectionMode={selectionMode} watchlistId={watchlist.id}>
           <WatchlistCardArtwork
             watchlist={watchlist}
             selectionMode={selectionMode}
@@ -76,13 +76,13 @@ export function WatchlistCard(cardProps: WatchlistCardProps) {
             showUpNextBadge={showUpNextBadge}
             onToggle={onToggle}
           />
-          <WatchlistCardInfo watchlist={watchlist} infoVariant={infoVariant} />
-        </Flex>
+        </CardArtworkLink>
+        {!selectionMode ? <WatchlistCardMenu watchlist={watchlist} /> : null}
+        {!selectionMode ? <CardRotationActions watchlist={watchlist} /> : null}
+      </Box>
+      <CardArtworkLink selectionMode={selectionMode} watchlistId={watchlist.id}>
+        <WatchlistCardInfo watchlist={watchlist} infoVariant={infoVariant} />
       </CardArtworkLink>
-
-      {!selectionMode ? <WatchlistCardMenu watchlist={watchlist} /> : null}
-
-      {!selectionMode ? <CardRotationActions watchlist={watchlist} /> : null}
     </Flex>
   );
 }
