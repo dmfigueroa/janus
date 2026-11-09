@@ -251,6 +251,44 @@ describe("TimelineItem removal actions", () => {
 });
 
 describe("TimelineItem movement actions", () => {
+  it.each(["item", "group"])(
+    "resets %s movement on reopening and retains selection on unsuccessful submission",
+    async (kind) => {
+      watchlistListState.data = createDestinationWatchlists();
+      renderTimelineItem({ mediaType: "episode", parentId: "tmdb:42", parentTitle: "Great Show" });
+      const action = kind === "item" ? "Move to..." : "Move show";
+      fireEvent.click(screen.getByRole("button", { name: "More actions for Standalone Movie" }));
+      fireEvent.click(await screen.findByRole("button", { name: action }));
+      let dialog = await screen.findByRole("dialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: /Manual queue/ }));
+      within(dialog).getByRole("radio", { name: "Beginning" }).click();
+      await waitFor(() =>
+        expect(within(dialog).getByRole("radio", { name: "Beginning" })).toHaveProperty(
+          "checked",
+          true,
+        ),
+      );
+      fireEvent.click(within(dialog).getByRole("button", { name: "Move" }));
+      const mutation = kind === "item" ? moveItemMutate : moveParentMutate;
+      expect(mutation).toHaveBeenCalledWith(
+        { destinationWatchlistId: 3, position: "beginning" },
+        { onSuccess: expect.any(Function) },
+      );
+      expect(within(dialog).getByRole("radio", { name: "Beginning" })).toHaveProperty(
+        "checked",
+        true,
+      );
+      fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      fireEvent.click(screen.getByRole("button", { name: "More actions for Standalone Movie" }));
+      fireEvent.click(await screen.findByRole("button", { name: action }));
+      dialog = await screen.findByRole("dialog");
+      expect(within(dialog).getByRole("button", { name: "Move" })).toHaveProperty("disabled", true);
+      fireEvent.click(within(dialog).getByRole("button", { name: /Manual queue/ }));
+      expect(within(dialog).getByRole("radio", { name: "End" })).toHaveProperty("checked", true);
+    },
+  );
+
   it("moves an item to a custom-ordered destination with the selected position", async () => {
     watchlistListState.data = createDestinationWatchlists();
     renderTimelineItem();
