@@ -1,4 +1,5 @@
 import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
+import { toastAnatomy } from "@chakra-ui/react/anatomy";
 
 const janusConfig = defineConfig({
   preflight: true,
@@ -18,6 +19,24 @@ const janusConfig = defineConfig({
     },
   },
   theme: {
+    slotRecipes: {
+      toast: {
+        slots: toastAnatomy.keys(),
+        base: {
+          root: {
+            width: "fit-content",
+            alignItems: "center",
+            gap: "4",
+            "&[data-type=success]": { bg: "bg.surface", color: "fg.default" },
+          },
+          actionTrigger: {
+            bg: "accent.solid",
+            color: "accent.contrast",
+            _hover: { bg: "pink.600" },
+          },
+        },
+      },
+    },
     tokens: {
       fonts: {
         body: {

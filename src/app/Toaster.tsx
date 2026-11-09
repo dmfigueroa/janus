@@ -12,7 +12,7 @@ export function Toaster() {
 
 function ToastMessage(toast: ToastMessage) {
   return (
-    <Toast.Root key={toast.id} width="fit-content" alignItems="center" gap="4">
+    <Toast.Root key={toast.id}>
       <Toast.Indicator />
       <Toast.Title>{toast.title}</Toast.Title>
       <Toast.Description>{toast.description}</Toast.Description>
@@ -27,11 +27,7 @@ function ToastAction({ action }: { action: ToastMessage["action"] }) {
     return null;
   }
 
-  return (
-    <Toast.ActionTrigger bg="accent.solid" color="accent.contrast">
-      {action.label}
-    </Toast.ActionTrigger>
-  );
+  return <Toast.ActionTrigger>{action.label}</Toast.ActionTrigger>;
 }
 
 function ToastClose({ closable }: { closable: boolean }) {
