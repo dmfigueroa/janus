@@ -1,4 +1,4 @@
-import { Button, Flex } from "@chakra-ui/react";
+import { Box, Button, Flex } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import type { WatchlistItem } from "@/db/Schema";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
@@ -97,9 +97,8 @@ function WatchedButton({
         borderColor: "accent.solid",
         color: "accent.contrast",
         bg: "accent.solid",
-        shadow: undefined,
       }
-    : { borderColor: "fg.muted", color: "transparent", bg: "transparent", shadow: undefined };
+    : { borderColor: "border.default", color: "transparent", bg: "transparent" };
   const label = item.isWatched ? `Mark ${item.title} unwatched` : `Mark ${item.title} watched`;
   return (
     <Button
@@ -107,16 +106,26 @@ function WatchedButton({
       onClick={onToggle}
       disabled={disabled}
       aria-label={label}
+      aria-pressed={item.isWatched}
+      variant="ghost"
       size="sm"
       minW="44px"
       h="44px"
       p={0}
       flexShrink={0}
-      rounded="full"
-      borderWidth="2px"
-      {...watchedStyles}
+      rounded="md"
     >
-      <Check size={16} strokeWidth={3} />
+      <Box
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        boxSize="20px"
+        rounded="sm"
+        borderWidth="1px"
+        {...watchedStyles}
+      >
+        <Check size={14} strokeWidth={2.5} aria-hidden="true" />
+      </Box>
     </Button>
   );
 }
