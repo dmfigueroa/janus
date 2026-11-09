@@ -92,7 +92,9 @@ function WatchlistTimelineContent({
       onDragCancel={reorder.handleDragCancel}
       onDragEnd={reorder.handleDragEnd}
     >
-      <DragOverlay>
+      {/* Saving updates the cache asynchronously. The default drop animation measures
+          the old row position and can fly back there before the new order renders. */}
+      <DragOverlay dropAnimation={null}>
         {reorder.activeItem ? (
           <DragOverlayTimelineRow
             item={reorder.activeItem}
