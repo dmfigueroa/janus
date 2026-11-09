@@ -25,8 +25,7 @@ interface WatchlistTimelineProps {
   onLoadMore?: () => void;
   canReorder?: boolean;
   interactionDisabled?: boolean;
-  reorderFailed?: boolean;
-  onReorder?: (intent: ReorderIntent) => void;
+  onReorder?: (intent: ReorderIntent) => Promise<boolean> | void;
 }
 
 export function WatchlistTimeline(props: WatchlistTimelineProps) {
@@ -35,7 +34,6 @@ export function WatchlistTimeline(props: WatchlistTimelineProps) {
     items,
     itemOrderMode,
     canReorder: Boolean(props.canReorder),
-    reorderFailed: Boolean(props.reorderFailed),
     onReorder,
   });
   const groups = useMemo(
@@ -93,13 +91,16 @@ function WatchlistTimelineContent({
       onDragStart={reorder.handleDragStart}
       onDragCancel={reorder.handleDragCancel}
       onDragEnd={reorder.handleDragEnd}
+      cancelDrop={reorder.prepareDrop}
     >
-      <DragOverlay>
+      {/* Saving updates the cache asynchronously. The default drop animation measures
+          the old row position and can fly back there before the new order renders. */}
+      <DragOverlay dropAnimation={null}>
         {reorder.activeItem ? (
           <DragOverlayTimelineRow
             item={reorder.activeItem}
+            activeFilters={props.activeFilters}
             itemOrderMode={props.itemOrderMode}
-            interactionDisabled={Boolean(props.interactionDisabled)}
           />
         ) : null}
       </DragOverlay>

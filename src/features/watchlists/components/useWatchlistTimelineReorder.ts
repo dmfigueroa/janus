@@ -6,39 +6,29 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import type { WatchlistItem } from "@/db/Schema";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
-import {
-  reorderVisibleItemsByAnchor,
-  resolveReorderIntent,
-  type ReorderIntent,
-} from "@/features/watchlists/detail/Reorder";
-import { reorderItemsByIds, shouldResetOptimisticOrder } from "./WatchlistTimeline.model";
+import { resolveReorderIntent, type ReorderIntent } from "@/features/watchlists/detail/Reorder";
 
 interface UseWatchlistTimelineReorderOptions {
   items: WatchlistItem[];
   itemOrderMode: WatchlistItemOrderMode;
   canReorder: boolean;
-  reorderFailed: boolean;
-  onReorder?: (intent: ReorderIntent) => void;
+  onReorder?: (intent: ReorderIntent) => Promise<boolean> | void;
 }
 
 export function useWatchlistTimelineReorder({
   items,
   itemOrderMode,
   canReorder,
-  reorderFailed,
   onReorder,
 }: UseWatchlistTimelineReorderOptions) {
-  const [activeItemId, setActiveItemId] = useState<number | null>(null);
-  const [localOrderIds, setLocalOrderIds] = useState<number[] | null>(null);
-  const reorderEnabled = isReorderEnabled(canReorder, onReorder);
-  const itemIds = useMemo(() => items.map((item) => item.id), [items]);
-  const displayedItems = useMemo(
-    () => (localOrderIds ? reorderItemsByIds(items, localOrderIds) : items),
-    [items, localOrderIds],
-  );
+  const [drag, setDrag] = useState<{ itemId: number; items: WatchlistItem[] } | null>(null);
+  const reorderEnabled = isReorderEnabled(canReorder && itemOrderMode === "custom", onReorder);
+  // Keep the sortable input stable until drag end. A cache notification during
+  // drop preparation must not apply the drag displacement to the new order.
+  const { items: displayedItems, itemId: activeItemId } = drag ?? { items, itemId: null };
   const activeItem = findActiveItem(displayedItems, activeItemId);
   const sensors = useSensors(
     useSensor(MouseSensor),
@@ -50,48 +40,25 @@ export function useWatchlistTimelineReorder({
     }),
   );
 
-  useEffect(() => {
-    if (itemOrderMode !== "custom") {
-      setLocalOrderIds(null);
-      return;
-    }
-
-    if (shouldResetOptimisticOrder(itemIds, localOrderIds)) {
-      setLocalOrderIds(null);
-    }
-  }, [itemIds, itemOrderMode, localOrderIds]);
-
-  useEffect(() => {
-    if (reorderFailed) {
-      setLocalOrderIds(null);
-    }
-  }, [reorderFailed]);
-
   function handleDragStart(event: DragStartEvent) {
-    setActiveItemId(Number(event.active.id));
+    if (reorderEnabled) setDrag({ itemId: Number(event.active.id), items });
   }
 
   function handleDragCancel() {
-    setActiveItemId(null);
+    setDrag(null);
   }
 
-  function handleDragEnd(event: DragEndEvent) {
-    if (!reorderEnabled) {
-      handleDragCancel();
-      return;
-    }
-
+  async function prepareDrop(event: DragEndEvent) {
+    if (!reorderEnabled) return true;
     const attempt = buildDragEventReorderAttempt(displayedItems, activeItemId, event);
+    if (!attempt) return true;
 
-    if (!attempt) {
-      handleDragCancel();
-      return;
-    }
+    return finishDropPreparation(onReorder, attempt);
+  }
 
+  function handleDragEnd() {
     blurActiveElement();
-    setLocalOrderIds(attempt.nextItemIds);
-    setActiveItemId(null);
-    notifyReorder(onReorder, attempt.intent);
+    setDrag(null);
   }
 
   return {
@@ -99,6 +66,7 @@ export function useWatchlistTimelineReorder({
     displayedItems,
     handleDragCancel,
     handleDragEnd,
+    prepareDrop,
     handleDragStart,
     reorderEnabled,
     sensors,
@@ -136,13 +104,6 @@ function buildDragEventReorderAttempt(
   return buildReorderAttempt(items, activeItemId, Number(event.over.id));
 }
 
-function notifyReorder(
-  onReorder: UseWatchlistTimelineReorderOptions["onReorder"],
-  intent: ReorderIntent,
-) {
-  onReorder?.(intent);
-}
-
 function buildReorderAttempt(items: WatchlistItem[], movedItemId: number, referenceItemId: number) {
   const movedIndex = items.findIndex((item) => item.id === movedItemId);
   const referenceIndex = items.findIndex((item) => item.id === referenceItemId);
@@ -150,12 +111,6 @@ function buildReorderAttempt(items: WatchlistItem[], movedItemId: number, refere
   if (!indexes) return null;
 
   const position = getReorderPosition(indexes.moved, indexes.reference);
-  const nextItemIds = reorderVisibleItemsByAnchor({
-    items,
-    movedItemId,
-    referenceItemId,
-    position,
-  });
   const intent = resolveReorderIntent({
     items,
     movedItemId,
@@ -167,7 +122,7 @@ function buildReorderAttempt(items: WatchlistItem[], movedItemId: number, refere
     return null;
   }
 
-  return buildReorderAttemptResult(intent, nextItemIds);
+  return intent;
 }
 
 function getValidReorderIndexes(moved: number, reference: number) {
@@ -180,16 +135,21 @@ function getReorderPosition(movedIndex: number, referenceIndex: number) {
   return movedIndex < referenceIndex ? ("after" as const) : ("before" as const);
 }
 
-function buildReorderAttemptResult(intent: ReorderIntent, nextItemIds: number[] | null) {
-  if (!nextItemIds) {
-    return null;
-  }
-
-  return { intent, nextItemIds };
-}
-
 function blurActiveElement() {
   if (document.activeElement instanceof HTMLElement) {
     document.activeElement.blur();
   }
+}
+
+async function finishDropPreparation(
+  onReorder: UseWatchlistTimelineReorderOptions["onReorder"],
+  intent: ReorderIntent,
+) {
+  const prepared = await onReorder?.(intent);
+  if (prepared === false) return true;
+  // Query observers notify asynchronously. Retain the overlay until React has
+  // committed the optimistic cache order before ending the drag.
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  return false;
 }

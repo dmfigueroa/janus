@@ -2,7 +2,6 @@ import { useEffect, useState, useMemo } from "react";
 import { Box, Container } from "@chakra-ui/react";
 import { useInfiniteQuery, useIsMutating, type InfiniteData } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { toaster } from "@/app/Toaster";
 import { DeleteWatchlistDialog } from "@/features/watchlists/components/DeleteWatchlistDialog";
 import { WatchlistHeader } from "@/features/watchlists/components/WatchlistHeader";
 import { WatchlistTimeline } from "@/features/watchlists/components/WatchlistTimeline";
@@ -32,18 +31,23 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
 
   const normalizedSearchQuery = normalizeSearchQuery(debouncedSearchQuery);
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    ...watchlistDetailInfiniteQueryOptions({
+  const itemOrderMode = initialData.watchlist.itemOrderMode;
+  const activeFilters = useMemo(
+    () => ({
       watchlistId,
+      itemOrderMode,
       query: normalizedSearchQuery,
       unwatchedOnly: showUnwatchedOnly,
     }),
+    [watchlistId, itemOrderMode, normalizedSearchQuery, showUnwatchedOnly],
+  );
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    ...watchlistDetailInfiniteQueryOptions(activeFilters),
     queryFn: async ({ pageParam }) => {
       const detail = await getWatchlistDetailPageFn({
         data: {
-          watchlistId,
-          query: normalizedSearchQuery,
-          unwatchedOnly: showUnwatchedOnly,
+          ...activeFilters,
           cursor: pageParam,
         },
       });
@@ -58,16 +62,6 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
 
   const { allItems, latestWatchlist } = getCurrentDetailData(data, initialData.watchlist);
   const latestItemOrderMode = latestWatchlist.itemOrderMode;
-
-  const activeFilters = useMemo(
-    () => ({
-      watchlistId,
-      itemOrderMode: latestItemOrderMode,
-      query: normalizedSearchQuery,
-      unwatchedOnly: showUnwatchedOnly,
-    }),
-    [watchlistId, latestItemOrderMode, normalizedSearchQuery, showUnwatchedOnly],
-  );
 
   const reorderItemsMutation = useReorderWatchlistItemsMutation({
     watchlistId,
@@ -121,11 +115,7 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
           onLoadMore={getLoadMoreHandler(isReorderPending, fetchNextPage)}
           canReorder={canReorderItems}
           interactionDisabled={isReorderPending}
-          reorderFailed={reorderItemsMutation.isError}
-          onReorder={async (intent) => {
-            await reorderItemsMutation.mutateAsync(intent);
-            toaster.create({ type: "success", title: "Order saved", duration: 2000 });
-          }}
+          onReorder={reorderItemsMutation.prepare}
         />
       </Box>
     </Container>
