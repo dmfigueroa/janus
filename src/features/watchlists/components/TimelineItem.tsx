@@ -1,4 +1,4 @@
-import { Box, Button, Flex } from "@chakra-ui/react";
+import { Box, Button, Flex, Icon } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import type { WatchlistItem } from "@/db/Schema";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
@@ -57,14 +57,14 @@ function TimelineItemControls({
   onToggle,
 }: TimelineItemProps & { isDisabled: boolean; onToggle: () => void }) {
   return (
-    <>
+    <Flex align="center" gap={0} flexShrink={0}>
       <TimelineActionsSlot
         item={item}
         activeFilters={activeFilters}
         interactionDisabled={interactionDisabled}
       />
       <WatchedButton item={item} disabled={isDisabled} onToggle={onToggle} />
-    </>
+    </Flex>
   );
 }
 
@@ -109,8 +109,8 @@ function WatchedButton({
       aria-pressed={Boolean(item.isWatched)}
       variant="ghost"
       size="sm"
-      minW="44px"
-      h="44px"
+      minW={11}
+      h={11}
       p={0}
       flexShrink={0}
       rounded="md"
@@ -119,12 +119,14 @@ function WatchedButton({
         display="flex"
         alignItems="center"
         justifyContent="center"
-        boxSize="20px"
+        boxSize={6}
         rounded="sm"
         borderWidth="1px"
         {...watchedStyles}
       >
-        <Check size={14} strokeWidth={2.5} aria-hidden="true" />
+        <Icon boxSize={4} asChild>
+          <Check strokeWidth={2.5} aria-hidden="true" />
+        </Icon>
       </Box>
     </Button>
   );
