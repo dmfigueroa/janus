@@ -10,7 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { useController, type Control } from "react-hook-form";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   useWatchlistForm,
   type UseWatchlistFormOptions,
@@ -21,18 +21,19 @@ type WatchlistFormDialogProps = UseWatchlistFormOptions & { trigger: React.React
 
 const watchlistFormLabels = {
   create: {
-    title: "Create New List",
-    submitLabel: "Create List",
+    title: "Create watchlist",
+    submitLabel: "Create watchlist",
     descriptionLabel: "Create a new watchlist to track your movies and shows.",
   },
   edit: {
-    title: "Edit List",
-    submitLabel: "Save Changes",
+    title: "Edit watchlist",
+    submitLabel: "Save changes",
     descriptionLabel: "Update your watchlist details.",
   },
 };
 
 export function WatchlistFormDialog({ trigger, ...formOptions }: WatchlistFormDialogProps) {
+  const nameRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const { loading, onSubmit, register, control, formState } = useWatchlistForm({
     ...formOptions,
@@ -42,13 +43,19 @@ export function WatchlistFormDialog({ trigger, ...formOptions }: WatchlistFormDi
   const labels = watchlistFormLabels[formOptions.mode];
 
   return (
-    <Dialog.Root open={open} onOpenChange={({ open: nextOpen }) => setOpen(nextOpen)}>
+    <Dialog.Root
+      initialFocusEl={() => nameRef.current?.querySelector("input") ?? null}
+      open={open}
+      onOpenChange={({ open: nextOpen }) => {
+        if (!loading) setOpen(nextOpen);
+      }}
+    >
       <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content maxW="sm">
-            <Dialog.CloseTrigger aria-label="Close dialog">
+          <Dialog.Content ref={nameRef} maxW="sm">
+            <Dialog.CloseTrigger aria-label="Close dialog" disabled={loading}>
               <X size={16} />
             </Dialog.CloseTrigger>
             <form onSubmit={onSubmit}>
@@ -85,7 +92,15 @@ export function WatchlistFormDialog({ trigger, ...formOptions }: WatchlistFormDi
                   </Field.Root>
                 </Stack>
               </Dialog.Body>
-              <Dialog.Footer>
+              <Dialog.Footer aria-busy={loading} aria-live="polite">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={loading}
+                  onClick={() => setOpen(false)}
+                >
+                  Cancel
+                </Button>
                 <Button type="submit" disabled={loading} colorPalette="pink">
                   {loading ? "Saving..." : labels.submitLabel}
                 </Button>

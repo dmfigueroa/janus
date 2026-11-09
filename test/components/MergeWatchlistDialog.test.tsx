@@ -104,7 +104,7 @@ describe("MergeWatchlistDialog", () => {
     fireEvent.change(screen.getByPlaceholderText("New Watchlist Name"), {
       target: { value: "Merged Queue" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+    fireEvent.click(screen.getByRole("button", { name: "Merge watchlists" }));
 
     await waitFor(() => {
       expect(mergeWatchlistsFnMock).toHaveBeenCalledWith({
@@ -130,7 +130,7 @@ describe("MergeWatchlistDialog", () => {
     fireEvent.change(await screen.findByRole("combobox", { name: "Target watchlist" }), {
       target: { value: "1" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+    fireEvent.click(screen.getByRole("button", { name: "Merge watchlists" }));
 
     await waitFor(() => {
       expect(mergeWatchlistsFnMock).toHaveBeenCalledWith({
@@ -158,7 +158,7 @@ describe("MergeWatchlistDialog", () => {
 
     const nameInput = screen.getByPlaceholderText("New Watchlist Name");
     fireEvent.change(nameInput, { target: { value: "Merged Queue" } });
-    fireEvent.click(screen.getByRole("button", { name: "Merge" }));
+    fireEvent.click(screen.getByRole("button", { name: "Merge watchlists" }));
 
     await waitFor(() => {
       expect(toasterMock.create).toHaveBeenCalledWith({
@@ -167,8 +167,34 @@ describe("MergeWatchlistDialog", () => {
       });
     });
     expect((nameInput as HTMLInputElement).value).toBe("Merged Queue");
-    expect((screen.getByRole("button", { name: "Merge" }) as HTMLButtonElement).disabled).toBe(
-      false,
+    expect(
+      (screen.getByRole("button", { name: "Merge watchlists" }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+  });
+  it("keeps dismissal controls disabled while merging and explains source removal", async () => {
+    mergeWatchlistsFnMock.mockReturnValueOnce(new Promise(() => {}));
+    render(
+      <MergeWatchlistDialog
+        open
+        onOpenChange={vi.fn()}
+        selectedWatchlistIds={[1, 2]}
+        allWatchlists={[watchlist({ id: 1, name: "Alpha" }), watchlist({ id: 2, name: "Beta" })]}
+      />,
     );
+    fireEvent.change(screen.getByPlaceholderText("New Watchlist Name"), {
+      target: { value: "Combined" },
+    });
+    expect(screen.getByRole("note").textContent).toContain(
+      "All selected source watchlists will be removed",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Merge watchlists" }));
+    await waitFor(() => {
+      expect((screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled).toBe(
+        true,
+      );
+      expect(
+        (screen.getByRole("button", { name: "Close dialog" }) as HTMLButtonElement).disabled,
+      ).toBe(true);
+    });
   });
 });

@@ -195,7 +195,7 @@ describe("DeleteWatchlistDialog", () => {
       </Provider>,
     );
 
-    const title = await waitFor(() => screen.getByRole("heading", { name: "Delete Watchlist" }));
+    const title = await waitFor(() => screen.getByRole("heading", { name: "Delete watchlist" }));
     const header = title.parentElement;
 
     expect(header).not.toBeNull();

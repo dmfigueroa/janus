@@ -58,7 +58,7 @@ export function DeleteWatchlistDialog({
               <X size={16} />
             </Dialog.CloseTrigger>
             <Dialog.Header flexDirection="column" alignItems="flex-start" gap={1}>
-              <Dialog.Title>Delete Watchlist</Dialog.Title>
+              <Dialog.Title>Delete watchlist</Dialog.Title>
               <Dialog.Description>
                 The watchlist &quot;{watchlist.name}&quot; and all of its items will be permanently
                 deleted and cannot be undone.

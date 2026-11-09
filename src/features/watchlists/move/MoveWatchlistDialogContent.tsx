@@ -46,7 +46,12 @@ export function MoveWatchlistDialogContent({
   const moveLabel = getMoveLabel(isPending);
 
   return (
-    <Dialog.Root open={open} onOpenChange={({ open: nextOpen }) => onOpenChange(nextOpen)}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={({ open: nextOpen }) => {
+        if (!isPending) onOpenChange(nextOpen);
+      }}
+    >
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -78,7 +83,11 @@ export function MoveWatchlistDialogContent({
                 />
               </Stack>
             </Dialog.Body>
-            <Dialog.Footer flexDir={{ base: "column-reverse", sm: "row" }}>
+            <Dialog.Footer
+              aria-busy={isPending}
+              aria-live="polite"
+              flexDir={{ base: "column-reverse", sm: "row" }}
+            >
               <Button
                 variant="outline"
                 w={{ base: "full", sm: "auto" }}

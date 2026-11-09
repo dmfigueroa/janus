@@ -63,11 +63,10 @@ export function CreateCustomItemDialog({
   onOpenChange,
 }: CreateCustomItemDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
-  const isControlled = open !== undefined;
-  const isOpen = isControlled ? open : internalOpen;
+  const isOpen = open ?? internalOpen;
 
   const setIsOpen = (nextOpen: boolean) => {
-    if (isControlled) {
+    if (open !== undefined) {
       onOpenChange?.(nextOpen);
       return;
     }
@@ -76,14 +75,16 @@ export function CreateCustomItemDialog({
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const newMedia = createCustomMediaFromForm(event.currentTarget);
-
-    onCreated(newMedia);
+    onCreated(createCustomMediaFromForm(event.currentTarget));
     setIsOpen(false);
   };
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={({ open: nextOpen }) => setIsOpen(nextOpen)}>
+    <Dialog.Root
+      initialFocusEl={customTitleInput}
+      open={isOpen}
+      onOpenChange={({ open: nextOpen }) => setIsOpen(nextOpen)}
+    >
       {children ? <Dialog.Trigger asChild>{children}</Dialog.Trigger> : null}
       <Portal>
         <Dialog.Backdrop />
@@ -93,7 +94,7 @@ export function CreateCustomItemDialog({
               <X size={16} />
             </Dialog.CloseTrigger>
             <Dialog.Header flexDirection="column" alignItems="flex-start" gap={1}>
-              <Dialog.Title>Add Custom Item</Dialog.Title>
+              <Dialog.Title>Add custom item</Dialog.Title>
               <Dialog.Description color="fg.muted">
                 Add an item that couldn't be found in the search results.
               </Dialog.Description>
@@ -148,7 +149,7 @@ export function CreateCustomItemDialog({
                   Cancel
                 </Button>
                 <Button type="submit" colorPalette="pink">
-                  Create Item
+                  Create item
                 </Button>
               </Dialog.Footer>
             </form>
@@ -157,4 +158,8 @@ export function CreateCustomItemDialog({
       </Portal>
     </Dialog.Root>
   );
+}
+
+function customTitleInput() {
+  return document.querySelector<HTMLInputElement>("#custom-item-title");
 }

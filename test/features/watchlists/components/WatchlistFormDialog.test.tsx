@@ -110,8 +110,8 @@ describe("WatchlistFormDialog", () => {
       render(<WatchlistFormDialog mode="create" trigger={<button>Open</button>} />);
       await openDialog();
 
-      expect(screen.getByRole("heading", { name: "Create New List" })).not.toBeNull();
-      expect(screen.getByRole("button", { name: "Create List" })).not.toBeNull();
+      expect(screen.getByRole("heading", { name: "Create watchlist" })).not.toBeNull();
+      expect(screen.getByRole("button", { name: "Create watchlist" })).not.toBeNull();
       expect(screen.getByLabelText("Name")).toHaveProperty("value", "");
       expect(screen.getByLabelText("Description")).toHaveProperty("value", "");
       expect(screen.getByLabelText("Release order")).toHaveProperty("checked", true);
@@ -129,7 +129,7 @@ describe("WatchlistFormDialog", () => {
       const customOrderRadio = screen.getByRole("radio", { name: "Custom order" });
       customOrderRadio.click();
       await waitFor(() => expect(customOrderRadio).toHaveProperty("checked", true));
-      fireEvent.click(screen.getByRole("button", { name: "Create List" }));
+      fireEvent.click(screen.getByRole("button", { name: "Create watchlist" }));
 
       await waitFor(() => {
         expect(createWatchlistFnMock).toHaveBeenCalledWith({
@@ -158,8 +158,8 @@ describe("WatchlistFormDialog", () => {
       );
       await openDialog();
 
-      expect(screen.getByRole("heading", { name: "Edit List" })).not.toBeNull();
-      expect(screen.getByRole("button", { name: "Save Changes" })).not.toBeNull();
+      expect(screen.getByRole("heading", { name: "Edit watchlist" })).not.toBeNull();
+      expect(screen.getByRole("button", { name: "Save changes" })).not.toBeNull();
       expect(screen.getByLabelText("Name")).toHaveProperty("value", "Existing List");
       expect(screen.getByLabelText("Description")).toHaveProperty("value", "Existing desc");
       expect(screen.getByLabelText("Release order")).toHaveProperty("checked", false);
@@ -186,7 +186,7 @@ describe("WatchlistFormDialog", () => {
       const releaseOrderRadio = screen.getByRole("radio", { name: "Release order" });
       releaseOrderRadio.click();
       await waitFor(() => expect(releaseOrderRadio).toHaveProperty("checked", true));
-      fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
       await waitFor(() => {
         expect(updateWatchlistFnMock).toHaveBeenCalledWith({
@@ -220,7 +220,7 @@ describe("WatchlistFormDialog", () => {
       await openDialog();
 
       fireEvent.change(screen.getByLabelText("Description"), { target: { value: "" } });
-      fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
       await waitFor(() => {
         expect(updateWatchlistFnMock).toHaveBeenCalledWith({

@@ -26,7 +26,7 @@ describe("CreateCustomItemDialog", () => {
     fireEvent.change(screen.getByLabelText("Description (Optional)"), {
       target: { value: "A short description" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Create Item" }));
+    fireEvent.click(screen.getByRole("button", { name: "Create item" }));
 
     await waitFor(() => {
       expect(onCreated).toHaveBeenCalledWith({

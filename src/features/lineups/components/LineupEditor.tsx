@@ -9,7 +9,9 @@ export function LineupEditor({ lineup, watchlists, trigger }: Props) {
   return (
     <Dialog.Root
       open={editor.open}
-      onOpenChange={({ open }) => editor.setOpen(open)}
+      onOpenChange={({ open }) => {
+        if (!editor.saving) editor.setOpen(open);
+      }}
       initialFocusEl={() => editor.nameRef.current}
     >
       <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
