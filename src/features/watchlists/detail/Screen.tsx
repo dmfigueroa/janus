@@ -31,18 +31,23 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
 
   const normalizedSearchQuery = normalizeSearchQuery(debouncedSearchQuery);
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    ...watchlistDetailInfiniteQueryOptions({
+  const itemOrderMode = initialData.watchlist.itemOrderMode;
+  const activeFilters = useMemo(
+    () => ({
       watchlistId,
+      itemOrderMode,
       query: normalizedSearchQuery,
       unwatchedOnly: showUnwatchedOnly,
     }),
+    [watchlistId, itemOrderMode, normalizedSearchQuery, showUnwatchedOnly],
+  );
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    ...watchlistDetailInfiniteQueryOptions(activeFilters),
     queryFn: async ({ pageParam }) => {
       const detail = await getWatchlistDetailPageFn({
         data: {
-          watchlistId,
-          query: normalizedSearchQuery,
-          unwatchedOnly: showUnwatchedOnly,
+          ...activeFilters,
           cursor: pageParam,
         },
       });
@@ -57,16 +62,6 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
 
   const { allItems, latestWatchlist } = getCurrentDetailData(data, initialData.watchlist);
   const latestItemOrderMode = latestWatchlist.itemOrderMode;
-
-  const activeFilters = useMemo(
-    () => ({
-      watchlistId,
-      itemOrderMode: latestItemOrderMode,
-      query: normalizedSearchQuery,
-      unwatchedOnly: showUnwatchedOnly,
-    }),
-    [watchlistId, latestItemOrderMode, normalizedSearchQuery, showUnwatchedOnly],
-  );
 
   const reorderItemsMutation = useReorderWatchlistItemsMutation({
     watchlistId,
