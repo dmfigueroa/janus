@@ -63,24 +63,27 @@ describe("WatchlistHeader", () => {
     }
   });
 
-  it("wires the delete action to its callback", () => {
+  it("wires the delete action to its callback", async () => {
     const { onDelete } = renderHeader(null);
-    fireEvent.click(screen.getByRole("button", { name: "Delete watchlist" }));
+    fireEvent.click(screen.getByRole("button", { name: "Watchlist actions" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Delete watchlist" }));
     expect(onDelete).toHaveBeenCalledOnce();
   });
 
-  it("offers pausing for an active watchlist", () => {
+  it("offers pausing for an active watchlist", async () => {
     const { onTogglePause } = renderHeader(null);
 
-    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+    fireEvent.click(screen.getByRole("button", { name: "Watchlist actions" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Pause" }));
 
     expect(onTogglePause).toHaveBeenCalledOnce();
   });
 
-  it("offers resuming for a paused watchlist", () => {
+  it("offers resuming for a paused watchlist", async () => {
     const { onTogglePause } = renderHeader("2024-06-01 00:00:00");
 
-    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+    fireEvent.click(screen.getByRole("button", { name: "Watchlist actions" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
 
     expect(onTogglePause).toHaveBeenCalledOnce();
   });

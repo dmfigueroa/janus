@@ -96,7 +96,7 @@ describe("custom timeline optimistic query identity", () => {
         },
       });
       client.setQueryData(
-        watchlistDetailQueryKey({ watchlistId: 1, itemOrderMode: "custom", unwatchedOnly: true }),
+        watchlistDetailQueryKey({ watchlistId: 1, itemOrderMode: "custom", unwatchedOnly: false }),
         { pages: [initialData], pageParams: [1] },
       );
       mocks.read.mockResolvedValue(initialData);
@@ -111,7 +111,7 @@ describe("custom timeline optimistic query identity", () => {
       await waitFor(() => expect(screen.getByRole("status").textContent).toBe("1,2"));
       if (filter === "search") fireEvent.click(screen.getByText("Search"));
       if (filter === "all items") fireEvent.click(screen.getByText("All items"));
-      if (filter !== "initial") await waitFor(() => expect(mocks.read).toHaveBeenCalled());
+      if (filter === "search") await waitFor(() => expect(mocks.read).toHaveBeenCalled());
       fireEvent.click(screen.getByText("Reorder"));
       await waitFor(() => expect(screen.getByRole("status").textContent).toBe("2,1"));
       expect(screen.getByText("Reorder")).toHaveProperty("disabled", true);

@@ -52,7 +52,7 @@ export function TimelineItemPoster({ mediaType, posterPath, title }: WatchlistIt
         flexShrink={0}
         overflow="hidden"
         fontWeight="bold"
-        shadow="md"
+        shadow="xs"
         borderWidth="1px"
         borderColor="border.default"
         rounded={config.frame.rounded}
@@ -162,13 +162,7 @@ export function TimelineItemContent({
 function ParentTitle({ title }: { title: string | null }) {
   if (!title) return null;
   return (
-    <Text
-      fontSize="xs"
-      fontWeight="medium"
-      textTransform="uppercase"
-      letterSpacing="wide"
-      color="accent.solid"
-    >
+    <Text fontSize="xs" fontWeight="medium" color="fg.muted">
       {title}
     </Text>
   );

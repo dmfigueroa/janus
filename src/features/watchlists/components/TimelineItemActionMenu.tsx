@@ -1,4 +1,4 @@
-import { Button, IconButton, Popover, Portal, Stack } from "@chakra-ui/react";
+import { Button, Icon, IconButton, Popover, Portal, Stack } from "@chakra-ui/react";
 import { ArrowRightFromLine, MoreHorizontal } from "lucide-react";
 import type { WatchlistItem } from "@/db/Schema";
 
@@ -91,12 +91,16 @@ export function TimelineItemActionMenu({
           aria-label={`More actions for ${item.title}`}
           disabled={disabled}
           variant="ghost"
-          size="xs"
+          size="sm"
+          minW={11}
+          h={11}
           flexShrink={0}
           rounded="full"
           color="fg.muted"
         >
-          <MoreHorizontal size={16} />
+          <Icon boxSize={4} asChild>
+            <MoreHorizontal />
+          </Icon>
         </IconButton>
       </Popover.Trigger>
       <Portal>

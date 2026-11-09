@@ -1,4 +1,4 @@
-import { Button, Flex } from "@chakra-ui/react";
+import { Box, Button, Flex, Icon } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import type { WatchlistItem } from "@/db/Schema";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
@@ -57,14 +57,14 @@ function TimelineItemControls({
   onToggle,
 }: TimelineItemProps & { isDisabled: boolean; onToggle: () => void }) {
   return (
-    <>
+    <Flex align="center" gap={0} flexShrink={0}>
       <TimelineActionsSlot
         item={item}
         activeFilters={activeFilters}
         interactionDisabled={interactionDisabled}
       />
       <WatchedButton item={item} disabled={isDisabled} onToggle={onToggle} />
-    </>
+    </Flex>
   );
 }
 
@@ -97,9 +97,8 @@ function WatchedButton({
         borderColor: "accent.solid",
         color: "accent.contrast",
         bg: "accent.solid",
-        shadow: "0 0 10px rgba(255, 0, 85, 0.4)",
       }
-    : { borderColor: "fg.muted/30", color: "transparent", bg: "transparent", shadow: undefined };
+    : { borderColor: "border.default", color: "transparent", bg: "transparent" };
   const label = item.isWatched ? `Mark ${item.title} unwatched` : `Mark ${item.title} watched`;
   return (
     <Button
@@ -107,16 +106,28 @@ function WatchedButton({
       onClick={onToggle}
       disabled={disabled}
       aria-label={label}
+      aria-pressed={Boolean(item.isWatched)}
+      variant="ghost"
       size="sm"
-      minW={8}
-      h={8}
+      minW={11}
+      h={11}
       p={0}
       flexShrink={0}
-      rounded="full"
-      borderWidth="2px"
-      {...watchedStyles}
+      rounded="md"
     >
-      <Check size={16} strokeWidth={3} />
+      <Box
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        boxSize={6}
+        rounded="sm"
+        borderWidth="1px"
+        {...watchedStyles}
+      >
+        <Icon boxSize={4} asChild>
+          <Check strokeWidth={2.5} aria-hidden="true" />
+        </Icon>
+      </Box>
     </Button>
   );
 }

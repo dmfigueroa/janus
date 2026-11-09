@@ -7,7 +7,7 @@ import { createFileRoute, notFound } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/watchlists/$watchlistId")({
   loader: async ({ context, params: { watchlistId } }) => {
-    const filters = { watchlistId: Number.parseInt(watchlistId, 10), unwatchedOnly: true };
+    const filters = { watchlistId: Number.parseInt(watchlistId, 10), unwatchedOnly: false };
     const detail = await getWatchlistDetailPage({
       data: { ...filters, cursor: 1 },
     });
