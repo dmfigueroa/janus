@@ -4,7 +4,7 @@ import type { WatchlistItem } from "@/db/Schema";
 import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
 import type { WatchlistTimelineGroup } from "./WatchlistTimeline.model";
-import { ReorderableTimelineRow } from "./ReorderableTimelineRow";
+import { WatchedTimelineRun, buildTimelineRuns } from "../detail/WatchedTimelineRun";
 
 export function WatchlistTimelineGroupSection({
   group,
@@ -64,23 +64,25 @@ function TimelineRows({
   reorderEnabled: boolean;
   interactionDisabled: boolean;
 }) {
-  const rowProps = items.map((item) => ({
-    key: item.id,
-    item,
+  const runs = buildTimelineRuns(items, Boolean(activeFilters.unwatchedOnly));
+  const runProps = runs.map((run) => ({
+    key: run.items[0].id,
+    run,
     activeFilters,
     itemOrderMode,
     showHandleSlot,
-    showHandle: showHandleSlot && reorderEnabled,
+    reorderEnabled,
     interactionDisabled,
   }));
-  return rowProps.map(TimelineRow);
+  return runProps.map(TimelineRun);
 }
 
-function TimelineRow({
+function TimelineRun({
   key,
+  run,
   ...props
-}: React.ComponentProps<typeof ReorderableTimelineRow> & { key: number }) {
-  return <ReorderableTimelineRow key={key} {...props} />;
+}: React.ComponentProps<typeof WatchedTimelineRun> & { key: number }) {
+  return <WatchedTimelineRun key={key} run={run} {...props} />;
 }
 
 function TimelineYearHeader({ year }: { year: string }) {
@@ -89,7 +91,9 @@ function TimelineYearHeader({ year }: { year: string }) {
       position="sticky"
       top="calc(var(--watchlist-header-height, 0px) + 0.5rem)"
       zIndex={10}
-      mb={6}
+      mb={2}
+      bg="bg.canvas"
+      py={2}
       align="center"
     >
       <Flex
@@ -102,7 +106,6 @@ function TimelineYearHeader({ year }: { year: string }) {
         fontSize="xs"
         fontWeight="bold"
         color="fg.default"
-        shadow="sm"
         borderWidth="1px"
         borderColor="border.default"
         ml={{ base: 0, md: 4 }}

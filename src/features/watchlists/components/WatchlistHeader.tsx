@@ -39,7 +39,7 @@ export function WatchlistHeader({
   useLayoutEffect(() => {
     const header = headerRef.current;
     if (!header) return;
-    const container = header.parentElement;
+    const container = getHeaderContainer(header);
     if (!container) return;
 
     const updateHeight = () => {
@@ -58,17 +58,7 @@ export function WatchlistHeader({
   }, []);
 
   return (
-    <Box
-      ref={headerRef}
-      as="header"
-      position="sticky"
-      top={0}
-      zIndex={40}
-      bg="bg.canvas/95"
-      backdropFilter="blur(8px)"
-      pb={{ base: 4, md: 6 }}
-      pt={4}
-    >
+    <Box as="header" display="contents" pb={{ base: 4, md: 6 }} pt={4}>
       <WatchlistTitle
         watchlist={watchlist}
         onTogglePause={onTogglePause}
@@ -78,26 +68,31 @@ export function WatchlistHeader({
 
       <Box mt={4}>
         <WatchlistProgress totalItems={totalItems} watchedItems={watchedItems} />
-
-        <Flex
-          direction={{ base: "column", sm: "row" }}
-          align={{ sm: "center" }}
-          justify="space-between"
-          gap={3}
-        >
-          <WatchlistSearch
-            query={searchQuery}
-            onChange={onSearchChange}
-            disabled={interactionDisabled}
-          />
-
-          <WatchlistFilterToggle
-            showUnwatchedOnly={showUnwatchedOnly}
-            onChange={onFilterChange}
-            disabled={interactionDisabled}
-          />
-        </Flex>
       </Box>
+      <Flex
+        ref={headerRef}
+        position="sticky"
+        top={0}
+        zIndex={40}
+        bg="bg.canvas"
+        py={3}
+        direction={{ base: "column", sm: "row" }}
+        align={{ sm: "center" }}
+        justify="space-between"
+        gap={3}
+      >
+        <WatchlistSearch
+          query={searchQuery}
+          onChange={onSearchChange}
+          disabled={interactionDisabled}
+        />
+
+        <WatchlistFilterToggle
+          showUnwatchedOnly={showUnwatchedOnly}
+          onChange={onFilterChange}
+          disabled={interactionDisabled}
+        />
+      </Flex>
     </Box>
   );
 }
@@ -121,13 +116,7 @@ function WatchlistProgress({
       </Flex>
 
       <Box h={2} mt={2} bg="bg.subtle" rounded="full" overflow="hidden">
-        <Box
-          h="full"
-          w={`${percentage}%`}
-          bg="accent.solid"
-          rounded="full"
-          transition="width 500ms ease-out"
-        />
+        <Box h="full" w={`${percentage}%`} bg="accent.solid" rounded="full" />
       </Box>
     </Box>
   );
@@ -151,6 +140,7 @@ function WatchlistSearch({
       />
       <Input
         type="search"
+        aria-label="Search titles"
         placeholder="Search titles..."
         disabled={disabled}
         h={9}
@@ -180,6 +170,7 @@ function WatchlistFilterToggle({
       borderColor="border.default"
       bg="bg.subtle/30"
       p={1}
+      alignSelf="flex-start"
     >
       <FilterButton active={!showUnwatchedOnly} onClick={() => onChange(false)} disabled={disabled}>
         All
@@ -204,7 +195,9 @@ function FilterButton({
 }) {
   return (
     <Button
-      size="xs"
+      size="sm"
+      minH="44px"
+      aria-pressed={active}
       variant={active ? "solid" : "ghost"}
       colorPalette="pink"
       onClick={onClick}
@@ -213,4 +206,8 @@ function FilterButton({
       {children}
     </Button>
   );
+}
+
+function getHeaderContainer(header: HTMLElement) {
+  return header.closest("header")?.parentElement;
 }

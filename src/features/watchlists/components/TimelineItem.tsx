@@ -97,9 +97,9 @@ function WatchedButton({
         borderColor: "accent.solid",
         color: "accent.contrast",
         bg: "accent.solid",
-        shadow: "0 0 10px rgba(255, 0, 85, 0.4)",
+        shadow: undefined,
       }
-    : { borderColor: "fg.muted/30", color: "transparent", bg: "transparent", shadow: undefined };
+    : { borderColor: "fg.muted", color: "transparent", bg: "transparent", shadow: undefined };
   const label = item.isWatched ? `Mark ${item.title} unwatched` : `Mark ${item.title} watched`;
   return (
     <Button
@@ -108,8 +108,8 @@ function WatchedButton({
       disabled={disabled}
       aria-label={label}
       size="sm"
-      minW={8}
-      h={8}
+      minW="44px"
+      h="44px"
       p={0}
       flexShrink={0}
       rounded="full"

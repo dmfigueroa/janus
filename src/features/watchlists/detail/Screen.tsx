@@ -27,41 +27,25 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedSearchQuery(searchQuery);
 
-  const getWatchlistDetailPageFn = useServerFn(getWatchlistDetailPage);
-
   const normalizedSearchQuery = normalizeSearchQuery(debouncedSearchQuery);
-
-  const itemOrderMode = initialData.watchlist.itemOrderMode;
-  const activeFilters = useMemo(
-    () => ({
-      watchlistId,
-      itemOrderMode,
-      query: normalizedSearchQuery,
-      unwatchedOnly: showUnwatchedOnly,
-    }),
-    [watchlistId, itemOrderMode, normalizedSearchQuery, showUnwatchedOnly],
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useWatchlistTimelineData(
+    watchlistId,
+    normalizedSearchQuery,
+    initialData.watchlist.itemOrderMode,
   );
-
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    ...watchlistDetailInfiniteQueryOptions(activeFilters),
-    queryFn: async ({ pageParam }) => {
-      const detail = await getWatchlistDetailPageFn({
-        data: {
-          ...activeFilters,
-          cursor: pageParam,
-        },
-      });
-
-      if (!detail) {
-        throw new Error("Watchlist not found");
-      }
-
-      return detail;
-    },
-  });
 
   const { allItems, latestWatchlist } = getCurrentDetailData(data, initialData.watchlist);
   const latestItemOrderMode = latestWatchlist.itemOrderMode;
+
+  const activeFilters = useMemo(
+    () => ({
+      watchlistId,
+      itemOrderMode: initialData.watchlist.itemOrderMode,
+      query: normalizedSearchQuery,
+      unwatchedOnly: false,
+    }),
+    [watchlistId, initialData.watchlist.itemOrderMode, normalizedSearchQuery],
+  );
 
   const reorderItemsMutation = useReorderWatchlistItemsMutation({
     watchlistId,
@@ -73,7 +57,7 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
   const togglePauseMutation = useToggleWatchlistPause(latestWatchlist);
 
   const canReorderItems = canReorderWatchlistItems({
-    itemOrderMode: latestItemOrderMode,
+    itemOrderMode: initialData.watchlist.itemOrderMode,
     itemCount: allItems.length,
     isReorderPending,
     isWatchedTogglePending,
@@ -108,7 +92,7 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
       <Box mt={8}>
         <WatchlistTimeline
           items={allItems}
-          activeFilters={activeFilters}
+          activeFilters={{ ...activeFilters, unwatchedOnly: showUnwatchedOnly }}
           itemOrderMode={latestItemOrderMode}
           hasMore={hasNextPage}
           isLoadingMore={isFetchingNextPage}
@@ -160,4 +144,37 @@ function useDebouncedSearchQuery(searchQuery: string) {
   }, [searchQuery]);
 
   return debouncedSearchQuery;
+}
+
+function useWatchlistTimelineData(
+  watchlistId: number,
+  normalizedSearchQuery: string | undefined,
+  itemOrderMode: "release" | "custom",
+) {
+  const getWatchlistDetailPageFn = useServerFn(getWatchlistDetailPage);
+
+  return useInfiniteQuery({
+    ...watchlistDetailInfiniteQueryOptions({
+      watchlistId,
+      query: normalizedSearchQuery,
+      unwatchedOnly: false,
+      itemOrderMode,
+    }),
+    queryFn: async ({ pageParam }) => {
+      const detail = await getWatchlistDetailPageFn({
+        data: {
+          watchlistId,
+          query: normalizedSearchQuery,
+          unwatchedOnly: false,
+          cursor: pageParam,
+        },
+      });
+
+      if (!detail) {
+        throw new Error("Watchlist not found");
+      }
+
+      return detail;
+    },
+  });
 }
