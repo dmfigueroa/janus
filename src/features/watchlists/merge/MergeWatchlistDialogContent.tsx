@@ -141,17 +141,23 @@ export function MergeWatchlistDialogContent({
   onMerge,
   ...destinationProps
 }: MergeWatchlistDialogContentProps) {
+  const consequences = mergeConsequences(destinationProps, selectedWatchlists);
   return (
-    <Dialog.Root open={open} onOpenChange={({ open: nextOpen }) => onOpenChange(nextOpen)}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={({ open: nextOpen }) => {
+        if (!isSubmitting) onOpenChange(nextOpen);
+      }}
+    >
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
           <Dialog.Content maxW={{ base: "calc(100% - 2rem)", sm: "md" }}>
-            <Dialog.CloseTrigger aria-label="Close dialog">
+            <Dialog.CloseTrigger aria-label="Close dialog" disabled={isSubmitting}>
               <X size={16} />
             </Dialog.CloseTrigger>
             <Dialog.Header flexDirection="column" alignItems="flex-start" gap={1}>
-              <Dialog.Title>Merge Watchlists</Dialog.Title>
+              <Dialog.Title>Merge watchlists</Dialog.Title>
               <Dialog.Description color="fg.muted">
                 Merge {selectedCount} lists. All items will be combined into the target list.
               </Dialog.Description>
@@ -164,18 +170,21 @@ export function MergeWatchlistDialogContent({
                   isSubmitting={isSubmitting}
                   onMove={onMove}
                 />
+                <Text role="note" fontSize="sm">
+                  {consequences}
+                </Text>
                 <MergeWatchlistDestination
                   {...destinationProps}
                   selectedWatchlists={selectedWatchlists}
                 />
               </Stack>
             </Dialog.Body>
-            <Dialog.Footer>
+            <Dialog.Footer aria-busy={isSubmitting} aria-live="polite">
               <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
                 Cancel
               </Button>
               <Button colorPalette="pink" onClick={onMerge} disabled={isSubmitting}>
-                {isSubmitting ? "Merging..." : "Merge"}
+                {isSubmitting ? "Merging..." : "Merge watchlists"}
               </Button>
             </Dialog.Footer>
           </Dialog.Content>
@@ -183,4 +192,17 @@ export function MergeWatchlistDialogContent({
       </Portal>
     </Dialog.Root>
   );
+}
+
+function mergeConsequences(
+  destination: Pick<MergeWatchlistDestinationProps, "mode" | "newName" | "targetId">,
+  watchlists: WatchlistSummary[],
+) {
+  if (destination.mode === "new")
+    return `Items will be combined into “${destination.newName || "a new watchlist"}”. All selected source watchlists will be removed.`;
+  const target = watchlists.find((watchlist) => String(watchlist.id) === destination.targetId);
+  return `Items will be combined into “${targetName(target)}”. Other selected watchlists will be removed.`;
+}
+function targetName(target: WatchlistSummary | undefined) {
+  return target?.name || "the selected target";
 }

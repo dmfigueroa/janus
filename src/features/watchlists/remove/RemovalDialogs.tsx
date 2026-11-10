@@ -119,7 +119,9 @@ function RemovalDialogContent({
       open={open}
       closeOnInteractOutside={false}
       initialFocusEl={() => cancelButtonReference.current}
-      onOpenChange={({ open: nextOpen }) => onOpenChange(nextOpen)}
+      onOpenChange={({ open: nextOpen }) => {
+        if (!isPending) onOpenChange(nextOpen);
+      }}
     >
       <Portal>
         <Dialog.Backdrop />
@@ -129,7 +131,11 @@ function RemovalDialogContent({
               <Dialog.Title>{title}</Dialog.Title>
               <Dialog.Description color="fg.muted">{description}</Dialog.Description>
             </Dialog.Header>
-            <Dialog.Footer flexDir={{ base: "column-reverse", sm: "row" }}>
+            <Dialog.Footer
+              aria-busy={isPending}
+              aria-live="polite"
+              flexDir={{ base: "column-reverse", sm: "row" }}
+            >
               <Button
                 ref={cancelButtonReference}
                 variant="outline"
@@ -145,7 +151,7 @@ function RemovalDialogContent({
                 disabled={isPending}
                 onClick={onConfirm}
               >
-                {label}
+                {isPending ? "Removing…" : label}
               </Button>
             </Dialog.Footer>
           </Dialog.Content>

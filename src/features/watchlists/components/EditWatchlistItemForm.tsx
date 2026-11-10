@@ -1,5 +1,5 @@
 import { Button, Dialog, Field, Image, Input, Stack, Text } from "@chakra-ui/react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import type { WatchlistItem } from "@/db/Schema";
 import { ReleaseDateField } from "@/features/watchlists/components/ReleaseDateField";
 import { posterPathSchema } from "@/features/watchlists/edit/Mutation";
@@ -13,6 +13,7 @@ type EditWatchlistItemFormProps = {
   item: WatchlistItem;
   onSaved: () => void;
   onCanceled: () => void;
+  onPendingChange?: (pending: boolean) => void;
 };
 
 function SaveButton({ isSaving }: { isSaving: boolean }) {
@@ -103,10 +104,18 @@ function handleSaveResult(
   }
 }
 
-export function EditWatchlistItemForm({ item, onSaved, onCanceled }: EditWatchlistItemFormProps) {
+export function EditWatchlistItemForm({
+  item,
+  onSaved,
+  onCanceled,
+  onPendingChange,
+}: EditWatchlistItemFormProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [posterPath, setPosterPath] = useState(posterPathOrEmpty(item.posterPath));
   const mutation = useEditWatchlistItemMutation(item);
+  useEffect(() => {
+    onPendingChange?.(mutation.isPending);
+  }, [mutation.isPending, onPendingChange]);
   const posterPreviewPath = getPosterPreviewPath(posterPath);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -160,7 +169,7 @@ export function EditWatchlistItemForm({ item, onSaved, onCanceled }: EditWatchli
           <FormError message={errorMessage} />
         </Stack>
       </Dialog.Body>
-      <Dialog.Footer>
+      <Dialog.Footer aria-busy={mutation.isPending} aria-live="polite">
         <Button type="button" variant="outline" disabled={mutation.isPending} onClick={onCanceled}>
           Cancel
         </Button>

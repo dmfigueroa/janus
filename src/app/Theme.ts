@@ -1,9 +1,22 @@
 import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
-import { toastAnatomy } from "@chakra-ui/react/anatomy";
+import { dialogAnatomy, toastAnatomy } from "@chakra-ui/react/anatomy";
 
 const janusConfig = defineConfig({
   preflight: true,
   globalCss: {
+    ".chakra-dialog__content": {
+      maxHeight: "calc(100dvh - 2rem)",
+      display: "flex",
+      flexDirection: "column",
+      "& > form": { display: "flex", flexDirection: "column", minHeight: 0 },
+      "& .chakra-dialog__body": { overflowY: "auto", minHeight: 0 },
+      "& .chakra-dialog__header, & .chakra-dialog__footer": { flexShrink: 0 },
+      "& .chakra-dialog__footer": { flexDirection: { base: "column-reverse", sm: "row" } },
+      "& button": { minHeight: "44px" },
+      "& .chakra-dialog__footer button": { width: { base: "100%", sm: "auto" } },
+      "& .chakra-dialog__close-trigger": { minWidth: "44px" },
+      "& button:active:not(:disabled)": { transform: "scale(0.97)" },
+    },
     "html, body": {
       minHeight: "100%",
     },
@@ -19,7 +32,37 @@ const janusConfig = defineConfig({
     },
   },
   theme: {
+    keyframes: {
+      "dialog-enter": {
+        from: { opacity: 0, transform: "scale(0.97)" },
+        to: { opacity: 1, transform: "scale(1)" },
+      },
+      "dialog-exit": { from: { opacity: 1 }, to: { opacity: 0 } },
+    },
     slotRecipes: {
+      dialog: {
+        slots: dialogAnatomy.keys(),
+        variants: {
+          motionPreset: {
+            scale: {
+              content: {
+                _open: {
+                  animationName: "dialog-enter",
+                  animationDuration: "200ms",
+                  animationTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",
+                  _motionReduce: { animationName: "none" },
+                },
+                _closed: {
+                  animationName: "dialog-exit",
+                  animationDuration: "140ms",
+                  animationTimingFunction: "ease-out",
+                  _motionReduce: { animationName: "none" },
+                },
+              },
+            },
+          },
+        },
+      },
       toast: {
         slots: toastAnatomy.keys(),
         base: {

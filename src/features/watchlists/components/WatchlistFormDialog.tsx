@@ -10,30 +10,40 @@ import {
 } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { useController, type Control } from "react-hook-form";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   useWatchlistForm,
   type UseWatchlistFormOptions,
   type WatchlistFormValues,
 } from "./useWatchlistForm";
 
-type WatchlistFormDialogProps = UseWatchlistFormOptions & { trigger: React.ReactNode };
+type WatchlistFormDialogProps = UseWatchlistFormOptions & {
+  trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+};
 
 const watchlistFormLabels = {
   create: {
-    title: "Create New List",
-    submitLabel: "Create List",
+    title: "Create watchlist",
+    submitLabel: "Create watchlist",
     descriptionLabel: "Create a new watchlist to track your movies and shows.",
   },
   edit: {
-    title: "Edit List",
-    submitLabel: "Save Changes",
+    title: "Edit watchlist",
+    submitLabel: "Save changes",
     descriptionLabel: "Update your watchlist details.",
   },
 };
 
-export function WatchlistFormDialog({ trigger, ...formOptions }: WatchlistFormDialogProps) {
-  const [open, setOpen] = useState(false);
+export function WatchlistFormDialog({
+  trigger,
+  open: controlledOpen,
+  onOpenChange,
+  ...formOptions
+}: WatchlistFormDialogProps) {
+  const nameRef = useRef<HTMLDivElement>(null);
+  const { open, setOpen } = useDialogOpen(controlledOpen, onOpenChange);
   const { loading, onSubmit, register, control, formState } = useWatchlistForm({
     ...formOptions,
     open,
@@ -42,13 +52,19 @@ export function WatchlistFormDialog({ trigger, ...formOptions }: WatchlistFormDi
   const labels = watchlistFormLabels[formOptions.mode];
 
   return (
-    <Dialog.Root open={open} onOpenChange={({ open: nextOpen }) => setOpen(nextOpen)}>
-      <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
+    <Dialog.Root
+      initialFocusEl={() => nameRef.current?.querySelector("input") ?? null}
+      open={open}
+      onOpenChange={({ open: nextOpen }) => {
+        if (!loading) setOpen(nextOpen);
+      }}
+    >
+      <OptionalDialogTrigger trigger={trigger} />
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content maxW="sm">
-            <Dialog.CloseTrigger aria-label="Close dialog">
+          <Dialog.Content ref={nameRef} maxW="sm">
+            <Dialog.CloseTrigger aria-label="Close dialog" disabled={loading}>
               <X size={16} />
             </Dialog.CloseTrigger>
             <form onSubmit={onSubmit}>
@@ -85,7 +101,15 @@ export function WatchlistFormDialog({ trigger, ...formOptions }: WatchlistFormDi
                   </Field.Root>
                 </Stack>
               </Dialog.Body>
-              <Dialog.Footer>
+              <Dialog.Footer aria-busy={loading} aria-live="polite">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={loading}
+                  onClick={() => setOpen(false)}
+                >
+                  Cancel
+                </Button>
                 <Button type="submit" disabled={loading} colorPalette="pink">
                   {loading ? "Saving..." : labels.submitLabel}
                 </Button>
@@ -123,4 +147,15 @@ function WatchlistOrderField({ control }: { control: Control<WatchlistFormValues
       </RadioGroup.Item>
     </RadioGroup.Root>
   );
+}
+
+function useDialogOpen(
+  controlledOpen: boolean | undefined,
+  onOpenChange: ((open: boolean) => void) | undefined,
+) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  return { open: controlledOpen ?? internalOpen, setOpen: onOpenChange ?? setInternalOpen };
+}
+function OptionalDialogTrigger({ trigger }: { trigger: React.ReactNode }) {
+  return trigger ? <Dialog.Trigger asChild>{trigger}</Dialog.Trigger> : null;
 }

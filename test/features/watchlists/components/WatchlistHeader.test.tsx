@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@test/utils/Render";
+import { cleanup, fireEvent, render, screen, waitFor } from "@test/utils/Render";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Watchlist } from "@/db/Schema";
@@ -66,24 +66,45 @@ describe("WatchlistHeader", () => {
   it("wires the delete action to its callback", async () => {
     const { onDelete } = renderHeader(null);
     fireEvent.click(screen.getByRole("button", { name: "Watchlist actions" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Delete watchlist" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete watchlist" }));
     expect(onDelete).toHaveBeenCalledOnce();
+  });
+
+  it("opens the edit dialog from the action menu", async () => {
+    renderHeader(null);
+    fireEvent.click(screen.getByRole("button", { name: "Watchlist actions" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Edit watchlist" }));
+    await screen.findByRole("dialog", { name: "Edit watchlist" });
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    expect(screen.getByRole("dialog", { name: "Edit watchlist" })).toBeTruthy();
   });
 
   it("offers pausing for an active watchlist", async () => {
     const { onTogglePause } = renderHeader(null);
 
     fireEvent.click(screen.getByRole("button", { name: "Watchlist actions" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Pause" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Pause watchlist" }));
 
     expect(onTogglePause).toHaveBeenCalledOnce();
+  });
+
+  it("shows paused status without opening the actions menu", () => {
+    renderHeader("2024-06-01 00:00:00");
+    expect(screen.getByRole("status").textContent).toBe("Paused");
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("does not show paused status for an active watchlist", () => {
+    renderHeader(null);
+    expect(screen.queryByText("Paused")).toBeNull();
   });
 
   it("offers resuming for a paused watchlist", async () => {
     const { onTogglePause } = renderHeader("2024-06-01 00:00:00");
 
     fireEvent.click(screen.getByRole("button", { name: "Watchlist actions" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Resume watchlist" }));
 
     expect(onTogglePause).toHaveBeenCalledOnce();
   });
