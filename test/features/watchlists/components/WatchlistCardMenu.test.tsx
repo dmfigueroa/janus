@@ -43,7 +43,7 @@ it("requires the typed name from the card and preserves it after a failed deleti
   const input = (await screen.findByRole("textbox", {
     name: /watchlist name/i,
   })) as HTMLInputElement;
-  const button = screen.getByRole("button", { name: "Delete" }) as HTMLButtonElement;
+  const button = screen.getByRole("button", { name: "Delete watchlist" }) as HTMLButtonElement;
   expect(button.disabled).toBe(true);
   fireEvent.change(input, { target: { value: "Movie Night" } });
   fireEvent.click(button);

@@ -51,8 +51,8 @@ describe("DeleteWatchlistDialog", () => {
 
     const dialog = await waitFor(() => screen.getByRole("alertdialog"));
 
-    expect(dialog.textContent).toContain("permanently deleted");
-    const button = screen.getByRole("button", { name: "Delete" }) as HTMLButtonElement;
+    expect(dialog.textContent).toContain("permanently deletes");
+    const button = screen.getByRole("button", { name: "Delete watchlist" }) as HTMLButtonElement;
     const input = screen.getByRole("textbox", { name: /watchlist name/i });
     expect(button.disabled).toBe(true);
     fireEvent.change(input, { target: { value: "movie night" } });
@@ -78,12 +78,12 @@ describe("DeleteWatchlistDialog", () => {
         />
       </Provider>,
     );
-    fireEvent.click(await screen.findByRole("button", { name: "Copy name" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Copy watchlist name" }));
     await waitFor(() => expect(writeText).toHaveBeenCalledWith("Movie Night"));
     expect(await screen.findByText("Watchlist name copied")).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Delete" }) as HTMLButtonElement).disabled).toBe(
-      true,
-    );
+    expect(
+      (screen.getByRole("button", { name: "Delete watchlist" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
     vi.unstubAllGlobals();
   });
 
@@ -115,9 +115,9 @@ describe("DeleteWatchlistDialog", () => {
       </Provider>,
     );
     expect(input.disabled).toBe(true);
-    expect((screen.getByRole("button", { name: "Copy name" }) as HTMLButtonElement).disabled).toBe(
-      true,
-    );
+    expect(
+      (screen.getByRole("button", { name: "Copy watchlist name" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
     expect(
       (screen.getByRole("button", { name: "Deleting..." }) as HTMLButtonElement).disabled,
     ).toBe(true);
@@ -136,9 +136,9 @@ describe("DeleteWatchlistDialog", () => {
       </Provider>,
     );
     expect(input.value).toBe("Movie Night");
-    expect((screen.getByRole("button", { name: "Delete" }) as HTMLButtonElement).disabled).toBe(
-      false,
-    );
+    expect(
+      (screen.getByRole("button", { name: "Delete watchlist" }) as HTMLButtonElement).disabled,
+    ).toBe(false);
   });
 
   it("clears the typed name when the dialog closes", async () => {
@@ -195,7 +195,7 @@ describe("DeleteWatchlistDialog", () => {
       </Provider>,
     );
 
-    const title = await waitFor(() => screen.getByRole("heading", { name: "Delete watchlist" }));
+    const title = await waitFor(() => screen.getByRole("heading", { name: "Delete watchlist?" }));
     const header = title.parentElement;
 
     expect(header).not.toBeNull();
