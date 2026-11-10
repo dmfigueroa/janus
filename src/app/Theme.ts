@@ -1,5 +1,5 @@
 import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
-import { toastAnatomy } from "@chakra-ui/react/anatomy";
+import { dialogAnatomy, toastAnatomy } from "@chakra-ui/react/anatomy";
 
 const janusConfig = defineConfig({
   preflight: true,
@@ -16,9 +16,6 @@ const janusConfig = defineConfig({
       "& .chakra-dialog__footer button": { width: { base: "100%", sm: "auto" } },
       "& .chakra-dialog__close-trigger": { minWidth: "44px" },
       "& button:active:not(:disabled)": { transform: "scale(0.97)" },
-      '&[data-state="open"]': { animation: "dialog-enter 200ms cubic-bezier(0.23, 1, 0.32, 1)" },
-      '&[data-state="closed"]': { animation: "dialog-exit 140ms ease-out" },
-      "@media (prefers-reduced-motion: reduce)": { animation: "none" },
     },
     "html, body": {
       minHeight: "100%",
@@ -43,6 +40,29 @@ const janusConfig = defineConfig({
       "dialog-exit": { from: { opacity: 1 }, to: { opacity: 0 } },
     },
     slotRecipes: {
+      dialog: {
+        slots: dialogAnatomy.keys(),
+        variants: {
+          motionPreset: {
+            scale: {
+              content: {
+                _open: {
+                  animationName: "dialog-enter",
+                  animationDuration: "200ms",
+                  animationTimingFunction: "cubic-bezier(0.23, 1, 0.32, 1)",
+                  _motionReduce: { animationName: "none" },
+                },
+                _closed: {
+                  animationName: "dialog-exit",
+                  animationDuration: "140ms",
+                  animationTimingFunction: "ease-out",
+                  _motionReduce: { animationName: "none" },
+                },
+              },
+            },
+          },
+        },
+      },
       toast: {
         slots: toastAnatomy.keys(),
         base: {
