@@ -89,6 +89,17 @@ describe("WatchlistHeader", () => {
     expect(onTogglePause).toHaveBeenCalledOnce();
   });
 
+  it("shows paused status without opening the actions menu", () => {
+    renderHeader("2024-06-01 00:00:00");
+    expect(screen.getByRole("status").textContent).toBe("Paused");
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("does not show paused status for an active watchlist", () => {
+    renderHeader(null);
+    expect(screen.queryByText("Paused")).toBeNull();
+  });
+
   it("offers resuming for a paused watchlist", async () => {
     const { onTogglePause } = renderHeader("2024-06-01 00:00:00");
 
