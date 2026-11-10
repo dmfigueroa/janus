@@ -66,15 +66,22 @@ describe("WatchlistHeader", () => {
   it("wires the delete action to its callback", async () => {
     const { onDelete } = renderHeader(null);
     fireEvent.click(screen.getByRole("button", { name: "Watchlist actions" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Delete watchlist" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete watchlist" }));
     expect(onDelete).toHaveBeenCalledOnce();
+  });
+
+  it("opens the edit dialog from the action menu", async () => {
+    renderHeader(null);
+    fireEvent.click(screen.getByRole("button", { name: "Watchlist actions" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Edit watchlist" }));
+    expect(await screen.findByRole("dialog", { name: "Edit watchlist" })).toBeTruthy();
   });
 
   it("offers pausing for an active watchlist", async () => {
     const { onTogglePause } = renderHeader(null);
 
     fireEvent.click(screen.getByRole("button", { name: "Watchlist actions" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Pause" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Pause watchlist" }));
 
     expect(onTogglePause).toHaveBeenCalledOnce();
   });
@@ -83,7 +90,7 @@ describe("WatchlistHeader", () => {
     const { onTogglePause } = renderHeader("2024-06-01 00:00:00");
 
     fireEvent.click(screen.getByRole("button", { name: "Watchlist actions" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Resume" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Resume watchlist" }));
 
     expect(onTogglePause).toHaveBeenCalledOnce();
   });
