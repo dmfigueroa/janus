@@ -17,7 +17,11 @@ import {
   type WatchlistFormValues,
 } from "./useWatchlistForm";
 
-type WatchlistFormDialogProps = UseWatchlistFormOptions & { trigger: React.ReactNode };
+type WatchlistFormDialogProps = UseWatchlistFormOptions & {
+  trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+};
 
 const watchlistFormLabels = {
   create: {
@@ -32,9 +36,14 @@ const watchlistFormLabels = {
   },
 };
 
-export function WatchlistFormDialog({ trigger, ...formOptions }: WatchlistFormDialogProps) {
+export function WatchlistFormDialog({
+  trigger,
+  open: controlledOpen,
+  onOpenChange,
+  ...formOptions
+}: WatchlistFormDialogProps) {
   const nameRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
+  const { open, setOpen } = useDialogOpen(controlledOpen, onOpenChange);
   const { loading, onSubmit, register, control, formState } = useWatchlistForm({
     ...formOptions,
     open,
@@ -50,7 +59,7 @@ export function WatchlistFormDialog({ trigger, ...formOptions }: WatchlistFormDi
         if (!loading) setOpen(nextOpen);
       }}
     >
-      <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
+      <OptionalDialogTrigger trigger={trigger} />
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -138,4 +147,15 @@ function WatchlistOrderField({ control }: { control: Control<WatchlistFormValues
       </RadioGroup.Item>
     </RadioGroup.Root>
   );
+}
+
+function useDialogOpen(
+  controlledOpen: boolean | undefined,
+  onOpenChange: ((open: boolean) => void) | undefined,
+) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  return { open: controlledOpen ?? internalOpen, setOpen: onOpenChange ?? setInternalOpen };
+}
+function OptionalDialogTrigger({ trigger }: { trigger: React.ReactNode }) {
+  return trigger ? <Dialog.Trigger asChild>{trigger}</Dialog.Trigger> : null;
 }

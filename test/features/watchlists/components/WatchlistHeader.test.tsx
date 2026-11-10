@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@test/utils/Render";
+import { cleanup, fireEvent, render, screen, waitFor } from "@test/utils/Render";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Watchlist } from "@/db/Schema";
@@ -74,7 +74,10 @@ describe("WatchlistHeader", () => {
     renderHeader(null);
     fireEvent.click(screen.getByRole("button", { name: "Watchlist actions" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Edit watchlist" }));
-    expect(await screen.findByRole("dialog", { name: "Edit watchlist" })).toBeTruthy();
+    await screen.findByRole("dialog", { name: "Edit watchlist" });
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    expect(screen.getByRole("dialog", { name: "Edit watchlist" })).toBeTruthy();
   });
 
   it("offers pausing for an active watchlist", async () => {
