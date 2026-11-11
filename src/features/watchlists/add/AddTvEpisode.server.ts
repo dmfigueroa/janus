@@ -1,9 +1,9 @@
 import type { TMDBEpisode } from "@/server/providers/TmdbApi.server";
 import { providerAdditionFailure } from "./ProviderAdditionFailure.server";
-import { persistAddedItems } from "./Insert.server";
+import { persistAddedItems } from "@/features/watchlists/InsertOrderedItem.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
 import { fetchShowEpisodes, filterNewEpisodes, mapToWatchlistEpisodes } from "./AddTv.server";
-import { addedItemsResult, rejectAdd, type WatchlistWriteResult } from "./AdditionOutcome";
+import { rejectAdd, type WatchlistWriteResult } from "./AdditionOutcome";
 
 const TMDB_EPISODE_NOT_FOUND_MESSAGE = "TMDB episode was not found for this show.";
 
@@ -76,41 +76,15 @@ async function persistEpisode({
     showDetails.poster_path,
   );
   const newEpisodes = await filterNewEpisodes(watchlistId, items);
-  return newEpisodes.length === 0
-    ? addedItemsResult(0, "Already in watchlist")
-    : persistNewEpisode({
-        watchlistId,
-        insertionPosition,
-        referenceItemId,
-        items: newEpisodes,
-      });
+  return persistAddedItems({
+    watchlistId,
+    insertionPosition,
+    referenceItemId,
+    items: newEpisodes,
+    addedMessage: "Added 1 episode to watchlist",
+  });
 }
 
 function showTitle(canonicalTitle: string | undefined, suppliedTitle: string | null | undefined) {
   return canonicalTitle || suppliedTitle || "Unknown Show";
-}
-
-async function persistNewEpisode({
-  watchlistId,
-  insertionPosition,
-  referenceItemId,
-  items,
-}: {
-  watchlistId: number;
-  insertionPosition?: AddToWatchlistInsertionPosition;
-  referenceItemId?: number;
-  items: Awaited<ReturnType<typeof filterNewEpisodes>>;
-}): Promise<WatchlistWriteResult> {
-  const result = await persistAddedItems({
-    watchlistId,
-    insertionPosition,
-    referenceItemId,
-    items,
-  });
-  return result.success
-    ? addedItemsResult(
-        result.insertedCount,
-        result.insertedCount > 0 ? "Added 1 episode to watchlist" : "Already in watchlist",
-      )
-    : { ...result, affectedCount: 0 };
 }

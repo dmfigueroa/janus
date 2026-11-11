@@ -5,8 +5,8 @@ import * as repository from "@/features/watchlists/Repository.server";
 import { getComicIssues } from "@/server/providers/Comicvine.server";
 import { getComicVolumeDetails } from "@/integrations/comicvine/ComicvineVolume.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
-import { persistAddedItems } from "./Insert.server";
-import { rejectAdd, addedItemsResult, type WatchlistWriteResult } from "./AdditionOutcome";
+import { persistAddedItems } from "@/features/watchlists/InsertOrderedItem.server";
+import { rejectAdd, type WatchlistWriteResult } from "./AdditionOutcome";
 
 const COMICVINE_UNAVAILABLE_MESSAGE =
   "Comic additions are unavailable because the ComicVine integration is not configured.";
@@ -26,15 +26,15 @@ export async function addComicToWatchlist(
   const existingIssueIds = await repository.getExistingComicsInWatchlist(watchlistId);
   return fetchVolumeIssues(media, volumeId, apiKey, existingIssueIds).then(
     ({ mediaWithTitle, issues }) =>
-      persistComicIssues(
+      persistAddedItems({
         watchlistId,
-        volumeId,
-        mediaWithTitle,
-        issues,
-        existingIssueIds,
         insertionPosition,
         referenceItemId,
-      ),
+        items: mapToWatchlistComics(issues, watchlistId, volumeId, mediaWithTitle.title),
+        unchangedCode: "no_new_items",
+        unchangedMessage: getNoNewIssuesMessage(existingIssueIds.size),
+        addedMessage: (count) => getIssuesAddedMessage(count, existingIssueIds.size),
+      }),
     (error: unknown) => providerAdditionFailure(error, "ComicVine"),
   );
 }
@@ -51,38 +51,6 @@ async function fetchVolumeIssues(
   const issues = await getComicIssues(volumeId, apiKey, { knownIssueIds: existingIssueIds });
   return { mediaWithTitle, issues };
 }
-
-async function persistComicIssues(
-  watchlistId: number,
-  volumeId: string,
-  media: WatchlistMedia,
-  issues: Awaited<ReturnType<typeof getComicIssues>>,
-  existingIssueIds: Set<string>,
-  insertionPosition?: AddToWatchlistInsertionPosition,
-  referenceItemId?: number,
-): Promise<WatchlistWriteResult> {
-  const items = mapToWatchlistComics(issues, watchlistId, volumeId, media.title);
-
-  const result = await persistAddedItems({
-    watchlistId,
-    insertionPosition,
-    referenceItemId,
-    items,
-  });
-  if (!result.success) {
-    return { ...result, affectedCount: 0 };
-  }
-
-  return addedItemsResult(
-    result.insertedCount,
-    result.insertedCount > 0
-      ? getIssuesAddedMessage(result.insertedCount, existingIssueIds.size)
-      : getNoNewIssuesMessage(existingIssueIds.size),
-    "no_new_items",
-  );
-}
-
-// --- Implementation Details ---
 
 function getApiKey() {
   return process.env.COMICVINE_API_KEY;

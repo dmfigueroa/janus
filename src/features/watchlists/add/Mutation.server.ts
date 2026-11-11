@@ -1,6 +1,7 @@
 import type { AddToWatchlistInput, GenericMedia } from "./Mutation";
 import { getDeprecatedWatchlistAddRejection } from "@/server/Media";
 import { rejectAdd, type WatchlistWriteResult } from "./AdditionOutcome";
+import { validateWatchlistAdditionDestination } from "@/features/watchlists/InsertOrderedItem.server";
 import { addTVShowToWatchlist } from "./AddTv.server";
 import { addMovieToWatchlist } from "./AddMovie.server";
 import { addComicToWatchlist } from "./AddComic.server";
@@ -20,6 +21,10 @@ export async function addToWatchlistMutation({
   const deprecatedRejection = getDeprecatedWatchlistAddRejection(media.mediaType);
   if (deprecatedRejection) {
     return rejectAdd(deprecatedRejection.message, "unsupported");
+  }
+  const destination = validateWatchlistAdditionDestination({ watchlistId, insertionPosition });
+  if (!destination.success) {
+    return destination.failure;
   }
 
   return dispatchWatchlistAddition({ watchlistId, media, insertionPosition, referenceItemId });

@@ -2,8 +2,8 @@ import { providerAdditionFailure } from "./ProviderAdditionFailure.server";
 import { watchlistItems } from "@/db/Schema";
 import { getComicIssue } from "@/integrations/comicvine/ComicvineIssueDetail.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
-import { persistAddedItems } from "./Insert.server";
-import { rejectAdd, addedItemsResult, type WatchlistWriteResult } from "./AdditionOutcome";
+import { persistAddedItems } from "@/features/watchlists/InsertOrderedItem.server";
+import { rejectAdd, type WatchlistWriteResult } from "./AdditionOutcome";
 
 const COMICVINE_UNAVAILABLE_MESSAGE =
   "Comic additions are unavailable because the ComicVine integration is not configured.";
@@ -26,34 +26,14 @@ export async function addComicIssueToWatchlist({
 
   return getComicIssue(issueId, apiKey).then(
     (issue) =>
-      persistComicIssue({ watchlistId, issue, parent, insertionPosition, referenceItemId }),
+      persistAddedItems({
+        watchlistId,
+        insertionPosition,
+        referenceItemId,
+        items: [mapIssueToWatchlistItem(watchlistId, issue, parent)],
+        addedMessage: "Added 1 issue to watchlist",
+      }),
     (error: unknown) => providerAdditionFailure(error, "ComicVine"),
-  );
-}
-
-async function persistComicIssue({
-  watchlistId,
-  issue,
-  parent,
-  insertionPosition,
-  referenceItemId,
-}: {
-  watchlistId: number;
-  issue: Awaited<ReturnType<typeof getComicIssue>>;
-  parent?: { providerId?: string | null; title?: string | null };
-  insertionPosition?: AddToWatchlistInsertionPosition;
-  referenceItemId?: number;
-}): Promise<WatchlistWriteResult> {
-  const result = await persistAddedItems({
-    watchlistId,
-    insertionPosition,
-    referenceItemId,
-    items: [mapIssueToWatchlistItem(watchlistId, issue, parent)],
-  });
-  if (!result.success) return { ...result, affectedCount: 0 };
-  return addedItemsResult(
-    result.insertedCount,
-    result.insertedCount === 0 ? "Already in watchlist" : "Added 1 issue to watchlist",
   );
 }
 

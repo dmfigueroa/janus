@@ -5,7 +5,7 @@ import type { WatchlistMedia } from "./Mutation";
 import * as repository from "@/features/watchlists/Repository.server";
 import { fetchTmdbSeason, fetchTmdbTv, type TMDBEpisode } from "@/server/providers/TmdbApi.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
-import { persistAddedItems } from "./Insert.server";
+import { persistAddedItems } from "@/features/watchlists/InsertOrderedItem.server";
 import { addedItemsResult, type WatchlistWriteResult } from "./AdditionOutcome";
 
 const limit = pLimit(5);
@@ -47,24 +47,17 @@ async function addNewEpisodes(
   referenceItemId?: number,
 ): Promise<WatchlistWriteResult> {
   const newEpisodes = await filterNewEpisodes(watchlistId, items);
-  if (newEpisodes.length === 0) {
-    return addedItemsResult(0, "No new episodes found for this show", "no_new_items");
-  }
-
-  const result = await persistAddedItems({
+  return persistAddedItems({
     watchlistId,
     insertionPosition,
     referenceItemId,
     items: newEpisodes,
+    unchangedCode: "no_new_items",
+    unchangedMessage: "No new episodes found for this show",
+    addedMessage: (count) =>
+      `Added ${count} ${count === 1 ? "new episode" : "new episodes"} to watchlist`,
   });
-  if (!result.success) {
-    return { ...result, affectedCount: 0 };
-  }
-
-  return episodesAddedResult(result.insertedCount);
 }
-
-// --- Implementation Details ---
 
 export async function fetchEpisodesAcrossSeasons(
   tmdbId: number,
@@ -115,13 +108,4 @@ export async function filterNewEpisodes(
 ) {
   const existingIds = await repository.getExistingEpisodesInWatchlist(watchlistId);
   return episodes.filter((e) => !existingIds.has(e.tmdbId ?? ""));
-}
-
-function episodesAddedResult(count: number): WatchlistWriteResult {
-  const label = count === 1 ? "new episode" : "new episodes";
-  return addedItemsResult(
-    count,
-    count > 0 ? `Added ${count} ${label} to watchlist` : "No new episodes found for this show",
-    "no_new_items",
-  );
 }

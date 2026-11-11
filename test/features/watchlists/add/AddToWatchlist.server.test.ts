@@ -416,7 +416,7 @@ describe("anchored add to custom-ordered watchlist", () => {
     expect(detail?.items.map((item) => item.title)).toEqual(["Existing"]);
   });
 
-  it("trails batch siblings after the anchor in customRank order", async () => {
+  it("orders multi-item batch siblings by release date and filters duplicates when inserting relative to an anchor", async () => {
     const watchlist = await createTestWatchlist(db, {
       name: "Trailing Siblings",
       itemOrderMode: "custom",
@@ -424,9 +424,10 @@ describe("anchored add to custom-ordered watchlist", () => {
     const [, anchor] = await Promise.all([
       createTestWatchlistItem(db, {
         watchlistId: watchlist.id,
-        tmdbId: "trail-prev",
-        source: "custom",
-        title: "Pre Anchor",
+        tmdbId: "1001",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Already Present Episode",
         customRank: 1,
       }),
       createTestWatchlistItem(db, {
@@ -436,33 +437,81 @@ describe("anchored add to custom-ordered watchlist", () => {
         title: "Anchor",
         customRank: 2,
       }),
+      createTestWatchlistItem(db, {
+        watchlistId: watchlist.id,
+        tmdbId: "trail-tail",
+        source: "custom",
+        title: "Tail",
+        customRank: 3,
+      }),
     ]);
 
     process.env.TMDB_API_KEY = "test-tmdb-key";
-    getMovieDetailsMock.mockResolvedValue({
-      title: "Anchor Movie One",
+    getTVDetailsMock.mockResolvedValue({
+      name: "Anchored Show",
       poster_path: null,
-      release_date: "2024-02-03",
-      vote_average: 8.7,
-      runtime: 127,
+      seasons: [{ season_number: 1 }],
     });
-    await addProviderMediaToWatchlist({
+    getSeasonDetailsMock.mockResolvedValue({
+      episodes: [
+        {
+          id: 1001,
+          name: "Already Present Episode",
+          season_number: 1,
+          episode_number: 1,
+          still_path: null,
+          air_date: "2024-01-01",
+          vote_average: 7,
+          runtime: 40,
+        },
+        {
+          id: 1003,
+          name: "Later Episode",
+          season_number: 1,
+          episode_number: 3,
+          still_path: null,
+          air_date: "2024-02-15",
+          vote_average: 8,
+          runtime: 45,
+        },
+        {
+          id: 1002,
+          name: "Earlier Episode",
+          season_number: 1,
+          episode_number: 2,
+          still_path: null,
+          air_date: "2024-01-10",
+          vote_average: 7.5,
+          runtime: 42,
+        },
+      ],
+    });
+    const result = await addProviderMediaToWatchlist({
       watchlistId: watchlist.id,
       provider: "tmdb",
-      providerId: "anchor-movie-1",
-      mediaType: "movie",
+      providerId: "42",
+      mediaType: "tv",
       insertionPosition: "after",
       referenceItemId: anchor.id,
+    });
+
+    expect(result).toEqual({
+      success: true,
+      code: "added",
+      affectedCount: 2,
+      message: "Added 2 new episodes to watchlist",
     });
 
     const detail = await readWatchlistDetail({
       watchlistId: watchlist.id,
       unwatchedOnly: false,
     });
-    expect(detail?.items.map((item) => item.title)).toEqual([
-      "Pre Anchor",
-      "Anchor",
-      "Anchor Movie One",
+    expect(detail?.items.map((item) => [item.title, item.customRank])).toEqual([
+      ["Already Present Episode", 1],
+      ["Anchor", 2],
+      ["Earlier Episode", 3],
+      ["Later Episode", 4],
+      ["Tail", 5],
     ]);
   });
 });

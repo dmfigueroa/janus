@@ -178,12 +178,12 @@ describe("custom item addition", () => {
     });
   });
 
-  it("inserts at the beginning of a custom-ordered watchlist when requested", async () => {
+  it("inserts at beginning, end, before, and after in a custom-ordered watchlist", async () => {
     const watchlist = await createTestWatchlist(db, {
       name: "Priority Queue",
       itemOrderMode: "custom",
     });
-    await createTestWatchlistItem(db, {
+    const firstExisting = await createTestWatchlistItem(db, {
       watchlistId: watchlist.id,
       tmdbId: "existing-1",
       source: "custom",
@@ -198,13 +198,125 @@ describe("custom item addition", () => {
       year: "2025",
       insertionPosition: "beginning",
     });
+    await addCustomItemToWatchlist({
+      watchlistId: watchlist.id,
+      title: "Before Existing",
+      mediaType: "movie",
+      year: "2025",
+      insertionPosition: "before",
+      referenceItemId: firstExisting.id,
+    });
+    await addCustomItemToWatchlist({
+      watchlistId: watchlist.id,
+      title: "After Existing",
+      mediaType: "movie",
+      year: "2025",
+      insertionPosition: "after",
+      referenceItemId: firstExisting.id,
+    });
+    await addCustomItemToWatchlist({
+      watchlistId: watchlist.id,
+      title: "Tail Pick",
+      mediaType: "movie",
+      year: "2025",
+      insertionPosition: "end",
+    });
+
     const items = await db
       .select()
       .from(schema.watchlistItems)
       .where(eq(schema.watchlistItems.watchlistId, watchlist.id))
       .orderBy(schema.watchlistItems.customRank);
 
-    expect(items.map((item) => item.title)).toEqual(["Urgent Pick", "Existing First"]);
+    expect(items.map((item) => [item.title, item.customRank])).toEqual([
+      ["Urgent Pick", 1],
+      ["Before Existing", 2],
+      ["Existing First", 3],
+      ["After Existing", 4],
+      ["Tail Pick", 5],
+    ]);
+  });
+
+  it("rejects anchored insertion on a release-ordered watchlist with not_custom_mode", async () => {
+    const watchlist = await createTestWatchlist(db, {
+      name: "Release Ordered",
+      itemOrderMode: "release",
+    });
+    const existing = await createTestWatchlistItem(db, {
+      watchlistId: watchlist.id,
+      tmdbId: "existing-1",
+      source: "custom",
+      title: "Existing",
+    });
+
+    const result = await addCustomItemToWatchlist({
+      watchlistId: watchlist.id,
+      title: "Anchored Custom",
+      mediaType: "movie",
+      insertionPosition: "before",
+      referenceItemId: existing.id,
+    });
+
+    expect(result).toEqual({
+      success: false,
+      code: "not_custom_mode",
+      message: "Anchored insertion is only available in custom mode.",
+      affectedCount: 0,
+    });
+  });
+
+  it("rejects anchored insertion with a missing or unknown reference item with invalid_reference", async () => {
+    const watchlist = await createTestWatchlist(db, {
+      name: "Custom Queue",
+      itemOrderMode: "custom",
+    });
+    await createTestWatchlistItem(db, {
+      watchlistId: watchlist.id,
+      tmdbId: "existing-1",
+      source: "custom",
+      title: "Existing",
+      customRank: 1,
+    });
+
+    const missingRefResult = await addCustomItemToWatchlist({
+      watchlistId: watchlist.id,
+      title: "No Ref",
+      mediaType: "movie",
+      insertionPosition: "after",
+      referenceItemId: 999_999,
+    });
+
+    expect(missingRefResult).toEqual({
+      success: false,
+      code: "invalid_reference",
+      message: "Reference item 999999 is not in this watchlist.",
+      affectedCount: 0,
+    });
+  });
+
+  it("updates lastItemAddedAt while preserving rotation timestamps (lastWatchedAt and pausedAt)", async () => {
+    const lastWatchedAt = "2025-01-01T12:00:00.000Z";
+    const pausedAt = "2025-01-02T12:00:00.000Z";
+    const watchlist = await createTestWatchlist(db, {
+      name: "Rotation Preserved",
+      lastWatchedAt,
+      pausedAt,
+    });
+
+    await addCustomItemToWatchlist({
+      watchlistId: watchlist.id,
+      title: "Fresh Addition",
+      mediaType: "movie",
+    });
+
+    const [updated] = await db
+      .select()
+      .from(schema.watchlists)
+      .where(eq(schema.watchlists.id, watchlist.id));
+
+    expect(updated?.lastWatchedAt).toBe(lastWatchedAt);
+    expect(updated?.pausedAt).toBe(pausedAt);
+    expect(updated?.lastItemAddedAt).toEqual(expect.any(String));
   });
 
   it("returns a not-found failure for a missing watchlist", async () => {
