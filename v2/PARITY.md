@@ -1,17 +1,27 @@
 # V2 parity baseline
 
-Source: b86d920c7faa347a3af04ffda13f163f461e0616 (2026-11-11).
-Coolify latest finished v1 deployment (inspected 2026-11-11):
-66bc894630f2360296c3fd089dd1d01c92b6ff60. This is deployment-history evidence;
-running-container reconciliation remains unverified. See ../deploy/README.md.
-Source delta from baseline: #275 adds the v2 scaffold; #276 changes Rust CI.
-Neither changes v1 product behavior. Transition Compose configuration for Coolify-managed builds is prepared; it is not deployed.
-This source inventory must be amended when v1 changes. No product parity is claimed.
+Parity source and running v1 image: `669a385b8efa855adfad93f73b734cc5c9a4e709`
+(verified 2026-11-11 through Coolify deployment history and Docker image inspection).
+The previous source baseline was `b86d920c7faa347a3af04ffda13f163f461e0616`.
+The intervening #275, #276 and #277 changes add v2 scaffold, Rust CI and deployment
+configuration; they do not change v1 product behavior.
+
+Running v1 mounts `h8gsos0k40kk8s8oo8o4ko0w-DB` at `/app/storage`; the database is
+`/app/storage/sqlite.db`. Directory permissions are 755 root:root, database 644 root:root.
+A separately deployed `janus-v2` smoke application also mounts this exact volume at the
+same directory. Both images currently run as root. This differs from the parent spec's
+same-application Compose topology: the checked-in Compose configuration remains prepared,
+while live Coolify currently uses two Dockerfile applications. No topology change is claimed.
+
+For each later v1 commit, inspect `git diff <baseline>..<new revision> -- src public drizzle`,
+append the revision and behavioral delta here, update affected workflow/tool/provider/PWA
+rows, and rerun their evidence before advancing the baseline. Schema deltas require explicit
+compatibility reconciliation and regeneration of the v1 schema contract through migrations.
 
 ## Setup evidence
 
 - [x] Independent Rust crate, rendered smoke page, local assets and mounted MCP.
-- [ ] Database compatibility readiness (setup deliberately returns 503).
+- [x] Local fail-closed database compatibility and readiness.
 - [ ] Deployed revision reconciliation and protected routing.
 
 ## Workflow checklist
@@ -65,3 +75,16 @@ Each tool remains unported. Contracts live in src/app/mcp at the source revision
 - [ ] skip_watchlists
 - [ ] update_lineups
 - [ ] update_watchlists
+
+## Issue #253 evidence
+
+Local SQLite/HTTP integration tests create disposable files with v1's actual Drizzle migrator.
+They cover missing/incompatible databases, schema and byte preservation, WAL preservation,
+nullable watched values, JSON authors, timestamp strings, stable IDs, custom ordering,
+HTML escaping, search/filtering, MCP discovery/envelopes/cursors/title grouping, session
+termination, and visibility of subsequent v1 writes. A bounded exclusive-lock test covers
+startup contention. These are local tests, not deployed or real-client acceptance.
+
+The connection remains read-only in this slice. V2-to-v1 writes, mutation rollback and
+reordering interaction evidence remain with #254/#255. No write compatibility is claimed.
+Browser/PWA, real-client, real-device and owner acceptance remain independent gates.

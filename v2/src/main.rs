@@ -15,12 +15,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let address: SocketAddr = std::env::var("JANUS_V2_BIND")
         .unwrap_or_else(|_| "127.0.0.1:3001".into())
         .parse()?;
+    let path = std::env::var("DATABASE_URL").map_err(|_| "DATABASE_URL is required")?;
+    let database = janus_v2::open_database(std::path::Path::new(&path)).await?;
     let listener = tokio::net::TcpListener::bind(address).await?;
     eprintln!(
-        "Janus v2 listening on {}; database readiness unavailable",
+        "Janus v2 listening on {}; database compatibility validated",
         listener.local_addr()?
     );
-    axum::serve(listener, janus_v2::router())
+    axum::serve(listener, janus_v2::database_router(database))
         .with_graceful_shutdown(async {
             let _ = tokio::signal::ctrl_c().await;
         })

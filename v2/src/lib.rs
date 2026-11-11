@@ -1,3 +1,5 @@
+mod database;
+pub use database::open_database;
 mod features;
 
 use axum::{
@@ -6,7 +8,7 @@ use axum::{
     routing::get,
 };
 use rmcp::transport::streamable_http_server::{
-    StreamableHttpService, session::local::LocalSessionManager,
+    StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
 };
 use std::sync::Arc;
 
@@ -15,22 +17,32 @@ struct SetupMcp;
 impl rmcp::ServerHandler for SetupMcp {}
 
 pub fn router() -> Router {
-    let mcp = StreamableHttpService::new(
-        || Ok(SetupMcp),
-        Arc::new(LocalSessionManager::default()),
-        Default::default(),
-    );
+    base_router(false).nest_service(
+        "/v2/mcp",
+        StreamableHttpService::new(
+            || Ok(SetupMcp),
+            sessions(),
+            StreamableHttpServerConfig::default().with_json_response(true),
+        ),
+    )
+}
+
+fn base_router(database_ready: bool) -> Router {
     Router::new()
         .route("/v2", get(features::smoke::page))
         .route("/v2/", get(features::smoke::page))
         .route("/v2/health/live", get(|| async { "live" }))
         .route(
             "/v2/health/ready",
-            get(|| async {
-                (
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "Database compatibility has not been validated",
-                )
+            get(move || async move {
+                if database_ready {
+                    (StatusCode::OK, "Database compatibility validated")
+                } else {
+                    (
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "Database compatibility has not been validated",
+                    )
+                }
             }),
         )
         .route(
@@ -69,6 +81,51 @@ pub fn router() -> Router {
                 )
             }),
         )
-        .nest_service("/v2/mcp", mcp)
         .fallback(|| async { (StatusCode::NOT_FOUND, "Page not found") })
+}
+
+/// Construct the feature router only after the existing database passes validation.
+pub fn database_router(database: sea_orm::DatabaseConnection) -> Router {
+    let state = features::watchlists::Watchlists(database);
+    Router::new()
+        .route("/v2/watchlists", get(features::watchlists::web::list))
+        .route(
+            "/v2/watchlists/{id}",
+            get(features::watchlists::web::detail),
+        )
+        .with_state(state.clone())
+        .merge(base_router(true))
+        .nest_service(
+            "/v2/mcp",
+            StreamableHttpService::new(
+                move || Ok(features::watchlists::mcp::ReadMcp(state.clone())),
+                sessions(),
+                StreamableHttpServerConfig::default().with_json_response(true),
+            ),
+        )
+        .layer(axum::middleware::from_fn(mcp_compatibility))
+}
+
+fn sessions() -> Arc<LocalSessionManager> {
+    let mut manager = LocalSessionManager::default();
+    manager.session_config.keep_alive = Some(std::time::Duration::from_secs(15 * 60));
+    Arc::new(manager)
+}
+
+// Preserve v1's externally visible legacy transport responses around the SDK.
+async fn mcp_compatibility(
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let mcp = request.uri().path() == "/v2/mcp";
+    let deleting = request.method() == axum::http::Method::DELETE;
+    let mut response = next.run(request).await;
+    if mcp && deleting && response.status() == StatusCode::ACCEPTED {
+        *response.status_mut() = StatusCode::OK;
+    }
+    if mcp && response.status() == StatusCode::NOT_FOUND {
+        use axum::response::IntoResponse;
+        return (StatusCode::NOT_FOUND, "MCP session not found").into_response();
+    }
+    response
 }
