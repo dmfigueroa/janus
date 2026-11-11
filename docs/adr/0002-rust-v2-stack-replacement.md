@@ -12,6 +12,10 @@ V1 remains available until v2 passes a documented parity checklist covering web 
 
 One Rust application will serve web pages, static assets, and MCP. Web and MCP will call the same business operations. While the versions coexist, v1 is the sole owner of schema migrations; v2 checks database compatibility at startup and never changes the schema. V2 may update application data.
 
+Use an ORM for v2 database access; the specific ORM remains undecided. Preserve externally observable MCP tool names, inputs, outputs, and error behavior. Compatibility with v1 web URLs or its internal request protocol is not required.
+
+V2 must be deployed during the transition in the same Coolify application as v1, sharing the existing database volume. A shared container or Compose deployment is acceptable; the arrangement remains undecided. Existing MCP clients initially continue using v1, with a separate v2 MCP endpoint for compatibility testing. After parity checks and user acceptance, the existing MCP address switches to v2 without requiring client configuration changes.
+
 Open v2 pages need not receive automatic background updates for changes made through v1 or MCP. Changes may appear on the next navigation, refresh, or relevant action. Actions must validate current database state and reconcile their displayed results.
 
 Rust is a firm requirement rather than an option conditional on benchmarking. Actual resource savings remain to be measured. Rust libraries remain undecided. This decision supersedes ADR 0001's Chakra UI requirement for v2; ADR 0001 continues to govern v1. Preserve existing interaction behavior and accessibility in the replacement UI.
