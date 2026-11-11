@@ -119,6 +119,7 @@ async fn mcp_compatibility(
 ) -> axum::response::Response {
     let mcp = request.uri().path() == "/v2/mcp";
     let deleting = request.method() == axum::http::Method::DELETE;
+    let posting = request.method() == axum::http::Method::POST;
     let mut response = next.run(request).await;
     if mcp && deleting && response.status() == StatusCode::ACCEPTED {
         *response.status_mut() = StatusCode::OK;
@@ -127,5 +128,49 @@ async fn mcp_compatibility(
         use axum::response::IntoResponse;
         return (StatusCode::NOT_FOUND, "MCP session not found").into_response();
     }
+    if mcp
+        && posting
+        && response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .is_some_and(|value| value == "text/event-stream")
+    {
+        return legacy_json_response(response).await;
+    }
     response
+}
+
+async fn legacy_json_response(response: axum::response::Response) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    let (mut parts, body) = response.into_parts();
+    let Ok(bytes) = axum::body::to_bytes(body, usize::MAX).await else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Unable to read MCP response",
+        )
+            .into_response();
+    };
+    let terminal = String::from_utf8_lossy(&bytes)
+        .lines()
+        .filter_map(|line| line.strip_prefix("data: "))
+        .filter_map(|data| serde_json::from_str::<serde_json::Value>(data).ok())
+        .find(|message| {
+            message.get("id").is_some()
+                && (message.get("result").is_some() || message.get("error").is_some())
+        });
+    let Some(message) = terminal else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "Missing MCP response").into_response();
+    };
+    parts.headers.insert(
+        header::CONTENT_TYPE,
+        axum::http::HeaderValue::from_static("application/json"),
+    );
+    for key in [
+        header::CONTENT_LENGTH,
+        header::CACHE_CONTROL,
+        header::CONNECTION,
+    ] {
+        parts.headers.remove(key);
+    }
+    axum::response::Response::from_parts(parts, axum::body::Body::from(message.to_string()))
 }

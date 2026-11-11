@@ -147,19 +147,16 @@ async fn rpc(
 }
 async fn result(response: axum::response::Response) -> Value {
     assert_eq!(response.status(), StatusCode::OK);
-    let text = body(response).await;
-    let text = text
-        .lines()
-        .filter_map(|line| line.strip_prefix("data: "))
-        .find(|line| !line.is_empty())
-        .unwrap_or(&text);
-    serde_json::from_str::<Value>(text).unwrap()["result"].clone()
+    assert_eq!(response.headers()["content-type"], "application/json");
+    serde_json::from_str::<Value>(&body(response).await).unwrap()["result"].clone()
 }
+
 #[tokio::test]
 async fn mcp_discovers_and_reads_existing_watchlist_with_baseline_envelopes_and_pagination() {
     let fixture = Fixture::v1();
     let app = janus_v2::database_router(janus_v2::open_database(&fixture.0).await.unwrap());
     let response=rpc(&app,json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"read-test","version":"1"}}}),None).await;
+    assert_eq!(response.headers()["content-type"], "application/json");
     let session = response.headers()["mcp-session-id"]
         .to_str()
         .unwrap()
