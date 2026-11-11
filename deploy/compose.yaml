@@ -1,0 +1,42 @@
+# Transition stack for the existing Janus Coolify application only.
+# Images must be immutable, externally built references (prefer sha256 digests).
+services:
+  v1:
+    image: ${JANUS_V1_IMAGE:?Set the externally built v1 image digest}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: /app/storage/sqlite.db
+      TMDB_API_KEY: ${TMDB_API_KEY:?}
+      COMICVINE_API_KEY: ${COMICVINE_API_KEY:?}
+      RAWG_API_KEY: ${RAWG_API_KEY:?}
+      GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY:?}
+    volumes:
+      - database:/app/storage
+    expose:
+      - "3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+  v2:
+    image: ${JANUS_V2_IMAGE:?Set the externally built v2 image digest}
+    restart: unless-stopped
+    environment:
+      JANUS_V2_BIND: 0.0.0.0:3001
+      DATABASE_URL: /app/storage/sqlite.db
+    volumes:
+      - database:/app/storage
+    expose:
+      - "3001"
+    # Image healthcheck proves smoke liveness, not database or feature readiness.
+volumes:
+  database:
+    external: true
+    name: h8gsos0k40kk8s8oo8o4ko0w-DB
