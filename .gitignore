@@ -13,3 +13,5 @@ count.txt
 todos.json
 *.db
 .agents/handoffs/
+
+/v2/target/
