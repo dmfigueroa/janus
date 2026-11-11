@@ -10,4 +10,8 @@ V2 will live alongside v1 under `v2/` in this repository, with independent build
 
 V1 remains available until v2 passes a documented parity checklist covering web workflows, MCP, provider integrations, PWA behavior, and shared-database compatibility. The user's acceptance of the actual application is required before retiring v1; automated test results alone do not authorize retirement.
 
+One Rust application will serve web pages, static assets, and MCP. Web and MCP will call the same business operations. While the versions coexist, v1 is the sole owner of schema migrations; v2 checks database compatibility at startup and never changes the schema. V2 may update application data.
+
+Open v2 pages need not receive automatic background updates for changes made through v1 or MCP. Changes may appear on the next navigation, refresh, or relevant action. Actions must validate current database state and reconcile their displayed results.
+
 Rust is a firm requirement rather than an option conditional on benchmarking. Actual resource savings remain to be measured. Rust libraries remain undecided. This decision supersedes ADR 0001's Chakra UI requirement for v2; ADR 0001 continues to govern v1. Preserve existing interaction behavior and accessibility in the replacement UI.
