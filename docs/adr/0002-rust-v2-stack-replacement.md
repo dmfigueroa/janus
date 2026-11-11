@@ -18,4 +18,8 @@ V2 must be deployed during the transition in the same Coolify application as v1.
 
 Open v2 pages need not receive automatic background updates for changes made through v1 or MCP. Changes may appear on the next navigation, refresh, or relevant action. Actions must validate current database state and reconcile their displayed results.
 
-Rust is a firm requirement rather than an option conditional on benchmarking. Actual resource savings remain to be measured. HTTP, template, and MCP libraries remain undecided. This decision supersedes ADR 0001's Chakra UI requirement for v2; ADR 0001 continues to govern v1. Preserve existing interaction behavior and accessibility in the replacement UI.
+Use Axum and Tokio for HTTP, Askama for server-rendered HTML templates, and the official `rmcp` SDK for MCP. Askama template compilation happens during the off-host Rust build; browser JavaScript and CSS require no frontend compilation. Verify existing MCP session and response behavior before declaring compatibility.
+
+Start with one Rust crate under `v2/`, organized by feature. Thin web and MCP handlers call shared feature operations; ORM entities and provider adapters stay behind those operations. Split crates only when a concrete need appears. This extends the repository's feature ownership model to v2 without carrying over TanStack-specific boundaries.
+
+Rust is a firm requirement rather than an option conditional on benchmarking. Actual resource savings remain to be measured. This decision supersedes ADR 0001's Chakra UI requirement for v2; ADR 0001 continues to govern v1. Preserve existing interaction behavior and accessibility in the replacement UI.
