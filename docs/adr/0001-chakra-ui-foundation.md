@@ -1,6 +1,6 @@
 # ADR 0001: Use Chakra UI As The Shared UI Foundation
 
-- Status: Accepted
+- Status: Accepted for v1; superseded for v2 by [ADR 0002: Rust v2](0002-rust-v2.md)
 - Date: 2026-08-20
 
 ## Context
