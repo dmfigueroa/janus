@@ -24,8 +24,9 @@ Before activating Compose in the SAME Coolify application:
 
 1. Confirm existing volume identity and non-destructively inspect the database file,
    directory permissions, and sidecar access with the intended image identity.
-2. Preserve v1's existing hostname and port 3000 mapping. Route the separately protected
-   v2 test hostname to v2 port 3001; its /mcp path is the separate MCP testing surface.
+2. Preserve v1's existing hostname and port 3000 mapping. Route Host(`janus.dmfigueroa.com`) with Path(`/v2`) or PathPrefix(`/v2/`)
+   to v2 port 3001 with higher priority than v1. Preserve the prefix (no stripping).
+   The MCP testing endpoint is /v2/mcp. The existing hostname is reused; deployed Access coverage remains to be verified.
    Confirm Cloudflare Access protects both paths before exposing them. Do not point
    existing MCP clients at v2. No host ports are published by this file.
 3. Configure existing application Compose location /deploy/compose.yaml and registry
@@ -35,6 +36,6 @@ Before activating Compose in the SAME Coolify application:
 5. Record image digests, routing, mounts, permissions, and deployed results here and in
    v2/PARITY.md. No deployed verification has been completed by this configuration change.
 
-V2 /health/live is smoke liveness. /health/ready deliberately returns 503 until #253.
+V2 /v2/health/live is smoke liveness. /v2/health/ready deliberately returns 503 until #253.
 Do not use readiness as a proxy routing check yet or claim database/feature readiness.
 No final cutover or v1 retirement is included.
