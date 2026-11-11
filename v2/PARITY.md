@@ -1,7 +1,11 @@
 # V2 parity baseline
 
 Source: b86d920c7faa347a3af04ffda13f163f461e0616 (2026-11-11).
-Deployed revision: unverified; deployment/source reconciliation is an outstanding gate.
+Coolify latest finished v1 deployment (inspected 2026-11-11):
+66bc894630f2360296c3fd089dd1d01c92b6ff60. This is deployment-history evidence;
+running-container reconciliation remains unverified. See ../deploy/README.md.
+Source delta from baseline: #275 adds the v2 scaffold; #276 changes Rust CI.
+Neither changes v1 product behavior. Transition Compose configuration for Coolify-managed builds is prepared; it is not deployed.
 This source inventory must be amended when v1 changes. No product parity is claimed.
 
 ## Setup evidence

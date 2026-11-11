@@ -21,10 +21,11 @@ pub fn router() -> Router {
         Default::default(),
     );
     Router::new()
-        .route("/", get(features::smoke::page))
-        .route("/health/live", get(|| async { "live" }))
+        .route("/v2", get(features::smoke::page))
+        .route("/v2/", get(features::smoke::page))
+        .route("/v2/health/live", get(|| async { "live" }))
         .route(
-            "/health/ready",
+            "/v2/health/ready",
             get(|| async {
                 (
                     StatusCode::SERVICE_UNAVAILABLE,
@@ -33,7 +34,7 @@ pub fn router() -> Router {
             }),
         )
         .route(
-            "/static/app.css",
+            "/v2/static/app.css",
             get(|| async {
                 (
                     [(header::CONTENT_TYPE, "text/css")],
@@ -42,7 +43,7 @@ pub fn router() -> Router {
             }),
         )
         .route(
-            "/static/app.js",
+            "/v2/static/app.js",
             get(|| async {
                 (
                     [(header::CONTENT_TYPE, "text/javascript")],
@@ -51,7 +52,7 @@ pub fn router() -> Router {
             }),
         )
         .route(
-            "/static/vendor/htmx.min.js",
+            "/v2/static/vendor/htmx.min.js",
             get(|| async {
                 (
                     [(header::CONTENT_TYPE, "text/javascript")],
@@ -60,7 +61,7 @@ pub fn router() -> Router {
             }),
         )
         .route(
-            "/static/vendor/Sortable.min.js",
+            "/v2/static/vendor/Sortable.min.js",
             get(|| async {
                 (
                     [(header::CONTENT_TYPE, "text/javascript")],
@@ -68,6 +69,6 @@ pub fn router() -> Router {
                 )
             }),
         )
-        .nest_service("/mcp", mcp)
+        .nest_service("/v2/mcp", mcp)
         .fallback(|| async { (StatusCode::NOT_FOUND, "Page not found") })
 }

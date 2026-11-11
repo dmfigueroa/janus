@@ -8,9 +8,9 @@ use tower::ServiceExt;
 async fn smoke_is_live_but_database_readiness_is_unavailable() {
     let application = janus_v2::router();
     for (path, expected) in [
-        ("/", StatusCode::OK),
-        ("/health/live", StatusCode::OK),
-        ("/health/ready", StatusCode::SERVICE_UNAVAILABLE),
+        ("/v2", StatusCode::OK),
+        ("/v2/health/live", StatusCode::OK),
+        ("/v2/health/ready", StatusCode::SERVICE_UNAVAILABLE),
     ] {
         let response = application
             .clone()
@@ -24,10 +24,10 @@ async fn smoke_is_live_but_database_readiness_is_unavailable() {
 #[tokio::test]
 async fn browser_assets_are_served_locally() {
     for path in [
-        "/static/app.css",
-        "/static/app.js",
-        "/static/vendor/htmx.min.js",
-        "/static/vendor/Sortable.min.js",
+        "/v2/static/app.css",
+        "/v2/static/app.js",
+        "/v2/static/vendor/htmx.min.js",
+        "/v2/static/vendor/Sortable.min.js",
     ] {
         let response = janus_v2::router()
             .oneshot(Request::builder().uri(path).body(Body::empty()).unwrap())
@@ -42,7 +42,7 @@ async fn browser_assets_are_served_locally() {
 async fn mcp_initializes_in_the_web_process_without_product_tools() {
     use http_body_util::BodyExt;
     let response = janus_v2::router().oneshot(
-        Request::builder().method("POST").uri("/mcp")
+        Request::builder().method("POST").uri("/v2/mcp")
             .header("content-type", "application/json")
             .header("host", "localhost:3001")
             .header("accept", "application/json, text/event-stream")
