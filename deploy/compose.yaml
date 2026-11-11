@@ -1,8 +1,10 @@
 # Transition stack for the existing Janus Coolify application only.
-# Images must be immutable, externally built references (prefer sha256 digests).
+# Coolify builds these services on its build server and deploys to its deployment server.
 services:
   v1:
-    image: ${JANUS_V1_IMAGE:?Set the externally built v1 image digest}
+    build:
+      context: ..
+      dockerfile: Dockerfile
     restart: unless-stopped
     environment:
       DATABASE_URL: /app/storage/sqlite.db
@@ -26,7 +28,9 @@ services:
       timeout: 5s
       start_period: 30s
   v2:
-    image: ${JANUS_V2_IMAGE:?Set the externally built v2 image digest}
+    build:
+      context: ..
+      dockerfile: v2/Dockerfile
     restart: unless-stopped
     environment:
       JANUS_V2_BIND: 0.0.0.0:3001

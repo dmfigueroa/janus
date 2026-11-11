@@ -15,10 +15,11 @@ image identity; actual file permissions and running mounts are not yet verified.
 No chmod, chown, schema migration transfer, or database initialization is introduced.
 V1 retains its image startup command and migration ownership.
 
-Run the Publish transition images workflow on the reviewed revision. Builds run on
-GitHub runners, not the deployment server. Record both resulting image digests and set
-JANUS_V1_IMAGE and JANUS_V2_IMAGE to those immutable references. Configure the existing
-server's GHCR login for retrieval if the packages are private; never commit credentials.
+Coolify manages builds, image publishing/retrieval, and deployment using its existing
+build server and separate deployment server. Compose defines the v1 and v2 Dockerfile
+builds independently, with repository-root build contexts. There is no GitHub Actions
+image publishing workflow or manually supplied image-reference environment variable.
+Use the existing Coolify pipeline and registry configuration.
 
 Before activating Compose in the SAME Coolify application:
 
@@ -29,8 +30,7 @@ Before activating Compose in the SAME Coolify application:
    The MCP testing endpoint is /v2/mcp. The existing hostname is reused; deployed Access coverage remains to be verified.
    Confirm Cloudflare Access protects both paths before exposing them. Do not point
    existing MCP clients at v2. No host ports are published by this file.
-3. Configure existing application Compose location /deploy/compose.yaml and registry
-   references, retain existing provider environment values, then deploy.
+3. Configure existing application Compose location /deploy/compose.yaml using the repository root as the build context, retain existing provider environment values, then deploy.
 4. Verify v1 web and MCP remain reachable, v2 smoke and local assets respond, unauthorized
    v2 web/MCP requests are blocked by Access, and authorized requests reach v2.
 5. Record image digests, routing, mounts, permissions, and deployed results here and in
