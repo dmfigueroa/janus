@@ -67,7 +67,7 @@ pub async fn detail(
         .map_err(failure)?
         .ok_or((StatusCode::NOT_FOUND, "Watchlist not found"))?;
     let list = &data["watchlist"];
-    let query = filters.query.to_ascii_lowercase();
+    let query = filters.query.trim().to_ascii_lowercase();
     let rows: Vec<Row> = data["items"]
         .as_array()
         .unwrap()

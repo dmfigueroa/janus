@@ -93,8 +93,17 @@ impl ServerHandler for ReadMcp {
             )
             .await
         {
-            Ok(data) => Ok(CallToolResult::structured(data).into()),
-            Err(message) => Ok(CallToolResult::error(vec![ContentBlock::text(message)]).into()),
+            Ok(data) => {
+                let mut result = CallToolResult::structured(data);
+                result.result_type = None;
+                result.is_error = None;
+                Ok(result.into())
+            }
+            Err(message) => {
+                let mut result = CallToolResult::error(vec![ContentBlock::text(message)]);
+                result.result_type = None;
+                Ok(result.into())
+            }
         }
     }
 }

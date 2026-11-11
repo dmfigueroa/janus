@@ -182,6 +182,8 @@ async fn mcp_discovers_and_reads_existing_watchlist_with_baseline_envelopes_and_
     .await;
     assert_eq!(tools["tools"].as_array().unwrap().len(), 4);
     let read=result(rpc(&app,json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_watchlist","arguments":{"watchlistId":41,"pageSize":1}}}),Some(&session)).await).await;
+    assert!(read.get("resultType").is_none());
+    assert!(read.get("isError").is_none());
     let data = &read["structuredContent"];
     assert_eq!(data["items"][0]["id"], 102);
     assert_eq!(data["watchlist"]["stats"]["watchedItems"], 1);
