@@ -1,6 +1,6 @@
 # V2 Frontend Without Compilation: Feasibility
 
-Investigation date: 2026-11-11. This is source and documentation research, not a tested v2 implementation or a settled frontend decision.
+Investigation date: 2026-11-11. This is source and documentation research, not a tested v2 implementation. The candidate direction was subsequently accepted in ADR 0002, subject to validating the hardest interactions.
 
 ## Finding
 
@@ -27,6 +27,6 @@ Keep keyboard reordering and announcements as explicit application behavior. Tes
 - [SortableJS documentation](https://github.com/SortableJS/Sortable): direct script installation, touch options, handles, drop callbacks, and disabling interaction.
 - [htmx sortable example](https://htmx.org/examples/sortable/): integration with SortableJS, persistence after drop, and disabling sorting during a request. The example is a starting point, not Janus's filtered-order or failure-handling implementation.
 
-## Next Decision
+## Validation Gate
 
-Adopt this as the candidate frontend direction only after design approval. Before committing to full replacement, validate the hardest watchlist reorder interaction with a small isolated prototype and explicit parity checks. No frontend framework or library has been selected by this document.
+The frontend direction is accepted in ADR 0002. Before implementing the full replacement, validate the hardest watchlist reorder interaction with a small isolated prototype and explicit parity checks. This research alone does not establish runtime resource savings or complete feature parity.
