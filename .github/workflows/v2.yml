@@ -5,7 +5,8 @@ on:
   pull_request:
     branches: [main]
 jobs:
-  rust:
+  format:
+    name: Rust Format
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -14,9 +15,45 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.94.0
         with:
-          components: rustfmt, clippy
+          components: rustfmt
       - run: cargo fmt --check
-      - run: cargo check --locked
+
+  clippy:
+    name: Rust Clippy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "v2 -> target"
+          shared-key: v2-debug
+          save-if: "false"
       - run: cargo clippy --locked --all-targets -- -D warnings
+
+  test:
+    name: Rust Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.94.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "v2 -> target"
+          shared-key: v2-debug
       - run: cargo test --locked
+      - uses: Swatinem/rust-cache@v2
+        if: github.event_name == 'push'
+        with:
+          workspaces: "v2 -> target"
+          shared-key: v2-release
       - run: cargo build --locked --release
+        if: github.event_name == 'push'
