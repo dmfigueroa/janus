@@ -88,3 +88,29 @@ startup contention. These are local tests, not deployed or real-client acceptanc
 The connection remains read-only in this slice. V2-to-v1 writes, mutation rollback and
 reordering interaction evidence remain with #254/#255. No write compatibility is claimed.
 Browser/PWA, real-client, real-device and owner acceptance remain independent gates.
+
+## Provider inventory at the baseline
+
+- [ ] TMDB movies and TV: search paging, details, TV-to-episode expansion, poster paths,
+      configured-key failures, duplicate/no-new-item and partial addition outcomes.
+- [ ] RAWG games: configured-key failures, search paging, details and additions.
+- [ ] Google Books: identifiers/ISBNs, authors, optional metadata, search paging and additions.
+- [ ] ComicVine: configured-key failures, volumes/issues, paging and volume expansion.
+- [ ] AniList anime/manga: preserve deliberate unavailable-category outcomes; do not enable
+      the dormant provider adapter simply because its implementation exists.
+
+Sources: `src/features/search/search/MediaSearch.server.ts`, `src/server/providers/*`,
+`src/server/Media.ts`, and addition feature operations at the baseline revision.
+All provider ports and live-provider evidence remain outstanding.
+
+## PWA inventory at the baseline
+
+- [ ] Manifest: Janus name/icons, standalone display, root start URL, pink theme/dark background.
+- [ ] Credential-aware service-worker registration, prompt-based updates and startup update checks.
+- [ ] Existing waiting-worker detection, persistent Update toast, reload after activation,
+      and visible/reportable registration/update failures.
+- [ ] Existing cache behavior and absent navigation fallback; no new offline-write semantics.
+- [ ] Install and update behavior on actual devices, independently of emulated viewport checks.
+
+Sources: `vite.config.ts`, `src/lib/PwaRegistration.ts`, `src/components/PwaUpdatePrompt.tsx`.
+No v2 PWA port or PWA acceptance is claimed by the read slice.

@@ -219,6 +219,36 @@ async fn mcp_discovers_and_reads_existing_watchlist_with_baseline_envelopes_and_
     );
     let invalid_selector=result(rpc(&app,json!({"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"find_watchlist_items","arguments":{"watchlistId":41,"watchlistItemId":101,"pageSize":1}}}),Some(&session)).await).await;
     assert_eq!(invalid_selector["isError"], true);
+
+    for (name, arguments) in [
+        ("list_watchlists", json!({"order":123})),
+        ("get_watchlist", json!({"watchlistId":41,"resultView":123})),
+        (
+            "find_watchlist_items",
+            json!({"watchlistId":999999,"watchlistItemId":-1}),
+        ),
+    ] {
+        let response=result(rpc(&app,json!({"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":name,"arguments":arguments}}),Some(&session)).await).await;
+        assert_eq!(response["isError"], true, "{response}");
+    }
+    let greek=result(rpc(&app,json!({"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"search_watchlists","arguments":{"query":"ος"}}}),Some(&session)).await).await;
+    assert_eq!(greek["structuredContent"]["watchlists"][0]["id"], 42);
+    for (name, arguments) in [
+        (
+            "get_watchlist",
+            json!({"watchlistId":41,"resultView":"titles","pageSize":1}),
+        ),
+        (
+            "find_watchlist_items",
+            json!({"watchlistId":41,"query":"show","pageSize":1}),
+        ),
+    ] {
+        let response=result(rpc(&app,json!({"jsonrpc":"2.0","id":22,"method":"tools/call","params":{"name":name,"arguments":arguments}}),Some(&session)).await).await;
+        let cursor = &response["structuredContent"]["nextCursor"];
+        assert!(cursor.is_string(), "{response}");
+        let crossed=result(rpc(&app,json!({"jsonrpc":"2.0","id":23,"method":"tools/call","params":{"name":"get_watchlist","arguments":{"watchlistId":41,"pageSize":1,"cursor":cursor}}}),Some(&session)).await).await;
+        assert_eq!(crossed["isError"], true, "{crossed}");
+    }
     let unknown = rpc(
         &app,
         json!({"jsonrpc":"2.0","id":10,"method":"tools/list"}),
@@ -309,10 +339,18 @@ async fn reads_refresh_after_v1_writes_without_restarting_or_changing_schema() {
     );
     change_v1(&fixture, "mutate");
     assert!(
-        body(app.oneshot(read()).await.unwrap())
+        body(app.clone().oneshot(read()).await.unwrap())
             .await
             .contains("2 of 3 watched")
     );
+    change_v1(&fixture, "release");
+    let released = body(app.oneshot(read()).await.unwrap()).await;
+    assert!(
+        released.find("data-item-id=\"101\"").unwrap()
+            < released.find("data-item-id=\"102\"").unwrap()
+    );
+    assert!(released.contains("<h2>2020</h2>"));
+    assert!(released.contains("<h2>TBA</h2>"));
 }
 
 #[tokio::test]

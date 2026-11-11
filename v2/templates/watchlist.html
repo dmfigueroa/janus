@@ -28,12 +28,12 @@
         ><button>Apply filters</button>
       </form>
       <div class="timeline">
-        {% for row in rows %}{% if mode == "release" %}{% if row.heading %}
-        <h2>{{row.year}}</h2>
-        {% endif %}{% endif %}{% if row.start_hidden %}
+        {% for run in runs %}{% if run.heading %}
+        <h2>{{run.year}}</h2>
+        {% endif %}{% if run.hidden %}
         <details class="watched-run">
-          <summary>{{row.hidden_count}} watched items</summary>
-          {% endif %}
+          <summary>{{run.rows.len()}} watched items</summary>
+          {% endif %} {% for row in run.rows %}
           <article data-item-id="{{row.id}}">
             {% if !row.poster.is_empty() %}<img
               class="poster {{row.media}}"
@@ -51,7 +51,7 @@
             </div>
             <span>{% if row.watched %}Watched{% else %}Unwatched{% endif %}</span>
           </article>
-          {% if row.end_hidden %}
+          {% endfor %}{% if run.hidden %}
         </details>
         {% endif %}{% else %}
         <p role="status">No items match these filters.</p>

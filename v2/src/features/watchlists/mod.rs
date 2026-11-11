@@ -72,13 +72,9 @@ impl Watchlists {
             .as_str()
             .unwrap_or("release")
             .to_owned();
-        let ordering = if mode == "custom" {
-            "custom_rank IS NULL,custom_rank,"
-        } else {
-            ""
-        };
         let sql = format!(
-            "SELECT * FROM watchlist_items WHERE watchlist_id = ? ORDER BY {ordering} CASE WHEN release_date IS NULL OR release_date = '' THEN 1 ELSE 0 END,release_date,id"
+            "SELECT * FROM watchlist_items WHERE watchlist_id=? ORDER BY {}",
+            item_order(&mode)
         );
         let items: Vec<Value> = transaction
             .query_all_raw(statement(&sql, vec![id.into()]))
@@ -154,14 +150,7 @@ impl Watchlists {
             return Ok(None);
         };
         let mut list = watchlist_record(&row)?;
-        let ordering = if list["itemOrderMode"] == "custom" {
-            "custom_rank IS NULL,custom_rank,"
-        } else {
-            ""
-        };
-        let ordering = format!(
-            "{ordering} CASE WHEN release_date IS NULL OR release_date='' THEN 1 ELSE 0 END,release_date,id"
-        );
+        let ordering = item_order(list["itemOrderMode"].as_str().unwrap());
         let counts=transaction.query_one_raw(statement("SELECT count(*) AS total,sum(CASE WHEN is_watched THEN 1 ELSE 0 END) AS watched FROM watchlist_items WHERE watchlist_id=?",vec![id.into()])).await?.unwrap();
         let total = counts.try_get::<i64>("", "total")?;
         let watched = counts.try_get::<Option<i64>>("", "watched")?.unwrap_or(0);
@@ -190,4 +179,17 @@ fn stats(total: usize, watched: usize, next: Option<&Value>, cover: Option<&Valu
         ((watched as f64 / total as f64 * 100.0).round() as usize).min(99)
     };
     json!({"totalItems":total,"watchedItems":watched,"progress":progress,"nextUnwatched":next,"coverImage":cover.map(|item| &item["posterPath"]),"coverMediaType":cover.map(|item| &item["mediaType"])})
+}
+
+mod validation;
+
+fn item_order(mode: &str) -> String {
+    let prefix = if mode == "custom" {
+        "custom_rank IS NULL,custom_rank,"
+    } else {
+        ""
+    };
+    format!(
+        "{prefix} CASE WHEN release_date IS NULL OR release_date='' THEN 1 ELSE 0 END,release_date,id"
+    )
 }

@@ -4,6 +4,11 @@ const { drizzle } = require("drizzle-orm/better-sqlite3");
 const { migrate } = require("drizzle-orm/better-sqlite3/migrator");
 const path = require("node:path");
 const database = new Database(process.argv[2]);
+if (process.argv[3] === "release") {
+  database.prepare("UPDATE watchlists SET item_order_mode = 'release' WHERE id = 41").run();
+  database.close();
+  process.exit(0);
+}
 if (process.argv[3] === "mutate") {
   database.prepare("UPDATE watchlist_items SET is_watched = 1 WHERE id = 101").run();
   database.close();
@@ -28,6 +33,7 @@ database
     "UPDATE watchlists SET created_at = '2020-01-01 12:30:00', updated_at = '2020-01-01T12:30:00.000Z' WHERE id = 41",
   )
   .run();
+database.prepare("INSERT INTO watchlists(id,name) VALUES(42, 'ΟΣ')").run();
 const insert = database.prepare(
   "INSERT INTO watchlist_items(id,watchlist_id,tmdb_id,source,media_type,title,parent_id,parent_title,episode,custom_rank,is_watched,authors,release_date) VALUES(?,41,?,?,?,?,?,?,?,?,?,?,?)",
 );

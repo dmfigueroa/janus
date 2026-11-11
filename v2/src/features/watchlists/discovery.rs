@@ -14,12 +14,12 @@ fn offset(arguments: &Value, binding: &Value) -> Result<usize, String> {
         .decode(cursor.as_str().ok_or_else(|| invalid("Invalid cursor."))?)
         .map_err(|_| invalid("Invalid cursor."))?;
     let cursor: Value = serde_json::from_slice(&decoded).map_err(|_| invalid("Invalid cursor."))?;
-    if binding
-        .as_object()
-        .unwrap()
-        .iter()
-        .any(|(key, value)| cursor.get(key) != Some(value))
-    {
+    let mut cursor_binding = cursor.clone();
+    let Some(object) = cursor_binding.as_object_mut() else {
+        return Err(invalid("Invalid cursor."));
+    };
+    object.remove("offset");
+    if cursor_binding != *binding {
         return Err(invalid("Invalid cursor."));
     }
     cursor["offset"]
@@ -96,6 +96,7 @@ fn titles(items: &[Value]) -> Vec<Value> {
 }
 impl Watchlists {
     pub async fn discover(&self, name: &str, arguments: Value) -> Result<Value, String> {
+        let arguments = super::validation::arguments(name, arguments)?;
         if name == "list_watchlists" || name == "search_watchlists" {
             return self.summaries(name, arguments).await;
         }

@@ -27,9 +27,10 @@ struct Page {
     total: u64,
     query: String,
     unwatched: bool,
-    rows: Vec<Row>,
+    runs: Vec<Run>,
     paused: bool,
 }
+#[derive(Clone)]
 struct Row {
     id: i64,
     title: String,
@@ -37,13 +38,15 @@ struct Row {
     episode: String,
     date: String,
     year: String,
-    heading: bool,
     watched: bool,
     poster: String,
     media: String,
-    start_hidden: bool,
-    end_hidden: bool,
-    hidden_count: usize,
+}
+struct Run {
+    year: String,
+    heading: bool,
+    hidden: bool,
+    rows: Vec<Row>,
 }
 type Failure = (StatusCode, &'static str);
 fn failure(error: impl std::fmt::Display) -> Failure {
@@ -65,7 +68,7 @@ pub async fn detail(
         .ok_or((StatusCode::NOT_FOUND, "Watchlist not found"))?;
     let list = &data["watchlist"];
     let query = filters.query.to_ascii_lowercase();
-    let mut rows: Vec<Row> = data["items"]
+    let rows: Vec<Row> = data["items"]
         .as_array()
         .unwrap()
         .iter()
@@ -85,7 +88,6 @@ pub async fn detail(
                 title: item["title"].as_str().unwrap_or("").into(),
                 parent: item["parentTitle"].as_str().unwrap_or("").into(),
                 episode: item["episode"].as_str().unwrap_or("").into(),
-                heading: false,
                 year: if date.is_empty() {
                     "TBA".into()
                 } else {
@@ -95,31 +97,25 @@ pub async fn detail(
                 watched: item["isWatched"] == true,
                 poster: poster(item["posterPath"].as_str().unwrap_or("")),
                 media: item["mediaType"].as_str().unwrap_or("").into(),
-                start_hidden: false,
-                end_hidden: false,
-                hidden_count: 0,
             }
         })
         .collect();
-    for index in 0..rows.len() {
-        rows[index].heading = (index == 0 || rows[index].year != rows[index - 1].year)
-            && list["itemOrderMode"] == "release";
-        rows[index].start_hidden = filters.unwatched
-            && rows[index].watched
-            && (index == 0 || !rows[index - 1].watched || rows[index].heading);
-        rows[index].end_hidden = filters.unwatched
-            && rows[index].watched
-            && (index + 1 == rows.len()
-                || !rows[index + 1].watched
-                || (list["itemOrderMode"] == "release"
-                    && rows[index].year != rows[index + 1].year));
-        rows[index].hidden_count = rows[index..]
-            .iter()
-            .take_while(|row| {
-                row.watched && (list["itemOrderMode"] != "release" || row.year == rows[index].year)
-            })
-            .count();
-    }
+    let release_mode = list["itemOrderMode"] == "release";
+    let groups: Vec<&[Row]> = rows
+        .chunk_by(|previous, next| {
+            previous.watched == next.watched && (!release_mode || previous.year == next.year)
+        })
+        .collect();
+    let runs = groups
+        .iter()
+        .enumerate()
+        .map(|(index, rows)| Run {
+            year: rows[0].year.clone(),
+            heading: release_mode && (index == 0 || groups[index - 1][0].year != rows[0].year),
+            hidden: filters.unwatched && rows[0].watched,
+            rows: rows.to_vec(),
+        })
+        .collect();
     Page {
         name: list["name"].as_str().unwrap_or("").into(),
         description: list["description"].as_str().unwrap_or("").into(),
@@ -129,7 +125,7 @@ pub async fn detail(
         total: list["stats"]["totalItems"].as_u64().unwrap(),
         query: filters.query,
         unwatched: filters.unwatched,
-        rows,
+        runs,
         paused: !list["pausedAt"].is_null(),
     }
     .render()
