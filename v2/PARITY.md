@@ -8,7 +8,7 @@ configuration; they do not change v1 product behavior.
 
 Running v1 mounts `h8gsos0k40kk8s8oo8o4ko0w-DB` at `/app/storage`; the database is
 `/app/storage/sqlite.db`. Directory permissions are 755 root:root, database 644 root:root.
-A separately deployed `janus-v2` smoke application also mounts this exact volume at the
+A separately deployed `janus-v2` read application also mounts this exact volume at the
 same directory. Both images currently run as root. This differs from the parent spec's
 same-application Compose topology: the checked-in Compose configuration remains prepared,
 while live Coolify currently uses two Dockerfile applications. No topology change is claimed.
@@ -22,12 +22,15 @@ compatibility reconciliation and regeneration of the v1 schema contract through 
 
 - [x] Independent Rust crate, rendered smoke page, local assets and mounted MCP.
 - [x] Local fail-closed database compatibility and readiness.
-- [ ] Deployed revision reconciliation and protected routing.
+- [x] Deployed v1/v2 revision reconciliation and shared-volume inspection.
+- [ ] Complete Access-authenticated routing/client verification.
 
 ## Workflow checklist
 
-- [ ] Watchlist listing, search, create, edit, delete and merge.
-- [ ] Details, filters, release/custom order, grouping, hidden-item-safe reorder.
+- [x] Watchlist listing and name search through web/MCP reads.
+- [ ] Watchlist create, edit, delete and merge.
+- [x] Existing detail reads, text filters, stored release/custom order and release-year/watched grouping.
+- [ ] Hidden-item-safe reorder and order-mode changes.
 - [ ] Provider search/details/pagination and additions; TV/comic expansions.
 - [ ] Custom additions, anchored insertion, duplicates and partial outcomes.
 - [ ] Edited metadata, item/parent removal and movement.
@@ -46,7 +49,8 @@ compatibility reconciliation and regeneration of the v1 schema contract through 
 
 ## MCP source inventory
 
-Each tool remains unported. Contracts live in src/app/mcp at the source revision above.
+The four prerequisite read tools are implemented; the remaining tools are unported.
+Contracts live in src/app/mcp at the source revision above.
 
 - [ ] add_custom_items_to_watchlists
 - [ ] add_media_to_watchlists
@@ -55,11 +59,11 @@ Each tool remains unported. Contracts live in src/app/mcp at the source revision
 - [ ] delete_lineups
 - [ ] delete_watchlists
 - [ ] edit_watchlist_items
-- [ ] find_watchlist_items
+- [x] find_watchlist_items
 - [ ] get_lineup
-- [ ] get_watchlist
+- [x] get_watchlist
 - [ ] list_lineups
-- [ ] list_watchlists
+- [x] list_watchlists
 - [ ] merge_watchlists
 - [ ] move_watchlist_items
 - [ ] move_watchlist_parents
@@ -68,7 +72,7 @@ Each tool remains unported. Contracts live in src/app/mcp at the source revision
 - [ ] reorder_lineups
 - [ ] reorder_watchlist_items
 - [ ] search_media
-- [ ] search_watchlists
+- [x] search_watchlists
 - [ ] set_lineup_watchlists
 - [ ] set_watchlist_items_watched
 - [ ] set_watchlist_order
@@ -114,3 +118,40 @@ All provider ports and live-provider evidence remain outstanding.
 
 Sources: `vite.config.ts`, `src/lib/PwaRegistration.ts`, `src/components/PwaUpdatePrompt.tsx`.
 No v2 PWA port or PWA acceptance is claimed by the read slice.
+
+## Final read-slice verification
+
+Runtime revision: `1f3297ecdd7095aa46086d373e200fe756010749`.
+Local gates: 10 Rust tests, 483 v1 tests across 68 files, Rust formatting/Clippy,
+v1 typechecking and the release build pass. A headless Chromium check at 390px and 1280px
+passed rendering, horizontal-overflow and filter-navigation checks. This is emulated browser
+evidence; it does not establish physical-device or full visual/PWA parity.
+
+Coolify deployment `bhygmznuh9nkbb8cqfo3c9da` finished successfully on 2026-11-11
+at 21:12:18 UTC. Running image ID:
+`sha256:ed1c4748e55d74ab89762509582aedc78ab6538ee01e38b0bd4e391fc69bfde2`.
+The service is healthy; independent readiness returns 200. Its source configuration was
+restored to main/HEAD after testing; the verified PR image remains running.
+
+Read-only deployment-host checks confirmed the exact shared volume in both containers.
+The existing database contains 210 watchlists and 50,575 items. For watchlist 293,
+v2 returned all 62 items and matching HTML item IDs; its complete MCP item results,
+summary and SHA-256 order token matched the running v1 MCP endpoint. Initialization
+and tool calls returned application/json with legacy session headers; termination passed.
+These checks used the internal container network, not an Access-authenticated external client.
+
+Schema hash before/after:
+`f74fcb1b80662a7dea722dc51293e260333584195d7ca8e3b282980eb6153ca9`.
+Drizzle migration-metadata hash before/after:
+`aa8d7855b6b62554596aa5af6abc79052d5a336441ecd9401164269ce3be9939`.
+Both are SHA-256 of the ordered SQLite schema/migration rows read by the same verifier.
+Journal mode remains delete. V1 remained running and its MCP endpoint remained usable.
+No production mutation test was run.
+
+All six GitHub CI checks passed on the runtime revision. Standards/spec reviews led to
+fixes for cursor/argument validation, duplicate ordering and quadratic watched-run grouping.
+A Greek final-sigma concern did not reproduce against Rust/Node and has a public regression.
+JSON-valued feature records remain a non-blocking design concern for later typed-interface work.
+Unauthenticated external v1/v2 web/MCP requests returned 403; this alone does not verify
+Access-authenticated or real-client behavior. Physical-device, full PWA, write/reorder and
+owner acceptance gates remain outstanding in their respective slices.
