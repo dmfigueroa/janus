@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{{name}} · Janus</title>
+    <link rel="stylesheet" href="/v2/static/app.css" />
+  </head>
+  <body>
+    <main class="watchlist">
+      <nav><a href="/v2/watchlists">Janus</a></nav>
+      <header>
+        <h1>{{name}}</h1>
+        {% if paused %}<span class="badge" role="status">Paused</span>{% endif %}
+        <p>{{description}}</p>
+        <p>{{watched}} of {{total}} watched · {{mode}} order</p>
+        <progress value="{{progress}}" max="100" aria-label="Watchlist progress">
+          {{progress}}%
+        </progress>
+      </header>
+      <form method="get">
+        <label for="query">Search items</label
+        ><input id="query" name="query" value="{{query}}" type="search" /><label for="unwatched"
+          >Watched items</label
+        ><select name="unwatched" id="unwatched">
+          <option value="true" {% if unwatched %}selected{% endif %}>Collapse watched</option>
+          <option value="false" {% if !unwatched %}selected{% endif %}>Show all</option></select
+        ><button>Apply filters</button>
+      </form>
+      <div class="timeline">
+        {% for run in runs %}{% if run.heading %}
+        <h2>{{run.year}}</h2>
+        {% endif %}{% if run.hidden %}
+        <details class="watched-run">
+          <summary>{{run.rows.len()}} watched items</summary>
+          {% endif %} {% for row in run.rows %}
+          <article data-item-id="{{row.id}}">
+            {% if !row.poster.is_empty() %}<img
+              class="poster {{row.media}}"
+              src="{{row.poster}}"
+              alt=""
+              loading="lazy"
+              referrerpolicy="no-referrer"
+            />{% else %}
+            <div class="poster placeholder" aria-hidden="true">{{row.media}}</div>
+            {% endif %}
+            <div class="item-content">
+              <h3>{{row.title}}</h3>
+              <p>{{row.parent}} {{row.episode}}</p>
+              <p>{{row.date}}</p>
+            </div>
+            <span>{% if row.watched %}Watched{% else %}Unwatched{% endif %}</span>
+          </article>
+          {% endfor %}{% if run.hidden %}
+        </details>
+        {% endif %}{% else %}
+        <p role="status">No items match these filters.</p>
+        {% endfor %}
+      </div>
+    </main>
+  </body>
+</html>

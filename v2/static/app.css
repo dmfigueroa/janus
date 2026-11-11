@@ -18,3 +18,120 @@ h1 {
   outline: 3px solid currentColor;
   outline-offset: 4px;
 }
+.watchlist {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding-bottom: 5rem;
+}
+.watchlist header {
+  margin: 2rem 0;
+}
+.watchlist progress {
+  width: 100%;
+  accent-color: #16a085;
+}
+.watchlist form {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.watchlist input[type="search"] {
+  flex: 1;
+  min-width: 8rem;
+}
+.watchlist button,
+.watchlist input[type="search"] {
+  min-height: 44px;
+  padding: 0.5rem;
+  font: inherit;
+}
+.watchlist article {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid light-dark(#ddd, #333);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  margin: 0.5rem 0;
+  overflow-wrap: anywhere;
+}
+.watchlist h3,
+.watchlist article p {
+  margin: 0;
+}
+.watchlist article p {
+  color: light-dark(#555, #bbb);
+  font-size: 0.875rem;
+}
+.watchlist h2 {
+  position: sticky;
+  top: 0;
+  background: Canvas;
+  padding: 0.5rem 0;
+}
+.watchlist {
+  padding-top: 1rem;
+}
+.watchlist h1 {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+.watchlist article {
+  align-items: center;
+}
+.watchlist .item-content {
+  flex: 1;
+  min-width: 0;
+}
+.watchlist .poster {
+  width: 5rem;
+  height: 7rem;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  flex-shrink: 0;
+}
+.watchlist .poster.episode {
+  height: 3.5rem;
+}
+.watchlist .placeholder {
+  display: grid;
+  place-items: center;
+  font-size: 0.7rem;
+  background: light-dark(#f4f4f5, #27272a);
+}
+.watchlist summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: list-item;
+  align-content: center;
+  padding-inline: 0.75rem;
+}
+.watchlist select {
+  font: inherit;
+  min-height: 44px;
+  padding: 0.5rem;
+}
+.watchlist .badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.4rem;
+  background: light-dark(#eee, #333);
+}
+@media (max-width: 480px) {
+  body {
+    padding: 1rem;
+  }
+  .watchlist article {
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+  .watchlist .poster {
+    width: 3rem;
+    height: 4.5rem;
+  }
+  .watchlist article > span {
+    font-size: 0.75rem;
+  }
+}
