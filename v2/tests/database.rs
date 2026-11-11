@@ -230,6 +230,8 @@ async fn mcp_discovers_and_reads_existing_watchlist_with_baseline_envelopes_and_
         let response=result(rpc(&app,json!({"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":name,"arguments":arguments}}),Some(&session)).await).await;
         assert_eq!(response["isError"], true, "{response}");
     }
+    let coerced=result(rpc(&app,json!({"jsonrpc":"2.0","id":24,"method":"tools/call","params":{"name":"get_watchlist","arguments":{"watchlistId":"41.0","pageSize":1.0}}}),Some(&session)).await).await;
+    assert_eq!(coerced["structuredContent"]["items"][0]["id"], 102);
     let greek=result(rpc(&app,json!({"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"search_watchlists","arguments":{"query":"ος"}}}),Some(&session)).await).await;
     assert_eq!(greek["structuredContent"]["watchlists"][0]["id"], 42);
     for (name, arguments) in [

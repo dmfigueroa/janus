@@ -63,26 +63,23 @@ pub fn arguments(name: &str, mut arguments: Value) -> Result<Value, String> {
             *value = json!(text);
         }
     }
-    if name == "get_watchlist"
-        && let Some(value) = object.get_mut("watchlistId")
-    {
-        let id = value.as_i64().or_else(|| {
-            value
-                .as_str()
-                .and_then(|text| text.trim().parse::<i64>().ok())
-        });
-        if let Some(id) = id {
-            *value = json!(id);
-        }
-    }
     for key in ["watchlistId", "watchlistItemId", "pageSize"] {
-        if let Some(value) = object.get(key) {
-            let number = value
-                .as_u64()
-                .filter(|number| *number > 0 && (key != "pageSize" || *number <= 100));
-            if number.is_none() {
-                return Err(format!("Invalid {key}."));
-            }
+        if let Some(value) = object.get_mut(key) {
+            let number = if key == "watchlistId" && name == "get_watchlist" {
+                coerced_number(value, false)
+            } else {
+                value.as_f64()
+            };
+            let number = number
+                .filter(|number| {
+                    number.is_finite()
+                        && number.fract() == 0.0
+                        && *number > 0.0
+                        && *number < i64::MAX as f64
+                        && (key != "pageSize" || *number <= 100.0)
+                })
+                .ok_or_else(|| format!("Invalid {key}."))?;
+            *value = json!(number as i64);
         }
     }
     if name == "search_watchlists" && !object.contains_key("query") {
@@ -115,4 +112,34 @@ pub fn arguments(name: &str, mut arguments: Value) -> Result<Value, String> {
         }
     }
     Ok(arguments)
+}
+
+// Zod's get_watchlist selector uses JavaScript Number coercion. Other selectors
+// and page sizes accept JSON numbers only, including integral decimal notation.
+fn coerced_number(value: &Value, in_array: bool) -> Option<f64> {
+    match value {
+        Value::Number(number) => number.as_f64(),
+        Value::Bool(true) if !in_array => Some(1.0),
+        Value::String(text) => {
+            let text = text.trim();
+            let radix = if text.starts_with("0x") || text.starts_with("0X") {
+                Some(16)
+            } else if text.starts_with("0b") || text.starts_with("0B") {
+                Some(2)
+            } else if text.starts_with("0o") || text.starts_with("0O") {
+                Some(8)
+            } else {
+                None
+            };
+            if let Some(radix) = radix {
+                u64::from_str_radix(&text[2..], radix)
+                    .ok()
+                    .map(|number| number as f64)
+            } else {
+                text.parse().ok()
+            }
+        }
+        Value::Array(values) if values.len() == 1 => coerced_number(&values[0], true),
+        _ => None,
+    }
 }
