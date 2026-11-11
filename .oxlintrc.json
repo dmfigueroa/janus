@@ -1,4 +1,5 @@
 {
+  "ignorePatterns": ["v2/static/vendor/**", "v2/target/**"],
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "unicorn", "typescript", "oxc"],
   "categories": {},

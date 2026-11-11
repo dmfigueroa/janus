@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Janus v2 · Development</title>
+    <link rel="stylesheet" href="/static/app.css" />
+    <script defer src="/static/vendor/htmx.min.js"></script>
+    <script defer src="/static/vendor/Sortable.min.js"></script>
+    <script type="module" src="/static/app.js"></script>
+  </head>
+  <body>
+    <main>
+      <p>Janus · v2 development</p>
+      <h1>Application is running</h1>
+      <p>This smoke page confirms HTTP liveness. Database compatibility has not been validated.</p>
+      <p>Continue using v1 for your watchlists.</p>
+      <noscript
+        >The smoke page works without JavaScript. Future interactive workflows may require
+        it.</noscript
+      >
+      <p id="request-error" role="alert" hidden>Request failed. Please try again.</p>
+    </main>
+  </body>
+</html>
