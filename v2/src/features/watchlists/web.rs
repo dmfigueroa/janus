@@ -19,6 +19,7 @@ fn default_unwatched() -> bool {
 #[derive(Template)]
 #[template(path = "watchlist.html")]
 struct Page {
+    id: i64,
     name: String,
     description: String,
     mode: String,
@@ -111,6 +112,7 @@ pub async fn detail(
         })
         .collect();
     Page {
+        id,
         name: list.name.clone(),
         description: list.description.clone().unwrap_or_default(),
         mode: list.item_order_mode.as_str().into(),
@@ -204,4 +206,15 @@ pub async fn list(
     .render()
     .map(Html)
     .map_err(failure)
+}
+
+pub async fn reorder(
+    State(lists): State<Watchlists>,
+    Path(id): Path<i64>,
+    axum::Json(input): axum::Json<super::reorder::Reorder>,
+) -> axum::Json<serde_json::Value> {
+    axum::Json(lists.reorder(id, input).await.unwrap_or_else(|error| {
+        eprintln!("Reorder failed: {error}");
+        serde_json::json!({"success":false,"code":"internal_error","message":"Unable to reorder watchlist items."})
+    }))
 }

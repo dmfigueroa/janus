@@ -135,3 +135,20 @@ h1 {
     font-size: 0.75rem;
   }
 }
+
+.reorder-handle {
+  min-width: 44px;
+  min-height: 44px;
+  cursor: grab;
+  touch-action: none;
+}
+.reorder-handle:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+.sortable-ghost {
+  opacity: 0.4;
+}
+.timeline[aria-busy="true"] {
+  opacity: 0.75;
+}

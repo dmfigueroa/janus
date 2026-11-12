@@ -155,3 +155,21 @@ JSON-valued feature records remain a non-blocking design concern for later typed
 Unauthenticated external v1/v2 web/MCP requests returned 403; this alone does not verify
 Access-authenticated or real-client behavior. Physical-device, full PWA, write/reorder and
 owner acceptance gates remain outstanding in their respective slices.
+
+## Issue #254 reorder slice
+
+Web and MCP call the same atomic custom-order operation. Intents identify moved and
+reference IDs and before/after placement; filtered views never submit a replacement
+order. Invalid anchors and release-mode writes reject before rank changes. SQLite
+writer acquisition uses the existing two-second busy timeout; commits are not retried.
+The browser provides pointer/touch handles and Alt+Up/Down keyboard controls, blocks
+local reorder writes while saving, and reconciles from the current filtered URL after
+success or failure. Expanded watched groups, focus and scroll are restored.
+
+Automated coverage: disposable v1-migrated SQLite web/MCP success and invalid anchors,
+independent batch results, durable reopened reads, v1 rank reads/writes, and forced
+mid-write rollback. DOM coverage exercises optimistic keyboard movement, failed-save
+reconciliation, one write attempt and focus restoration. DOM tests do not establish
+real browser pointer/touch behavior. Existing database tests cover bounded locks and
+schema compatibility. No deployment, Access-authenticated client, physical-device or
+owner acceptance evidence is claimed for this change; those gates remain outstanding.

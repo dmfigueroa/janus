@@ -4,6 +4,28 @@ const { drizzle } = require("drizzle-orm/better-sqlite3");
 const { migrate } = require("drizzle-orm/better-sqlite3/migrator");
 const path = require("node:path");
 const database = new Database(process.argv[2]);
+if (process.argv[3] === "check-reorder") {
+  const assert = require("node:assert/strict");
+  assert.deepEqual(
+    database
+      .prepare(
+        "SELECT id FROM watchlist_items WHERE watchlist_id=41 ORDER BY custom_rank IS NULL, custom_rank, id",
+      )
+      .all()
+      .map((row) => row.id),
+    [101, 103, 102],
+  );
+  database.prepare("UPDATE watchlist_items SET custom_rank=0 WHERE id=102").run();
+  database.close();
+  process.exit(0);
+}
+if (process.argv[3] === "reject-rank") {
+  database.exec(
+    "CREATE TRIGGER reject_rank BEFORE UPDATE OF custom_rank ON watchlist_items WHEN NEW.id=102 BEGIN SELECT RAISE(ABORT, 'test failure'); END",
+  );
+  database.close();
+  process.exit(0);
+}
 if (process.argv[3] === "release") {
   database.prepare("UPDATE watchlists SET item_order_mode = 'release' WHERE id = 41").run();
   database.close();

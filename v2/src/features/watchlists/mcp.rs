@@ -19,7 +19,7 @@ fn definitions() -> Vec<Tool> {
     find["providerId"] = json!({"type":"string","minLength":1});
     find["mediaType"] = media;
     find["query"] = json!({"type":"string","minLength":1});
-    [
+    let mut tools: Vec<Tool> = [
         ("list_watchlists", "List watchlists", list, vec![]),
         (
             "search_watchlists",
@@ -60,7 +60,19 @@ fn definitions() -> Vec<Tool> {
         tool.annotations = Some(ToolAnnotations::new().read_only(true).destructive(false));
         tool
     })
-    .collect()
+    .collect();
+    let mut reorder = Tool::new("reorder_watchlist_items", "Reorder watchlist items", json!({"type":"object","properties":{"reorders":{"type":"array","minItems":1,"items":{"type":"object","properties":{"watchlistId":{"type":"integer"},"movedItemId":{"type":"integer"},"referenceItemId":{"type":"integer"},"position":{"type":"string","enum":["before","after"]}}}}},"required":["reorders"]}).as_object().unwrap().clone());
+    reorder.title = Some("Reorder watchlist items".into());
+    reorder.description = Some("Reorder one or more watchlist items within a custom-ordered watchlist, moving each item before or after a reference item. Each reorder targets an explicit watchlist, moved item ID, reference item ID, and before-or-after position, is processed independently, and returns an ordered result. Only custom-ordered watchlists accept reorders. This changes the order of items and is consequential, so confirm before applying.".into());
+    reorder.output_schema = Some(std::sync::Arc::new(json!({"type":"object","properties":{"results":{"type":"array","items":{"type":"object","properties":{"index":{"type":"integer","minimum":0},"success":{"type":"boolean"},"code":{"type":"string"},"message":{"type":"string"},"watchlistId":{"type":"number"},"movedItemId":{"type":"number"},"referenceItemId":{"type":"number"}},"required":["index","success","code","message"]}}},"required":["results"]}).as_object().unwrap().clone()));
+    reorder.annotations = Some(
+        ToolAnnotations::new()
+            .read_only(false)
+            .destructive(true)
+            .idempotent(false),
+    );
+    tools.push(reorder);
+    tools
 }
 impl ServerHandler for ReadMcp {
     fn get_info(&self) -> ServerConfig {
@@ -87,6 +99,57 @@ impl ServerHandler for ReadMcp {
     ) -> Result<CallToolResponse, ErrorData> {
         if self.get_tool(&request.name).is_none() {
             return Err(ErrorData::method_not_found::<CallToolRequestMethod>());
+        }
+        if request.name == "reorder_watchlist_items" {
+            let arguments = Value::Object(request.arguments.unwrap_or_default());
+            let Some(entries) = arguments
+                .get("reorders")
+                .and_then(Value::as_array)
+                .filter(|entries| !entries.is_empty())
+            else {
+                return Err(ErrorData::invalid_params(
+                    "reorders must be a non-empty array",
+                    None,
+                ));
+            };
+            for entry in entries {
+                if !entry.is_object()
+                    || ["watchlistId", "movedItemId", "referenceItemId"]
+                        .iter()
+                        .any(|key| {
+                            entry
+                                .get(*key)
+                                .is_some_and(|value| value.as_i64().is_none())
+                        })
+                    || entry
+                        .get("position")
+                        .is_some_and(|value| !matches!(value.as_str(), Some("before" | "after")))
+                {
+                    return Err(ErrorData::invalid_params("Invalid reorder input", None));
+                }
+            }
+            let mut results = Vec::new();
+            for (index, entry) in entries.iter().enumerate() {
+                let mut result = match (entry.get("watchlistId").and_then(Value::as_i64), serde_json::from_value::<super::reorder::Reorder>(entry.clone())) {
+                    (Some(id), Ok(input)) => self.0.reorder(id, input).await.unwrap_or_else(|_| json!({"success":false,"code":"internal_error","message":"Unable to reorder watchlist items."})),
+                    _ => json!({"success":false,"code":"validation_error","message":"watchlistId, movedItemId, referenceItemId, and position are required."}),
+                };
+                if result["success"] == true {
+                    result["code"] = json!("reordered");
+                    result["message"] = json!("Watchlist items reordered.");
+                }
+                result["index"] = json!(index);
+                for key in ["watchlistId", "movedItemId", "referenceItemId"] {
+                    if let Some(value) = entry.get(key) {
+                        result[key] = value.clone();
+                    }
+                }
+                results.push(result);
+            }
+            let mut response = CallToolResult::structured(json!({"results":results}));
+            response.result_type = None;
+            response.is_error = None;
+            return Ok(response.into());
         }
         let operation = match request.name.as_ref() {
             "list_watchlists" => DiscoveryOperation::List,

@@ -179,7 +179,7 @@ async fn mcp_discovers_and_reads_existing_watchlist_with_baseline_envelopes_and_
         .await,
     )
     .await;
-    assert_eq!(tools["tools"].as_array().unwrap().len(), 4);
+    assert_eq!(tools["tools"].as_array().unwrap().len(), 5);
     let read=result(rpc(&app,json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_watchlist","arguments":{"watchlistId":41,"pageSize":1}}}),Some(&session)).await).await;
     assert!(read.get("resultType").is_none());
     assert!(read.get("isError").is_none());
@@ -634,4 +634,153 @@ async fn web_discovery_distinguishes_invalid_cursor_from_database_failure() {
         .unwrap();
     assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
     assert!(!body(response).await.contains("pool"));
+}
+
+#[tokio::test]
+async fn reorder_preserves_hidden_items_and_rejects_invalid_anchors() {
+    let fixture = Fixture::v1();
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let app = janus_v2::database_router(database.clone());
+    for (reference, success) in [(103, true), (999, false)] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v2/watchlists/41/reorder")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        json!({"movedItemId":102,"referenceItemId":reference,"position":"after"})
+                            .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let result: Value = serde_json::from_str(&body(response).await).unwrap();
+        assert_eq!(result["success"], success);
+        assert_eq!(
+            janus_v2::Watchlists(database.clone())
+                .detail(41)
+                .await
+                .unwrap()
+                .unwrap()
+                .items
+                .iter()
+                .map(|item| item.id)
+                .collect::<Vec<_>>(),
+            vec![101, 103, 102]
+        );
+    }
+}
+
+#[tokio::test]
+async fn mcp_reorders_are_independent_and_visible_after_reopen() {
+    let fixture = Fixture::v1();
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let app = janus_v2::database_router(database);
+    let initialized = rpc(&app,json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"reorder-test","version":"1"}}}),None).await;
+    let session = initialized.headers()["mcp-session-id"]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let response = result(rpc(&app,json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"reorder_watchlist_items","arguments":{"reorders":[{"watchlistId":41,"movedItemId":102,"referenceItemId":999,"position":"after"},{"watchlistId":41,"movedItemId":102,"referenceItemId":103,"position":"after"}]}}}),Some(&session)).await).await;
+    assert_eq!(
+        response["structuredContent"]["results"][0]["code"],
+        "invalid_reference"
+    );
+    assert_eq!(
+        response["structuredContent"]["results"][1]["code"],
+        "reordered"
+    );
+    let reopened = janus_v2::Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    assert_eq!(
+        reopened
+            .detail(41)
+            .await
+            .unwrap()
+            .unwrap()
+            .items
+            .iter()
+            .map(|item| item.id)
+            .collect::<Vec<_>>(),
+        vec![101, 103, 102]
+    );
+}
+
+#[tokio::test]
+async fn failed_rank_write_rolls_back_and_v1_round_trips_successful_order() {
+    let fixture = Fixture::v1();
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let app = janus_v2::database_router(database.clone());
+    let request = || {
+        Request::builder()
+            .method("POST")
+            .uri("/v2/watchlists/41/reorder")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"movedItemId":102,"referenceItemId":103,"position":"after"}"#,
+            ))
+            .unwrap()
+    };
+    assert_eq!(
+        serde_json::from_str::<Value>(&body(app.clone().oneshot(request()).await.unwrap()).await)
+            .unwrap()["success"],
+        true
+    );
+    change_v1(&fixture, "check-reorder");
+    let lists = janus_v2::Watchlists(database);
+    let before = lists.detail(41).await.unwrap().unwrap();
+    assert_eq!(before.items[0].id, 102);
+    change_v1(&fixture, "reject-rank");
+    assert_eq!(
+        serde_json::from_str::<Value>(&body(app.oneshot(request()).await.unwrap()).await).unwrap()
+            ["success"],
+        false
+    );
+    assert_eq!(lists.detail(41).await.unwrap().unwrap(), before);
+}
+
+#[tokio::test]
+async fn reorder_writer_contention_is_bounded_and_release_mode_rejects() {
+    use std::io::{BufRead, BufReader};
+    use std::process::Stdio;
+    let fixture = Fixture::v1();
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let lists = janus_v2::Watchlists(database.clone());
+    let before = lists.detail(41).await.unwrap().unwrap();
+    let app = janus_v2::database_router(database);
+    let request = || {
+        Request::builder()
+            .method("POST")
+            .uri("/v2/watchlists/41/reorder")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                r#"{"movedItemId":102,"referenceItemId":103,"position":"after"}"#,
+            ))
+            .unwrap()
+    };
+    let mut writer=Command::new("python3").arg("-c").arg("import sqlite3,sys; connection=sqlite3.connect(sys.argv[1]); connection.execute('BEGIN IMMEDIATE'); print('locked',flush=True); sys.stdin.read(); connection.rollback()").arg(&fixture.0).stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().unwrap();
+    let mut ready = String::new();
+    BufReader::new(writer.stdout.take().unwrap())
+        .read_line(&mut ready)
+        .unwrap();
+    assert_eq!(ready.trim(), "locked");
+    let response = tokio::time::timeout(
+        std::time::Duration::from_secs(7),
+        app.clone().oneshot(request()),
+    )
+    .await;
+    drop(writer.stdin.take());
+    writer.wait().unwrap();
+    let result: Value = serde_json::from_str(
+        &body(response.expect("write contention must be bounded").unwrap()).await,
+    )
+    .unwrap();
+    assert_eq!(result["code"], "internal_error");
+    assert_eq!(lists.detail(41).await.unwrap().unwrap(), before);
+    change_v1(&fixture, "release");
+    let result: Value =
+        serde_json::from_str(&body(app.oneshot(request()).await.unwrap()).await).unwrap();
+    assert_eq!(result["code"], "not_custom_mode");
 }

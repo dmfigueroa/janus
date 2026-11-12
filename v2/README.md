@@ -19,7 +19,7 @@ executable when it differs from PATH. Node is a test fixture dependency only.
 
 `JANUS_V2_BIND` defaults to `127.0.0.1:3001`. `DATABASE_URL` is a required filesystem path,
 as in v1. Missing files, incompatible schema and unsupported stored values fail startup.
-The connection is read-only, never creates a file, and leaves journal mode unchanged.
+The connection supports reorder writes, never creates a file, and leaves journal mode unchanged.
 The pool has at most two connections, a five-second connect/acquire timeout and two-second
 SQLite busy timeout. V1 alone owns migrations. No schema-sync/migration features are enabled.
 The existing directory must be mounted, including WAL/SHM sidecars.
@@ -46,5 +46,6 @@ v1 values. Name search uses NFC plus lowercase; detail text search intentionally
 SQLite LIKE's ASCII case behavior and treats wildcard characters literally.
 
 Future writes must explicitly preserve Drizzle's application-side `updatedAt` hook;
-SeaORM does not supply it automatically. Reordering and write coexistence belong to the
-following slices. See [PARITY.md](PARITY.md) for evidence and outstanding acceptance.
+SeaORM does not supply it automatically. Reordering now uses the shared web/MCP operation; other writes belong to following slices. See [PARITY.md](PARITY.md) for evidence and outstanding acceptance.
+
+Reorder DOM regression: `node --test v2/tests/reorder-browser.cjs` (Node 24 with npm dependencies).

@@ -1,7 +1,7 @@
 use sea_orm::{ConnectOptions, ConnectionTrait, Database, DatabaseConnection, DbErr};
 use std::{path::Path, time::Duration};
 
-/// V1 owns the schema. This read slice cannot create a file or execute writes.
+/// V1 owns the schema. V2 opens only existing files and never migrates them.
 pub async fn open_database(path: &Path) -> Result<DatabaseConnection, DbErr> {
     let path = path
         .canonicalize()
@@ -21,7 +21,7 @@ pub async fn open_database(path: &Path) -> Result<DatabaseConnection, DbErr> {
                 .filename(&path)
                 .in_memory(false)
                 .create_if_missing(false)
-                .read_only(true)
+                .read_only(false)
                 .busy_timeout(Duration::from_secs(2))
         });
     let database = Database::connect(options).await?;
