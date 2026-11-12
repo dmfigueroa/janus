@@ -41,17 +41,20 @@ function mapTmdbMedia(item: TMDBMedia, type: "movie" | "tv"): UnifiedMedia {
   };
 }
 
-export async function searchMultimedia(data: {
-  query: string;
-  page: number;
-  type: "movie" | "tv";
-}): Promise<{
+export async function searchMultimedia(
+  data: {
+    query: string;
+    page: number;
+    type: "movie" | "tv";
+  },
+  signal?: AbortSignal,
+): Promise<{
   results: UnifiedMedia[];
   page: number;
   total_pages: number;
   total_results: number;
 }> {
-  const tmdbData = await fetchTmdbSearch(data);
+  const tmdbData = await fetchTmdbSearch(data, signal);
   const results = tmdbData.results.map((item) => mapTmdbMedia(item, data.type));
 
   return {

@@ -2,6 +2,7 @@ import {
   ProviderRequestError,
   requestProviderJson,
   parseProviderData,
+  rethrowProviderFailure,
 } from "@/integrations/ProviderRequest.server";
 import { z } from "zod";
 import { API_PAGE_SIZE } from "../Constants";
@@ -72,7 +73,7 @@ const getGoogleBooksApiKey = () => {
   return apiKey;
 };
 
-async function searchBooksRequest(query: string, page: number) {
+async function searchBooksRequest(query: string, page: number, signal?: AbortSignal) {
   const apiKey = getGoogleBooksApiKey();
   const maxResults = API_PAGE_SIZE;
   const startIndex = (page - 1) * maxResults;
@@ -84,37 +85,34 @@ async function searchBooksRequest(query: string, page: number) {
     key: apiKey,
   }).toString();
 
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`Google Books search request failed: ${res.status}`);
-
-  const rawData = await res.json();
-  const data = GoogleBooksResponseSchema.parse(rawData);
+  const rawData = await requestProviderJson(url.toString(), { signal });
+  const data = parseProviderData(GoogleBooksResponseSchema, rawData);
   return formatBookSearch(data);
 }
 
-async function getBookDetailsRequest(id: string) {
+async function getBookDetailsRequest(id: string, signal?: AbortSignal) {
   const apiKey = getGoogleBooksApiKey();
   const encodedId = encodeURIComponent(id);
   const url = new URL(`https://www.googleapis.com/books/v1/volumes/${encodedId}`);
   url.search = new URLSearchParams({ key: apiKey }).toString();
 
-  const item = await requestProviderJson(url.toString());
+  const item = await requestProviderJson(url.toString(), { signal });
   return mapBook(parseProviderData(GoogleBookItemSchema, item));
 }
 
 export async function searchBooks(
   query: string,
   page: number = 1,
+  signal?: AbortSignal,
 ): Promise<{ results: UnifiedMedia[]; totalResults: number }> {
   try {
-    return await searchBooksRequest(query, page);
-  } catch (e) {
-    const errorMessage = getErrorMessage(e);
-    console.error("Google Books API Error:", errorMessage);
-    throw new Error(`Google Books API Error: ${errorMessage}`);
+    return await searchBooksRequest(query, page, signal);
+  } catch (error) {
+    console.error("Google Books API Error:", getErrorMessage(error));
+    rethrowProviderFailure(error, "Google Books API Error");
   }
 }
 
-export async function getBookDetails(id: string) {
-  return getBookDetailsRequest(id);
+export async function getBookDetails(id: string, signal?: AbortSignal) {
+  return getBookDetailsRequest(id, signal);
 }

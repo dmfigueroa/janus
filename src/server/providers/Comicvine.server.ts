@@ -1,11 +1,16 @@
 import { z } from "zod";
 import pLimit from "p-limit";
+import {
+  parseProviderData,
+  requestProviderJson,
+  rethrowProviderFailure,
+} from "@/integrations/ProviderRequest.server";
 import { API_PAGE_SIZE } from "../Constants";
 import { type UnifiedMedia } from "../Media";
 import { getErrorMessage } from "../Utils";
 import {
   COMICVINE_ISSUE_PAGE_LIMIT,
-  fetchIssuePageWithRetry,
+  fetchIssuePage,
   type ComicIssueItem,
 } from "./ComicvineIssuePages.server";
 import { mapIssueToComicIssue, type ComicIssue } from "./ComicvineIssueMapping.server";
@@ -34,7 +39,11 @@ const ComicVineResponseSchema = z.object({
 const COMICVINE_MAX_CONCURRENCY = 5,
   COMICVINE_DEFAULT_CONCURRENCY = 3;
 
-type GetComicIssuesOptions = { knownIssueIds?: Set<string>; concurrency?: number };
+type GetComicIssuesOptions = {
+  knownIssueIds?: Set<string>;
+  concurrency?: number;
+  signal?: AbortSignal;
+};
 
 const getVolumeImage = (item: ComicVineVolume) =>
   getVolumeMediumImage(item) || getVolumeSmallImage(item);
@@ -75,8 +84,9 @@ async function collectAllVolumeIssues(
   volumeId: string,
   apiKey: string,
   concurrency: number,
+  signal?: AbortSignal,
 ): Promise<ComicIssueItem[]> {
-  const firstPage = await fetchIssuePageWithRetry(volumeId, apiKey, 0, "asc");
+  const firstPage = await fetchIssuePage(volumeId, apiKey, 0, "asc", signal);
   const allIssues = [...firstPage.results];
   const totalResults = firstPage.number_of_total_results;
 
@@ -90,7 +100,7 @@ async function collectAllVolumeIssues(
   const remainingPages = await Promise.all(
     offsets.map((offset) =>
       pageLimit(async () => {
-        const data = await fetchIssuePageWithRetry(volumeId, apiKey, offset, "asc");
+        const data = await fetchIssuePage(volumeId, apiKey, offset, "asc", signal);
         return { offset, results: data.results };
       }),
     ),
@@ -118,13 +128,14 @@ async function collectNewVolumeIssues(
   volumeId: string,
   apiKey: string,
   knownIssueIds: Set<string>,
+  signal?: AbortSignal,
 ): Promise<ComicIssueItem[]> {
   const newIssues: ComicIssueItem[] = [];
   let offset = 0;
   let totalResults = 1;
 
   while (offset < totalResults) {
-    const data = await fetchIssuePageWithRetry(volumeId, apiKey, offset, "desc");
+    const data = await fetchIssuePage(volumeId, apiKey, offset, "desc", signal);
     totalResults = data.number_of_total_results;
 
     if (data.results.length === 0) break;
@@ -136,7 +147,12 @@ async function collectNewVolumeIssues(
   return newIssues;
 }
 
-async function searchComicsRequest(query: string, apiKey: string, page: number) {
+async function searchComicsRequest(
+  query: string,
+  apiKey: string,
+  page: number,
+  signal?: AbortSignal,
+) {
   const limit = API_PAGE_SIZE;
   const url = new URL("https://comicvine.gamespot.com/api/search/");
   url.search = new URLSearchParams({
@@ -148,13 +164,11 @@ async function searchComicsRequest(query: string, apiKey: string, page: number) 
     limit: limit.toString(),
   }).toString();
 
-  const res = await fetch(url.toString(), {
+  const rawData = await requestProviderJson(url.toString(), {
     headers: { "User-Agent": "JanusApp/1.0" },
+    signal,
   });
-  if (!res.ok) throw new Error(`ComicVine search request failed: ${res.status}`);
-
-  const rawData = await res.json();
-  const data = ComicVineResponseSchema.parse(rawData);
+  const data = parseProviderData(ComicVineResponseSchema, rawData);
   return formatComicSearch(data);
 }
 
@@ -162,13 +176,13 @@ export async function searchComics(
   query: string,
   apiKey: string,
   page: number = 1,
+  signal?: AbortSignal,
 ): Promise<{ results: UnifiedMedia[]; totalResults: number }> {
   try {
-    return await searchComicsRequest(query, apiKey, page);
-  } catch (e) {
-    const errorMessage = getErrorMessage(e);
-    console.error("ComicVine API Error:", errorMessage);
-    throw new Error(`ComicVine API Error: ${errorMessage}`);
+    return await searchComicsRequest(query, apiKey, page, signal);
+  } catch (error) {
+    console.error("ComicVine API Error:", getErrorMessage(error));
+    rethrowProviderFailure(error, "ComicVine API Error");
   }
 }
 
@@ -184,9 +198,10 @@ async function collectVolumeIssues(
   apiKey: string,
   knownIssueIds: Set<string> | undefined,
   concurrency: number,
+  signal?: AbortSignal,
 ) {
-  if (knownIssueIds?.size) return collectNewVolumeIssues(volumeId, apiKey, knownIssueIds);
-  return collectAllVolumeIssues(volumeId, apiKey, concurrency);
+  if (knownIssueIds?.size) return collectNewVolumeIssues(volumeId, apiKey, knownIssueIds, signal);
+  return collectAllVolumeIssues(volumeId, apiKey, concurrency, signal);
 }
 
 export async function getComicIssues(
@@ -196,6 +211,12 @@ export async function getComicIssues(
 ): Promise<ComicIssue[]> {
   const knownIssueIds = options.knownIssueIds;
   const concurrency = getComicIssueConcurrency(options);
-  const issues = await collectVolumeIssues(volumeId, apiKey, knownIssueIds, concurrency);
+  const issues = await collectVolumeIssues(
+    volumeId,
+    apiKey,
+    knownIssueIds,
+    concurrency,
+    options.signal,
+  );
   return issues.map(mapIssueToComicIssue);
 }

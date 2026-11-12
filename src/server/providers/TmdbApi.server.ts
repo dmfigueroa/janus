@@ -68,14 +68,18 @@ function getTmdbApiKey() {
   return apiKey;
 }
 
-async function fetchWithAuth(url: string) {
+async function fetchWithAuth(url: string, signal?: AbortSignal) {
   const apiKey = getTmdbApiKey();
   return requestProviderJson(url, {
     headers: { Authorization: `Bearer ${apiKey}`, accept: "application/json" },
+    signal,
   });
 }
 
-export async function fetchTmdbSearch(data: { query: string; page: number; type: "movie" | "tv" }) {
+export async function fetchTmdbSearch(
+  data: { query: string; page: number; type: "movie" | "tv" },
+  signal?: AbortSignal,
+) {
   const { query, page, type } = z
     .object({
       query: z.string(),
@@ -91,7 +95,7 @@ export async function fetchTmdbSearch(data: { query: string; page: number; type:
   url.searchParams.set("include_adult", "false");
   url.searchParams.set("language", "en-US");
 
-  const response = (await fetchWithAuth(url.toString())) as TMDBSearchResponse;
+  const response = (await fetchWithAuth(url.toString(), signal)) as TMDBSearchResponse;
 
   response.results = response.results.map((item) => ({
     ...item,
@@ -101,20 +105,23 @@ export async function fetchTmdbSearch(data: { query: string; page: number; type:
   return response;
 }
 
-export async function fetchTmdbTv(data: { id: number }) {
+export async function fetchTmdbTv(data: { id: number }, signal?: AbortSignal) {
   const input = z.object({ id: z.number() }).parse(data);
   const url = new URL(`${TMDB_BASE_URL}/tv/${input.id}`);
-  return parseProviderData(tmdbTvSchema, await fetchWithAuth(url.toString()));
+  return parseProviderData(tmdbTvSchema, await fetchWithAuth(url.toString(), signal));
 }
 
-export async function fetchTmdbSeason(data: { id: number; seasonNumber: number }) {
+export async function fetchTmdbSeason(
+  data: { id: number; seasonNumber: number },
+  signal?: AbortSignal,
+) {
   const input = z.object({ id: z.number(), seasonNumber: z.number() }).parse(data);
   const url = new URL(`${TMDB_BASE_URL}/tv/${input.id}/season/${input.seasonNumber}`);
-  return parseProviderData(tmdbSeasonSchema, await fetchWithAuth(url.toString()));
+  return parseProviderData(tmdbSeasonSchema, await fetchWithAuth(url.toString(), signal));
 }
 
-export async function fetchTmdbMovie(data: { id: number }) {
+export async function fetchTmdbMovie(data: { id: number }, signal?: AbortSignal) {
   const input = z.object({ id: z.number() }).parse(data);
   const url = new URL(`${TMDB_BASE_URL}/movie/${input.id}`);
-  return parseProviderData(tmdbMovieSchema, await fetchWithAuth(url.toString()));
+  return parseProviderData(tmdbMovieSchema, await fetchWithAuth(url.toString(), signal));
 }

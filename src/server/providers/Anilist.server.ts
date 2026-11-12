@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  PROVIDER_RETRY_POLICY,
+  parseProviderData,
+  requestProviderJson,
+  rethrowProviderFailure,
+} from "@/integrations/ProviderRequest.server";
 import { API_PAGE_SIZE } from "../Constants";
 import { type UnifiedMedia } from "../Media";
 import { getErrorMessage } from "../Utils";
@@ -112,72 +118,84 @@ const getAniListTotal = (total: number | undefined) => total || 0;
 
 const ANILIST_URL = "https://graphql.anilist.co";
 
-async function fetchAniList(query: string, variables: Record<string, unknown>) {
-  const response = await fetch(ANILIST_URL, {
+// AniList uses a read-only GraphQL POST. Retry it explicitly instead of
+// enabling retries for POST requests globally.
+const ANILIST_POST_RETRY_POLICY = {
+  ...PROVIDER_RETRY_POLICY,
+  methods: ["post"],
+};
+
+async function fetchAniList(
+  query: string,
+  variables: Record<string, unknown>,
+  signal?: AbortSignal,
+) {
+  return requestProviderJson(ANILIST_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
     },
-    body: JSON.stringify({
+    json: {
       query,
       variables,
-    }),
+    },
+    retry: ANILIST_POST_RETRY_POLICY,
+    signal,
   });
-
-  if (!response.ok) {
-    const errorData = (await response.json().catch(() => ({}))) as Record<string, unknown>;
-    throw new Error(
-      `AniList API Error: ${response.status} ${response.statusText} ${JSON.stringify(errorData)}`,
-    );
-  }
-
-  return response.json();
 }
 
 export async function searchAnilistInternal(
   query: string,
   type: "ANIME" | "MANGA",
   page: number = 1,
+  signal?: AbortSignal,
 ): Promise<{ results: UnifiedMedia[]; totalResults: number }> {
   try {
-    const rawData = await fetchAniList(ANILIST_SEARCH_QUERY, {
-      search: query,
-      type,
-      page,
-      perPage: API_PAGE_SIZE,
-    });
+    const rawData = await fetchAniList(
+      ANILIST_SEARCH_QUERY,
+      {
+        search: query,
+        type,
+        page,
+        perPage: API_PAGE_SIZE,
+      },
+      signal,
+    );
 
-    const data = AniListResponseSchema.parse(rawData);
+    const data = parseProviderData(AniListResponseSchema, rawData);
     const results: UnifiedMedia[] = data.data.Page.media.map(mapAniListMedia);
 
     return {
       results,
       totalResults: getAniListTotal(data.data.Page.pageInfo.total),
     };
-  } catch (e) {
-    const errorMessage = getErrorMessage(e);
-    console.error("AniList Search Error:", errorMessage);
-    throw new Error(`AniList Search Error: ${errorMessage}`);
+  } catch (error) {
+    console.error("AniList Search Error:", getErrorMessage(error));
+    rethrowProviderFailure(error, "AniList Search Error");
   }
 }
 
-export async function getAnilistDetailsInternal(id: string) {
+export async function getAnilistDetailsInternal(id: string, signal?: AbortSignal) {
   try {
-    const rawData = await fetchAniList(ANILIST_DETAILS_QUERY, { id: parseInt(id) });
-    const data = AniListDetailsResponseSchema.parse(rawData);
+    const rawData = await fetchAniList(ANILIST_DETAILS_QUERY, { id: parseInt(id) }, signal);
+    const data = parseProviderData(AniListDetailsResponseSchema, rawData);
     return mapAniListDetails(data.data.Media);
-  } catch (e) {
-    const errorMessage = getErrorMessage(e);
-    console.error("AniList Details Error:", errorMessage);
-    throw new Error(`AniList Details Error: ${errorMessage}`);
+  } catch (error) {
+    console.error("AniList Details Error:", getErrorMessage(error));
+    rethrowProviderFailure(error, "AniList Details Error");
   }
 }
 
-export async function searchAnilist(query: string, type: "ANIME" | "MANGA", page: number = 1) {
-  return searchAnilistInternal(query, type, page);
+export async function searchAnilist(
+  query: string,
+  type: "ANIME" | "MANGA",
+  page: number = 1,
+  signal?: AbortSignal,
+) {
+  return searchAnilistInternal(query, type, page, signal);
 }
 
-export async function getAnilistDetails(id: string) {
-  return getAnilistDetailsInternal(id);
+export async function getAnilistDetails(id: string, signal?: AbortSignal) {
+  return getAnilistDetailsInternal(id, signal);
 }

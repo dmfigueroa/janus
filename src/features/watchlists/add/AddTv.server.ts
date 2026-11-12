@@ -34,9 +34,9 @@ export async function addTVShowToWatchlist(
   );
 }
 
-export async function fetchShowEpisodes(tmdbId: number) {
-  const showDetails = await fetchTmdbTv({ id: tmdbId });
-  const episodes = await fetchEpisodesAcrossSeasons(tmdbId, showDetails.seasons);
+export async function fetchShowEpisodes(tmdbId: number, signal?: AbortSignal) {
+  const showDetails = await fetchTmdbTv({ id: tmdbId }, signal);
+  const episodes = await fetchEpisodesAcrossSeasons(tmdbId, showDetails.seasons, signal);
   return { showDetails, episodes };
 }
 
@@ -69,13 +69,14 @@ async function addNewEpisodes(
 export async function fetchEpisodesAcrossSeasons(
   tmdbId: number,
   seasons: Array<{ season_number: number }> | undefined,
+  signal?: AbortSignal,
 ) {
   const targetSeasons = (seasons || []).filter((s) => s.season_number !== 0);
 
   const results = await Promise.all(
     targetSeasons.map((season) =>
       limit(() =>
-        fetchTmdbSeason({ id: tmdbId, seasonNumber: season.season_number }).then(
+        fetchTmdbSeason({ id: tmdbId, seasonNumber: season.season_number }, signal).then(
           (sd: { episodes: TMDBEpisode[] }) => sd.episodes,
         ),
       ),
