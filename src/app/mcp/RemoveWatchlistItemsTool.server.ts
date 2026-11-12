@@ -1,7 +1,7 @@
 import { executeWriteBatch } from "./ExecuteWriteBatch.server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { removeWatchlistItemMutation } from "@/features/watchlists/remove/Mutation.server";
+import { removeWatchlistItemMutation } from "@/features/watchlists/remove/RemoveFromWatchlist.server";
 import { asMcpContent } from "./McpToolResponse.server";
 
 const itemRemovalResultSchema = z.object({

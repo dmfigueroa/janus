@@ -100,7 +100,7 @@ it.each(["mouse", "touch"])(
             item({ id: 2, title: "Second" }),
             item({ id: 3, title: "Third" }),
           ]}
-          activeFilters={{ watchlistId: 1, itemOrderMode: "custom" }}
+          unwatchedOnly={false}
           itemOrderMode="custom"
           canReorder
           onReorder={onReorder}
@@ -134,7 +134,7 @@ it.each(["mouse", "touch"])(
             item({ id: 1, title: "First" }),
             item({ id: 2, title: "Second" }),
           ]}
-          activeFilters={{ watchlistId: 1, itemOrderMode: "custom" }}
+          unwatchedOnly={false}
           itemOrderMode="custom"
           canReorder={false}
           interactionDisabled

@@ -4,7 +4,7 @@ import { toaster } from "@/app/Toaster";
 import {
   optimisticallyReorderWatchlistItems,
   restoreWatchlistDetailSnapshot,
-} from "@/features/watchlists/detail/Cache";
+} from "@/features/watchlists/detail/WatchlistDetailCache";
 import {
   watchlistDetailQueryKey,
   type WatchlistDetailQueryFilters,

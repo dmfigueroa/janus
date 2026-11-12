@@ -112,5 +112,3 @@ export function watchlistDetailInfiniteQueryOptions(filters: WatchlistDetailQuer
     getNextPageParam: (lastPage) => lastPage.nextCursor,
   });
 }
-
-export { optimisticallyToggleWatchedItem, restoreWatchlistDetailSnapshot } from "./Cache";

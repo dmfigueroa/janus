@@ -4,7 +4,6 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { Provider } from "@/app/Provider";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistItem } from "@/db/Schema";
-import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query";
 import { TimelineItem } from "@/features/watchlists/components/TimelineItem";
 
@@ -23,12 +22,6 @@ const watchlistListState = {
   data: [] as WatchlistSummary[],
   isLoading: false,
   isError: false,
-};
-const activeFilters: WatchlistDetailQueryFilters = {
-  watchlistId: 1,
-  itemOrderMode: "release",
-  unwatchedOnly: false,
-  query: "",
 };
 const baseItem: WatchlistItem = {
   id: 1,
@@ -61,18 +54,16 @@ vi.mock("@/features/watchlists/detail/useToggleWatchedItem", () => ({
   }),
 }));
 
-vi.mock("@/features/watchlists/remove/useRemoveWatchlistItem", () => ({
+vi.mock("@/features/watchlists/remove/RemoveFromWatchlist", () => ({
   useRemoveWatchlistItemMutation: () => ({
     isPending: false,
     mutateAsync: removeItemMutateAsync,
   }),
-}));
-
-vi.mock("@/features/watchlists/remove/useRemoveWatchlistParent", () => ({
   useRemoveWatchlistParentMutation: () => ({
     isPending: false,
     mutateAsync: removeParentMutateAsync,
   }),
+  useParentRemovalPreview: () => previewState,
 }));
 
 vi.mock("@/features/watchlists/move/useMoveWatchlistItem", () => ({
@@ -340,7 +331,7 @@ describe("TimelineItem movement actions", () => {
 function renderTimelineItem(overrides: Partial<WatchlistItem> = {}) {
   render(
     <Provider>
-      <TimelineItem item={{ ...baseItem, ...overrides }} activeFilters={activeFilters} />
+      <TimelineItem item={{ ...baseItem, ...overrides }} itemOrderMode="release" />
     </Provider>,
   );
 }

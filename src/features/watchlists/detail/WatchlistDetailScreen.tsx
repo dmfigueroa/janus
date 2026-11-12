@@ -119,7 +119,7 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
       <Box mt={8}>
         <WatchlistTimeline
           items={allItems}
-          activeFilters={{ ...activeFilters, unwatchedOnly: showUnwatchedOnly }}
+          unwatchedOnly={showUnwatchedOnly}
           itemOrderMode={latestItemOrderMode}
           hasMore={hasNextPage}
           isLoadingMore={isFetchingNextPage}

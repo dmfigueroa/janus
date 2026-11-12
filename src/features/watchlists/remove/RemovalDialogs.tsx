@@ -1,26 +1,21 @@
 import { Button, Dialog, Portal, Text } from "@chakra-ui/react";
 import { useEffect, useRef, type ReactNode } from "react";
 import type { WatchlistItem } from "@/db/Schema";
-import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
-import { useRemoveWatchlistItemMutation } from "./useRemoveWatchlistItem";
-import { useRemoveWatchlistParentMutation } from "./useRemoveWatchlistParent";
+import {
+  useRemoveWatchlistItemMutation,
+  useRemoveWatchlistParentMutation,
+  type WatchlistRemovalPreview,
+} from "./RemoveFromWatchlist";
 
 type RemovalDialogProps = {
   item: WatchlistItem;
-  activeFilters: WatchlistDetailQueryFilters;
   label: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
-export function ItemRemovalDialog({
-  item,
-  activeFilters,
-  label,
-  open,
-  onOpenChange,
-}: RemovalDialogProps) {
-  const mutation = useRemoveWatchlistItemMutation({ item, activeFilters });
+export function ItemRemovalDialog({ item, label, open, onOpenChange }: RemovalDialogProps) {
+  const mutation = useRemoveWatchlistItemMutation({ item });
   const handleRemove = () => {
     void mutation
       .mutateAsync()
@@ -40,6 +35,7 @@ export function ItemRemovalDialog({
       }
       label={label}
       isPending={mutation.isPending}
+      confirmDisabled={false}
       onConfirm={handleRemove}
     />
   );
@@ -47,20 +43,18 @@ export function ItemRemovalDialog({
 
 export function ParentRemovalDialog({
   item,
-  activeFilters,
   label,
   open,
   onOpenChange,
   previewQuery,
 }: RemovalDialogProps & {
   previewQuery: {
-    data?: { count: number; watchedCount: number };
+    data?: WatchlistRemovalPreview;
     isLoading: boolean;
   };
 }) {
   const mutation = useRemoveWatchlistParentMutation({
     item,
-    activeFilters,
     preview: previewQuery.data,
   });
   const description = getParentRemovalDescription({
@@ -83,6 +77,7 @@ export function ParentRemovalDialog({
       description={description}
       label={label}
       isPending={mutation.isPending}
+      confirmDisabled={previewQuery.isLoading}
       onConfirm={handleRemove}
     />
   );
@@ -95,6 +90,7 @@ function RemovalDialogContent({
   description,
   label,
   isPending,
+  confirmDisabled,
   onConfirm,
 }: {
   open: boolean;
@@ -103,6 +99,7 @@ function RemovalDialogContent({
   description: ReactNode;
   label: string;
   isPending: boolean;
+  confirmDisabled: boolean;
   onConfirm: () => void;
 }) {
   const cancelButtonReference = useRef<HTMLButtonElement>(null);
@@ -148,7 +145,7 @@ function RemovalDialogContent({
               <Button
                 colorPalette="red"
                 w={{ base: "full", sm: "auto" }}
-                disabled={isPending}
+                disabled={isPending || confirmDisabled}
                 onClick={onConfirm}
               >
                 {isPending ? "Removing…" : label}

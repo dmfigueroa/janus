@@ -82,7 +82,7 @@ describe("Janus MCP endpoint", () => {
   });
 
   it("keeps successful removal results around an unexpected batch failure", async () => {
-    const removal = await import("@/features/watchlists/remove/Mutation.server");
+    const removal = await import("@/features/watchlists/remove/RemoveFromWatchlist.server");
     const operation = vi
       .spyOn(removal, "removeWatchlistItemMutation")
       .mockResolvedValueOnce({ success: true, removedCount: 1, message: "Removed." })

@@ -7,20 +7,14 @@ import { invalidateWatchlistQueries } from "@/features/watchlists/Cache";
 import {
   optimisticallyRemoveWatchlistParent,
   restoreWatchlistDetailSnapshot,
-} from "@/features/watchlists/detail/Cache";
-import {
-  watchlistDetailQueryKey,
-  type WatchlistDetailQueryFilters,
-} from "@/features/watchlists/detail/Query";
+} from "@/features/watchlists/detail/WatchlistDetailCache";
 import { moveParentToWatchlist } from "./Mutation";
 
 export function useMoveWatchlistParentMutation({
   item,
-  activeFilters,
   preview,
 }: {
   item: WatchlistItem;
-  activeFilters: WatchlistDetailQueryFilters;
   preview?: {
     count: number;
     watchedCount: number;
@@ -28,7 +22,6 @@ export function useMoveWatchlistParentMutation({
 }) {
   const queryClient = useQueryClient();
   const moveParentToWatchlistFn = useServerFn(moveParentToWatchlist);
-  const activeQueryKey = watchlistDetailQueryKey(activeFilters);
 
   return useMutation({
     mutationKey: ["watchlists", "move-parent", item.id],
@@ -61,7 +54,6 @@ export function useMoveWatchlistParentMutation({
       return optimisticallyRemoveWatchlistParent({
         queryClient,
         watchlistId: item.watchlistId,
-        activeQueryKey,
         parentId: item.parentId,
         removedCount: getPreviewCount(preview, 1),
         watchedCount: getPreviewWatchedCount(preview),

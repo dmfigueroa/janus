@@ -8,23 +8,12 @@ import {
   optimisticallyRemoveWatchlistItem,
   restoreWatchlistDetailSnapshot,
   type WatchlistDetailCacheSnapshot,
-} from "@/features/watchlists/detail/Cache";
-import {
-  watchlistDetailQueryKey,
-  type WatchlistDetailQueryFilters,
-} from "@/features/watchlists/detail/Query";
+} from "@/features/watchlists/detail/WatchlistDetailCache";
 import { moveItemToWatchlist } from "./Mutation";
 
-export function useMoveWatchlistItemMutation({
-  item,
-  activeFilters,
-}: {
-  item: WatchlistItem;
-  activeFilters: WatchlistDetailQueryFilters;
-}) {
+export function useMoveWatchlistItemMutation({ item }: { item: WatchlistItem }) {
   const queryClient = useQueryClient();
   const moveItemToWatchlistFn = useServerFn(moveItemToWatchlist);
-  const activeQueryKey = watchlistDetailQueryKey(activeFilters);
 
   return useMutation({
     mutationKey: ["watchlists", "move-item", item.id],
@@ -53,7 +42,6 @@ export function useMoveWatchlistItemMutation({
       const snapshot: WatchlistDetailCacheSnapshot = await optimisticallyRemoveWatchlistItem({
         queryClient,
         watchlistId: item.watchlistId,
-        activeQueryKey,
         itemId: item.id,
         removedCount: 1,
         watchedCount: item.isWatched ? 1 : 0,
