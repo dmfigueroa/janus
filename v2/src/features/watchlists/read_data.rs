@@ -1,3 +1,6 @@
+//! Feature-owned watchlist read data: stored-row decoding and the domain
+//! interpretation both web and MCP adapters consume.
+
 use super::Watchlists;
 use sea_orm::{ConnectionTrait, DbBackend, DbErr, QueryResult, Statement, TransactionTrait};
 use sha2::{Digest, Sha256};
@@ -18,13 +21,22 @@ pub enum ItemOrderMode {
 }
 
 impl ItemOrderMode {
-    pub fn from_stored(value: &str) -> Self {
+    /// Decodes a stored `item_order_mode` value.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DbErr`] when the stored text is neither `release` nor `custom`.
+    fn from_stored(value: &str) -> Result<Self, DbErr> {
         match value {
-            "custom" => Self::Custom,
-            _ => Self::Release,
+            "release" => Ok(Self::Release),
+            "custom" => Ok(Self::Custom),
+            unknown => Err(DbErr::Custom(format!(
+                "Unsupported watchlist item order mode: {unknown}"
+            ))),
         }
     }
 
+    /// The stored value for this mode.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Release => "release",
@@ -44,6 +56,7 @@ impl ItemOrderMode {
     }
 }
 
+/// One watchlist row without derived statistics.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WatchlistRecord {
     pub id: i64,
@@ -57,6 +70,7 @@ pub struct WatchlistRecord {
     pub paused_at: Option<String>,
 }
 
+/// One stored watchlist item with nullable watched state and metadata decoded.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WatchlistItem {
     pub id: i64,
@@ -80,6 +94,7 @@ pub struct WatchlistItem {
 }
 
 impl WatchlistItem {
+    /// Matches the item's title, parent title or episode against a lowercase query.
     pub fn matches_text(&self, lowercase_query: &str) -> bool {
         [self.title.as_str()]
             .into_iter()
@@ -88,6 +103,7 @@ impl WatchlistItem {
             .any(|value| value.to_ascii_lowercase().contains(lowercase_query))
     }
 
+    /// The parent identity and title, falling back to the item's own identity.
     pub fn group_title(&self) -> (&str, &str) {
         let id = self.parent_id.as_deref().unwrap_or(&self.tmdb_id);
         let title = self.parent_title.as_deref().unwrap_or(&self.title);
@@ -95,6 +111,7 @@ impl WatchlistItem {
     }
 }
 
+/// Derived counts, progress, next unwatched item and cover metadata.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WatchlistStats {
     pub total_items: usize,
@@ -105,12 +122,14 @@ pub struct WatchlistStats {
     pub cover_media_type: Option<String>,
 }
 
+/// A watchlist row plus its derived statistics.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WatchlistSummary {
     pub watchlist: WatchlistRecord,
     pub stats: WatchlistStats,
 }
 
+/// A consistent watchlist snapshot: summary, ordered items and order token.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WatchlistDetail {
     pub watchlist: WatchlistSummary,
@@ -123,7 +142,9 @@ fn watchlist_record(row: &QueryResult) -> Result<WatchlistRecord, DbErr> {
         id: row.try_get("", "id")?,
         name: row.try_get("", "name")?,
         description: text(row, "description")?,
-        item_order_mode: ItemOrderMode::from_stored(&row.try_get::<String>("", "item_order_mode")?),
+        item_order_mode: ItemOrderMode::from_stored(
+            &row.try_get::<String>("", "item_order_mode")?,
+        )?,
         created_at: row.try_get("", "created_at")?,
         updated_at: text(row, "updated_at")?,
         last_watched_at: text(row, "last_watched_at")?,
@@ -132,7 +153,7 @@ fn watchlist_record(row: &QueryResult) -> Result<WatchlistRecord, DbErr> {
     })
 }
 
-fn item(row: &QueryResult) -> Result<WatchlistItem, DbErr> {
+fn watchlist_item(row: &QueryResult) -> Result<WatchlistItem, DbErr> {
     let authors = match text(row, "authors")? {
         Some(value) => {
             Some(serde_json::from_str(&value).map_err(|error| DbErr::Custom(error.to_string()))?)
@@ -161,7 +182,7 @@ fn item(row: &QueryResult) -> Result<WatchlistItem, DbErr> {
     })
 }
 
-fn stats(
+fn watchlist_stats(
     total_items: usize,
     watched_items: usize,
     next_unwatched: Option<&WatchlistItem>,
@@ -172,7 +193,9 @@ fn stats(
     } else if total_items == watched_items {
         100
     } else {
-        ((watched_items as f64 / total_items as f64 * 100.0).round() as usize).min(99) as u64
+        let percentage = (watched_items as f64 / total_items as f64 * 100.0).round();
+        // Completed lists report 100 above; partial lists stay below it.
+        percentage.min(99.0) as u64
     };
     WatchlistStats {
         total_items,
@@ -185,7 +208,12 @@ fn stats(
 }
 
 impl Watchlists {
-    /// Consistent snapshot of one watchlist, its ordered items and order token.
+    /// Reads one watchlist, its items in stored order and its order token from
+    /// a single transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DbErr`] when the database read or stored-value decoding fails.
     pub async fn detail(&self, id: i64) -> Result<Option<WatchlistDetail>, DbErr> {
         let transaction = self.0.begin().await?;
         let Some(row) = transaction
@@ -207,7 +235,7 @@ impl Watchlists {
             .query_all_raw(statement(&sql, vec![id.into()]))
             .await?
             .iter()
-            .map(item)
+            .map(watchlist_item)
             .collect::<Result<_, _>>()?;
         transaction.commit().await?;
         let watched_items = items
@@ -219,7 +247,7 @@ impl Watchlists {
         let order_token = order_token(id, mode, &items);
         Ok(Some(WatchlistDetail {
             watchlist: WatchlistSummary {
-                stats: stats(items.len(), watched_items, next_unwatched, cover),
+                stats: watchlist_stats(items.len(), watched_items, next_unwatched, cover),
                 watchlist,
             },
             items,
@@ -227,6 +255,11 @@ impl Watchlists {
         }))
     }
 
+    /// Reads every watchlist row without derived statistics.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DbErr`] when the database read or stored-value decoding fails.
     pub async fn headers(&self) -> Result<Vec<WatchlistRecord>, DbErr> {
         self.0
             .query_all_raw(statement("SELECT * FROM watchlists", vec![]))
@@ -249,32 +282,53 @@ impl Watchlists {
         };
         let watchlist = watchlist_record(&row)?;
         let ordering = watchlist.item_order_mode.order_sql();
-        let Some(counts) = transaction
+        let counts = transaction
             .query_one_raw(statement(
-                "SELECT count(*) AS total,sum(CASE WHEN is_watched THEN 1 ELSE 0 END) AS watched FROM watchlist_items WHERE watchlist_id=?",
+                "SELECT count(*) AS total,\
+                 sum(CASE WHEN is_watched THEN 1 ELSE 0 END) AS watched \
+                 FROM watchlist_items WHERE watchlist_id=?",
                 vec![id.into()],
             ))
             .await?
-        else {
-            return Err(DbErr::Custom(
-                "Missing watchlist item counts".to_owned(),
-            ));
-        };
+            .ok_or_else(|| DbErr::Custom("Missing watchlist item counts".to_owned()))?;
         let total = counts.try_get::<i64>("", "total")? as usize;
         let watched_items = counts.try_get::<Option<i64>>("", "watched")?.unwrap_or(0) as usize;
-        let next_unwatched=transaction.query_one_raw(statement(&format!("SELECT * FROM watchlist_items WHERE watchlist_id=? AND COALESCE(is_watched,0)=0 ORDER BY {ordering} LIMIT 1"),vec![id.into()])).await?.as_ref().map(item).transpose()?;
+        let next_unwatched = transaction
+            .query_one_raw(statement(
+                &format!(
+                    "SELECT * FROM watchlist_items \
+                     WHERE watchlist_id=? AND COALESCE(is_watched,0)=0 \
+                     ORDER BY {ordering} LIMIT 1"
+                ),
+                vec![id.into()],
+            ))
+            .await?
+            .as_ref()
+            .map(watchlist_item)
+            .transpose()?;
         let cover = if next_unwatched.is_some() {
-            next_unwatched.clone()
+            None
         } else {
-            transaction.query_one_raw(statement(&format!("SELECT * FROM watchlist_items WHERE watchlist_id=? ORDER BY {ordering} LIMIT 1"),vec![id.into()])).await?.as_ref().map(item).transpose()?
+            transaction
+                .query_one_raw(statement(
+                    &format!(
+                        "SELECT * FROM watchlist_items WHERE watchlist_id=? \
+                         ORDER BY {ordering} LIMIT 1"
+                    ),
+                    vec![id.into()],
+                ))
+                .await?
+                .as_ref()
+                .map(watchlist_item)
+                .transpose()?
         };
         transaction.commit().await?;
         Ok(Some(WatchlistSummary {
-            stats: stats(
+            stats: watchlist_stats(
                 total,
                 watched_items,
                 next_unwatched.as_ref(),
-                cover.as_ref(),
+                next_unwatched.as_ref().or(cover.as_ref()),
             ),
             watchlist,
         }))
@@ -291,4 +345,32 @@ fn order_token(id: i64, mode: ItemOrderMode, items: &[WatchlistItem]) -> String 
         "sha256:{:x}",
         Sha256::digest(format!("{id}:{}:{ids}", mode.as_str()))
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn item_order_mode_decodes_release_and_custom() {
+        assert_eq!(
+            ItemOrderMode::from_stored("release").unwrap(),
+            ItemOrderMode::Release
+        );
+        assert_eq!(
+            ItemOrderMode::from_stored("custom").unwrap(),
+            ItemOrderMode::Custom
+        );
+    }
+
+    #[test]
+    fn item_order_mode_rejects_unknown_stored_values() {
+        let error = ItemOrderMode::from_stored("sideways").unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("Unsupported watchlist item order mode: sideways"),
+            "{error}"
+        );
+    }
 }

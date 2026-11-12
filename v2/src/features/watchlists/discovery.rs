@@ -1,3 +1,6 @@
+//! Watchlist discovery: cursor pagination, ordering, search and item lookup.
+//! Typed results feed adapters; JSON is produced at the protocol boundary.
+
 use super::{WatchlistItem, WatchlistRecord, WatchlistStats, WatchlistSummary, Watchlists};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde_json::{Value, json};
@@ -77,6 +80,9 @@ fn summary_json(summary: &WatchlistSummary) -> Value {
 fn invalid(message: &str) -> String {
     message.into()
 }
+fn request_arguments(request: DiscoveryRequest) -> Result<Value, DiscoveryError> {
+    serde_json::to_value(request).map_err(|error| invalid(&error.to_string()).into())
+}
 fn offset(arguments: &Value, binding: &Value) -> Result<usize, String> {
     let Some(cursor) = arguments.get("cursor") else {
         return Ok(0);
@@ -126,7 +132,10 @@ fn with_cursor(mut value: Value, cursor: Option<String>) -> Value {
     value
 }
 fn size(arguments: &Value) -> Value {
-    arguments.get("pageSize").cloned().unwrap_or(json!(50))
+    arguments
+        .get("pageSize")
+        .cloned()
+        .unwrap_or_else(|| json!(50))
 }
 fn folded(value: &str) -> String {
     value.nfc().collect::<String>().to_lowercase()
@@ -141,26 +150,33 @@ fn title_json(
     json!({"provider":provider,"providerId":provider_id,"mediaType":media_type,"title":title,"matchingItemCount":matching_item_count})
 }
 fn titles(items: &[&WatchlistItem]) -> Vec<Value> {
-    let mut grouped = BTreeMap::<(String, String, String, String), usize>::new();
+    // Keys borrow from `items`, which outlives the grouping map.
+    let mut grouped = BTreeMap::<(&str, &str, &str, &str), usize>::new();
     for item in items {
         let (id, title) = item.group_title();
         *grouped
-            .entry((
-                title.to_owned(),
-                id.to_owned(),
-                item.source.clone(),
-                item.media_type.clone(),
-            ))
+            .entry((title, id, &item.source, &item.media_type))
             .or_default() += 1;
     }
     grouped
         .into_iter()
-        .map(|((title, id, source, media), count)| title_json(&source, &id, &media, &title, count))
+        .map(|((title, id, source, media), count)| title_json(source, id, media, title, count))
         .collect()
 }
 fn title(item: &WatchlistItem) -> Value {
     let (id, title) = item.group_title();
     title_json(&item.source, id, &item.media_type, title, 1)
+}
+/// The discovery operations shared by web and MCP.
+fn sort_value<'a>(list: &'a WatchlistRecord, order_by: &str) -> Option<&'a str> {
+    match order_by {
+        "lastWatched" => list.last_watched_at.as_deref(),
+        "lastAdded" => list
+            .last_item_added_at
+            .as_deref()
+            .or(Some(list.created_at.as_str())),
+        _ => Some(list.created_at.as_str()),
+    }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DiscoveryOperation {
@@ -170,6 +186,7 @@ pub enum DiscoveryOperation {
     Find,
 }
 
+/// Discovery arguments after transport-level normalization.
 #[derive(Default, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiscoveryRequest {
@@ -204,6 +221,7 @@ pub struct SummaryPage {
     pub next_cursor: Option<String>,
 }
 
+/// User-facing discovery failure.
 #[derive(Debug)]
 pub enum DiscoveryError {
     InvalidInput(String),
@@ -223,15 +241,25 @@ impl std::fmt::Display for DiscoveryError {
     }
 }
 impl Watchlists {
+    /// Runs a discovery operation and returns its MCP-compatible JSON envelope.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DiscoveryError`] for invalid input, missing watchlists or a
+    /// failed database read.
     pub async fn discovery(
         &self,
         operation: DiscoveryOperation,
         request: DiscoveryRequest,
     ) -> Result<Value, DiscoveryError> {
-        self.discover_arguments(operation, serde_json::to_value(request).unwrap())
+        self.discover_arguments(operation, request_arguments(request)?)
             .await
     }
     /// Typed summary discovery for adapters that do not speak MCP JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DiscoveryError`] for invalid input or a failed database read.
     pub async fn summaries(
         &self,
         operation: DiscoveryOperation,
@@ -243,8 +271,7 @@ impl Watchlists {
         ) {
             return Err(invalid("Invalid discovery operation.").into());
         }
-        let arguments =
-            super::validation::arguments(operation, serde_json::to_value(request).unwrap())?;
+        let arguments = super::validation::arguments(operation, request_arguments(request)?)?;
         self.summary_page(operation, arguments).await
     }
     pub(super) async fn discover_arguments(
@@ -263,7 +290,9 @@ impl Watchlists {
                 page.next_cursor,
             ));
         }
-        let id = arguments["watchlistId"].as_i64().unwrap();
+        let Some(id) = arguments["watchlistId"].as_i64() else {
+            return Err(invalid("Invalid watchlist ID.").into());
+        };
         let data = self.detail(id).await.map_err(DiscoveryError::Database)?;
         let view = arguments["resultView"].as_str().unwrap_or("items");
         let Some(data) = data else {
@@ -286,7 +315,9 @@ impl Watchlists {
                 arguments.get("query").is_some(),
             ];
             if selectors[0] {
-                let target = arguments["watchlistItemId"].as_i64().unwrap();
+                let Some(target) = arguments["watchlistItemId"].as_i64() else {
+                    return Err(invalid("Invalid watchlist item ID.").into());
+                };
                 selected.retain(|item| item.id == target);
                 exact = true;
             } else if selectors[1] {
@@ -300,11 +331,10 @@ impl Watchlists {
                 });
                 exact = true;
             } else {
-                let query = arguments["query"]
-                    .as_str()
-                    .unwrap()
-                    .trim()
-                    .to_ascii_lowercase();
+                let Some(query) = arguments["query"].as_str() else {
+                    return Err(invalid("A search query is required.").into());
+                };
+                let query = query.trim().to_ascii_lowercase();
                 selected.retain(|item| item.matches_text(&query));
             }
         }
@@ -346,7 +376,10 @@ impl Watchlists {
         let order_by = arguments["orderBy"].as_str().unwrap_or("createdAt");
         let order = arguments["order"].as_str().unwrap_or("desc");
         let query = if operation == DiscoveryOperation::Search {
-            Some(folded(arguments["query"].as_str().unwrap().trim()))
+            let Some(query) = arguments["query"].as_str() else {
+                return Err(invalid("A search query is required.").into());
+            };
+            Some(folded(query.trim()))
         } else {
             None
         };
@@ -357,17 +390,9 @@ impl Watchlists {
                 .as_ref()
                 .is_none_or(|query| folded(&list.name).contains(query))
         });
-        let value = |list: &WatchlistRecord| match order_by {
-            "lastWatched" => list.last_watched_at.clone(),
-            "lastAdded" => list
-                .last_item_added_at
-                .clone()
-                .or_else(|| Some(list.created_at.clone())),
-            _ => Some(list.created_at.clone()),
-        };
         headers.sort_by(|left, right| {
-            let compared = value(left)
-                .cmp(&value(right))
+            let compared = sort_value(left, order_by)
+                .cmp(&sort_value(right, order_by))
                 .then_with(|| left.id.cmp(&right.id));
             if order == "desc" {
                 compared.reverse()

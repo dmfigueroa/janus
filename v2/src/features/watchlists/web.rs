@@ -83,7 +83,9 @@ pub async fn detail(
                 year: if date.is_empty() {
                     "TBA".into()
                 } else {
-                    date.split('-').next().unwrap().into()
+                    date.split_once('-')
+                        .map_or(date.as_str(), |(year, _)| year)
+                        .into()
                 },
                 date,
                 watched: item.is_watched == Some(true),
