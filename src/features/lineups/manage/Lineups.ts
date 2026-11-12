@@ -1,12 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-const reference = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("system"),
-    key: z.enum(["movie", "television", "game", "book", "comic"]),
-  }),
-  z.object({ kind: z.literal("custom"), id: z.number().int().positive() }),
-]);
+import { lineupReferenceSchema } from "@/features/lineups/LineupReference";
+
 const action = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("create"),
@@ -15,15 +10,16 @@ const action = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("edit"),
-    reference,
+    reference: lineupReferenceSchema,
     name: z.string(),
     watchlistIds: z.array(z.number().int().positive()),
   }),
-  z.object({ action: z.literal("enable"), reference, enabled: z.boolean() }),
-  z.object({ action: z.literal("delete"), reference }),
-  z.object({ action: z.literal("reorder"), references: z.array(reference) }),
+  z.object({ action: z.literal("enable"), reference: lineupReferenceSchema, enabled: z.boolean() }),
+  z.object({ action: z.literal("delete"), reference: lineupReferenceSchema }),
+  z.object({ action: z.literal("reorder"), references: z.array(lineupReferenceSchema) }),
 ]);
 export type LineupAction = z.infer<typeof action>;
+
 export const getLineupData = createServerFn().handler(async () => {
   const { readLineups } = await import("@/features/lineups/read/LineupRead.server");
   const { listWatchlistSummaries } = await import("@/features/watchlists/list/Query.server");
@@ -32,10 +28,13 @@ export const getLineupData = createServerFn().handler(async () => {
     watchlists: await listWatchlistSummaries({ orderBy: "recency" }),
   };
 });
+
 export const changeLineup = createServerFn({ method: "POST" })
   .validator(action)
   .handler(async ({ data }) => {
-    const { executeLineupAction } = await import("@/features/lineups/manage/LineupActions.server");
+    const { executeLineupAction } =
+      await import("@/features/lineups/manage/LineupConfiguration.server");
     return executeLineupAction(data);
   });
+
 export type LineupData = Awaited<ReturnType<typeof getLineupData>>;

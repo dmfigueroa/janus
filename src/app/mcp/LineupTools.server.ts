@@ -1,28 +1,20 @@
 import { executeWriteBatch } from "./ExecuteWriteBatch.server";
-import { deleteLineup } from "@/features/lineups/manage/DeleteLineup.server";
-import { matchesReference } from "@/features/lineups/read/LineupConfigurationRead.server";
-import { readLineups } from "@/features/lineups/read/LineupRead.server";
-import { reorderLineups } from "@/features/lineups/manage/ReorderLineups.server";
+import { readLineup, readLineups } from "@/features/lineups/read/LineupRead.server";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import {
   createLineup,
+  deleteLineup,
+  reorderLineups,
   setLineupWatchlists,
   updateLineup,
 } from "@/features/lineups/manage/LineupConfiguration.server";
+import { lineupReferenceSchema } from "@/features/lineups/LineupReference";
 import { asMcpContent } from "./McpToolResponse.server";
-
-const reference = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("system"),
-    key: z.enum(["movie", "television", "game", "book", "comic"]),
-  }),
-  z.object({ kind: z.literal("custom"), id: z.number().int().positive() }),
-]);
 
 const createInput = z.object({ name: z.string() });
 const updateInput = z.object({
-  reference,
+  reference: lineupReferenceSchema,
   name: z.string().optional(),
   enabled: z.boolean().optional(),
 });
@@ -76,11 +68,11 @@ export function registerLineupTools(server: McpServer) {
     "get_lineup",
     {
       description: "Read configured and eligible watchlists in a lineup.",
-      inputSchema: { reference },
+      inputSchema: { reference: lineupReferenceSchema },
       annotations: { readOnlyHint: true, destructiveHint: false },
     },
     async ({ reference: requested }) => {
-      const lineup = (await readLineups()).find((entry) => matchesReference(entry, requested));
+      const lineup = await readLineup(requested);
       return asMcpContent(
         lineup
           ? { success: true, lineup }
@@ -128,7 +120,10 @@ export function registerLineupTools(server: McpServer) {
     "set_lineup_watchlists",
     {
       description: "Replace all configured watchlists in a custom lineup.",
-      inputSchema: { reference, watchlistIds: z.array(z.number().int().positive()) },
+      inputSchema: {
+        reference: lineupReferenceSchema,
+        watchlistIds: z.array(z.number().int().positive()),
+      },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     },
     async ({ reference, watchlistIds }) =>
@@ -138,12 +133,12 @@ export function registerLineupTools(server: McpServer) {
     "delete_lineups",
     {
       description: "Delete custom lineups without deleting watchlists.",
-      inputSchema: { lineups: z.array(z.union([reference, z.unknown()])).min(1) },
+      inputSchema: { lineups: z.array(z.union([lineupReferenceSchema, z.unknown()])).min(1) },
       annotations: { readOnlyHint: false, destructiveHint: true },
     },
     async ({ lineups }) => {
       const results = await executeWriteBatch(lineups, (entry, index) =>
-        batchResult(entry, index, reference, deleteLineup, "deleted"),
+        batchResult(entry, index, lineupReferenceSchema, deleteLineup, "deleted"),
       );
       return asMcpContent({ results });
     },
@@ -152,7 +147,7 @@ export function registerLineupTools(server: McpServer) {
     "reorder_lineups",
     {
       description: "Replace the complete order of all lineups.",
-      inputSchema: { lineups: z.array(reference) },
+      inputSchema: { lineups: z.array(lineupReferenceSchema) },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     },
     async ({ lineups }) => asMcpContent(await reorderLineups(lineups)),
