@@ -1,7 +1,9 @@
 import { useEffect, useState, useMemo } from "react";
 import { Box, Container } from "@chakra-ui/react";
 import { useInfiniteQuery, useIsMutating, type InfiniteData } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import { toaster } from "@/app/Toaster";
 import { DeleteWatchlistDialog } from "@/features/watchlists/components/DeleteWatchlistDialog";
 import { WatchlistHeader } from "@/features/watchlists/components/WatchlistHeader";
 import { WatchlistTimeline } from "@/features/watchlists/components/WatchlistTimeline";
@@ -10,10 +12,12 @@ import {
   watchlistDetailInfiniteQueryOptions,
   type WatchlistDetailQueryData,
 } from "@/features/watchlists/detail/Query";
-import { useDeleteWatchlistDetail } from "@/features/watchlists/detail/useDeleteWatchlistDetail";
 import { useReorderWatchlistItemsMutation } from "@/features/watchlists/detail/useReorderWatchlistItemsMutation";
 import { canReorderWatchlistItems } from "@/features/watchlists/detail/Reorder";
-import { useToggleWatchlistPause } from "@/features/watchlists/pause/useToggleWatchlistPause";
+import {
+  useDeleteWatchlist,
+  useToggleWatchlistPause,
+} from "@/features/watchlists/lifecycle/useWatchlistLifecycleActions";
 
 interface WatchlistDetailScreenProps {
   initialData: WatchlistDetailQueryData;
@@ -21,8 +25,8 @@ interface WatchlistDetailScreenProps {
 
 export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProps) {
   const watchlistId = initialData.watchlist.id;
-  const { deleteOpen, setDeleteOpen, deleting, handleDelete } =
-    useDeleteWatchlistDetail(watchlistId);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const navigate = useNavigate();
   const [showUnwatchedOnly, setShowUnwatchedOnly] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebouncedSearchQuery(searchQuery);
@@ -36,6 +40,30 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
 
   const { allItems, latestWatchlist } = getCurrentDetailData(data, initialData.watchlist);
   const latestItemOrderMode = latestWatchlist.itemOrderMode;
+  const remove = useDeleteWatchlist(watchlistId, {
+    onDeleted: async () => {
+      setDeleteOpen(false);
+      toaster.create({ type: "success", title: "Watchlist deleted" });
+      await navigate({ to: "/", replace: true });
+    },
+  });
+  const togglePauseMutation = useToggleWatchlistPause(latestWatchlist);
+
+  const handleDelete = async () => {
+    try {
+      await remove.mutateAsync();
+    } catch {
+      return;
+    }
+  };
+
+  const handleTogglePause = async () => {
+    try {
+      await togglePauseMutation.mutateAsync();
+    } catch {
+      return;
+    }
+  };
 
   const activeFilters = useMemo(
     () => ({
@@ -54,7 +82,6 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
   const isWatchedTogglePending =
     useIsMutating({ mutationKey: ["watchlists", "toggle-watched", watchlistId] }) > 0;
   const isReorderPending = reorderItemsMutation.isPending;
-  const togglePauseMutation = useToggleWatchlistPause(latestWatchlist);
 
   const canReorderItems = canReorderWatchlistItems({
     itemOrderMode: initialData.watchlist.itemOrderMode,
@@ -76,7 +103,7 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
         onFilterChange={setShowUnwatchedOnly}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        onTogglePause={() => void togglePauseMutation.mutateAsync()}
+        onTogglePause={() => void handleTogglePause()}
         onDelete={() => setDeleteOpen(true)}
         interactionDisabled={isReorderPending}
       />
@@ -85,7 +112,7 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
         watchlist={latestWatchlist}
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        deleting={deleting}
+        deleting={remove.isPending}
         handleDelete={() => void handleDelete()}
       />
 

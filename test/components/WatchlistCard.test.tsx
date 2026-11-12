@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@test/utils/Render";
-import type { PropsWithChildren } from "react";
+import type { PropsWithChildren, ReactElement } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EnrichedWatchlist } from "@/features/watchlists/components/WatchlistCard";
 import { WatchlistCard } from "@/features/watchlists/components/WatchlistCard";
@@ -12,6 +13,8 @@ const {
   rotateServerFn,
   undoServerFn,
   invalidateMock,
+  invalidateQueriesMock,
+  toastMock,
   deleteWatchlistFnMock,
   skipWatchlistFnMock,
   pauseWatchlistFnMock,
@@ -26,6 +29,8 @@ const {
   rotateServerFn: Symbol("rotate"),
   undoServerFn: Symbol("undo"),
   invalidateMock: vi.fn(),
+  invalidateQueriesMock: vi.fn(),
+  toastMock: vi.fn(),
   deleteWatchlistFnMock: vi.fn(),
   skipWatchlistFnMock: vi.fn(),
   pauseWatchlistFnMock: vi.fn(),
@@ -41,15 +46,9 @@ vi.mock("@/features/watchlists/rotation/CardRotation", () => ({
   undoWatchlistCard: undoServerFn,
 }));
 
-vi.mock("@/features/watchlists/delete/Mutation", () => ({
+vi.mock("@/features/watchlists/lifecycle/WatchlistLifecycleActions", () => ({
   deleteWatchlist: deleteWatchlistServerFn,
-}));
-
-vi.mock("@/features/watchlists/skip/Mutation", () => ({
   skipWatchlist: skipWatchlistServerFn,
-}));
-
-vi.mock("@/features/watchlists/pause/PauseWatchlist", () => ({
   pauseWatchlist: pauseWatchlistServerFn,
   resumeWatchlist: resumeWatchlistServerFn,
 }));
@@ -84,11 +83,12 @@ vi.mock("@tanstack/react-start", () => ({
   },
 }));
 
-vi.mock("@tanstack/react-query", () => ({
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+vi.mock("@tanstack/react-query", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-query")>()),
+  useQueryClient: () => ({ invalidateQueries: invalidateQueriesMock }),
 }));
 
-vi.mock("@/app/Toaster", () => ({ toaster: { create: vi.fn() } }));
+vi.mock("@/app/Toaster", () => ({ toaster: { create: toastMock } }));
 
 vi.mock("@/features/watchlists/components/DeleteWatchlistDialog", () => ({
   DeleteWatchlistDialog: ({ open }: { open: boolean }) =>
@@ -147,6 +147,16 @@ function createWatchlist(
   };
 }
 
+function renderCard(ui: ReactElement) {
+  const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+  const result = render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  return {
+    ...result,
+    rerender: (next: ReactElement) =>
+      result.rerender(<QueryClientProvider client={queryClient}>{next}</QueryClientProvider>),
+  };
+}
+
 async function openCardMenu(watchlistName: string) {
   fireEvent.click(screen.getByRole("button", { name: `Watchlist actions for ${watchlistName}` }));
   await waitFor(() => {
@@ -168,7 +178,7 @@ describe("WatchlistCard", () => {
   });
 
   it("skips an up next watchlist from the card menu and invalidates the route data", async () => {
-    render(
+    renderCard(
       <WatchlistCard
         watchlist={createWatchlist({ id: 1, name: "Movie Night" })}
         showUpNextBadge={false}
@@ -183,11 +193,13 @@ describe("WatchlistCard", () => {
         data: { watchlistId: 1 },
       });
     });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["watchlists"] });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["lineups"] });
     expect(invalidateMock).toHaveBeenCalled();
   });
 
   it("pauses a watchlist from the card menu and invalidates the route data", async () => {
-    render(
+    renderCard(
       <WatchlistCard
         watchlist={createWatchlist({ id: 1, name: "Movie Night" })}
         showUpNextBadge={false}
@@ -202,11 +214,18 @@ describe("WatchlistCard", () => {
         data: { watchlistId: 1 },
       });
     });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["watchlists"] });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["lineups"] });
     expect(invalidateMock).toHaveBeenCalled();
+    expect(toastMock).toHaveBeenCalledWith({
+      type: "success",
+      title: "Watchlist paused",
+      description: "Removed from active rotation. Find it under Paused.",
+    });
   });
 
   it("resumes a paused watchlist from the card menu", async () => {
-    render(
+    renderCard(
       <WatchlistCard
         watchlist={createWatchlist({ id: 1, name: "Movie Night", pausedAt: "2024-06-01 00:00:00" })}
         showUpNextBadge={false}
@@ -221,11 +240,18 @@ describe("WatchlistCard", () => {
         data: { watchlistId: 1 },
       });
     });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["watchlists"] });
+    expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ["lineups"] });
     expect(invalidateMock).toHaveBeenCalled();
+    expect(toastMock).toHaveBeenCalledWith({
+      type: "success",
+      title: "Watchlist returned to rotation",
+      description: undefined,
+    });
   });
 
   it("offers skip only when a next unwatched item exists", async () => {
-    render(
+    renderCard(
       <WatchlistCard
         watchlist={createWatchlist({
           id: 1,
@@ -250,7 +276,7 @@ describe("WatchlistCard", () => {
   });
 
   it("opens the delete confirmation dialog from the card menu", async () => {
-    render(
+    renderCard(
       <WatchlistCard
         watchlist={createWatchlist({ id: 1, name: "Movie Night" })}
         showUpNextBadge={false}
@@ -264,7 +290,7 @@ describe("WatchlistCard", () => {
   });
 
   it("marks the card wrapper as a group for hover actions", () => {
-    render(
+    renderCard(
       <WatchlistCard
         watchlist={createWatchlist({ id: 1, name: "Movie Night" })}
         showUpNextBadge={false}
@@ -277,7 +303,7 @@ describe("WatchlistCard", () => {
   });
 
   it("shows item titles instead of the watchlist name in featured up next cards", () => {
-    render(
+    renderCard(
       <WatchlistCard
         watchlist={createWatchlist({
           id: 1,
@@ -301,7 +327,7 @@ describe("WatchlistCard", () => {
   });
 
   it("formats comic numbering ahead of the item title in featured up next cards", () => {
-    render(
+    renderCard(
       <WatchlistCard
         watchlist={createWatchlist({
           id: 1,
@@ -333,7 +359,7 @@ describe("WatchlistCard", () => {
   });
 
   it("exposes whether a watchlist is selected to assistive technology", () => {
-    const { rerender } = render(
+    const { rerender } = renderCard(
       <WatchlistCard
         watchlist={createWatchlist({ id: 1, name: "Movie Night" })}
         selectionMode
@@ -359,7 +385,7 @@ describe("WatchlistCard", () => {
   it("lets keyboard users select a watchlist from selection mode", () => {
     const onToggle = vi.fn();
 
-    render(
+    renderCard(
       <WatchlistCard
         watchlist={createWatchlist({ id: 1, name: "Movie Night" })}
         selectionMode
@@ -383,7 +409,7 @@ it("marks the displayed next item directly and shares the pending lock across ca
       finish = resolve;
     }),
   );
-  render(
+  renderCard(
     <>
       <WatchlistCard watchlist={createWatchlist({ id: 1, name: "First" })} />
       <WatchlistCard watchlist={createWatchlist({ id: 2, name: "Second" })} />
@@ -403,7 +429,7 @@ it("marks the displayed next item directly and shares the pending lock across ca
 });
 
 it("keeps quick-action buttons outside the artwork navigation link", () => {
-  render(<WatchlistCard watchlist={createWatchlist({ id: 1, name: "Movie Night" })} />);
+  renderCard(<WatchlistCard watchlist={createWatchlist({ id: 1, name: "Movie Night" })} />);
   const watched = screen.getByRole("button", { name: "Mark Next Movie watched" });
   const skip = screen.getByRole("button", { name: "Skip turn for Movie Night" });
   expect(watched.closest("a")).toBeNull();

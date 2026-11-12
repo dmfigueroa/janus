@@ -2,7 +2,7 @@ import {
   getWatchlistDetailPage,
   watchlistDetailQueryKey,
 } from "@/features/watchlists/detail/Query";
-import { WatchlistDetailScreen } from "@/features/watchlists/detail/Screen";
+import { WatchlistDetailScreen } from "@/features/watchlists/detail/WatchlistDetailScreen";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/watchlists/$watchlistId")({

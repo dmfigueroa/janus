@@ -1,4 +1,4 @@
-import type { DeleteWatchlistInput } from "./Mutation";
+import type { DeleteWatchlistInput } from "@/features/watchlists/lifecycle/WatchlistLifecycleActions";
 import { deleteWatchlist, getWatchlistById } from "@/features/watchlists/Repository.server";
 
 export async function deleteWatchlistMutation({ id }: DeleteWatchlistInput) {
