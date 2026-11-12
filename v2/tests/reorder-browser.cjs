@@ -41,3 +41,27 @@ test("keyboard reorder saves intent and restores authoritative order and focus a
   assert.match(window.document.getElementById("reorder-status").textContent, /Stale anchor/);
   dom.window.close();
 });
+
+test("collapsed watched groups reject incoming drops while expanded groups accept them", () => {
+  const dom = new JSDOM(
+    '<p id="reorder-status"></p><div class="timeline" data-reorder-url="/reorder" data-mode="custom"><article data-item-id="1"></article><details><summary>Watched</summary><article data-item-id="2"></article></details><article data-item-id="3"></article></div>',
+    { url: "https://janus.example/v2/watchlists/41", runScripts: "outside-only" },
+  );
+  const { window } = dom;
+  window.eval(fs.readFileSync(path.join(root, "static/vendor/Sortable.min.js"), "utf8"));
+  window.eval(fs.readFileSync(path.join(root, "static/app.js"), "utf8"));
+  const timeline = window.document.querySelector(".timeline");
+  const group = window.document.querySelector("details");
+  const source = window.Sortable.get(timeline);
+  const destination = window.Sortable.get(group);
+  const moved = timeline.querySelector('[data-item-id="3"]');
+  const acceptsDrop = () => destination.options.group.checkPut(destination, source, moved, {});
+  assert.equal(acceptsDrop(), false);
+  group.open = true;
+  assert.equal(acceptsDrop(), true);
+  assert.deepEqual(
+    [...timeline.querySelectorAll("article")].map((row) => row.dataset.itemId),
+    ["1", "2", "3"],
+  );
+  dom.window.close();
+});

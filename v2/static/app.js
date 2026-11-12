@@ -107,7 +107,10 @@ class WatchlistReorder {
     [this.timeline, ...this.timeline.querySelectorAll("details")].forEach((container) => {
       if (Sortable.get(container)) return;
       Sortable.create(container, {
-        group: "watchlist-items",
+        group: {
+          name: "watchlist-items",
+          put: () => !container.matches("details:not([open])"),
+        },
         draggable: "article",
         handle: ".reorder-handle",
         animation: this.dragDuration(),
