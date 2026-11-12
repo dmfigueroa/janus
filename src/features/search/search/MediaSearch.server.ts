@@ -1,25 +1,24 @@
-import { searchAnilist } from "@/server/providers/Anilist.server";
 import { searchComics } from "@/server/providers/Comicvine.server";
 import { searchBooks } from "@/server/providers/GoogleBooks.server";
 import { searchGames } from "@/server/providers/Rawg.server";
 import { searchMultimedia } from "@/server/providers/Tmdb.server";
 import { API_PAGE_SIZE } from "@/server/Constants";
 import { DEPRECATED_MEDIA_MESSAGE, isDeprecatedMediaType, type UnifiedMedia } from "@/server/Media";
-import type { SearchableMediaType } from "./MediaSearch";
+import {
+  EMPTY_MEDIA_SEARCH_MESSAGE,
+  PROVIDER_UNAVAILABLE_MESSAGE,
+  normalizeMediaSearchPage,
+  normalizeMediaSearchQuery,
+  type MediaSearchInput,
+  type MediaSearchOutcome,
+  type MediaSearchRejection,
+  type MediaSearchSuccess,
+  type SearchableMediaType,
+} from "./MediaSearch";
 
 type ProviderSearchResult = { results: UnifiedMedia[]; totalResults: number };
-
-export const PROVIDER_UNAVAILABLE_MESSAGE =
-  "Search is temporarily unavailable for this media type. Please try again later.";
-
-export type MediaSearchPage = {
-  results: UnifiedMedia[];
-  page: number;
-  total_pages: number;
-  total_results: number;
-  rejected: boolean;
-  message?: string;
-};
+type ProviderSearch = (query: string, page: number) => Promise<ProviderSearchResult>;
+type ActiveProviderMediaType = Exclude<SearchableMediaType, "movie" | "tv" | "anime" | "manga">;
 
 async function searchGameProvider(query: string, page: number) {
   const apiKey = process.env.RAWG_API_KEY;
@@ -33,85 +32,112 @@ async function searchComicProvider(query: string, page: number) {
   return searchComics(query, apiKey, page);
 }
 
-const providerSearches: Record<
-  Exclude<SearchableMediaType, "movie" | "tv">,
-  (query: string, page: number) => Promise<ProviderSearchResult>
-> = {
+const providerSearches: Record<ActiveProviderMediaType, ProviderSearch> = {
   book: searchBooks,
   game: searchGameProvider,
   comic: searchComicProvider,
-  anime: (query, page) => searchAnilist(query, "ANIME", page),
-  manga: (query, page) => searchAnilist(query, "MANGA", page),
 };
 
-function formatProviderResponse(result: ProviderSearchResult, page: number): MediaSearchPage {
+function isActiveProviderMediaType(
+  mediaType: SearchableMediaType,
+): mediaType is ActiveProviderMediaType {
+  return mediaType in providerSearches;
+}
+
+function formatProviderResponse(result: ProviderSearchResult, page: number): MediaSearchSuccess {
   const totalPages = Math.ceil(result.totalResults / API_PAGE_SIZE);
   return {
+    status: "ok",
     results: result.results,
     page,
-    total_pages: totalPages || 1,
-    total_results: result.totalResults,
-    rejected: false,
+    totalPages: totalPages || 1,
+    totalResults: result.totalResults,
   };
 }
 
-function isTmdbMediaType(mediaType: SearchableMediaType) {
+function isTmdbMediaType(mediaType: SearchableMediaType): mediaType is "movie" | "tv" {
   return mediaType === "movie" || mediaType === "tv";
 }
 
-async function searchTmdbMedia(query: string, mediaType: "movie" | "tv", page: number) {
+async function searchTmdbMedia(
+  query: string,
+  mediaType: "movie" | "tv",
+  page: number,
+): Promise<MediaSearchSuccess> {
   const result = await searchMultimedia({ query, page, type: mediaType });
-  return { ...result, rejected: false };
+  return {
+    status: "ok",
+    results: result.results,
+    page,
+    totalPages: result.total_pages || 1,
+    totalResults: result.total_results,
+  };
 }
 
-async function getMediaSearchPage(query: string, mediaType: SearchableMediaType, page: number) {
+async function getMediaSearchPage(
+  query: string,
+  mediaType: SearchableMediaType,
+  page: number,
+): Promise<MediaSearchOutcome> {
   if (isTmdbMediaType(mediaType)) return searchTmdbMedia(query, mediaType, page);
+
+  if (!isActiveProviderMediaType(mediaType)) {
+    throw new Error(`Unsupported media type: ${mediaType}`);
+  }
 
   return formatProviderResponse(await providerSearches[mediaType](query, page), page);
 }
 
-export function getDeprecatedMediaSearchPage(
-  mediaType: string,
+function getLocalRejection(
+  query: string,
+  mediaType: SearchableMediaType,
   page: number,
-): MediaSearchPage | null {
-  if (!isDeprecatedMediaType(mediaType)) return null;
+): MediaSearchRejection | null {
+  if (!query) {
+    return {
+      status: "empty_query",
+      page,
+      message: EMPTY_MEDIA_SEARCH_MESSAGE,
+    };
+  }
 
-  return {
-    results: [],
-    page,
-    total_pages: 1,
-    total_results: 0,
-    rejected: true,
-    message: DEPRECATED_MEDIA_MESSAGE,
-  };
+  if (isDeprecatedMediaType(mediaType)) {
+    return {
+      status: "deprecated_media_type",
+      page,
+      message: DEPRECATED_MEDIA_MESSAGE,
+    };
+  }
+
+  return null;
 }
 
-function getUnavailableMediaSearchPage(page: number): MediaSearchPage {
-  return {
-    results: [],
-    page,
-    total_pages: 1,
-    total_results: 0,
-    rejected: true,
-    message: PROVIDER_UNAVAILABLE_MESSAGE,
-  };
+async function searchProviders(
+  query: string,
+  mediaType: SearchableMediaType,
+  page: number,
+): Promise<MediaSearchOutcome> {
+  try {
+    return await getMediaSearchPage(query, mediaType, page);
+  } catch {
+    return {
+      status: "provider_unavailable",
+      page,
+      message: PROVIDER_UNAVAILABLE_MESSAGE,
+    };
+  }
 }
 
 export async function searchMedia({
   query,
   mediaType,
   page,
-}: {
-  query: string;
-  mediaType: SearchableMediaType;
-  page: number;
-}): Promise<MediaSearchPage> {
-  const deprecatedPage = getDeprecatedMediaSearchPage(mediaType, page);
-  if (deprecatedPage) return deprecatedPage;
+}: MediaSearchInput): Promise<MediaSearchOutcome> {
+  const normalizedPage = normalizeMediaSearchPage(page);
+  const normalizedQuery = normalizeMediaSearchQuery(query);
 
-  try {
-    return await getMediaSearchPage(query, mediaType, page);
-  } catch {
-    return getUnavailableMediaSearchPage(page);
-  }
+  return (
+    getLocalRejection(normalizedQuery, mediaType, normalizedPage) ??
+    (await searchProviders(normalizedQuery, mediaType, normalizedPage))
+  );
 }

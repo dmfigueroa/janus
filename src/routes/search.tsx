@@ -7,7 +7,6 @@ import {
 } from "@/features/search/search/MediaSearch";
 import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { z } from "zod";
-import { isDeprecatedMediaType } from "../server/Media";
 
 const searchSchema = z.object({
   query: z.string().optional().default(""),
@@ -20,23 +19,7 @@ export type SearchType = SearchableMediaType;
 export const Route = createFileRoute("/search")({
   validateSearch: searchSchema,
   loaderDeps: ({ search: { query, type } }) => ({ query, type }),
-  loader: async ({ deps: { query, type } }) => {
-    if (!query) {
-      return { results: [], page: 1, total_pages: 0, total_results: 0 };
-    }
-
-    if (isDeprecatedMediaType(type)) {
-      return {
-        results: [],
-        page: 1,
-        total_pages: 1,
-        total_results: 0,
-        rejected: true,
-      };
-    }
-
-    return searchUnified({ data: { query, page: 1, type } });
-  },
+  loader: ({ deps: { query, type } }) => searchUnified({ data: { query, page: 1, type } }),
   head: ({ match }) => ({
     meta: [{ title: `Search ${searchableMediaLabels[match.search.type]} - Janus` }],
   }),

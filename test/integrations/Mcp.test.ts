@@ -2543,7 +2543,7 @@ describe("Janus MCP endpoint", () => {
     expect(animeResult.isError).not.toBe(true);
     expect(animeResult.structuredContent).toMatchObject({
       success: false,
-      code: "provider_unavailable",
+      code: "deprecated_media_type",
       message: "Anime and manga categories are deprecated while we revisit provider data quality.",
     });
 
@@ -2561,6 +2561,18 @@ describe("Janus MCP endpoint", () => {
       success: false,
       code: "provider_unavailable",
       message: "Search is temporarily unavailable for this media type. Please try again later.",
+    });
+
+    const emptyResult = await client.callTool({
+      name: "search_media",
+      arguments: { query: "   ", mediaType: "book" },
+    });
+
+    expect(emptyResult.isError).not.toBe(true);
+    expect(emptyResult.structuredContent).toEqual({
+      success: false,
+      code: "empty_query",
+      message: "Enter a search term to find media.",
     });
   });
 
