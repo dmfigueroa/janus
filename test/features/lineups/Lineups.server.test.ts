@@ -10,22 +10,19 @@ import {
 const state = vi.hoisted(() => ({ db: undefined as IsolatedTestDb | undefined }));
 vi.mock("@/db/Db.server", () => ({ getDb: () => state.db }));
 let testDb: Awaited<ReturnType<typeof createIsolatedTestDb>>;
-let listLineups: typeof import("@/features/lineups/read/LineupConfigurationRead.server").listLineups;
+let listLineups: typeof import("@/features/lineups/manage/LineupConfiguration.server").listLineups;
 let createLineup: typeof import("@/features/lineups/manage/LineupConfiguration.server").createLineup;
 let readLineups: typeof import("@/features/lineups/read/LineupRead.server").readLineups;
 let setLineupWatchlists: typeof import("@/features/lineups/manage/LineupConfiguration.server").setLineupWatchlists;
-let reorderLineups: typeof import("@/features/lineups/manage/ReorderLineups.server").reorderLineups;
+let reorderLineups: typeof import("@/features/lineups/manage/LineupConfiguration.server").reorderLineups;
 let updateLineup: typeof import("@/features/lineups/manage/LineupConfiguration.server").updateLineup;
-let deleteLineup: typeof import("@/features/lineups/manage/DeleteLineup.server").deleteLineup;
+let deleteLineup: typeof import("@/features/lineups/manage/LineupConfiguration.server").deleteLineup;
 
 beforeAll(async () => {
   testDb = await createIsolatedTestDb();
   state.db = testDb.db;
-  ({ deleteLineup } = await import("@/features/lineups/manage/DeleteLineup.server"));
-  ({ listLineups } = await import("@/features/lineups/read/LineupConfigurationRead.server"));
   ({ readLineups } = await import("@/features/lineups/read/LineupRead.server"));
-  ({ reorderLineups } = await import("@/features/lineups/manage/ReorderLineups.server"));
-  ({ createLineup, setLineupWatchlists, updateLineup } =
+  ({ createLineup, deleteLineup, listLineups, reorderLineups, setLineupWatchlists, updateLineup } =
     await import("@/features/lineups/manage/LineupConfiguration.server"));
 });
 afterAll(() => testDb.close());
@@ -146,15 +143,21 @@ describe("lineups", () => {
       expect(stored.name).toBe("Atomic original");
       expect(stored.configuredWatchlists?.map((entry) => entry.id)).toEqual([member.id]);
     }
-    for (const name of [" Movies ", "WEEKNIGHTS", "   "]) {
+    for (const [name, message] of [
+      [" Movies ", "Movies is reserved for an automatic lineup."],
+      ["WEEKNIGHTS", "That lineup name is already used."],
+      ["   ", "Enter a name for this lineup."],
+    ] as const) {
       expect(await saveCustomLineup({ id: created.id, name, watchlistIds: [] })).toMatchObject({
         success: false,
         field: "name",
+        message,
       });
-      expect(await updateLineup(reference, { name, enabled: false })).toEqual({
+      expect(await updateLineup(reference, { name, enabled: false })).toMatchObject({
         success: false,
         code: "validation_error",
-        message: "A unique lineup name is required.",
+        field: "name",
+        message,
       });
     }
     expect((await readLineups()).find((entry) => entry.id === created.id)).toMatchObject({
@@ -182,6 +185,33 @@ describe("lineups", () => {
         .filter((entry) => [first.id, second.id].includes(entry.id))
         .map((entry) => entry.configuredCount),
     ).toEqual([0, 0]);
+  });
+
+  it("seeds first-use defaults before reordering inside a single transaction", async () => {
+    const { lineups } = await import("@/db/Schema");
+    const seeded = (await listLineups())
+      .map((entry) => entry.reference)
+      .filter((entry) => entry.kind === "system");
+    await testDb.db.delete(lineups);
+    const reversed = [...seeded].reverse();
+    expect(await reorderLineups(reversed)).toMatchObject({ success: true });
+    expect((await listLineups()).map((entry) => entry.reference)).toEqual(reversed);
+  });
+
+  it("keeps seeding and configuration writes inside one transaction", async () => {
+    const order = (await listLineups()).map((entry) => entry.reference);
+    const transaction = vi.spyOn(testDb.db, "transaction");
+    transaction.mockClear();
+    expect(await reorderLineups([...order].reverse())).toMatchObject({ success: true });
+    expect(transaction).toHaveBeenCalledTimes(1);
+    transaction.mockRestore();
+
+    const created = await createLineup("Single transaction delete");
+    if (!created.success) throw new Error(created.message);
+    const remove = vi.spyOn(testDb.db, "delete");
+    expect(await deleteLineup({ kind: "custom", id: created.id })).toMatchObject({ success: true });
+    expect(remove).not.toHaveBeenCalled();
+    remove.mockRestore();
   });
 
   it.each([

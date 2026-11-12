@@ -204,6 +204,7 @@ describe("Janus MCP endpoint", () => {
           { reference },
           { reference, enabled: false },
           { reference: { kind: "custom", id: "bad" }, name: "Invalid" },
+          { reference, name: "Movies" },
         ],
       },
     });
@@ -212,6 +213,12 @@ describe("Janus MCP endpoint", () => {
         { index: 0, success: false, code: "validation_error" },
         { index: 1, success: true, code: "updated" },
         { index: 2, success: false, code: "validation_error" },
+        {
+          index: 3,
+          success: false,
+          code: "validation_error",
+          message: "Movies is reserved for an automatic lineup.",
+        },
       ],
     });
   });
