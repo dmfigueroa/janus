@@ -3,13 +3,11 @@ import { CSS, type Transform } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { Box, Button, Flex } from "@chakra-ui/react";
 import type { WatchlistItem } from "@/db/Schema";
-import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
 import { TimelineItem } from "./TimelineItem";
 
 type ReorderableTimelineRowProps = {
   item: WatchlistItem;
-  activeFilters?: WatchlistDetailQueryFilters;
   showHandleSlot: boolean;
   showHandle: boolean;
   interactionDisabled: boolean;
@@ -18,7 +16,6 @@ type ReorderableTimelineRowProps = {
 
 export function ReorderableTimelineRow({
   item,
-  activeFilters,
   showHandleSlot,
   showHandle,
   interactionDisabled,
@@ -50,7 +47,6 @@ export function ReorderableTimelineRow({
     >
       <TimelineRowShell
         item={item}
-        activeFilters={activeFilters}
         showHandleSlot={showHandleSlot}
         showHandle={showHandle}
         interactionDisabled={interactionDisabled}
@@ -68,11 +64,9 @@ export function ReorderableTimelineRow({
 
 export function DragOverlayTimelineRow({
   item,
-  activeFilters,
   itemOrderMode,
 }: {
   item: WatchlistItem;
-  activeFilters: WatchlistDetailQueryFilters;
   itemOrderMode: WatchlistItemOrderMode;
 }) {
   return (
@@ -86,7 +80,6 @@ export function DragOverlayTimelineRow({
     >
       <TimelineRowShell
         item={item}
-        activeFilters={activeFilters}
         showHandleSlot
         showHandle
         interactionDisabled
@@ -99,7 +92,6 @@ export function DragOverlayTimelineRow({
 
 function TimelineRowShell({
   item,
-  activeFilters,
   showHandleSlot,
   showHandle,
   interactionDisabled,
@@ -108,7 +100,6 @@ function TimelineRowShell({
   handleProps,
 }: {
   item: WatchlistItem;
-  activeFilters?: WatchlistDetailQueryFilters;
   showHandleSlot: boolean;
   showHandle: boolean;
   interactionDisabled: boolean;
@@ -129,7 +120,6 @@ function TimelineRowShell({
       <Box minW={0} flex={1}>
         <TimelineItem
           item={item}
-          activeFilters={activeFilters}
           interactionDisabled={interactionDisabled}
           itemOrderMode={itemOrderMode}
         />

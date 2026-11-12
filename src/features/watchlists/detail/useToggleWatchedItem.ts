@@ -6,7 +6,7 @@ import { invalidateWatchlistQueries } from "@/features/watchlists/Cache";
 import {
   optimisticallyToggleWatchedItem,
   restoreWatchlistDetailSnapshot,
-} from "@/features/watchlists/detail/Cache";
+} from "@/features/watchlists/detail/WatchlistDetailCache";
 import { setWatchedState } from "@/features/watchlists/watched/SetWatchedState";
 
 type UseToggleWatchedItemOptions = {

@@ -1,7 +1,6 @@
 import { EditWatchlistItemDialog } from "./EditWatchlistItemDialog";
 import { useState } from "react";
 import type { WatchlistItem } from "@/db/Schema";
-import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
 import { MoveItemDialog } from "@/features/watchlists/move/MoveItemDialog";
 import { useToggleWatchedItem } from "@/features/watchlists/detail/useToggleWatchedItem";
 import { MoveParentDialog } from "@/features/watchlists/move/MoveParentDialog";
@@ -9,18 +8,16 @@ import {
   ItemRemovalDialog,
   ParentRemovalDialog,
 } from "@/features/watchlists/remove/RemovalDialogs";
-import { useParentRemovalPreview } from "@/features/watchlists/remove/useParentRemovalPreview";
+import { useParentRemovalPreview } from "@/features/watchlists/remove/RemoveFromWatchlist";
 import { getTimelineItemActionLabels, TimelineItemActionMenu } from "./TimelineItemActionMenu";
 
 type TimelineItemActionsProps = {
   item: WatchlistItem;
-  activeFilters: WatchlistDetailQueryFilters;
   interactionDisabled?: boolean;
 };
 
 export function TimelineItemActions({
   item,
-  activeFilters,
   interactionDisabled = false,
 }: TimelineItemActionsProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -58,7 +55,6 @@ export function TimelineItemActions({
 
       <ItemRemovalDialog
         item={item}
-        activeFilters={activeFilters}
         label={labels.item}
         open={removeItemOpen}
         onOpenChange={setRemoveItemOpen}
@@ -66,23 +62,16 @@ export function TimelineItemActions({
 
       <ParentRemovalDialog
         item={item}
-        activeFilters={activeFilters}
         label={labels.parent}
         open={removeParentOpen}
         onOpenChange={setRemoveParentOpen}
         previewQuery={parentPreviewQuery}
       />
 
-      <MoveItemDialog
-        item={item}
-        activeFilters={activeFilters}
-        open={moveItemOpen}
-        onOpenChange={setMoveItemOpen}
-      />
+      <MoveItemDialog item={item} open={moveItemOpen} onOpenChange={setMoveItemOpen} />
 
       <MoveParentDialog
         item={item}
-        activeFilters={activeFilters}
         open={moveParentOpen}
         onOpenChange={setMoveParentOpen}
         title={labels.moveParent}

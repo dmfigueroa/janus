@@ -1,24 +1,16 @@
 import type { WatchlistItem } from "@/db/Schema";
-import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
 import { useMoveWatchlistParentMutation } from "./useMoveWatchlistParent";
-import { useParentRemovalPreview } from "@/features/watchlists/remove/useParentRemovalPreview";
+import { useParentRemovalPreview } from "@/features/watchlists/remove/RemoveFromWatchlist";
 import { MoveWatchlistDialog } from "./MoveWatchlistDialog";
 
 type MoveParentDialogProps = {
   item: WatchlistItem;
-  activeFilters: WatchlistDetailQueryFilters;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
 };
 
-export function MoveParentDialog({
-  item,
-  activeFilters,
-  open,
-  onOpenChange,
-  title,
-}: MoveParentDialogProps) {
+export function MoveParentDialog({ item, open, onOpenChange, title }: MoveParentDialogProps) {
   const previewQuery = useParentRemovalPreview({
     watchlistId: item.watchlistId,
     parentId: item.parentId,
@@ -26,7 +18,6 @@ export function MoveParentDialog({
   });
   const moveMutation = useMoveWatchlistParentMutation({
     item,
-    activeFilters,
     preview: previewQuery.data,
   });
 

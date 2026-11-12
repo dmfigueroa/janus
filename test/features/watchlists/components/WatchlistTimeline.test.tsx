@@ -8,13 +8,6 @@ import type { WatchlistItem } from "@/db/Schema";
 import { WatchlistTimeline } from "@/features/watchlists/components/WatchlistTimeline";
 import { janusSystem } from "@/app/Theme";
 
-const activeFilters = {
-  watchlistId: 1,
-  itemOrderMode: "custom" as const,
-  unwatchedOnly: false,
-  query: "",
-};
-
 let latestDndContextProps: Pick<DndContextProps, "onDragStart" | "onDragEnd" | "cancelDrop"> = {};
 let sortableListeners: Record<string, () => void> = {};
 
@@ -135,7 +128,7 @@ describe("WatchlistTimeline reorder controls", () => {
           item({ id: 1, title: "First", releaseDate: "2024-01-01" }),
           item({ id: 2, title: "Second", releaseDate: "2025-01-01" }),
         ]}
-        activeFilters={activeFilters}
+        unwatchedOnly={false}
         itemOrderMode="custom"
         canReorder
         onReorder={vi.fn()}
@@ -157,7 +150,7 @@ describe("WatchlistTimeline reorder controls", () => {
     renderWithProvider(
       <WatchlistTimeline
         items={[item({ id: 1, title: "First" })]}
-        activeFilters={activeFilters}
+        unwatchedOnly={false}
         itemOrderMode="custom"
         canReorder
         onReorder={vi.fn()}
@@ -176,7 +169,7 @@ describe("WatchlistTimeline reorder controls", () => {
     renderWithProvider(
       <WatchlistTimeline
         items={[item({ id: 1, title: "First" }), item({ id: 2, title: "Second" })]}
-        activeFilters={activeFilters}
+        unwatchedOnly={false}
         itemOrderMode="custom"
         canReorder={false}
         onReorder={vi.fn()}
@@ -194,7 +187,7 @@ describe("WatchlistTimeline reorder controls", () => {
           item({ id: 1, title: "First", releaseDate: "2024-01-01" }),
           item({ id: 2, title: "Second", releaseDate: "2025-01-01" }),
         ]}
-        activeFilters={{ ...activeFilters, itemOrderMode: "release" }}
+        unwatchedOnly={false}
         itemOrderMode="release"
         canReorder
         onReorder={vi.fn()}
@@ -212,7 +205,7 @@ describe("WatchlistTimeline reorder controls", () => {
     const { rerender: rerenderBase } = renderWithProvider(
       <WatchlistTimeline
         items={[item({ id: 1, title: "First" }), item({ id: 2, title: "Second" })]}
-        activeFilters={activeFilters}
+        unwatchedOnly={false}
         itemOrderMode="custom"
         canReorder
         onReorder={onReorder}
@@ -243,7 +236,7 @@ describe("WatchlistTimeline reorder controls", () => {
       <ChakraProvider value={janusSystem}>
         <WatchlistTimeline
           items={[item({ id: 2, title: "Second" }), item({ id: 1, title: "First" })]}
-          activeFilters={activeFilters}
+          unwatchedOnly={false}
           itemOrderMode="custom"
           canReorder
           onReorder={onReorder}
@@ -259,7 +252,7 @@ describe("WatchlistTimeline reorder controls", () => {
       <ChakraProvider value={janusSystem}>
         <WatchlistTimeline
           items={[item({ id: 1, title: "First" }), item({ id: 2, title: "Second" })]}
-          activeFilters={activeFilters}
+          unwatchedOnly={false}
           itemOrderMode="custom"
           canReorder
           onReorder={onReorder}

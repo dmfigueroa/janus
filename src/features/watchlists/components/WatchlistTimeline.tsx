@@ -2,7 +2,6 @@ import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { Box, Flex, Text } from "@chakra-ui/react";
 import { DndContext, DragOverlay, closestCenter } from "@dnd-kit/core";
 import type { WatchlistItem } from "@/db/Schema";
-import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
 import type { ReorderIntent } from "@/features/watchlists/detail/Reorder";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
@@ -18,7 +17,7 @@ import {
 
 interface WatchlistTimelineProps {
   items: WatchlistItem[];
-  activeFilters: WatchlistDetailQueryFilters;
+  unwatchedOnly: boolean;
   itemOrderMode: WatchlistItemOrderMode;
   hasMore?: boolean;
   isLoadingMore?: boolean;
@@ -97,11 +96,7 @@ function WatchlistTimelineContent({
           the old row position and can fly back there before the new order renders. */}
       <DragOverlay dropAnimation={null}>
         {reorder.activeItem ? (
-          <DragOverlayTimelineRow
-            item={reorder.activeItem}
-            activeFilters={props.activeFilters}
-            itemOrderMode={props.itemOrderMode}
-          />
+          <DragOverlayTimelineRow item={reorder.activeItem} itemOrderMode={props.itemOrderMode} />
         ) : null}
       </DragOverlay>
 
@@ -135,7 +130,7 @@ function TimelineGroups({
   const groupProps = groups.map((group) => ({
     key: group.year,
     group,
-    activeFilters: props.activeFilters,
+    unwatchedOnly: props.unwatchedOnly,
     itemOrderMode: props.itemOrderMode,
     interactionDisabled: Boolean(props.interactionDisabled),
     reorderEnabled,

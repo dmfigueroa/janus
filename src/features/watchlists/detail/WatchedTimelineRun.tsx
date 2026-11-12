@@ -33,7 +33,6 @@ export function WatchedTimelineRun({
 
   const rowProps = run.items.map((item) => ({
     ...props,
-    activeFilters: unfilteredActions(props.activeFilters),
     item,
     showHandle: props.showHandleSlot && reorderEnabled,
     key: item.id,
@@ -59,9 +58,6 @@ function TimelineRunItem({ key, ...props }: RowProps & { key: number }) {
   return <ReorderableTimelineRow key={key} {...props} />;
 }
 
-function unfilteredActions(filters: RowProps["activeFilters"]) {
-  return filters ? { ...filters, unwatchedOnly: false } : undefined;
-}
 function TimelineRunItems({ rows }: { rows: Array<RowProps & { key: number }> }) {
   return rows.map(TimelineRunItem);
 }

@@ -1,21 +1,20 @@
 import { Box, Flex } from "@chakra-ui/react";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { WatchlistItem } from "@/db/Schema";
-import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
 import type { WatchlistTimelineGroup } from "./WatchlistTimeline.model";
 import { WatchedTimelineRun, buildTimelineRuns } from "../detail/WatchedTimelineRun";
 
 export function WatchlistTimelineGroupSection({
   group,
-  activeFilters,
+  unwatchedOnly,
   itemOrderMode,
   interactionDisabled,
   reorderEnabled,
   showHandleSlot,
 }: {
   group: WatchlistTimelineGroup;
-  activeFilters: WatchlistDetailQueryFilters;
+  unwatchedOnly: boolean;
   itemOrderMode: WatchlistItemOrderMode;
   interactionDisabled: boolean;
   reorderEnabled: boolean;
@@ -37,7 +36,7 @@ export function WatchlistTimelineGroupSection({
         >
           <TimelineRows
             items={group.items}
-            activeFilters={activeFilters}
+            unwatchedOnly={unwatchedOnly}
             itemOrderMode={itemOrderMode}
             showHandleSlot={showHandleSlot}
             reorderEnabled={reorderEnabled}
@@ -51,24 +50,23 @@ export function WatchlistTimelineGroupSection({
 
 function TimelineRows({
   items,
-  activeFilters,
+  unwatchedOnly,
   itemOrderMode,
   showHandleSlot,
   reorderEnabled,
   interactionDisabled,
 }: {
   items: WatchlistItem[];
-  activeFilters: WatchlistDetailQueryFilters;
+  unwatchedOnly: boolean;
   itemOrderMode: WatchlistItemOrderMode;
   showHandleSlot: boolean;
   reorderEnabled: boolean;
   interactionDisabled: boolean;
 }) {
-  const runs = buildTimelineRuns(items, Boolean(activeFilters.unwatchedOnly));
+  const runs = buildTimelineRuns(items, unwatchedOnly);
   const runProps = runs.map((run) => ({
     key: run.items[0].id,
     run,
-    activeFilters,
     itemOrderMode,
     showHandleSlot,
     reorderEnabled,

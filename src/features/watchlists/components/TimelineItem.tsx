@@ -1,7 +1,6 @@
 import { Box, Button, Flex, Icon } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import type { WatchlistItem } from "@/db/Schema";
-import type { WatchlistDetailQueryFilters } from "@/features/watchlists/detail/Query";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
 import { useToggleWatchedItem } from "@/features/watchlists/detail/useToggleWatchedItem";
 import { TimelineItemActions } from "./TimelineItemActions";
@@ -9,21 +8,14 @@ import { TimelineItemContent, TimelineItemPoster } from "./TimelineItemPresentat
 
 type TimelineItemProps = {
   item: WatchlistItem;
-  activeFilters?: WatchlistDetailQueryFilters;
   interactionDisabled?: boolean;
   itemOrderMode?: WatchlistItemOrderMode;
 };
 
-export function TimelineItem({
-  item,
-  activeFilters,
-  interactionDisabled,
-  itemOrderMode,
-}: TimelineItemProps) {
+export function TimelineItem({ item, interactionDisabled, itemOrderMode }: TimelineItemProps) {
   const toggleMutation = useToggleWatchedItem(item);
   const interactionsDisabled = Boolean(interactionDisabled);
   const isDisabled = [interactionsDisabled, toggleMutation.isPending].some(Boolean);
-  const displayOrderMode = itemOrderMode ?? activeFilters?.itemOrderMode;
 
   return (
     <Flex
@@ -36,11 +28,10 @@ export function TimelineItem({
       transition="opacity 200ms"
     >
       <TimelineItemPoster {...item} />
-      <TimelineItemContent {...item} itemOrderMode={displayOrderMode} />
+      <TimelineItemContent {...item} itemOrderMode={itemOrderMode} />
 
       <TimelineItemControls
         item={item}
-        activeFilters={activeFilters}
         interactionDisabled={interactionsDisabled}
         isDisabled={isDisabled}
         onToggle={() => toggleMutation.mutate()}
@@ -51,35 +42,15 @@ export function TimelineItem({
 
 function TimelineItemControls({
   item,
-  activeFilters,
   interactionDisabled,
   isDisabled,
   onToggle,
 }: TimelineItemProps & { isDisabled: boolean; onToggle: () => void }) {
   return (
     <Flex align="center" gap={0} flexShrink={0}>
-      <TimelineActionsSlot
-        item={item}
-        activeFilters={activeFilters}
-        interactionDisabled={interactionDisabled}
-      />
+      <TimelineItemActions item={item} interactionDisabled={interactionDisabled} />
       <WatchedButton item={item} disabled={isDisabled} onToggle={onToggle} />
     </Flex>
-  );
-}
-
-function TimelineActionsSlot({
-  item,
-  activeFilters,
-  interactionDisabled,
-}: Pick<TimelineItemProps, "item" | "activeFilters" | "interactionDisabled">) {
-  if (!activeFilters) return null;
-  return (
-    <TimelineItemActions
-      item={item}
-      activeFilters={activeFilters}
-      interactionDisabled={interactionDisabled}
-    />
   );
 }
 

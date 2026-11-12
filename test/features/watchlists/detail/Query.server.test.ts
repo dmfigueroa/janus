@@ -18,8 +18,8 @@ const { watchlists, watchlistItems } = schema;
 let getWatchlistDetail: typeof import("@/features/watchlists/detail/Query.server").getWatchlistDetail;
 let readWatchlistDetailScreen: typeof import("@/features/watchlists/Read.server").WatchlistsRead.detailScreen;
 let invalidateWatchlistQueries: typeof import("@/features/watchlists/Cache").invalidateWatchlistQueries;
-let optimisticallyToggleWatchedItem: typeof import("@/features/watchlists/detail/Query").optimisticallyToggleWatchedItem;
-let restoreWatchlistDetailSnapshot: typeof import("@/features/watchlists/detail/Query").restoreWatchlistDetailSnapshot;
+let optimisticallyToggleWatchedItem: typeof import("@/features/watchlists/detail/WatchlistDetailCache").optimisticallyToggleWatchedItem;
+let restoreWatchlistDetailSnapshot: typeof import("@/features/watchlists/detail/WatchlistDetailCache").restoreWatchlistDetailSnapshot;
 let watchlistDetailInfiniteQueryOptions: typeof import("@/features/watchlists/detail/Query").watchlistDetailInfiniteQueryOptions;
 let watchlistDetailQueryKey: typeof import("@/features/watchlists/detail/Query").watchlistDetailQueryKey;
 type WatchlistDetailQueryFilters =
@@ -34,13 +34,14 @@ beforeAll(async () => {
 
   const queryModule = await import("@/features/watchlists/detail/Query");
   const cacheModule = await import("@/features/watchlists/Cache");
+  const detailCacheModule = await import("@/features/watchlists/detail/WatchlistDetailCache");
   const queryServerModule = await import("@/features/watchlists/detail/Query.server");
   const readModule = await import("@/features/watchlists/Read.server");
   getWatchlistDetail = queryServerModule.getWatchlistDetail;
   readWatchlistDetailScreen = readModule.WatchlistsRead.detailScreen;
   invalidateWatchlistQueries = cacheModule.invalidateWatchlistQueries;
-  optimisticallyToggleWatchedItem = queryModule.optimisticallyToggleWatchedItem;
-  restoreWatchlistDetailSnapshot = queryModule.restoreWatchlistDetailSnapshot;
+  optimisticallyToggleWatchedItem = detailCacheModule.optimisticallyToggleWatchedItem;
+  restoreWatchlistDetailSnapshot = detailCacheModule.restoreWatchlistDetailSnapshot;
   watchlistDetailInfiniteQueryOptions = queryModule.watchlistDetailInfiniteQueryOptions;
   watchlistDetailQueryKey = queryModule.watchlistDetailQueryKey;
 });

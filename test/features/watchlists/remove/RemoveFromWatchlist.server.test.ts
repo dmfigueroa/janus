@@ -13,8 +13,9 @@ vi.mock("@/db/Db.server", () => ({
 let testDb: Awaited<ReturnType<typeof createIsolatedTestDb>>;
 let db: IsolatedTestDb;
 const { watchlists, watchlistItems } = schema;
-let removeWatchlistItemMutation: typeof import("@/features/watchlists/remove/Mutation.server").removeWatchlistItemMutation;
-let removeWatchlistParentMutation: typeof import("@/features/watchlists/remove/Mutation.server").removeWatchlistParentMutation;
+let removeWatchlistItemMutation: typeof import("@/features/watchlists/remove/RemoveFromWatchlist.server").removeWatchlistItemMutation;
+let removeWatchlistParentMutation: typeof import("@/features/watchlists/remove/RemoveFromWatchlist.server").removeWatchlistParentMutation;
+let getWatchlistParentRemovalPreview: typeof import("@/features/watchlists/remove/RemoveFromWatchlist.server").getWatchlistParentRemovalPreview;
 let readWatchlistDetailScreen: typeof import("@/features/watchlists/Read.server").WatchlistsRead.detailScreen;
 
 beforeAll(async () => {
@@ -23,12 +24,13 @@ beforeAll(async () => {
   dbState.db = db;
 
   const [removeModule, readModule] = await Promise.all([
-    import("@/features/watchlists/remove/Mutation.server"),
+    import("@/features/watchlists/remove/RemoveFromWatchlist.server"),
     import("@/features/watchlists/Read.server"),
   ]);
 
   removeWatchlistItemMutation = removeModule.removeWatchlistItemMutation;
   removeWatchlistParentMutation = removeModule.removeWatchlistParentMutation;
+  getWatchlistParentRemovalPreview = removeModule.getWatchlistParentRemovalPreview;
   readWatchlistDetailScreen = readModule.WatchlistsRead.detailScreen;
 });
 
@@ -179,5 +181,75 @@ describe("remove watchlist item mutation", () => {
       progress: 0,
     });
     expect(otherDetail?.items.map((item) => item.title)).toEqual(["Elsewhere"]);
+  });
+});
+
+describe("watchlist parent removal preview", () => {
+  it("returns exact count and watched count for the current watchlist parent group", async () => {
+    const [watchlist, otherWatchlist] = await db
+      .insert(watchlists)
+      .values([{ name: "Primary" }, { name: "Secondary" }])
+      .returning();
+
+    await db.insert(watchlistItems).values([
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "episode-1",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Pilot",
+        parentId: "tmdb:42",
+        parentTitle: "Show 42",
+        episode: "1",
+        releaseDate: "2024-01-01",
+        isWatched: true,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "episode-2",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Second",
+        parentId: "tmdb:42",
+        parentTitle: "Show 42",
+        episode: "2",
+        releaseDate: "2024-01-02",
+        isWatched: false,
+      },
+      {
+        watchlistId: watchlist.id,
+        tmdbId: "episode-3",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Different Show",
+        parentId: "tmdb:99",
+        parentTitle: "Show 99",
+        episode: "1",
+        releaseDate: "2024-01-03",
+        isWatched: true,
+      },
+      {
+        watchlistId: otherWatchlist.id,
+        tmdbId: "episode-4",
+        source: "tmdb",
+        mediaType: "episode",
+        title: "Elsewhere",
+        parentId: "tmdb:42",
+        parentTitle: "Show 42",
+        episode: "3",
+        releaseDate: "2024-01-04",
+        isWatched: true,
+      },
+    ]);
+
+    const preview = await getWatchlistParentRemovalPreview({
+      watchlistId: watchlist.id,
+      parentId: "tmdb:42",
+    });
+
+    expect(preview).toEqual({
+      count: 2,
+      watchedCount: 1,
+    });
   });
 });

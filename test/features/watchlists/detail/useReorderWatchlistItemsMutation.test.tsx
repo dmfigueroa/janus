@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@tanstack/react-start", () => ({ useServerFn: () => mocks.save }));
 vi.mock("@/features/watchlists/reorder/Mutation", () => ({ reorderWatchlistItems: vi.fn() }));
 vi.mock("@/app/Toaster", () => ({ toaster: { create: mocks.toast } }));
-vi.mock("@/features/watchlists/detail/Cache", () => ({
+vi.mock("@/features/watchlists/detail/WatchlistDetailCache", () => ({
   optimisticallyReorderWatchlistItems: mocks.optimistic,
   restoreWatchlistDetailSnapshot: mocks.restore,
 }));

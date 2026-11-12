@@ -209,15 +209,7 @@ function TimelineItemFixture({ queryClient }: { queryClient: QueryClient }) {
   return (
     <Provider>
       <QueryClientProvider client={queryClient}>
-        <TimelineItem
-          item={item}
-          activeFilters={{
-            watchlistId: item.watchlistId,
-            itemOrderMode: "custom",
-            unwatchedOnly: false,
-            query: "",
-          }}
-        />
+        <TimelineItem item={item} itemOrderMode="custom" />
       </QueryClientProvider>
     </Provider>
   );
