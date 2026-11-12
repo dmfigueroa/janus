@@ -45,42 +45,38 @@ export type WatchlistItemSelection = {
     }
 );
 
-export async function discoverWatchlistItems({
-  watchlistId,
-  pageSize = 50,
-  cursor,
-  query,
-}: WatchlistPageRequest): Promise<WatchlistItemDiscovery | null> {
-  const watchlist = await loadWatchlistById(watchlistId);
-  if (!watchlist) return null;
+export async function discoverWatchlistItems(
+  request: WatchlistPageRequest,
+): Promise<WatchlistItemDiscovery | null> {
+  const loaded = await loadWatchlistItemRequest(request);
+  if (!loaded) return null;
 
-  const offset = getPageOffset({ cursor, watchlistId, pageSize, query });
-  const [summary, page, orderToken] = await Promise.all([
-    loadWatchlistSummary(watchlist),
-    loadWatchlistItemPage({ watchlist, pageSize, offset, query }),
-    getWatchlistOrderToken(watchlist),
+  const [summary, orderToken] = await Promise.all([
+    loadWatchlistSummary(loaded.watchlist),
+    getWatchlistOrderToken(loaded.watchlist),
   ]);
 
   return {
     watchlist: summary,
     orderToken,
-    items: page.items,
-    nextCursor: nextCursorForPage({
-      hasNextPage: page.hasNextPage,
-      offset,
-      pageSize,
-      query,
-      watchlistId,
-    }),
+    items: loaded.page.items,
+    nextCursor: loaded.nextCursor,
   };
 }
 
-export async function findWatchlistItemsByText({
+export async function findWatchlistItemsByText(request: WatchlistPageRequest & { query: string }) {
+  const loaded = await loadWatchlistItemRequest(request);
+  if (!loaded) return null;
+
+  return { items: loaded.page.items, nextCursor: loaded.nextCursor };
+}
+
+async function loadWatchlistItemRequest({
   watchlistId,
-  query,
   pageSize = 50,
   cursor,
-}: WatchlistPageRequest & { query: string }) {
+  query,
+}: WatchlistPageRequest) {
   const watchlist = await loadWatchlistById(watchlistId);
   if (!watchlist) return null;
 
@@ -88,7 +84,8 @@ export async function findWatchlistItemsByText({
   const page = await loadWatchlistItemPage({ watchlist, pageSize, offset, query });
 
   return {
-    items: page.items,
+    watchlist,
+    page,
     nextCursor: nextCursorForPage({
       hasNextPage: page.hasNextPage,
       offset,
@@ -99,35 +96,43 @@ export async function findWatchlistItemsByText({
   };
 }
 
-export async function discoverWatchlistTitles({
-  watchlistId,
-  pageSize = 50,
-  cursor,
-  query,
-}: WatchlistPageRequest): Promise<WatchlistTitleDiscovery | null> {
-  const watchlist = await loadWatchlistById(watchlistId);
-  if (!watchlist) return null;
+export async function discoverWatchlistTitles(
+  request: WatchlistPageRequest,
+): Promise<WatchlistTitleDiscovery | null> {
+  const loaded = await loadWatchlistTitleRequest(request);
+  if (!loaded) return null;
 
-  const offset = getPageOffset({ cursor, watchlistId, pageSize, query, resultView: "titles" });
   const [summary, titlePage] = await Promise.all([
-    loadWatchlistSummary(watchlist),
-    loadWatchlistTitlePage({ watchlistId, query, pageSize, offset }),
+    loadWatchlistSummary(loaded.watchlist),
+    loadWatchlistTitlePage(loaded),
   ]);
 
   return { watchlist: summary, ...titlePage };
 }
 
-export async function findWatchlistTitles({
+export async function findWatchlistTitles(request: WatchlistPageRequest) {
+  const loaded = await loadWatchlistTitleRequest(request);
+  if (!loaded) return null;
+
+  return loadWatchlistTitlePage(loaded);
+}
+
+async function loadWatchlistTitleRequest({
   watchlistId,
-  query,
   pageSize = 50,
   cursor,
+  query,
 }: WatchlistPageRequest) {
   const watchlist = await loadWatchlistById(watchlistId);
   if (!watchlist) return null;
 
-  const offset = getPageOffset({ cursor, watchlistId, pageSize, query, resultView: "titles" });
-  return loadWatchlistTitlePage({ watchlistId, query, pageSize, offset });
+  return {
+    watchlist,
+    watchlistId,
+    pageSize,
+    query,
+    offset: getPageOffset({ cursor, watchlistId, pageSize, query, resultView: "titles" }),
+  };
 }
 
 export async function findWatchlistItemMatches(

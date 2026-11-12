@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { WatchlistItem } from "@/db/Schema";
+import { asMcpError } from "./McpToolResponse.server";
 
 export const mediaTypeSchema = z.enum([
   "movie",
@@ -30,6 +31,10 @@ export const titleOutputSchema = z.object({
   title: z.string(),
   matchingItemCount: z.number(),
 });
+
+export function watchlistNotFoundOutput(watchlistId: number) {
+  return asMcpError(`Watchlist ${watchlistId} was not found.`);
+}
 
 export function toMcpWatchlistItem(item: WatchlistItem) {
   return {

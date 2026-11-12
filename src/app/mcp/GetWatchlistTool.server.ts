@@ -4,11 +4,12 @@ import {
   discoverWatchlistItems,
   discoverWatchlistTitles,
 } from "@/features/watchlists/detail/DiscoverWatchlist.server";
-import { asMcpContent, asMcpError } from "./McpToolResponse.server";
+import { asMcpContent } from "./McpToolResponse.server";
 import {
   itemOutputSchema,
   titleOutputSchema,
   toMcpWatchlistItem,
+  watchlistNotFoundOutput,
 } from "./WatchlistReadOutput.server";
 
 type GetWatchlistRequest = {
@@ -55,7 +56,7 @@ function respondToGetWatchlist(request: GetWatchlistRequest) {
 
 async function respondToWatchlistTitles({ watchlistId, pageSize, cursor }: GetWatchlistRequest) {
   const page = await discoverWatchlistTitles({ watchlistId, pageSize, cursor });
-  if (!page) return watchlistNotFound(watchlistId);
+  if (!page) return watchlistNotFoundOutput(watchlistId);
   return asMcpContent({
     watchlist: page.watchlist,
     titles: page.titles,
@@ -65,15 +66,11 @@ async function respondToWatchlistTitles({ watchlistId, pageSize, cursor }: GetWa
 
 async function respondToWatchlistItems({ watchlistId, pageSize, cursor }: GetWatchlistRequest) {
   const page = await discoverWatchlistItems({ watchlistId, pageSize, cursor });
-  if (!page) return watchlistNotFound(watchlistId);
+  if (!page) return watchlistNotFoundOutput(watchlistId);
   return asMcpContent({
     watchlist: page.watchlist,
     items: page.items.map(toMcpWatchlistItem),
     nextCursor: page.nextCursor,
     orderToken: page.orderToken,
   });
-}
-
-function watchlistNotFound(watchlistId: number) {
-  return asMcpError(`Watchlist ${watchlistId} was not found.`);
 }

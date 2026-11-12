@@ -12,6 +12,7 @@ import {
   mediaTypeSchema,
   titleOutputSchema,
   toMcpWatchlistItem,
+  watchlistNotFoundOutput,
 } from "./WatchlistReadOutput.server";
 
 const selectorSchema = z.union([
@@ -97,7 +98,7 @@ async function respondToSelectedItems(selection: MatchSelection) {
 
 async function respondToTextItemSearch(selection: QuerySelection) {
   const page = await findWatchlistItemsByText(selection);
-  if (!page) return watchlistNotFound(selection.watchlistId);
+  if (!page) return watchlistNotFoundOutput(selection.watchlistId);
   return asMcpContent({ items: page.items.map(toMcpWatchlistItem), nextCursor: page.nextCursor });
 }
 
@@ -113,10 +114,6 @@ async function respondToSelectedTitles(selection: MatchSelection) {
 
 async function respondToTextTitleSearch(selection: QuerySelection) {
   const page = await findWatchlistTitles(selection);
-  if (!page) return watchlistNotFound(selection.watchlistId);
+  if (!page) return watchlistNotFoundOutput(selection.watchlistId);
   return asMcpContent(page);
-}
-
-function watchlistNotFound(watchlistId: number) {
-  return asMcpError(`Watchlist ${watchlistId} was not found.`);
 }
