@@ -2141,6 +2141,64 @@ describe("Janus MCP endpoint", () => {
     });
   });
 
+  it("groups collapsed titles for explicit provider selectors", async () => {
+    const { watchlists, watchlistItems } = await import("@/db/Schema");
+    const [watchlist] = await database
+      .getDb()
+      .insert(watchlists)
+      .values({ name: "Selected collapsed titles" })
+      .returning();
+    await database
+      .getDb()
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "selected-episode-one",
+          source: "tmdb",
+          mediaType: "episode",
+          title: "Pilot",
+          parentId: "selected-show-identity",
+          parentTitle: "Selected Show",
+          episode: "S01E01",
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "selected-episode-two",
+          source: "tmdb",
+          mediaType: "episode",
+          title: "Finale",
+          parentId: "selected-show-identity",
+          parentTitle: "Selected Show",
+          episode: "S01E02",
+        },
+      ]);
+
+    const result = await client.callTool({
+      name: "find_watchlist_items",
+      arguments: {
+        watchlistId: watchlist.id,
+        provider: "tmdb",
+        providerId: "selected-show-identity",
+        mediaType: "episode",
+        resultView: "titles",
+      },
+    });
+
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      titles: [
+        {
+          provider: "tmdb",
+          providerId: "selected-show-identity",
+          mediaType: "episode",
+          title: "Selected Show",
+          matchingItemCount: 2,
+        },
+      ],
+    });
+  });
+
   it("paginates text item searches and returns structured expected failures", async () => {
     const { watchlists, watchlistItems } = await import("@/db/Schema");
     const [watchlist] = await database

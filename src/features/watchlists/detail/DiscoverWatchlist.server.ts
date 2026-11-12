@@ -1,92 +1,177 @@
-import { z } from "zod";
-import { asc, count, eq, sql } from "drizzle-orm";
+import { and, asc, count, eq, or, sql } from "drizzle-orm";
 import { getDb } from "@/db/Db.server";
-import { watchlists, watchlistItems } from "@/db/Schema";
-import { buildDetailFilters, getWatchlistDetail } from "./Query.server";
+import { watchlistItems, type WatchlistItem } from "@/db/Schema";
+import type { WatchlistSummary } from "@/features/watchlists/list/Query";
+import { getWatchlistOrderToken } from "@/features/watchlists/order/SetWatchlistOrder.server";
+import {
+  buildDetailFilters,
+  loadWatchlistById,
+  loadWatchlistItemPage,
+  loadWatchlistSummary,
+} from "./Query.server";
+import { getPageOffset, nextCursorForPage } from "./WatchlistPageCursor.server";
+import { collapseWatchlistItemsToTitles, type WatchlistTitle } from "./WatchlistTitles";
 
-const watchlistPageCursorSchema = z.object({
-  offset: z.number().int().nonnegative(),
-  pageSize: z.number().int().positive(),
-  query: z.string().optional(),
-  resultView: z.enum(["items", "titles"]).optional(),
-  watchlistId: z.number().int().positive(),
-});
+export type { WatchlistTitle } from "./WatchlistTitles";
 
-type WatchlistDetail = NonNullable<Awaited<ReturnType<typeof getWatchlistDetail>>>;
-export type DiscoverWatchlistPage =
-  | (Omit<WatchlistDetail, "nextCursor"> & { nextCursor?: string })
-  | null;
-
-export type WatchlistTitle = {
-  provider: string;
-  providerId: string;
-  mediaType: (typeof watchlistItems.$inferSelect)["mediaType"];
-  title: string;
-  matchingItemCount: number;
+export type WatchlistItemDiscovery = {
+  watchlist: WatchlistSummary;
+  orderToken: string;
+  items: WatchlistItem[];
+  nextCursor?: string;
 };
 
-export async function discoverWatchlistPage({
-  watchlistId,
-  pageSize = 50,
-  cursor,
-  query,
-}: {
+export type WatchlistTitleDiscovery = {
+  watchlist: WatchlistSummary;
+  titles: WatchlistTitle[];
+  nextCursor?: string;
+};
+
+type WatchlistPageRequest = {
   watchlistId: number;
   pageSize?: number;
   cursor?: string;
   query?: string;
-}): Promise<DiscoverWatchlistPage> {
-  const offset = getPageOffset({ cursor, watchlistId, pageSize, query });
-  const page = await getWatchlistDetail({
-    watchlistId,
-    pageSize,
-    cursor: offset / pageSize + 1,
-    query,
-  });
+};
 
-  if (!page) {
-    return null;
-  }
+export type WatchlistItemSelection = {
+  watchlistId: number;
+} & (
+  | { watchlistItemId: number }
+  | {
+      provider: string;
+      providerId: string;
+      mediaType: WatchlistItem["mediaType"];
+    }
+);
+
+export async function discoverWatchlistItems(
+  request: WatchlistPageRequest,
+): Promise<WatchlistItemDiscovery | null> {
+  const loaded = await loadWatchlistItemRequest(request);
+  if (!loaded) return null;
+
+  const [summary, orderToken] = await Promise.all([
+    loadWatchlistSummary(loaded.watchlist),
+    getWatchlistOrderToken(loaded.watchlist),
+  ]);
 
   return {
-    ...page,
-    nextCursor: nextCursorForPage(
-      page.nextCursor !== undefined,
+    watchlist: summary,
+    orderToken,
+    items: loaded.page.items,
+    nextCursor: loaded.nextCursor,
+  };
+}
+
+export async function findWatchlistItemsByText(request: WatchlistPageRequest & { query: string }) {
+  const loaded = await loadWatchlistItemRequest(request);
+  if (!loaded) return null;
+
+  return { items: loaded.page.items, nextCursor: loaded.nextCursor };
+}
+
+async function loadWatchlistItemRequest({
+  watchlistId,
+  pageSize = 50,
+  cursor,
+  query,
+}: WatchlistPageRequest) {
+  const watchlist = await loadWatchlistById(watchlistId);
+  if (!watchlist) return null;
+
+  const offset = getPageOffset({ cursor, watchlistId, pageSize, query });
+  const page = await loadWatchlistItemPage({ watchlist, pageSize, offset, query });
+
+  return {
+    watchlist,
+    page,
+    nextCursor: nextCursorForPage({
+      hasNextPage: page.hasNextPage,
       offset,
       pageSize,
       query,
       watchlistId,
-    ),
+    }),
   };
 }
 
-export async function findWatchlistItemsByText({
-  watchlistId,
-  query,
-  pageSize,
-  cursor,
-}: {
-  watchlistId: number;
-  query: string;
-  pageSize?: number;
-  cursor?: string;
-}) {
-  return discoverWatchlistPage({ watchlistId, query, pageSize, cursor });
+export async function discoverWatchlistTitles(
+  request: WatchlistPageRequest,
+): Promise<WatchlistTitleDiscovery | null> {
+  const loaded = await loadWatchlistTitleRequest(request);
+  if (!loaded) return null;
+
+  const [summary, titlePage] = await Promise.all([
+    loadWatchlistSummary(loaded.watchlist),
+    loadWatchlistTitlePage(loaded),
+  ]);
+
+  return { watchlist: summary, ...titlePage };
 }
 
-export async function findWatchlistTitles({
+export async function findWatchlistTitles(request: WatchlistPageRequest) {
+  const loaded = await loadWatchlistTitleRequest(request);
+  if (!loaded) return null;
+
+  return loadWatchlistTitlePage(loaded);
+}
+
+async function loadWatchlistTitleRequest({
   watchlistId,
-  query,
   pageSize = 50,
   cursor,
-}: {
-  watchlistId: number;
-  query?: string;
-  pageSize?: number;
-  cursor?: string;
-}) {
-  const offset = getPageOffset({ cursor, watchlistId, pageSize, query, resultView: "titles" });
-  return loadWatchlistTitlePage({ watchlistId, query, pageSize, offset });
+  query,
+}: WatchlistPageRequest) {
+  const watchlist = await loadWatchlistById(watchlistId);
+  if (!watchlist) return null;
+
+  return {
+    watchlist,
+    watchlistId,
+    pageSize,
+    query,
+    offset: getPageOffset({ cursor, watchlistId, pageSize, query, resultView: "titles" }),
+  };
+}
+
+export async function findWatchlistItemMatches(
+  selection: WatchlistItemSelection,
+): Promise<WatchlistItem[]> {
+  const db = getDb();
+
+  if ("watchlistItemId" in selection) {
+    return db
+      .select()
+      .from(watchlistItems)
+      .where(
+        and(
+          eq(watchlistItems.watchlistId, selection.watchlistId),
+          eq(watchlistItems.id, selection.watchlistItemId),
+        ),
+      );
+  }
+
+  return db
+    .select()
+    .from(watchlistItems)
+    .where(
+      and(
+        eq(watchlistItems.watchlistId, selection.watchlistId),
+        eq(watchlistItems.source, selection.provider),
+        or(
+          eq(watchlistItems.tmdbId, selection.providerId),
+          eq(watchlistItems.parentId, selection.providerId),
+        ),
+        eq(watchlistItems.mediaType, selection.mediaType),
+      ),
+    );
+}
+
+export async function findWatchlistTitleMatches(
+  selection: WatchlistItemSelection,
+): Promise<WatchlistTitle[]> {
+  return collapseWatchlistItemsToTitles(await findWatchlistItemMatches(selection));
 }
 
 async function loadWatchlistTitlePage({
@@ -100,16 +185,9 @@ async function loadWatchlistTitlePage({
   pageSize: number;
   offset: number;
 }) {
-  const db = getDb();
-  const [watchlist] = await db
-    .select({ id: watchlists.id })
-    .from(watchlists)
-    .where(eq(watchlists.id, watchlistId));
-  if (!watchlist) return null;
-
   const providerId = sql<string>`coalesce(${watchlistItems.parentId}, ${watchlistItems.tmdbId})`;
   const title = sql<string>`coalesce(${watchlistItems.parentTitle}, ${watchlistItems.title})`;
-  const titlesWithContinuation = await db
+  const titlesWithContinuation = await getDb()
     .select({
       provider: watchlistItems.source,
       providerId,
@@ -123,81 +201,16 @@ async function loadWatchlistTitlePage({
     .orderBy(asc(title), asc(providerId))
     .limit(pageSize + 1)
     .offset(offset);
-  const titles = titlesWithContinuation.slice(0, pageSize) as WatchlistTitle[];
 
   return {
-    titles,
-    nextCursor: nextCursorForPage(
-      titlesWithContinuation.length > pageSize,
+    titles: titlesWithContinuation.slice(0, pageSize) as WatchlistTitle[],
+    nextCursor: nextCursorForPage({
+      hasNextPage: titlesWithContinuation.length > pageSize,
       offset,
       pageSize,
       query,
       watchlistId,
-      "titles",
-    ),
+      resultView: "titles",
+    }),
   };
-}
-
-function encodeWatchlistPageCursor(cursor: z.infer<typeof watchlistPageCursorSchema>) {
-  return Buffer.from(JSON.stringify(cursor)).toString("base64url");
-}
-
-function getPageOffset({
-  cursor,
-  watchlistId,
-  pageSize,
-  query,
-  resultView,
-}: {
-  cursor?: string;
-  watchlistId: number;
-  pageSize: number;
-  query?: string;
-  resultView?: "items" | "titles";
-}) {
-  return cursor === undefined
-    ? 0
-    : decodeWatchlistPageCursor(cursor, watchlistId, pageSize, query, resultView);
-}
-
-function nextCursorForPage(
-  hasNextPage: boolean,
-  offset: number,
-  pageSize: number,
-  query: string | undefined,
-  watchlistId: number,
-  resultView?: "items" | "titles",
-) {
-  if (!hasNextPage) return undefined;
-  return encodeWatchlistPageCursor({
-    offset: offset + pageSize,
-    pageSize,
-    query,
-    resultView,
-    watchlistId,
-  });
-}
-
-function decodeWatchlistPageCursor(
-  cursor: string,
-  watchlistId: number,
-  pageSize: number,
-  query?: string,
-  resultView?: "items" | "titles",
-) {
-  const decoded = watchlistPageCursorSchema.parse(
-    JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")),
-  );
-
-  const cursorMatches = [
-    decoded.watchlistId === watchlistId,
-    decoded.pageSize === pageSize,
-    decoded.query === query,
-    decoded.resultView === resultView,
-  ].every(Boolean);
-  if (!cursorMatches) {
-    throw new Error("Invalid watchlist item cursor.");
-  }
-
-  return decoded.offset;
 }

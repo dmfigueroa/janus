@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { getDb, type DatabaseTransaction } from "@/db/Db.server";
-import { watchlistItems, watchlists } from "@/db/Schema";
+import { watchlistItems, watchlists, type Watchlist } from "@/db/Schema";
 import { buildDetailOrderBy } from "@/features/watchlists/Order.server";
 import type { SetWatchlistOrderInput } from "./SetWatchlistOrderSchema";
 
@@ -33,16 +33,31 @@ export async function getWatchlistOrderState(watchlistId: number) {
     .where(eq(watchlists.id, watchlistId));
   if (!watchlist) return null;
 
-  const items = await db
-    .select({ id: watchlistItems.id })
-    .from(watchlistItems)
-    .where(eq(watchlistItems.watchlistId, watchlistId))
-    .orderBy(...buildDetailOrderBy(watchlist.itemOrderMode));
-  const orderedItemIds = items.map((item) => item.id);
+  const orderedItemIds = await loadWatchlistOrderedItemIds(watchlist);
   return {
     orderedItemIds,
     orderToken: createWatchlistOrderToken(watchlistId, orderedItemIds, watchlist.itemOrderMode),
   };
+}
+
+export async function loadWatchlistOrderedItemIds({
+  id: watchlistId,
+  itemOrderMode,
+}: Pick<Watchlist, "id" | "itemOrderMode">) {
+  const items = await getDb()
+    .select({ id: watchlistItems.id })
+    .from(watchlistItems)
+    .where(eq(watchlistItems.watchlistId, watchlistId))
+    .orderBy(...buildDetailOrderBy(itemOrderMode));
+  return items.map((item) => item.id);
+}
+
+export async function getWatchlistOrderToken({
+  id,
+  itemOrderMode,
+}: Pick<Watchlist, "id" | "itemOrderMode">) {
+  const orderedItemIds = await loadWatchlistOrderedItemIds({ id, itemOrderMode });
+  return createWatchlistOrderToken(id, orderedItemIds, itemOrderMode);
 }
 
 export async function setWatchlistOrder({

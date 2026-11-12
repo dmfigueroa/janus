@@ -1,5 +1,6 @@
+import { and, count, eq, or, sql } from "drizzle-orm";
 import { getDb } from "@/db/Db.server";
-import { watchlists, watchlistItems } from "@/db/Schema";
+import { watchlistItems, watchlists, type Watchlist, type WatchlistItem } from "@/db/Schema";
 import {
   buildDetailOrderBy,
   isUnwatchedExpression,
@@ -10,9 +11,9 @@ import {
   type SummaryCounts,
   type SummarySelection,
 } from "@/features/watchlists/Summary.server";
-import type { WatchlistDetailPage } from "./Query";
+import type { WatchlistSummary } from "@/features/watchlists/list/Query";
 import { escapeLikeString } from "@/utils/Search";
-import { and, count, eq, or, sql } from "drizzle-orm";
+import type { WatchlistDetailPage } from "./Query";
 
 export type GetWatchlistDetailParams = {
   watchlistId: number;
@@ -22,13 +23,31 @@ export type GetWatchlistDetailParams = {
   unwatchedOnly?: boolean;
 };
 
-async function loadWatchlistById(db: ReturnType<typeof getDb>, watchlistId: number) {
-  const [watchlist] = await db.select().from(watchlists).where(eq(watchlists.id, watchlistId));
+export type WatchlistItemPage = {
+  items: WatchlistItem[];
+  hasNextPage: boolean;
+};
+
+export async function loadWatchlistById(watchlistId: number): Promise<Watchlist | null> {
+  const [watchlist] = await getDb().select().from(watchlists).where(eq(watchlists.id, watchlistId));
   return watchlist ?? null;
 }
 
-async function loadDetailCounts(db: ReturnType<typeof getDb>, watchlistId: number) {
-  const [counts] = await db
+export async function loadWatchlistSummary(watchlist: Watchlist): Promise<WatchlistSummary> {
+  const db = getDb();
+  const [counts, selection] = await Promise.all([
+    loadDetailCounts(watchlist.id),
+    loadDetailSelection({ db, watchlistId: watchlist.id, itemOrderMode: watchlist.itemOrderMode }),
+  ]);
+
+  return {
+    ...watchlist,
+    stats: buildSummaryStats(counts, selection),
+  };
+}
+
+async function loadDetailCounts(watchlistId: number) {
+  const [counts] = await getDb()
     .select({
       totalItems: count(),
       watchedItems: watchedItemsExpression,
@@ -53,8 +72,8 @@ async function loadDetailSelection({
 }: {
   db: ReturnType<typeof getDb>;
   watchlistId: number;
-  itemOrderMode: (typeof watchlists.$inferSelect)["itemOrderMode"];
-}) {
+  itemOrderMode: Watchlist["itemOrderMode"];
+}): Promise<SummarySelection> {
   const itemOrder = buildDetailOrderBy(itemOrderMode);
   const [nextUnwatchedResult, firstItemResult] = await Promise.all([
     db
@@ -76,17 +95,17 @@ async function loadDetailSelection({
   return {
     nextUnwatched,
     coverItem: selectCoverItem(nextUnwatched, firstItemResult),
-  } satisfies SummarySelection;
+  };
 }
 
-function firstItemOrNull(items: Array<typeof watchlistItems.$inferSelect>) {
+function firstItemOrNull(items: WatchlistItem[]) {
   return items[0] ?? null;
 }
 
 function selectCoverItem(
-  nextUnwatched: typeof watchlistItems.$inferSelect | null,
-  firstItems: Array<typeof watchlistItems.$inferSelect>,
-) {
+  nextUnwatched: WatchlistItem | null,
+  firstItems: WatchlistItem[],
+): WatchlistItem | null {
   if (nextUnwatched) {
     return nextUnwatched;
   }
@@ -115,65 +134,58 @@ export function buildDetailFilters({
   );
 }
 
-async function loadDetailItems({
-  db,
-  watchlistId,
-  cursor,
+export async function loadWatchlistItemPage({
+  watchlist,
   pageSize,
+  offset,
   query,
   unwatchedOnly,
-  itemOrderMode,
-}: GetWatchlistDetailParams & {
-  db: ReturnType<typeof getDb>;
-  cursor: number;
+}: {
+  watchlist: Watchlist;
   pageSize: number;
-  itemOrderMode: (typeof watchlists.$inferSelect)["itemOrderMode"];
-}) {
-  const offset = (cursor - 1) * pageSize;
-
-  return db
+  offset: number;
+  query?: string;
+  unwatchedOnly?: boolean;
+}): Promise<WatchlistItemPage> {
+  const itemsWithContinuation = await getDb()
     .select()
     .from(watchlistItems)
-    .where(buildDetailFilters({ watchlistId, query, unwatchedOnly }))
-    .orderBy(...buildDetailOrderBy(itemOrderMode))
+    .where(buildDetailFilters({ watchlistId: watchlist.id, query, unwatchedOnly }))
+    .orderBy(...buildDetailOrderBy(watchlist.itemOrderMode))
     .limit(pageSize + 1)
     .offset(offset);
+
+  return {
+    items: itemsWithContinuation.slice(0, pageSize),
+    hasNextPage: itemsWithContinuation.length > pageSize,
+  };
 }
 
 export async function getWatchlistDetail(
   params: GetWatchlistDetailParams,
 ): Promise<WatchlistDetailPage | null> {
   const { watchlistId, cursor, pageSize, query, unwatchedOnly } = normalizeDetailParams(params);
-  const db = getDb();
-  const watchlist = await loadWatchlistById(db, watchlistId);
+  const watchlist = await loadWatchlistById(watchlistId);
 
   if (!watchlist) {
     return null;
   }
 
-  const [counts, selection, items] = await Promise.all([
-    loadDetailCounts(db, watchlistId),
-    loadDetailSelection({ db, watchlistId, itemOrderMode: watchlist.itemOrderMode }),
-    loadDetailItems({
-      db,
-      watchlistId,
-      cursor,
+  const [summary, page] = await Promise.all([
+    loadWatchlistSummary(watchlist),
+    loadWatchlistItemPage({
+      watchlist,
       pageSize,
+      offset: (cursor - 1) * pageSize,
       query,
       unwatchedOnly,
-      itemOrderMode: watchlist.itemOrderMode,
     }),
   ]);
-  const pageItems = items.slice(0, pageSize);
-  const hasNextPage = items.length > pageSize;
 
   return {
-    watchlist: {
-      ...watchlist,
-      stats: buildSummaryStats(counts, selectionOrEmpty(selection)),
-    },
-    items: pageItems,
-    nextCursor: nextPageCursor(hasNextPage, cursor),
+    watchlist: summary,
+    items: page.items,
+    nextCursor: nextPageCursor(page.hasNextPage, cursor),
   };
 }
 
@@ -187,10 +199,6 @@ function normalizeDetailParams(params: GetWatchlistDetailParams) {
 
 function valueOrDefault<T>(value: T | undefined, fallback: T) {
   return value === undefined ? fallback : value;
-}
-
-function selectionOrEmpty(selection: SummarySelection | null | undefined) {
-  return selection ?? { nextUnwatched: null, coverItem: null };
 }
 
 function nextPageCursor(hasNextPage: boolean, cursor: number) {
