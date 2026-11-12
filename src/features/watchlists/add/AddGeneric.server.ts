@@ -1,5 +1,5 @@
 import type { AddToWatchlistInsertionPosition, GenericMedia } from "./Mutation";
-import { persistAddedItems } from "./Insert.server";
+import { persistAddedItems } from "./InsertWatchlistItems.server";
 import { addedItemsResult, type WatchlistWriteResult } from "./AdditionOutcome";
 
 export async function addGenericItemToWatchlist(

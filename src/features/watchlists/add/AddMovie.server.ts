@@ -2,7 +2,7 @@ import { providerAdditionFailure } from "./ProviderAdditionFailure.server";
 import * as repository from "@/features/watchlists/Repository.server";
 import { fetchTmdbMovie } from "@/server/providers/TmdbApi.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
-import { persistAddedItems } from "./Insert.server";
+import { persistAddedItems } from "./InsertWatchlistItems.server";
 import { addedItemsResult, type WatchlistWriteResult } from "./AdditionOutcome";
 
 const MOVIE_ALREADY_IN_WATCHLIST_RESULT = {

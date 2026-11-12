@@ -5,7 +5,7 @@ import * as repository from "@/features/watchlists/Repository.server";
 import { getComicIssues } from "@/server/providers/Comicvine.server";
 import { getComicVolumeDetails } from "@/integrations/comicvine/ComicvineVolume.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
-import { persistAddedItems } from "./Insert.server";
+import { persistAddedItems } from "./InsertWatchlistItems.server";
 import { rejectAdd, addedItemsResult, type WatchlistWriteResult } from "./AdditionOutcome";
 
 const COMICVINE_UNAVAILABLE_MESSAGE =

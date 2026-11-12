@@ -1,16 +1,20 @@
 import type { WatchlistWriteFailureCode } from "./AdditionOutcome";
-import { getDb } from "@/db/Db.server";
-import type { DatabaseTransaction } from "@/db/Db.server";
-import { watchlistItems, watchlists } from "@/db/Schema";
+import { getDb, type DatabaseTransaction } from "@/db/Db.server";
+import { watchlistItems } from "@/db/Schema";
+import { and, asc, eq } from "drizzle-orm";
 import {
   getWatchlistById,
   markLastItemAddedInTransaction,
 } from "@/features/watchlists/Repository.server";
-import { CUSTOM_ORDER_INSERTION_REQUIRED_MESSAGE } from "./Constants";
-import { insertWithCustomOrder } from "./InsertCustomOrder.server";
+import { customRankOrder } from "@/features/watchlists/Order.server";
+import type { InsertionPosition } from "@/features/watchlists/Order";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
-
-type PendingWatchlistItem = typeof watchlistItems.$inferInsert;
+import { validateAdditionDestination } from "./AdditionDestination";
+import {
+  computeCustomOrderInsertion,
+  type CustomOrderWrites,
+  type PendingWatchlistItem,
+} from "./InsertionOrder";
 
 export type PersistAddedItemsResult =
   | { success: true; insertedCount: number }
@@ -60,15 +64,16 @@ function persistWatchlistItems({
 }): PersistAddedItemsResult {
   const watchlist = getWatchlistById(watchlistId, transaction);
 
-  if (!watchlist) {
-    return { success: false, code: "not_found", message: "Watchlist not found." } as const;
+  const validationFailure = validateAdditionDestination({ watchlist, insertionPosition });
+  if (validationFailure) {
+    return { success: false, code: validationFailure.code, message: validationFailure.message };
   }
 
   const result = insertItemsByOrderMode({
     transaction,
     watchlistId,
     items,
-    itemOrderMode: watchlist.itemOrderMode,
+    itemOrderMode: watchlist!.itemOrderMode,
     insertionPosition,
     referenceItemId,
   });
@@ -100,60 +105,21 @@ function insertItemsByOrderMode({
   transaction: DatabaseTransaction;
   watchlistId: number;
   items: PendingWatchlistItem[];
-  itemOrderMode: typeof watchlists.$inferSelect.itemOrderMode;
+  itemOrderMode: "release" | "custom";
   insertionPosition?: AddToWatchlistInsertionPosition;
   referenceItemId?: number;
 }): PersistAddedItemsResult {
-  if (itemOrderMode !== "custom") {
-    return insertForReleaseOrder({ transaction, items, insertionPosition });
+  if (itemOrderMode === "custom") {
+    return insertWithCustomOrder({
+      transaction,
+      watchlistId,
+      items,
+      insertionPosition: insertionPosition!,
+      referenceItemId,
+    });
   }
-  if (!insertionPosition) {
-    return insertionChoiceRequired();
-  }
-  return insertWithCustomOrder({
-    transaction,
-    watchlistId,
-    items,
-    insertionPosition,
-    referenceItemId,
-  });
-}
 
-function insertForReleaseOrder({
-  transaction,
-  items,
-  insertionPosition,
-}: {
-  transaction: DatabaseTransaction;
-  items: PendingWatchlistItem[];
-  insertionPosition?: AddToWatchlistInsertionPosition;
-}): PersistAddedItemsResult {
-  if (isAnchorPosition(insertionPosition)) {
-    return notCustomModeFailure();
-  }
   return insertWithReleaseDateOrder({ transaction, items });
-}
-
-function insertionChoiceRequired(): PersistAddedItemsResult {
-  return {
-    success: false,
-    code: "insertion_choice_required",
-    message: CUSTOM_ORDER_INSERTION_REQUIRED_MESSAGE,
-  };
-}
-
-function notCustomModeFailure(): PersistAddedItemsResult {
-  return {
-    success: false,
-    code: "not_custom_mode",
-    message: "Anchored insertion is only available in custom mode.",
-  };
-}
-
-function isAnchorPosition(
-  position: AddToWatchlistInsertionPosition | undefined,
-): position is "before" | "after" {
-  return position === "before" || position === "after";
 }
 
 function insertWithReleaseDateOrder({
@@ -171,4 +137,75 @@ function insertWithReleaseDateOrder({
     .all();
 
   return { success: true, insertedCount: inserted.length } as const;
+}
+
+function insertWithCustomOrder({
+  transaction,
+  watchlistId,
+  items,
+  insertionPosition,
+  referenceItemId,
+}: {
+  transaction: DatabaseTransaction;
+  watchlistId: number;
+  items: PendingWatchlistItem[];
+  insertionPosition: AddToWatchlistInsertionPosition;
+  referenceItemId?: number;
+}): PersistAddedItemsResult {
+  const existingItems = transaction
+    .select({
+      id: watchlistItems.id,
+      tmdbId: watchlistItems.tmdbId,
+      mediaType: watchlistItems.mediaType,
+      releaseDate: watchlistItems.releaseDate,
+      customRank: watchlistItems.customRank,
+    })
+    .from(watchlistItems)
+    .where(eq(watchlistItems.watchlistId, watchlistId))
+    .orderBy(...customRankOrder, asc(watchlistItems.id))
+    .all();
+
+  const writes = computeCustomOrderInsertion({
+    existingItems,
+    pendingItems: items,
+    insertionPosition: insertionPosition as InsertionPosition,
+    referenceItemId,
+  });
+
+  if (!writes) {
+    return { success: true, insertedCount: 0 } as const;
+  }
+
+  if ("failure" in writes) {
+    return writes.failure;
+  }
+
+  executeCustomOrderWrites({ transaction, watchlistId, writes });
+
+  return { success: true, insertedCount: writes.inserts.length } as const;
+}
+
+function executeCustomOrderWrites({
+  transaction,
+  watchlistId,
+  writes,
+}: {
+  transaction: DatabaseTransaction;
+  watchlistId: number;
+  writes: CustomOrderWrites;
+}): void {
+  for (const { item, rank } of writes.inserts) {
+    transaction
+      .insert(watchlistItems)
+      .values({ ...item, customRank: rank })
+      .run();
+  }
+
+  for (const { id, rank } of writes.updates) {
+    transaction
+      .update(watchlistItems)
+      .set({ customRank: rank })
+      .where(and(eq(watchlistItems.id, id), eq(watchlistItems.watchlistId, watchlistId)))
+      .run();
+  }
 }

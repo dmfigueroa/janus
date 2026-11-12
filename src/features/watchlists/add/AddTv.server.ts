@@ -5,7 +5,7 @@ import type { WatchlistMedia } from "./Mutation";
 import * as repository from "@/features/watchlists/Repository.server";
 import { fetchTmdbSeason, fetchTmdbTv, type TMDBEpisode } from "@/server/providers/TmdbApi.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
-import { persistAddedItems } from "./Insert.server";
+import { persistAddedItems } from "./InsertWatchlistItems.server";
 import { addedItemsResult, type WatchlistWriteResult } from "./AdditionOutcome";
 
 const limit = pLimit(5);
