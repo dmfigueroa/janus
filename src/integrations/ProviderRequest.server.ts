@@ -22,8 +22,9 @@ const PROVIDER_RETRY_LIMIT = 2;
 const PROVIDER_RETRY_BACKOFF_LIMIT_MS = 2_000;
 const PROVIDER_RETRY_MAX_AFTER_MS = 5_000;
 
-const RETRYABLE_STATUS_CODES = [408, 429, 500, 502, 503, 504];
-const RETRY_AFTER_STATUS_CODES = [408, 429, 500, 502, 503, 504];
+// Transient statuses only. Ky defaults also retry 413, which is permanent.
+// Retry-After is honored for every status we retry.
+const PROVIDER_RETRY_STATUS_CODES = [408, 429, 500, 502, 503, 504];
 
 /**
  * Shared retry policy for provider reads.
@@ -35,8 +36,8 @@ const RETRY_AFTER_STATUS_CODES = [408, 429, 500, 502, 503, 504];
 export const PROVIDER_RETRY_POLICY: RetryOptions = {
   limit: PROVIDER_RETRY_LIMIT,
   methods: ["get", "head"],
-  statusCodes: RETRYABLE_STATUS_CODES,
-  afterStatusCodes: RETRY_AFTER_STATUS_CODES,
+  statusCodes: PROVIDER_RETRY_STATUS_CODES,
+  afterStatusCodes: PROVIDER_RETRY_STATUS_CODES,
   maxRetryAfter: PROVIDER_RETRY_MAX_AFTER_MS,
   backoffLimit: PROVIDER_RETRY_BACKOFF_LIMIT_MS,
   // Return undefined for HTTP errors so `statusCodes` stays the single source
