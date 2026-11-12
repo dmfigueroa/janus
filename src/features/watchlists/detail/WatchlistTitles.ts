@@ -1,14 +1,30 @@
-import type { WatchlistItem } from "@/db/Schema";
+export type WatchlistMediaType =
+  | "movie"
+  | "episode"
+  | "game"
+  | "book"
+  | "comic"
+  | "anime"
+  | "manga";
 
 export type WatchlistTitle = {
   provider: string;
   providerId: string;
-  mediaType: WatchlistItem["mediaType"];
+  mediaType: WatchlistMediaType;
   title: string;
   matchingItemCount: number;
 };
 
-export function collapseWatchlistItemsToTitles(items: WatchlistItem[]): WatchlistTitle[] {
+export type WatchlistTitleSource = {
+  source: string;
+  tmdbId: string;
+  mediaType: WatchlistMediaType;
+  title: string;
+  parentId: string | null;
+  parentTitle: string | null;
+};
+
+export function collapseWatchlistItemsToTitles(items: WatchlistTitleSource[]): WatchlistTitle[] {
   const groups = items.reduce<Map<string, WatchlistTitle>>((titles, item) => {
     const title = watchlistTitleFromItem(item);
     const key = watchlistTitleGroupKey(title);
@@ -23,7 +39,7 @@ export function collapseWatchlistItemsToTitles(items: WatchlistItem[]): Watchlis
   return [...groups.values()].sort(compareWatchlistTitles);
 }
 
-function watchlistTitleFromItem(item: WatchlistItem): WatchlistTitle {
+function watchlistTitleFromItem(item: WatchlistTitleSource): WatchlistTitle {
   return {
     provider: item.source,
     providerId: item.parentId ?? item.tmdbId,
