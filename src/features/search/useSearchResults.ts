@@ -1,54 +1,38 @@
 import { useCallback } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { searchUnified } from "@/features/search/search/MediaSearch";
-import { DEPRECATED_MEDIA_MESSAGE, isDeprecatedMediaType } from "@/server/Media";
-import type { UnifiedMedia } from "@/server/Media";
-
-type SearchPage = {
-  results: UnifiedMedia[];
-  page: number;
-  total_pages: number;
-  total_results: number;
-  rejected?: boolean;
-  message?: string;
-};
+import {
+  searchUnified,
+  type MediaSearchOutcome,
+  type SearchableMediaType,
+} from "@/features/search/search/MediaSearch";
 
 interface UseSearchResultsOptions {
   query: string;
-  type: UnifiedMedia["mediaType"];
-  initialData: SearchPage;
+  type: SearchableMediaType;
+  initialData: MediaSearchOutcome;
 }
 
-function getInitialData(query: string, initialData: SearchPage) {
-  if (!query) return undefined;
-  return { pages: [initialData], pageParams: [1] };
+function flattenResults(pages: MediaSearchOutcome[]) {
+  return pages.flatMap((page) => (page.status === "ok" ? page.results : []));
 }
 
-function flattenResults(data: { pages: SearchPage[] } | undefined) {
-  if (!data) return [];
-  return data.pages.flatMap((page) => page.results);
+function getNextMediaSearchPage(lastPage: MediaSearchOutcome) {
+  if (lastPage.status !== "ok" || lastPage.page >= lastPage.totalPages) return undefined;
+  return lastPage.page + 1;
 }
 
-function getRejectionMessage(data: { pages: SearchPage[] } | undefined) {
-  return data?.pages.find((page) => page.rejected)?.message;
+function getCurrentOutcome(pages: MediaSearchOutcome[], initialData: MediaSearchOutcome) {
+  const rejection = pages.find((page) => page.status !== "ok");
+  return rejection ?? pages.at(0) ?? initialData;
 }
 
 export function useSearchResults({ query, type, initialData }: UseSearchResultsOptions) {
   const searchUnifiedFn = useServerFn(searchUnified);
 
   const fetchPage = useCallback(
-    ({ pageParam }: { pageParam: number }): Promise<SearchPage> => {
-      if (!query) {
-        return Promise.resolve(emptyPage(pageParam));
-      }
-
-      if (isDeprecatedMediaType(type)) {
-        return Promise.resolve(deprecatedPage(pageParam));
-      }
-
-      return searchUnifiedFn({ data: { query, page: pageParam, type } }) as Promise<SearchPage>;
-    },
+    ({ pageParam }: { pageParam: number }) =>
+      searchUnifiedFn({ data: { query, page: pageParam, type } }) as Promise<MediaSearchOutcome>,
     [query, type, searchUnifiedFn],
   );
 
@@ -56,39 +40,19 @@ export function useSearchResults({ query, type, initialData }: UseSearchResultsO
     queryKey: ["search", query, type],
     queryFn: fetchPage,
     initialPageParam: 1,
-    getNextPageParam: (lastPage) =>
-      lastPage.page < lastPage.total_pages ? lastPage.page + 1 : undefined,
-    initialData: getInitialData(query, initialData),
+    getNextPageParam: getNextMediaSearchPage,
+    initialData: { pages: [initialData], pageParams: [1] },
   });
 
-  const allResults = flattenResults(data);
-  const rejectionMessage = getRejectionMessage(data);
+  const pages = data?.pages ?? [];
+  const currentOutcome = getCurrentOutcome(pages, initialData);
 
   return {
-    allResults,
-    rejectionMessage,
+    allResults: flattenResults(pages),
+    status: currentOutcome.status,
+    message: currentOutcome.message,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  };
-}
-
-function emptyPage(page: number): SearchPage {
-  return {
-    results: [],
-    page,
-    total_pages: 1,
-    total_results: 0,
-  };
-}
-
-function deprecatedPage(page: number): SearchPage {
-  return {
-    results: [],
-    page,
-    total_pages: 1,
-    total_results: 0,
-    rejected: true,
-    message: DEPRECATED_MEDIA_MESSAGE,
   };
 }

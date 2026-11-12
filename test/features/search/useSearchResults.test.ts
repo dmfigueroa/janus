@@ -2,140 +2,176 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
+import {
+  PROVIDER_UNAVAILABLE_MESSAGE,
+  type MediaSearchOutcome,
+} from "@/features/search/search/MediaSearch";
 
 const searchUnifiedFnMock = vi.fn();
 
 vi.mock("@tanstack/react-start", () => ({
   useServerFn: () => searchUnifiedFnMock,
+  createServerFn: () => {
+    const chain = { validator: () => chain, handler: (handler: unknown) => handler };
+    return chain;
+  },
 }));
 
-let capturedQueryFn: ((ctx: { pageParam: number }) => Promise<unknown>) | undefined;
+type InfiniteQueryOptions = {
+  queryFn?: (context: { pageParam: number }) => Promise<unknown>;
+  getNextPageParam?: (lastPage: MediaSearchOutcome) => number | undefined;
+  initialData?: { pages: MediaSearchOutcome[]; pageParams: number[] };
+};
+
+let capturedOptions: InfiniteQueryOptions | undefined;
 
 const mockReturn = {
-  data: undefined as { pages: unknown[]; pageParams: unknown[] } | undefined,
+  data: undefined as { pages: MediaSearchOutcome[]; pageParams: number[] } | undefined,
   fetchNextPage: vi.fn(),
   hasNextPage: false,
   isFetchingNextPage: false,
 };
 
 vi.mock("@tanstack/react-query", () => ({
-  useInfiniteQuery: (options: { queryFn: typeof capturedQueryFn }) => {
-    capturedQueryFn = options.queryFn;
+  useInfiniteQuery: (options: InfiniteQueryOptions) => {
+    capturedOptions = options;
     return mockReturn;
   },
 }));
 
-vi.mock("@/features/search/search/MediaSearch", () => ({
-  searchUnified: vi.fn(),
-}));
-
-vi.mock("@/server/Media", () => ({
-  DEPRECATED_MEDIA_MESSAGE:
-    "Anime and manga categories are deprecated while we revisit provider data quality.",
-  isDeprecatedMediaType: (t: string) => t === "anime" || t === "manga",
-}));
+vi.mock("@/features/search/search/MediaSearch", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/search/search/MediaSearch")>();
+  return { ...actual, searchUnified: vi.fn() };
+});
 
 import { useSearchResults } from "@/features/search/useSearchResults";
+
+const emptyOutcome: MediaSearchOutcome = {
+  status: "empty_query",
+  page: 1,
+  message: "Enter a search term to find media.",
+};
+
+const movieOutcome: MediaSearchOutcome = {
+  status: "ok",
+  results: [
+    { id: "1", title: "A", mediaType: "movie", source: "tmdb", poster: null },
+    { id: "2", title: "B", mediaType: "movie", source: "tmdb", poster: null },
+  ],
+  page: 1,
+  totalPages: 2,
+  totalResults: 2,
+};
 
 describe("useSearchResults", () => {
   beforeEach(() => {
     searchUnifiedFnMock.mockReset();
-    capturedQueryFn = undefined;
+    capturedOptions = undefined;
     mockReturn.data = undefined;
   });
 
-  it("returns empty page when query is empty", async () => {
-    renderHook(() =>
-      useSearchResults({
-        query: "",
-        type: "movie",
-        initialData: { results: [], page: 1, total_pages: 1, total_results: 0 },
-      }),
-    );
+  it("requests the shared search boundary even for a blank query", async () => {
+    renderHook(() => useSearchResults({ query: "", type: "movie", initialData: emptyOutcome }));
 
-    expect(capturedQueryFn).toBeDefined();
-    const result = await capturedQueryFn!({ pageParam: 1 });
-    expect(result).toEqual({
-      results: [],
-      page: 1,
-      total_pages: 1,
-      total_results: 0,
-    });
-    expect(searchUnifiedFnMock).not.toHaveBeenCalled();
-  });
+    await capturedOptions!.queryFn!({ pageParam: 1 });
 
-  it("returns deprecated page for anime/manga types", async () => {
-    renderHook(() =>
-      useSearchResults({
-        query: "naruto",
-        type: "anime",
-        initialData: { results: [], page: 1, total_pages: 1, total_results: 0 },
-      }),
-    );
-
-    const result = await capturedQueryFn!({ pageParam: 2 });
-    expect(result).toEqual({
-      results: [],
-      page: 2,
-      total_pages: 1,
-      total_results: 0,
-      rejected: true,
-      message: "Anime and manga categories are deprecated while we revisit provider data quality.",
-    });
-    expect(searchUnifiedFnMock).not.toHaveBeenCalled();
-  });
-
-  it("calls searchUnifiedFn for valid types with a query", async () => {
-    searchUnifiedFnMock.mockResolvedValue({
-      results: [{ id: "1", title: "Star Wars" }],
-      page: 1,
-      total_pages: 1,
-      total_results: 1,
-    });
-
-    renderHook(() =>
-      useSearchResults({
-        query: "star wars",
-        type: "movie",
-        initialData: { results: [], page: 1, total_pages: 1, total_results: 0 },
-      }),
-    );
-
-    await capturedQueryFn!({ pageParam: 1 });
     expect(searchUnifiedFnMock).toHaveBeenCalledWith({
-      data: { query: "star wars", page: 1, type: "movie" },
+      data: { query: "", page: 1, type: "movie" },
     });
   });
 
-  it("computes allResults from paginated data", () => {
+  it("requests the next page from the shared search boundary", async () => {
+    renderHook(() =>
+      useSearchResults({ query: "star wars", type: "movie", initialData: movieOutcome }),
+    );
+
+    await capturedOptions!.queryFn!({ pageParam: 2 });
+
+    expect(searchUnifiedFnMock).toHaveBeenCalledWith({
+      data: { query: "star wars", page: 2, type: "movie" },
+    });
+  });
+
+  it("seeds infinite query data with the route loader outcome", () => {
+    renderHook(() => useSearchResults({ query: "", type: "movie", initialData: emptyOutcome }));
+
+    expect(capturedOptions!.initialData).toEqual({ pages: [emptyOutcome], pageParams: [1] });
+  });
+
+  it("flattens results from successful pages only", () => {
+    const secondPage: MediaSearchOutcome = {
+      status: "ok",
+      results: [{ id: "3", title: "C", mediaType: "movie", source: "tmdb", poster: null }],
+      page: 2,
+      totalPages: 2,
+      totalResults: 3,
+    };
+    mockReturn.data = {
+      pages: [movieOutcome, secondPage],
+      pageParams: [1, 2],
+    };
+
+    const { result } = renderHook(() =>
+      useSearchResults({ query: "test", type: "movie", initialData: movieOutcome }),
+    );
+
+    expect(result.current.allResults.map((media) => media.title)).toEqual(["A", "B", "C"]);
+    expect(result.current.status).toBe("ok");
+    expect(result.current.message).toBeUndefined();
+  });
+
+  it("surfaces a rejection from any page", () => {
     mockReturn.data = {
       pages: [
+        movieOutcome,
         {
-          results: [{ id: "1", title: "A" }],
-          page: 1,
-          total_pages: 2,
-          total_results: 2,
-        },
-        {
-          results: [{ id: "2", title: "B" }],
+          status: "provider_unavailable",
           page: 2,
-          total_pages: 2,
-          total_results: 2,
+          message: PROVIDER_UNAVAILABLE_MESSAGE,
         },
       ],
       pageParams: [1, 2],
     };
 
     const { result } = renderHook(() =>
-      useSearchResults({
-        query: "test",
-        type: "book",
-        initialData: { results: [], page: 1, total_pages: 2, total_results: 2 },
-      }),
+      useSearchResults({ query: "test", type: "movie", initialData: movieOutcome }),
     );
 
-    expect(result.current.allResults).toHaveLength(2);
-    expect(result.current.allResults[0].title).toBe("A");
-    expect(result.current.allResults[1].title).toBe("B");
+    expect(result.current.status).toBe("provider_unavailable");
+    expect(result.current.message).toBe(PROVIDER_UNAVAILABLE_MESSAGE);
+    expect(result.current.allResults.map((media) => media.title)).toEqual(["A", "B"]);
+  });
+
+  it("exposes the rejection status and message from the first page", () => {
+    const deprecatedOutcome: MediaSearchOutcome = {
+      status: "deprecated_media_type",
+      page: 1,
+      message: "Anime and manga categories are deprecated while we revisit provider data quality.",
+    };
+    mockReturn.data = { pages: [deprecatedOutcome], pageParams: [1] };
+
+    const { result } = renderHook(() =>
+      useSearchResults({ query: "naruto", type: "anime", initialData: deprecatedOutcome }),
+    );
+
+    expect(result.current.status).toBe("deprecated_media_type");
+    expect(result.current.message).toBe(
+      "Anime and manga categories are deprecated while we revisit provider data quality.",
+    );
+    expect(result.current.allResults).toEqual([]);
+  });
+
+  it("only paginates successful, unfinished searches", () => {
+    renderHook(() => useSearchResults({ query: "test", type: "movie", initialData: movieOutcome }));
+
+    expect(capturedOptions!.getNextPageParam!(movieOutcome)).toBe(2);
+    expect(capturedOptions!.getNextPageParam!({ ...movieOutcome, page: 2 })).toBeUndefined();
+    expect(
+      capturedOptions!.getNextPageParam!({
+        status: "provider_unavailable",
+        page: 1,
+        message: "unavailable",
+      }),
+    ).toBeUndefined();
   });
 });

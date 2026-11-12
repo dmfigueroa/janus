@@ -2,6 +2,7 @@
 
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "../../utils/Render";
+import type { MediaSearchOutcome } from "@/features/search/search/MediaSearch";
 
 const { toasterCreateMock } = vi.hoisted(() => ({ toasterCreateMock: vi.fn() }));
 
@@ -10,7 +11,8 @@ vi.mock("@/app/Toaster", () => ({ toaster: { create: toasterCreateMock } }));
 vi.mock("@/features/search/useSearchResults", () => ({
   useSearchResults: vi.fn(() => ({
     allResults: [],
-    rejectionMessage: undefined,
+    status: "empty_query",
+    message: "Enter a search term to find media.",
     fetchNextPage: vi.fn(),
     hasNextPage: false,
     isFetchingNextPage: false,
@@ -45,12 +47,34 @@ vi.mock("@/features/search/SearchResults", () => ({
 vi.mock("@/server/Media", () => ({
   DEPRECATED_MEDIA_MESSAGE:
     "Anime and manga categories are deprecated while we revisit provider data quality.",
-  isDeprecatedMediaType: (type: string) => type === "anime" || type === "manga",
 }));
 
 import { SearchDiscoveryScreen } from "@/features/search/SearchDiscoveryScreen";
 import { useSearchResults } from "@/features/search/useSearchResults";
 import { useSearchNavigation } from "@/features/search/useSearchNavigation";
+
+const emptyOutcome: MediaSearchOutcome = {
+  status: "empty_query",
+  page: 1,
+  message: "Enter a search term to find media.",
+};
+
+const deprecatedOutcome: MediaSearchOutcome = {
+  status: "deprecated_media_type",
+  page: 1,
+  message: "Anime and manga categories are deprecated while we revisit provider data quality.",
+};
+
+function mockSearchResults(outcome: MediaSearchOutcome, allResults: unknown[] = []) {
+  vi.mocked(useSearchResults).mockReturnValue({
+    allResults: allResults as never,
+    status: outcome.status,
+    message: outcome.message,
+    fetchNextPage: vi.fn(),
+    hasNextPage: false,
+    isFetchingNextPage: false,
+  });
+}
 
 describe("SearchDiscoveryScreen behavior", () => {
   afterEach(() => {
@@ -59,13 +83,7 @@ describe("SearchDiscoveryScreen behavior", () => {
 
   beforeEach(() => {
     toasterCreateMock.mockReset();
-    vi.mocked(useSearchResults).mockReturnValue({
-      allResults: [],
-      rejectionMessage: undefined,
-      fetchNextPage: vi.fn(),
-      hasNextPage: false,
-      isFetchingNextPage: false,
-    });
+    mockSearchResults(emptyOutcome);
     vi.mocked(useSearchNavigation).mockReturnValue({
       handleSearch: vi.fn(),
       handleTabChange: vi.fn(),
@@ -74,11 +92,7 @@ describe("SearchDiscoveryScreen behavior", () => {
 
   it("renders search input and tabs", () => {
     const { container } = render(
-      <SearchDiscoveryScreen
-        query=""
-        type="movie"
-        initialData={{ results: [], page: 1, total_pages: 0, total_results: 0 }}
-      />,
+      <SearchDiscoveryScreen query="" type="movie" initialData={emptyOutcome} />,
     );
     expect(screen.getByTestId("search-input")).not.toBeNull();
     expect(screen.getByRole("tablist")).not.toBeNull();
@@ -90,20 +104,29 @@ describe("SearchDiscoveryScreen behavior", () => {
     ).toBe("var(--chakra-colors-pink-solid)");
   });
 
-  it("shows 'No results found' when query is empty", () => {
-    render(
-      <SearchDiscoveryScreen
-        query=""
-        type="movie"
-        initialData={{ results: [], page: 1, total_pages: 0, total_results: 0 }}
-      />,
-    );
+  it("shows 'No results found' when the search is empty", () => {
+    render(<SearchDiscoveryScreen query="" type="movie" initialData={emptyOutcome} />);
     expect(screen.getByTestId("no-results")).not.toBeNull();
   });
 
-  it("renders results when query is present and data returns items", () => {
-    vi.mocked(useSearchResults).mockReturnValue({
-      allResults: [
+  it("renders results when the search returns items", () => {
+    mockSearchResults(
+      {
+        status: "ok",
+        results: [
+          {
+            id: "1",
+            title: "Harry Potter",
+            mediaType: "book",
+            source: "google_books",
+            poster: null,
+          },
+        ],
+        page: 1,
+        totalPages: 1,
+        totalResults: 1,
+      },
+      [
         {
           id: "1",
           title: "Harry Potter",
@@ -112,52 +135,44 @@ describe("SearchDiscoveryScreen behavior", () => {
           poster: null,
         },
       ],
-      rejectionMessage: undefined,
-      fetchNextPage: vi.fn(),
-      hasNextPage: false,
-      isFetchingNextPage: false,
-    });
+    );
 
     render(
       <SearchDiscoveryScreen
         query="harry potter"
         type="book"
-        initialData={{ results: [], page: 1, total_pages: 1, total_results: 1 }}
+        initialData={{
+          status: "ok",
+          results: [],
+          page: 1,
+          totalPages: 1,
+          totalResults: 1,
+        }}
       />,
     );
     expect(screen.getByTestId("has-results")).not.toBeNull();
     expect(screen.getByText("1 result(s)")).not.toBeNull();
   });
 
-  it("shows deprecated warning for anime/manga types", () => {
-    render(
-      <SearchDiscoveryScreen
-        query="naruto"
-        type="anime"
-        initialData={{ results: [], page: 1, total_pages: 1, total_results: 0, rejected: true }}
-      />,
-    );
-    // The warning banner should appear in addition to the static header message
+  it("shows the deprecated search message returned by the search boundary", () => {
+    mockSearchResults(deprecatedOutcome);
+
+    render(<SearchDiscoveryScreen query="naruto" type="anime" initialData={deprecatedOutcome} />);
     const deprecatedMessages = screen.getAllByText(/Anime and manga categories are deprecated/);
     expect(deprecatedMessages.length).toBeGreaterThanOrEqual(2);
+    expect(toasterCreateMock).not.toHaveBeenCalled();
   });
 
   it("toasts the provider-unavailable message returned by the search boundary", () => {
-    vi.mocked(useSearchResults).mockReturnValue({
-      allResults: [],
-      rejectionMessage:
-        "Search is temporarily unavailable for this media type. Please try again later.",
-      fetchNextPage: vi.fn(),
-      hasNextPage: false,
-      isFetchingNextPage: false,
-    });
+    const providerUnavailableOutcome: MediaSearchOutcome = {
+      status: "provider_unavailable",
+      page: 1,
+      message: "Search is temporarily unavailable for this media type. Please try again later.",
+    };
+    mockSearchResults(providerUnavailableOutcome);
 
     render(
-      <SearchDiscoveryScreen
-        query="Dune"
-        type="book"
-        initialData={{ results: [], page: 1, total_pages: 1, total_results: 0, rejected: true }}
-      />,
+      <SearchDiscoveryScreen query="Dune" type="book" initialData={providerUnavailableOutcome} />,
     );
 
     expect(toasterCreateMock).toHaveBeenCalledWith({
