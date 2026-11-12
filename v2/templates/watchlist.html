@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>{{name}} · Janus</title>
     <link rel="stylesheet" href="/v2/static/app.css" />
+    <script defer src="/v2/static/vendor/Sortable.min.js"></script>
+    <script defer src="/v2/static/app.js"></script>
   </head>
   <body>
     <main class="watchlist">
@@ -27,7 +29,8 @@
           <option value="false" {% if !unwatched %}selected{% endif %}>Show all</option></select
         ><button>Apply filters</button>
       </form>
-      <div class="timeline">
+      <p id="reorder-status" role="status" aria-live="polite"></p>
+      <div class="timeline" data-reorder-url="/v2/watchlists/{{id}}/reorder" data-mode="{{mode}}">
         {% for run in runs %}{% if run.heading %}
         <h2>{{run.year}}</h2>
         {% endif %}{% if run.hidden %}
@@ -35,7 +38,13 @@
           <summary>{{run.rows.len()}} watched items</summary>
           {% endif %} {% for row in run.rows %}
           <article data-item-id="{{row.id}}">
-            {% if !row.poster.is_empty() %}<img
+            {% if mode == "custom" %}<button
+              type="button"
+              class="reorder-handle"
+              aria-label="Move {{row.title}}. Use Alt and arrow keys to reorder"
+            >
+              ↕</button
+            >{% endif %} {% if !row.poster.is_empty() %}<img
               class="poster {{row.media}}"
               src="{{row.poster}}"
               alt=""

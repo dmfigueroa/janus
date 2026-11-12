@@ -19,6 +19,7 @@ fn default_unwatched() -> bool {
 #[derive(Template)]
 #[template(path = "watchlist.html")]
 struct Page {
+    id: i64,
     name: String,
     description: String,
     mode: String,
@@ -111,6 +112,7 @@ pub async fn detail(
         })
         .collect();
     Page {
+        id,
         name: list.name.clone(),
         description: list.description.clone().unwrap_or_default(),
         mode: list.item_order_mode.as_str().into(),
@@ -204,4 +206,50 @@ pub async fn list(
     .render()
     .map(Html)
     .map_err(failure)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReorderRequest {
+    moved_item_id: i64,
+    reference_item_id: i64,
+    position: String,
+}
+pub async fn reorder(
+    State(lists): State<Watchlists>,
+    Path(id): Path<i64>,
+    axum::Json(request): axum::Json<ReorderRequest>,
+) -> axum::Json<serde_json::Value> {
+    use super::reorder::{Reorder, ReorderFailure, ReorderOutcome, ReorderPosition};
+    use serde_json::json;
+    if request.moved_item_id == request.reference_item_id {
+        let failure = ReorderFailure::InvalidReorder;
+        return axum::Json(
+            json!({"success":false,"code":failure.code(),"message":failure.message()}),
+        );
+    }
+    let position = match request.position.as_str() {
+        "before" => ReorderPosition::Before,
+        "after" => ReorderPosition::After,
+        _ => {
+            return axum::Json(
+                json!({"success":false,"code":"validation_error","message":"Invalid position"}),
+            );
+        }
+    };
+    let input = Reorder {
+        moved_item_id: request.moved_item_id,
+        reference_item_id: request.reference_item_id,
+        position,
+    };
+    axum::Json(match lists.reorder(id, input).await {
+        Ok(ReorderOutcome::Reordered) => json!({"success":true}),
+        Ok(ReorderOutcome::Rejected(failure)) => {
+            json!({"success":false,"code":failure.code(),"message":failure.message()})
+        }
+        Err(error) => {
+            eprintln!("Reorder failed for watchlist {id}: {error}");
+            json!({"success":false,"code":"internal_error","message":"Unable to reorder watchlist items."})
+        }
+    })
 }
