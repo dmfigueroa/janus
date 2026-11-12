@@ -11,7 +11,7 @@ vi.mock("@/db/Db.server", () => ({ getDb: () => dbState.db }));
 
 let testDb: Awaited<ReturnType<typeof createIsolatedTestDb>>;
 let db: IsolatedTestDb;
-let deleteWatchlistMutation: typeof import("@/features/watchlists/delete/Mutation.server").deleteWatchlistMutation;
+let deleteWatchlistMutation: typeof import("@/features/watchlists/delete/DeleteWatchlist.server").deleteWatchlistMutation;
 let readWatchlistDetail: typeof import("@/features/watchlists/Read.server").WatchlistsRead.detailScreen;
 let listWatchlists: typeof import("@/features/watchlists/Read.server").WatchlistsRead.listScreen;
 
@@ -20,7 +20,7 @@ beforeAll(async () => {
   db = testDb.db;
   dbState.db = db;
   const [deleteModule, readModule] = await Promise.all([
-    import("@/features/watchlists/delete/Mutation.server"),
+    import("@/features/watchlists/delete/DeleteWatchlist.server"),
     import("@/features/watchlists/Read.server"),
   ]);
   deleteWatchlistMutation = deleteModule.deleteWatchlistMutation;

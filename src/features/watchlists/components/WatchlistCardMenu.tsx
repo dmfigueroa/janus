@@ -1,87 +1,50 @@
 import { IconButton, Menu, Portal } from "@chakra-ui/react";
 import { EllipsisVertical, Trash2 } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toaster } from "@/app/Toaster";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query";
-import { deleteWatchlist } from "@/features/watchlists/delete/Mutation";
-import { skipWatchlist } from "@/features/watchlists/skip/Mutation";
-import { pauseWatchlist, resumeWatchlist } from "@/features/watchlists/pause/PauseWatchlist";
 import { DeleteWatchlistDialog } from "@/features/watchlists/components/DeleteWatchlistDialog";
+import {
+  useDeleteWatchlist,
+  useSkipWatchlist,
+  useToggleWatchlistPause,
+} from "@/features/watchlists/lifecycle/useWatchlistLifecycleActions";
 
 type WatchlistCardMenuProps = {
   watchlist: WatchlistSummary;
 };
 
 export function WatchlistCardMenu({ watchlist }: WatchlistCardMenuProps) {
-  const router = useRouter();
-  const queryClient = useQueryClient();
-  const [deleting, setDeleting] = useState(false);
-  const [skipping, setSkipping] = useState(false);
-  const [pausePending, setPausePending] = useState(false);
   const [isDeleteOpen, setDeleteOpen] = useState(false);
-  const deleteWatchlistFn = useServerFn(deleteWatchlist);
-  const skipWatchlistFn = useServerFn(skipWatchlist);
-  const pauseWatchlistFn = useServerFn(pauseWatchlist);
-  const resumeWatchlistFn = useServerFn(resumeWatchlist);
+  const togglePause = useToggleWatchlistPause(watchlist);
+  const skip = useSkipWatchlist(watchlist.id);
+  const remove = useDeleteWatchlist(watchlist.id);
 
   const handleDelete = async () => {
-    setDeleting(true);
     try {
-      const result = await deleteWatchlistFn({ data: { id: watchlist.id } });
-      ensureSuccessfulResult(result);
-    } catch (error) {
-      console.error("Failed to delete", error);
-      toaster.create({ type: "error", title: "Failed to delete watchlist. Please try again." });
+      await remove.mutateAsync();
+    } catch {
       return;
-    } finally {
-      setDeleting(false);
     }
     setDeleteOpen(false);
     toaster.create({ type: "success", title: "Watchlist deleted" });
-    await queryClient.invalidateQueries({ queryKey: ["watchlists"] });
-    await router.invalidate?.();
   };
 
   const handleSkip = async () => {
-    setSkipping(true);
     try {
-      const result = await skipWatchlistFn({ data: { watchlistId: watchlist.id } });
-      ensureSuccessfulResult(result);
-      await router.invalidate?.();
-    } catch (error) {
-      console.error("Failed to skip watchlist", error);
-      toaster.create({ type: "error", title: "Failed to skip watchlist. Please try again." });
-    } finally {
-      setSkipping(false);
+      await skip.mutateAsync();
+    } catch {
+      return;
     }
-  };
-
-  const requestPauseToggle = () => {
-    if (watchlist.pausedAt) {
-      return resumeWatchlistFn({ data: { watchlistId: watchlist.id } });
-    }
-    return pauseWatchlistFn({ data: { watchlistId: watchlist.id } });
   };
 
   const handleTogglePause = async () => {
-    setPausePending(true);
     try {
-      const result = await requestPauseToggle();
-      ensureSuccessfulResult(result);
-      showPauseFeedback(Boolean(watchlist.pausedAt));
-      await router.invalidate?.();
-    } catch (error) {
-      console.error("Failed to change watchlist pause state", error);
-      toaster.create({
-        type: "error",
-        title: "Failed to change the pause state. Please try again.",
-      });
-    } finally {
-      setPausePending(false);
+      await togglePause.mutateAsync();
+    } catch {
+      return;
     }
+    showPauseFeedback(Boolean(watchlist.pausedAt));
   };
 
   return (
@@ -90,8 +53,8 @@ export function WatchlistCardMenu({ watchlist }: WatchlistCardMenuProps) {
         watchlistName={watchlist.name}
         hasNextUnwatched={Boolean(watchlist.stats.nextUnwatched)}
         isPaused={watchlist.pausedAt !== null}
-        skipping={skipping}
-        pausePending={pausePending}
+        skipping={skip.isPending}
+        pausePending={togglePause.isPending}
         onSkip={() => void handleSkip()}
         onTogglePause={() => void handleTogglePause()}
         onDelete={() => setDeleteOpen(true)}
@@ -100,7 +63,7 @@ export function WatchlistCardMenu({ watchlist }: WatchlistCardMenuProps) {
         watchlist={watchlist}
         open={isDeleteOpen}
         onOpenChange={setDeleteOpen}
-        deleting={deleting}
+        deleting={remove.isPending}
         handleDelete={() => void handleDelete()}
       />
     </>
@@ -196,10 +159,6 @@ function WatchlistActionMenu({
       </Portal>
     </Menu.Root>
   );
-}
-
-function ensureSuccessfulResult(result: { success: boolean }) {
-  if (!result.success) throw new Error("The watchlist action failed");
 }
 
 function showPauseFeedback(wasPaused: boolean) {

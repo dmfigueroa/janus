@@ -6,7 +6,7 @@ import { createWatchlistMutation } from "@/features/watchlists/create/Mutation.s
 import { createWatchlistSchema } from "@/features/watchlists/create/Mutation";
 import { updateWatchlistMutation } from "@/features/watchlists/update/Mutation.server";
 import { updateWatchlistSchema } from "@/features/watchlists/update/Mutation";
-import { deleteWatchlistMutation } from "@/features/watchlists/delete/Mutation.server";
+import { deleteWatchlistMutation } from "@/features/watchlists/delete/DeleteWatchlist.server";
 import { skipWatchlistMutation } from "@/features/watchlists/lifecycle/WatchlistLifecycle.server";
 import { asMcpContent } from "./McpToolResponse.server";
 import { batchResultSchema, validationErrorResult } from "./BatchResult.server";
