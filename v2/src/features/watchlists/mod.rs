@@ -117,7 +117,7 @@ pub mod web;
 
 pub mod mcp;
 
-mod discovery;
+pub mod discovery;
 
 mod contracts;
 

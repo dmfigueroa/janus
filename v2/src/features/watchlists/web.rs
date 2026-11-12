@@ -169,22 +169,30 @@ pub async fn list(
     State(lists): State<Watchlists>,
     Query(filters): Query<ListFilters>,
 ) -> Result<Html<String>, Failure> {
-    let mut arguments = serde_json::json!({"pageSize":50});
-    let name = if filters.query.trim().is_empty() {
-        "list_watchlists"
+    use super::discovery::{DiscoveryError, DiscoveryOperation, DiscoveryRequest};
+    let query = filters.query.trim();
+    let operation = if query.is_empty() {
+        DiscoveryOperation::List
     } else {
-        arguments["query"] = serde_json::json!(filters.query.trim());
-        "search_watchlists"
+        DiscoveryOperation::Search
     };
-    if let Some(cursor) = filters.cursor {
-        arguments["cursor"] = serde_json::json!(cursor);
-    }
-    let data = lists.discover(name, arguments).await.map_err(|_| {
-        (
-            StatusCode::BAD_REQUEST,
-            "Unable to load this page. Return to /v2/watchlists and try again.",
+    let data = lists
+        .discovery(
+            operation,
+            DiscoveryRequest {
+                query: (!query.is_empty()).then(|| query.to_owned()),
+                cursor: filters.cursor,
+                ..Default::default()
+            },
         )
-    })?;
+        .await
+        .map_err(|error| match error {
+            DiscoveryError::InvalidInput(_) => (
+                StatusCode::BAD_REQUEST,
+                "Unable to load this page. Return to /v2/watchlists and try again.",
+            ),
+            DiscoveryError::Database(error) => failure(error),
+        })?;
     ListPage {
         lists: data["watchlists"]
             .as_array()

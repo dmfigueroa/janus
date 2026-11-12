@@ -174,3 +174,8 @@ async fn legacy_json_response(response: axum::response::Response) -> axum::respo
     }
     axum::response::Response::from_parts(parts, axum::body::Body::from(message.to_string()))
 }
+
+pub use features::watchlists::{
+    Watchlists,
+    discovery::{DiscoveryError, DiscoveryOperation, DiscoveryRequest},
+};
