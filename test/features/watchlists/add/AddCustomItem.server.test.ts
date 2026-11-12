@@ -222,6 +222,32 @@ describe("custom item addition", () => {
     });
   });
 
+  it("rejects an anchored insertion on a release-ordered watchlist", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Release Ordered Custom" });
+    const existing = await createTestWatchlistItem(db, {
+      watchlistId: watchlist.id,
+      tmdbId: "release-anchor",
+      source: "custom",
+      title: "Existing",
+    });
+
+    const result = await addCustomItemToWatchlist({
+      watchlistId: watchlist.id,
+      title: "Anchored Pick",
+      mediaType: "movie",
+      year: "2025",
+      insertionPosition: "before",
+      referenceItemId: existing.id,
+    });
+
+    expect(result).toEqual({
+      success: false,
+      code: "not_custom_mode",
+      message: "Anchored insertion is only available in custom mode.",
+      affectedCount: 0,
+    });
+  });
+
   it("rejects custom TV items with the structured message", async () => {
     const watchlist = await createTestWatchlist(db, { name: "Custom TV" });
     const result = await addCustomItemToWatchlist({

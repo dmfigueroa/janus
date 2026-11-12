@@ -2,7 +2,7 @@ import { providerAdditionFailure } from "./ProviderAdditionFailure.server";
 import { watchlistItems } from "@/db/Schema";
 import { getComicIssue } from "@/integrations/comicvine/ComicvineIssueDetail.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
-import { persistAddedItems } from "./Insert.server";
+import { persistAddedItems } from "./InsertWatchlistItems.server";
 import { rejectAdd, addedItemsResult, type WatchlistWriteResult } from "./AdditionOutcome";
 
 const COMICVINE_UNAVAILABLE_MESSAGE =

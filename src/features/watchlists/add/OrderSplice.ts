@@ -1,10 +1,10 @@
-import { compareReleaseDates, type InsertionPosition } from "@/features/watchlists/Order";
+import type { InsertionPosition } from "@/features/watchlists/Order";
 
 type HasReleaseDate = { releaseDate?: string | null };
-type ExistingItem = HasReleaseDate & { id: number; customRank: number | null };
-type PendingItem = HasReleaseDate & { pendingIndex: number };
+type ExistingOrderItem = HasReleaseDate & { id: number; customRank: number | null };
+type PendingOrderItem = HasReleaseDate & { pendingIndex: number };
 
-export type OrderedWatchlistItem = ExistingItem | PendingItem;
+export type OrderedWatchlistItem = ExistingOrderItem | PendingOrderItem;
 
 export type AnchoredOrderFailure = {
   success: false;
@@ -13,7 +13,7 @@ export type AnchoredOrderFailure = {
 };
 
 export type PendingInsertion = {
-  pendingItem: PendingItem;
+  pendingItem: PendingOrderItem;
   insertionPosition: InsertionPosition;
   referenceItemId?: number;
 };
@@ -22,7 +22,7 @@ export function buildFinalOrder({
   existingItems,
   pendingInsertions,
 }: {
-  existingItems: readonly ExistingItem[];
+  existingItems: readonly ExistingOrderItem[];
   pendingInsertions: readonly PendingInsertion[];
 }): OrderedWatchlistItem[] | AnchoredOrderFailure {
   const nextOrder: OrderedWatchlistItem[] = [...existingItems];
@@ -82,11 +82,11 @@ function computeSpliceIndex(
 }
 
 function getAnchorKey(insertion: PendingInsertion): string | null {
-  const position = insertion.insertionPosition;
-  if (!isAnchorPosition(position) || insertion.referenceItemId === undefined) {
-    return null;
+  const { insertionPosition, referenceItemId } = insertion;
+  if (isAnchorPosition(insertionPosition) && referenceItemId !== undefined) {
+    return `${insertionPosition}:${referenceItemId}`;
   }
-  return `${position}:${insertion.referenceItemId}`;
+  return null;
 }
 
 function isAnchorPosition(position: InsertionPosition): position is "before" | "after" {
@@ -101,38 +101,27 @@ function anchoredSpliceIndex(
 ): number | AnchoredOrderFailure {
   const { referenceItemId } = insertion;
   if (referenceItemId === undefined) {
-    return missingReferenceFailure();
+    return { success: false, code: "invalid_reference", referenceItemId: NaN };
   }
   if (lastInsertedIndex !== undefined) {
     return lastInsertedIndex + 1;
   }
-  const referenceIndex = findRankedReference(currentOrder, referenceItemId);
-  return spliceIndexForReference(referenceIndex, direction, referenceItemId);
+  return referenceSpliceIndex(currentOrder, referenceItemId, direction);
 }
 
-function spliceIndexForReference(
-  referenceIndex: number,
-  direction: "before" | "after",
+function referenceSpliceIndex(
+  currentOrder: OrderedWatchlistItem[],
   referenceItemId: number,
+  direction: "before" | "after",
 ): number | AnchoredOrderFailure {
+  const referenceIndex = currentOrder.findIndex(
+    (item): item is ExistingOrderItem =>
+      "id" in item && item.id === referenceItemId && item.customRank !== null,
+  );
   if (referenceIndex === -1) {
     return { success: false, code: "invalid_reference", referenceItemId };
   }
-  return direction === "before" ? referenceIndex : referenceIndex + 1;
-}
-
-function findRankedReference(
-  currentOrder: OrderedWatchlistItem[],
-  referenceItemId: number,
-): number {
-  return currentOrder.findIndex(
-    (item): item is ExistingItem =>
-      "id" in item && item.id === referenceItemId && item.customRank !== null,
-  );
-}
-
-function missingReferenceFailure(): AnchoredOrderFailure {
-  return { success: false, code: "invalid_reference", referenceItemId: NaN };
+  return referenceIndex + Number(direction === "after");
 }
 
 function legacySpliceIndex(
@@ -140,26 +129,4 @@ function legacySpliceIndex(
   insertion: PendingInsertion,
 ): number {
   return insertion.insertionPosition === "beginning" ? 0 : currentOrder.length;
-}
-
-export function orderPendingItemsByReleaseDate<T extends HasReleaseDate>(
-  items: T[],
-): Array<T & { pendingIndex: number }> {
-  return items
-    .map((item, pendingIndex) => ({
-      ...item,
-      pendingIndex,
-    }))
-    .sort((left, right) =>
-      compareReleaseDates(
-        {
-          id: left.pendingIndex,
-          releaseDate: left.releaseDate ?? null,
-        },
-        {
-          id: right.pendingIndex,
-          releaseDate: right.releaseDate ?? null,
-        },
-      ),
-    );
 }

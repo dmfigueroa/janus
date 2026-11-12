@@ -1,6 +1,6 @@
 import type { TMDBEpisode } from "@/server/providers/TmdbApi.server";
 import { providerAdditionFailure } from "./ProviderAdditionFailure.server";
-import { persistAddedItems } from "./Insert.server";
+import { persistAddedItems } from "./InsertWatchlistItems.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
 import { fetchShowEpisodes, filterNewEpisodes, mapToWatchlistEpisodes } from "./AddTv.server";
 import { addedItemsResult, rejectAdd, type WatchlistWriteResult } from "./AdditionOutcome";
