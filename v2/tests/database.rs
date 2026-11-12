@@ -706,6 +706,23 @@ async fn mcp_reorders_are_independent_and_visible_after_reopen() {
             .collect::<Vec<_>>(),
         vec![101, 103, 102]
     );
+    change_v1(&fixture, "reject-rank");
+    let failed = result(rpc(&app,json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"reorder_watchlist_items","arguments":{"reorders":[{"watchlistId":41,"movedItemId":101,"referenceItemId":102,"position":"after"},{}]}}}),Some(&session)).await).await;
+    assert_eq!(
+        failed["structuredContent"]["results"][0]["code"],
+        "internal_error"
+    );
+    assert_eq!(
+        failed["structuredContent"]["results"][0]["message"],
+        "Unable to reorder watchlist items."
+    );
+    assert_eq!(
+        failed["structuredContent"]["results"][1]["code"],
+        "validation_error"
+    );
+    let malformed = rpc(&app,json!({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"reorder_watchlist_items","arguments":{"reorders":[{"watchlistId":41,"movedItemId":101,"referenceItemId":102,"position":"sideways"}]}}}),Some(&session)).await;
+    let malformed: Value = serde_json::from_str(&body(malformed).await).unwrap();
+    assert_eq!(malformed["error"]["code"], -32602);
 }
 
 #[tokio::test]
@@ -783,4 +800,47 @@ async fn reorder_writer_contention_is_bounded_and_release_mode_rejects() {
     let result: Value =
         serde_json::from_str(&body(app.oneshot(request()).await.unwrap()).await).unwrap();
     assert_eq!(result["code"], "not_custom_mode");
+}
+
+#[tokio::test]
+async fn web_reorder_preserves_validation_and_domain_failure_contracts() {
+    let fixture = Fixture::v1();
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let lists = janus_v2::Watchlists(database.clone());
+    let before = lists.detail(41).await.unwrap().unwrap();
+    let app = janus_v2::database_router(database);
+    for (moved, reference, position, code, message) in [
+        (102, 103, "sideways", "validation_error", "Invalid position"),
+        (
+            102,
+            102,
+            "sideways",
+            "invalid_reorder",
+            "Moved item and reference item must differ",
+        ),
+        (
+            102,
+            102,
+            "after",
+            "invalid_reorder",
+            "Moved item and reference item must differ",
+        ),
+        (
+            999,
+            103,
+            "before",
+            "invalid_item",
+            "Moved item does not belong to this watchlist",
+        ),
+    ] {
+        let response = app.clone().oneshot(Request::builder().method("POST")
+            .uri("/v2/watchlists/41/reorder").header("content-type", "application/json")
+            .body(Body::from(json!({"movedItemId":moved,"referenceItemId":reference,"position":position}).to_string())).unwrap()).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            serde_json::from_str::<Value>(&body(response).await).unwrap(),
+            json!({"success":false,"code":code,"message":message})
+        );
+    }
+    assert_eq!(lists.detail(41).await.unwrap().unwrap(), before);
 }

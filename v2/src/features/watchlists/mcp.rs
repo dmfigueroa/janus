@@ -6,6 +6,13 @@ use rmcp::{ErrorData, RoleServer, ServerHandler, model::*, service::RequestConte
 use serde_json::{Value, json};
 #[derive(Clone)]
 pub struct ReadMcp(pub Watchlists);
+fn object_schema(properties: Value, required: Value) -> serde_json::Map<String, Value> {
+    serde_json::Map::from_iter([
+        ("type".into(), json!("object")),
+        ("properties".into(), properties),
+        ("required".into(), required),
+    ])
+}
 fn definitions() -> Vec<Tool> {
     let media =
         json!({"type":"string","enum":["movie","episode","game","book","comic","anime","manga"]});
@@ -42,29 +49,27 @@ fn definitions() -> Vec<Tool> {
     ]
     .into_iter()
     .map(|(name, title, properties, required)| {
-        let mut tool = Tool::new(
-            name,
-            title,
-            json!({"type":"object","properties":properties,"required":required})
-                .as_object()
-                .unwrap()
-                .clone(),
-        );
+        let mut tool = Tool::new(name, title, object_schema(properties, json!(required)));
         tool.title = Some(title.into());
-        tool.output_schema = Some(std::sync::Arc::new(
-            super::contracts::output_schema(name)
-                .as_object()
-                .unwrap()
-                .clone(),
-        ));
+        tool.output_schema = Some(std::sync::Arc::new(super::contracts::output_schema(name)));
         tool.annotations = Some(ToolAnnotations::new().read_only(true).destructive(false));
         tool
     })
     .collect();
-    let mut reorder = Tool::new("reorder_watchlist_items", "Reorder watchlist items", json!({"type":"object","properties":{"reorders":{"type":"array","minItems":1,"items":{"type":"object","properties":{"watchlistId":{"type":"integer"},"movedItemId":{"type":"integer"},"referenceItemId":{"type":"integer"},"position":{"type":"string","enum":["before","after"]}}}}},"required":["reorders"]}).as_object().unwrap().clone());
+    let mut reorder = Tool::new(
+        "reorder_watchlist_items",
+        "Reorder watchlist items",
+        object_schema(
+            json!({"reorders":{"type":"array","minItems":1,"items":{"type":"object","properties":{"watchlistId":{"type":"integer"},"movedItemId":{"type":"integer"},"referenceItemId":{"type":"integer"},"position":{"type":"string","enum":["before","after"]}}}}}),
+            json!(["reorders"]),
+        ),
+    );
     reorder.title = Some("Reorder watchlist items".into());
     reorder.description = Some("Reorder one or more watchlist items within a custom-ordered watchlist, moving each item before or after a reference item. Each reorder targets an explicit watchlist, moved item ID, reference item ID, and before-or-after position, is processed independently, and returns an ordered result. Only custom-ordered watchlists accept reorders. This changes the order of items and is consequential, so confirm before applying.".into());
-    reorder.output_schema = Some(std::sync::Arc::new(json!({"type":"object","properties":{"results":{"type":"array","items":{"type":"object","properties":{"index":{"type":"integer","minimum":0},"success":{"type":"boolean"},"code":{"type":"string"},"message":{"type":"string"},"watchlistId":{"type":"number"},"movedItemId":{"type":"number"},"referenceItemId":{"type":"number"}},"required":["index","success","code","message"]}}},"required":["results"]}).as_object().unwrap().clone()));
+    reorder.output_schema = Some(std::sync::Arc::new(object_schema(
+        json!({"results":{"type":"array","items":{"type":"object","properties":{"index":{"type":"integer","minimum":0},"success":{"type":"boolean"},"code":{"type":"string"},"message":{"type":"string"},"watchlistId":{"type":"number"},"movedItemId":{"type":"number"},"referenceItemId":{"type":"number"}},"required":["index","success","code","message"]}}}),
+        json!(["results"]),
+    )));
     reorder.annotations = Some(
         ToolAnnotations::new()
             .read_only(false)
@@ -130,14 +135,28 @@ impl ServerHandler for ReadMcp {
             }
             let mut results = Vec::new();
             for (index, entry) in entries.iter().enumerate() {
-                let mut result = match (entry.get("watchlistId").and_then(Value::as_i64), serde_json::from_value::<super::reorder::Reorder>(entry.clone())) {
-                    (Some(id), Ok(input)) => self.0.reorder(id, input).await.unwrap_or_else(|_| json!({"success":false,"code":"internal_error","message":"Unable to reorder watchlist items."})),
-                    _ => json!({"success":false,"code":"validation_error","message":"watchlistId, movedItemId, referenceItemId, and position are required."}),
+                let mut result = match (
+                    entry.get("watchlistId").and_then(Value::as_i64),
+                    serde_json::from_value::<super::reorder::Reorder>(entry.clone()),
+                ) {
+                    (Some(id), Ok(input)) => match self.0.reorder(id, input).await {
+                        Ok(super::reorder::ReorderOutcome::Reordered) => {
+                            json!({"success":true,"code":"reordered","message":"Watchlist items reordered."})
+                        }
+                        Ok(super::reorder::ReorderOutcome::Rejected(failure)) => {
+                            json!({"success":false,"code":failure.code(),"message":failure.message()})
+                        }
+                        Err(error) => {
+                            eprintln!(
+                                "MCP reorder failed for watchlist {id}, batch entry {index}: {error}"
+                            );
+                            json!({"success":false,"code":"internal_error","message":"Unable to reorder watchlist items."})
+                        }
+                    },
+                    _ => {
+                        json!({"success":false,"code":"validation_error","message":"watchlistId, movedItemId, referenceItemId, and position are required."})
+                    }
                 };
-                if result["success"] == true {
-                    result["code"] = json!("reordered");
-                    result["message"] = json!("Watchlist items reordered.");
-                }
                 result["index"] = json!(index);
                 for key in ["watchlistId", "movedItemId", "referenceItemId"] {
                     if let Some(value) = entry.get(key) {
