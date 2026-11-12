@@ -14,6 +14,11 @@ if (process.argv[3] === "mutate") {
   database.close();
   process.exit(0);
 }
+if (process.argv[3] === "watch-all") {
+  database.prepare("UPDATE watchlist_items SET is_watched = 1 WHERE watchlist_id = 41").run();
+  database.close();
+  process.exit(0);
+}
 if (process.argv[3] === "incompatible") {
   database.exec("ALTER TABLE watchlists ADD COLUMN unexpected TEXT");
   database.close();
@@ -35,7 +40,7 @@ database
   .run();
 database.prepare("INSERT INTO watchlists(id,name) VALUES(42, 'ΟΣ')").run();
 const insert = database.prepare(
-  "INSERT INTO watchlist_items(id,watchlist_id,tmdb_id,source,media_type,title,parent_id,parent_title,episode,custom_rank,is_watched,authors,release_date) VALUES(?,41,?,?,?,?,?,?,?,?,?,?,?)",
+  "INSERT INTO watchlist_items(id,watchlist_id,tmdb_id,source,media_type,title,parent_id,parent_title,episode,custom_rank,is_watched,authors,release_date,poster_path) VALUES(?,41,?,?,?,?,?,?,?,?,?,?,?,?)",
 );
 insert.run(
   101,
@@ -50,6 +55,7 @@ insert.run(
   null,
   JSON.stringify(["Écrivain", "著者"]),
   "2020-01-02",
+  null,
 );
 insert.run(
   102,
@@ -64,6 +70,21 @@ insert.run(
   1,
   null,
   "2020-02-02",
+  "/poster.jpg",
 );
-insert.run(103, "book-1", "google_books", "book", "Last", null, null, null, null, 0, "[]", null);
+insert.run(
+  103,
+  "book-1",
+  "google_books",
+  "book",
+  "Last",
+  null,
+  null,
+  null,
+  null,
+  0,
+  "[]",
+  null,
+  "https://images.example/poster.jpg",
+);
 database.close();
