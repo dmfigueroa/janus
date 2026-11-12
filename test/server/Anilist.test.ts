@@ -6,15 +6,23 @@ import {
 
 vi.stubGlobal("fetch", vi.fn());
 
+function jsonResponse(body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 describe("anilist integration", () => {
   beforeEach(() => {
     vi.resetAllMocks();
   });
 
   it("should search for anime correctly", async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    let sentBody: unknown;
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      sentBody = input instanceof Request ? await input.clone().json() : undefined;
+      return jsonResponse({
         data: {
           Page: {
             pageInfo: { total: 1 },
@@ -32,26 +40,45 @@ describe("anilist integration", () => {
             ],
           },
         },
-      }),
-    } as Response);
+      });
+    });
 
     const result = await searchAnilistInternal("Cowboy Bebop", "ANIME", 1);
 
     expect(result.results[0].title).toBe("Cowboy Bebop");
     expect(result.results[0].mediaType).toBe("anime");
-    expect(fetch).toHaveBeenCalledWith(
-      "https://graphql.anilist.co",
-      expect.objectContaining({
-        method: "POST",
-        body: expect.stringContaining('"search":"Cowboy Bebop"'),
-      }),
-    );
+
+    const request = vi.mocked(fetch).mock.calls[0]?.[0] as Request;
+    expect(request.url).toBe("https://graphql.anilist.co/");
+    expect(request.method).toBe("POST");
+    expect(sentBody).toMatchObject({
+      variables: { search: "Cowboy Bebop" },
+    });
+  });
+
+  it("retries the read-only GraphQL POST explicitly", async () => {
+    vi.mocked(fetch)
+      .mockRejectedValueOnce(new TypeError("fetch failed"))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: {
+            Page: { pageInfo: { total: 0 }, media: [] },
+          },
+        }),
+      );
+
+    const result = await searchAnilistInternal("anything", "ANIME", 1);
+
+    expect(result).toEqual({ results: [], totalResults: 0 });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const secondRequest = vi.mocked(fetch).mock.calls[1]?.[0];
+    expect(secondRequest).toBeInstanceOf(Request);
+    expect((secondRequest as Request).method).toBe("POST");
   });
 
   it("should get anime details correctly", async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({
         data: {
           Media: {
             id: 1,
@@ -66,7 +93,7 @@ describe("anilist integration", () => {
           },
         },
       }),
-    } as Response);
+    );
 
     const result = await getAnilistDetailsInternal("1");
 

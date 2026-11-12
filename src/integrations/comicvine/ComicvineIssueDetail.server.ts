@@ -34,7 +34,11 @@ export type ComicIssueDetail = ComicIssue & {
   parent: { id: string; title: string | null };
 };
 
-export async function getComicIssue(issueId: string, apiKey: string): Promise<ComicIssueDetail> {
+export async function getComicIssue(
+  issueId: string,
+  apiKey: string,
+  signal?: AbortSignal,
+): Promise<ComicIssueDetail> {
   const url = new URL(`https://comicvine.gamespot.com/api/issue/4000-${issueId}/`);
   url.search = new URLSearchParams({
     api_key: apiKey,
@@ -42,6 +46,7 @@ export async function getComicIssue(issueId: string, apiKey: string): Promise<Co
   }).toString();
   const rawData = await requestProviderJson(url.toString(), {
     headers: { "User-Agent": "JanusApp/1.0" },
+    signal,
   });
   const data = parseProviderData(ComicVineIssueDetailResponseSchema, rawData);
   if (data.error !== "OK") throw new ProviderRequestError();

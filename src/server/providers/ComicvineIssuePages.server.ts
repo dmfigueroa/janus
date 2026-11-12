@@ -29,16 +29,10 @@ const ComicIssueResponseSchema = z.object({
 const COMICVINE_ISSUES_URL = "https://comicvine.gamespot.com/api/issues/";
 const COMICVINE_ISSUE_FIELDS = "id,name,issue_number,image,cover_date,description,deck";
 export const COMICVINE_ISSUE_PAGE_LIMIT = 100;
-const COMICVINE_RETRIES = 2;
-const COMICVINE_RETRY_BASE_DELAY_MS = 250;
 
 type ComicIssueSortDirection = "asc" | "desc";
 export type ComicIssueItem = z.infer<typeof ComicIssueItemSchema>;
 type ComicIssueResponse = z.infer<typeof ComicIssueResponseSchema>;
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function buildIssuePageUrl(
   volumeId: string,
@@ -60,68 +54,20 @@ function buildIssuePageUrl(
   return url;
 }
 
-async function fetchIssuePage(
+export async function fetchIssuePage(
   volumeId: string,
   apiKey: string,
   offset: number,
   direction: ComicIssueSortDirection,
+  signal?: AbortSignal,
 ): Promise<ComicIssueResponse> {
   const url = buildIssuePageUrl(volumeId, apiKey, offset, direction);
-  const rawData = await requestProviderJson(url, { headers: { "User-Agent": "JanusApp/1.0" } });
+  const rawData = await requestProviderJson(url, {
+    headers: { "User-Agent": "JanusApp/1.0" },
+    signal,
+  });
   const data = parseProviderData(ComicIssueResponseSchema, rawData);
   if (data.error !== "OK") throw new ProviderRequestError();
 
   return data;
-}
-
-function canRetryIssueRequest(error: unknown, attempt: number, retries: number) {
-  return error instanceof ProviderRequestError && attempt < retries;
-}
-
-async function fetchIssuePageAttempt(
-  volumeId: string,
-  apiKey: string,
-  offset: number,
-  direction: ComicIssueSortDirection,
-  attempt: number,
-  retries: number,
-) {
-  try {
-    return await fetchIssuePage(volumeId, apiKey, offset, direction);
-  } catch (error) {
-    if (!canRetryIssueRequest(error, attempt, retries)) throw error;
-    await sleep(COMICVINE_RETRY_BASE_DELAY_MS * (attempt + 1));
-  }
-}
-
-async function fetchIssuePagesWithRetry(
-  volumeId: string,
-  apiKey: string,
-  offset: number,
-  direction: ComicIssueSortDirection,
-  retries: number,
-): Promise<ComicIssueResponse> {
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
-    const response = await fetchIssuePageAttempt(
-      volumeId,
-      apiKey,
-      offset,
-      direction,
-      attempt,
-      retries,
-    );
-    if (response) return response;
-  }
-
-  throw new Error("Failed to fetch issues page");
-}
-
-export async function fetchIssuePageWithRetry(
-  volumeId: string,
-  apiKey: string,
-  offset: number,
-  direction: ComicIssueSortDirection,
-  retries = COMICVINE_RETRIES,
-): Promise<ComicIssueResponse> {
-  return fetchIssuePagesWithRetry(volumeId, apiKey, offset, direction, retries);
 }

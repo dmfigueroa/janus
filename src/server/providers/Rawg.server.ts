@@ -1,4 +1,8 @@
-import { requestProviderJson, parseProviderData } from "@/integrations/ProviderRequest.server";
+import {
+  requestProviderJson,
+  parseProviderData,
+  rethrowProviderFailure,
+} from "@/integrations/ProviderRequest.server";
 import { z } from "zod";
 import { API_PAGE_SIZE } from "../Constants";
 import { type UnifiedMedia } from "../Media";
@@ -52,7 +56,12 @@ function formatGameSearch(data: z.infer<typeof RawgResponseSchema>) {
   };
 }
 
-async function searchGamesRequest(query: string, apiKey: string, page: number) {
+async function searchGamesRequest(
+  query: string,
+  apiKey: string,
+  page: number,
+  signal?: AbortSignal,
+) {
   const pageSize = API_PAGE_SIZE;
   const url = new URL("https://api.rawg.io/api/games");
   url.search = new URLSearchParams({
@@ -62,17 +71,14 @@ async function searchGamesRequest(query: string, apiKey: string, page: number) {
     page_size: pageSize.toString(),
   }).toString();
 
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`RAWG search request failed: ${res.status}`);
-
-  const rawData = await res.json();
-  const data = RawgResponseSchema.parse(rawData);
+  const rawData = await requestProviderJson(url.toString(), { signal });
+  const data = parseProviderData(RawgResponseSchema, rawData);
   return formatGameSearch(data);
 }
 
-async function getGameDetailsRequest(id: string, apiKey: string) {
+async function getGameDetailsRequest(id: string, apiKey: string, signal?: AbortSignal) {
   const url = `https://api.rawg.io/api/games/${id}?key=${apiKey}`;
-  const item = await requestProviderJson(url);
+  const item = await requestProviderJson(url, { signal });
   return mapGame(parseProviderData(RawgGameSchema, item));
 }
 
@@ -80,16 +86,16 @@ export async function searchGames(
   query: string,
   apiKey: string,
   page: number = 1,
+  signal?: AbortSignal,
 ): Promise<{ results: UnifiedMedia[]; totalResults: number }> {
   try {
-    return await searchGamesRequest(query, apiKey, page);
-  } catch (e) {
-    const errorMessage = getErrorMessage(e);
-    console.error("RAWG API Error:", errorMessage);
-    throw new Error(`RAWG API Error: ${errorMessage}`);
+    return await searchGamesRequest(query, apiKey, page, signal);
+  } catch (error) {
+    console.error("RAWG API Error:", getErrorMessage(error));
+    rethrowProviderFailure(error, "RAWG API Error");
   }
 }
 
-export async function getGameDetails(id: string, apiKey: string) {
-  return getGameDetailsRequest(id, apiKey);
+export async function getGameDetails(id: string, apiKey: string, signal?: AbortSignal) {
+  return getGameDetailsRequest(id, apiKey, signal);
 }

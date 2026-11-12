@@ -31,23 +31,24 @@ function makeIssues(start: number, end: number): MockIssue[] {
 }
 
 function okResponse(results: MockIssue[], total: number) {
-  return {
-    ok: true,
-    json: async () => ({
+  return new Response(
+    JSON.stringify({
       error: "OK",
       results,
       number_of_total_results: total,
     }),
-  } as Response;
+    { status: 200, headers: { "Content-Type": "application/json" } },
+  );
+}
+
+function getFetchedUrl(input: Request | string | URL) {
+  return input instanceof Request ? input.url : input.toString();
 }
 
 async function waitForCalls(mockedFn: ReturnType<typeof vi.fn>, expectedCalls: number) {
-  for (let i = 0; i < 20; i += 1) {
-    if (mockedFn.mock.calls.length >= expectedCalls) {
-      return;
-    }
-    await Promise.resolve();
-  }
+  await vi.waitFor(() => {
+    expect(mockedFn).toHaveBeenCalledTimes(expectedCalls);
+  });
 }
 
 describe("getComicIssues", () => {
@@ -59,7 +60,7 @@ describe("getComicIssues", () => {
     const pendingResolves = new Map<number, (value: Response) => void>();
 
     vi.mocked(fetch).mockImplementation((input) => {
-      const url = new URL(input.toString());
+      const url = new URL(getFetchedUrl(input));
       const offset = Number(url.searchParams.get("offset"));
       const sort = url.searchParams.get("sort");
 
@@ -94,9 +95,23 @@ describe("getComicIssues", () => {
     expect(issues[349].id).toBe("350");
   });
 
+  it("retries transient page transport failures only through the shared transport", async () => {
+    let attempts = 0;
+    vi.mocked(fetch).mockImplementation(() => {
+      attempts += 1;
+      if (attempts === 1) return Promise.reject(new TypeError("fetch failed"));
+      return Promise.resolve(okResponse([makeIssues(1, 1)[0]], 1));
+    });
+
+    const issues = await getComicIssues("123", "api-key");
+
+    expect(issues.map((issue) => issue.id)).toEqual(["1"]);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it("syncs every page for known issues so it includes older missing issues", async () => {
     vi.mocked(fetch).mockImplementation((input) => {
-      const url = new URL(input.toString());
+      const url = new URL(getFetchedUrl(input));
       const offset = Number(url.searchParams.get("offset"));
       const sort = url.searchParams.get("sort");
 
@@ -151,7 +166,7 @@ describe("getComicIssue", () => {
       parent: { id: "4050", title: "Canonical Volume" },
     });
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(new URL(vi.mocked(fetch).mock.calls[0]?.[0].toString()).pathname).toBe(
+    expect(new URL(getFetchedUrl(vi.mocked(fetch).mock.calls[0]?.[0])).pathname).toBe(
       "/api/issue/4000-9001/",
     );
   });

@@ -8,6 +8,10 @@ import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { asc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+function readFetchUrl(input: Request | string | URL) {
+  return input instanceof Request ? input.url : input.toString();
+}
+
 describe("Janus MCP endpoint", () => {
   let temporaryDirectory: string;
   let handleMcpRequest: (context: { request: Request }) => Promise<Response>;
@@ -540,7 +544,7 @@ describe("Janus MCP endpoint", () => {
       .values({ name: "MCP canonical providers" })
       .returning();
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      const url = input.toString();
+      const url = readFetchUrl(input);
       if (url.includes("rawg.io")) {
         return new Response(
           JSON.stringify({ id: 3498, name: "Canonical Game", released: "2013-09-17" }),
@@ -743,7 +747,7 @@ describe("Janus MCP endpoint", () => {
       .values({ name: "MCP selected issues", itemOrderMode: "custom" })
       .returning();
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      const issueId = input.toString().match(/issue\/4000-(\d+)/)?.[1];
+      const issueId = readFetchUrl(input).match(/issue\/4000-(\d+)/)?.[1];
       if (issueId === "9001") {
         await new Promise((resolve) => setTimeout(resolve, 20));
       }
@@ -829,7 +833,7 @@ describe("Janus MCP endpoint", () => {
       episode: "7",
     });
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      const url = input.toString();
+      const url = readFetchUrl(input);
       if (url.includes("/volume/")) {
         throw new Error("Volume endpoint should not be reached for a parented comic addition");
       }
@@ -884,7 +888,7 @@ describe("Janus MCP endpoint", () => {
       .values({ name: "MCP selected episode" })
       .returning();
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      const url = input.toString();
+      const url = readFetchUrl(input);
       if (url.includes("/season/1")) {
         return new Response(
           JSON.stringify({
@@ -1063,7 +1067,7 @@ describe("Janus MCP endpoint", () => {
       .values({ name: "MCP provider failure isolation" })
       .returning();
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      const url = input.toString();
+      const url = readFetchUrl(input);
       if (url.includes("/movie/554")) {
         return new Response(
           JSON.stringify({
@@ -1126,7 +1130,7 @@ describe("Janus MCP endpoint", () => {
       .returning();
     vi.stubEnv("TMDB_API_KEY", "test-key");
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      const id = String(input).split("/").at(-1);
+      const id = readFetchUrl(input).split("/").at(-1);
       return Response.json({
         title: id === "701" ? "Fail this addition" : "Keep this addition",
         poster_path: null,
@@ -1246,7 +1250,7 @@ describe("Janus MCP endpoint", () => {
         .returning();
       vi.stubEnv("TMDB_API_KEY", "test-key");
       const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-        const url = String(input);
+        const url = readFetchUrl(input);
         if (url.endsWith("/season/2")) return Response.json({ invalid: "missing episodes" });
         if (url.endsWith("/season/1"))
           return Response.json({
@@ -2469,12 +2473,9 @@ describe("Janus MCP endpoint", () => {
       totalPages: 1,
       totalResults: 1,
     });
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("https://api.themoviedb.org/3/search/movie"),
-      expect.objectContaining({
-        headers: expect.objectContaining({ Authorization: "Bearer test-tmdb-key" }),
-      }),
-    );
+    const tmdbRequest = fetchMock.mock.calls[0]?.[0] as Request;
+    expect(tmdbRequest.url).toContain("https://api.themoviedb.org/3/search/movie");
+    expect(tmdbRequest.headers.get("Authorization")).toBe("Bearer test-tmdb-key");
     fetchMock.mockRestore();
   });
 
@@ -2670,7 +2671,8 @@ describe("Janus MCP endpoint", () => {
         }),
       ),
     );
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    // One initial attempt plus the shared transport's two retries per provider.
+    expect(fetchMock).toHaveBeenCalledTimes(9);
     fetchMock.mockRestore();
   });
 
