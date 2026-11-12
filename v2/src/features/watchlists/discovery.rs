@@ -1,10 +1,87 @@
-use super::{Watchlists, mcp_item};
+//! Watchlist discovery: cursor pagination, ordering, search and item lookup.
+//! Typed results feed adapters; JSON is produced at the protocol boundary.
+
+use super::{WatchlistItem, WatchlistRecord, WatchlistStats, WatchlistSummary, Watchlists};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 use unicode_normalization::UnicodeNormalization;
+
+/// Full stored-item projection used by detail stats.
+fn item_json(item: &WatchlistItem) -> Value {
+    json!({
+        "id": item.id,
+        "tmdbId": item.tmdb_id,
+        "source": item.source,
+        "mediaType": item.media_type,
+        "title": item.title,
+        "parentId": item.parent_id,
+        "parentTitle": item.parent_title,
+        "episode": item.episode,
+        "posterPath": item.poster_path,
+        "releaseDate": item.release_date,
+        "addedAt": item.added_at,
+        "watchlistId": item.watchlist_id,
+        "season": item.season,
+        "runtime": item.runtime,
+        "customRank": item.custom_rank,
+        "voteAverage": item.vote_average,
+        "isWatched": item.is_watched,
+        "authors": item.authors,
+    })
+}
+
+/// Reduced item projection returned by regular MCP item views.
+fn item_projection(item: &WatchlistItem) -> Value {
+    json!({
+        "id": item.id,
+        "watchlistId": item.watchlist_id,
+        "provider": item.source,
+        "providerId": item.tmdb_id,
+        "mediaType": item.media_type,
+        "title": item.title,
+        "parent": {"providerId": item.parent_id, "title": item.parent_title},
+        "episode": item.episode,
+        "isWatched": item.is_watched,
+    })
+}
+
+fn record_json(record: &WatchlistRecord) -> Value {
+    json!({
+        "id": record.id,
+        "name": record.name,
+        "description": record.description,
+        "itemOrderMode": record.item_order_mode.as_str(),
+        "createdAt": record.created_at,
+        "updatedAt": record.updated_at,
+        "lastWatchedAt": record.last_watched_at,
+        "lastItemAddedAt": record.last_item_added_at,
+        "pausedAt": record.paused_at,
+    })
+}
+
+fn stats_json(stats: &WatchlistStats) -> Value {
+    json!({
+        "totalItems": stats.total_items,
+        "watchedItems": stats.watched_items,
+        "progress": stats.progress,
+        "nextUnwatched": stats.next_unwatched.as_ref().map(item_json),
+        "coverImage": stats.cover_image,
+        "coverMediaType": stats.cover_media_type,
+    })
+}
+
+fn summary_json(summary: &WatchlistSummary) -> Value {
+    let mut value = record_json(&summary.watchlist);
+    value["stats"] = stats_json(&summary.stats);
+    value
+}
 
 fn invalid(message: &str) -> String {
     message.into()
+}
+fn request_arguments(request: DiscoveryRequest) -> Result<Value, DiscoveryError> {
+    serde_json::to_value(request).map_err(|error| invalid(&error.to_string()).into())
 }
 fn offset(arguments: &Value, binding: &Value) -> Result<usize, String> {
     let Some(cursor) = arguments.get("cursor") else {
@@ -27,63 +104,79 @@ fn offset(arguments: &Value, binding: &Value) -> Result<usize, String> {
         .and_then(|offset| usize::try_from(offset).ok())
         .ok_or_else(|| invalid("Invalid cursor."))
 }
-fn paginate(
-    values: Vec<Value>,
+fn paginate<T>(
+    values: Vec<T>,
     arguments: &Value,
     binding: Value,
-    key: &str,
-) -> Result<Value, String> {
+) -> Result<(Vec<T>, Option<String>), String> {
     let size = arguments["pageSize"].as_u64().unwrap_or(50) as usize;
     let offset = offset(arguments, &binding)?;
     let has_more = values.len().saturating_sub(offset) > size;
-    let page: Vec<Value> = values.into_iter().skip(offset).take(size).collect();
-    let mut result = json!({key:page});
-    if has_more {
+    let page: Vec<T> = values.into_iter().skip(offset).take(size).collect();
+    let cursor = if has_more {
         let mut cursor = binding;
         cursor["offset"] = json!(offset + size);
-        result["nextCursor"] = json!(URL_SAFE_NO_PAD.encode(serde_json::to_vec(&cursor).unwrap()));
+        Some(
+            URL_SAFE_NO_PAD
+                .encode(serde_json::to_vec(&cursor).map_err(|_| invalid("Invalid cursor."))?),
+        )
+    } else {
+        None
+    };
+    Ok((page, cursor))
+}
+fn with_cursor(mut value: Value, cursor: Option<String>) -> Value {
+    if let Some(cursor) = cursor {
+        value["nextCursor"] = json!(cursor);
     }
-    Ok(result)
+    value
 }
 fn size(arguments: &Value) -> Value {
-    arguments.get("pageSize").cloned().unwrap_or(json!(50))
+    arguments
+        .get("pageSize")
+        .cloned()
+        .unwrap_or_else(|| json!(50))
 }
 fn folded(value: &str) -> String {
     value.nfc().collect::<String>().to_lowercase()
 }
-fn matches(item: &Value, query: &str) -> bool {
-    ["title", "parentTitle", "episode"].iter().any(|key| {
-        item[key]
-            .as_str()
-            .unwrap_or("")
-            .to_ascii_lowercase()
-            .contains(&query.to_ascii_lowercase())
-    })
+fn title_json(
+    provider: &str,
+    provider_id: &str,
+    media_type: &str,
+    title: &str,
+    matching_item_count: usize,
+) -> Value {
+    json!({"provider":provider,"providerId":provider_id,"mediaType":media_type,"title":title,"matchingItemCount":matching_item_count})
 }
-fn titles(items: &[Value]) -> Vec<Value> {
-    let mut grouped = std::collections::BTreeMap::<(String, String, String, String), usize>::new();
+fn titles(items: &[&WatchlistItem]) -> Vec<Value> {
+    // Keys borrow from `items`, which outlives the grouping map.
+    let mut grouped = BTreeMap::<(&str, &str, &str, &str), usize>::new();
     for item in items {
-        let source = item["source"].as_str().unwrap().to_owned();
-        let id = item["parentId"]
-            .as_str()
-            .or(item["tmdbId"].as_str())
-            .unwrap()
-            .to_owned();
-        let title = item["parentTitle"]
-            .as_str()
-            .or(item["title"].as_str())
-            .unwrap()
-            .to_owned();
+        let (id, title) = item.group_title();
         *grouped
-            .entry((
-                title,
-                id,
-                source,
-                item["mediaType"].as_str().unwrap().into(),
-            ))
+            .entry((title, id, &item.source, &item.media_type))
             .or_default() += 1;
     }
-    grouped.into_iter().map(|((title,id,source,media),count)|json!({"provider":source,"providerId":id,"mediaType":media,"title":title,"matchingItemCount":count})).collect()
+    grouped
+        .into_iter()
+        .map(|((title, id, source, media), count)| title_json(source, id, media, title, count))
+        .collect()
+}
+fn title(item: &WatchlistItem) -> Value {
+    let (id, title) = item.group_title();
+    title_json(&item.source, id, &item.media_type, title, 1)
+}
+/// The discovery operations shared by web and MCP.
+fn sort_value<'a>(list: &'a WatchlistRecord, order_by: &str) -> Option<&'a str> {
+    match order_by {
+        "lastWatched" => list.last_watched_at.as_deref(),
+        "lastAdded" => list
+            .last_item_added_at
+            .as_deref()
+            .or(Some(list.created_at.as_str())),
+        _ => Some(list.created_at.as_str()),
+    }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DiscoveryOperation {
@@ -93,6 +186,7 @@ pub enum DiscoveryOperation {
     Find,
 }
 
+/// Discovery arguments after transport-level normalization.
 #[derive(Default, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiscoveryRequest {
@@ -120,6 +214,14 @@ pub struct DiscoveryRequest {
     pub result_view: Option<String>,
 }
 
+/// One page of typed watchlist summaries, ready for an adapter.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SummaryPage {
+    pub watchlists: Vec<WatchlistSummary>,
+    pub next_cursor: Option<String>,
+}
+
+/// User-facing discovery failure.
 #[derive(Debug)]
 pub enum DiscoveryError {
     InvalidInput(String),
@@ -139,13 +241,38 @@ impl std::fmt::Display for DiscoveryError {
     }
 }
 impl Watchlists {
+    /// Runs a discovery operation and returns its MCP-compatible JSON envelope.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DiscoveryError`] for invalid input, missing watchlists or a
+    /// failed database read.
     pub async fn discovery(
         &self,
         operation: DiscoveryOperation,
         request: DiscoveryRequest,
     ) -> Result<Value, DiscoveryError> {
-        self.discover_arguments(operation, serde_json::to_value(request).unwrap())
+        self.discover_arguments(operation, request_arguments(request)?)
             .await
+    }
+    /// Typed summary discovery for adapters that do not speak MCP JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DiscoveryError`] for invalid input or a failed database read.
+    pub async fn summaries(
+        &self,
+        operation: DiscoveryOperation,
+        request: DiscoveryRequest,
+    ) -> Result<SummaryPage, DiscoveryError> {
+        if !matches!(
+            operation,
+            DiscoveryOperation::List | DiscoveryOperation::Search
+        ) {
+            return Err(invalid("Invalid discovery operation.").into());
+        }
+        let arguments = super::validation::arguments(operation, request_arguments(request)?)?;
+        self.summary_page(operation, arguments).await
     }
     pub(super) async fn discover_arguments(
         &self,
@@ -157,22 +284,27 @@ impl Watchlists {
             operation,
             DiscoveryOperation::List | DiscoveryOperation::Search
         ) {
-            return self.summaries(operation, arguments).await;
+            let page = self.summary_page(operation, arguments).await?;
+            return Ok(with_cursor(
+                json!({"watchlists": page.watchlists.iter().map(summary_json).collect::<Vec<_>>()}),
+                page.next_cursor,
+            ));
         }
-        let id = arguments["watchlistId"].as_i64().unwrap();
+        let Some(id) = arguments["watchlistId"].as_i64() else {
+            return Err(invalid("Invalid watchlist ID.").into());
+        };
         let data = self.detail(id).await.map_err(DiscoveryError::Database)?;
+        let view = arguments["resultView"].as_str().unwrap_or("items");
         let Some(data) = data else {
             if operation == DiscoveryOperation::Find
                 && (arguments.get("watchlistItemId").is_some()
                     || arguments.get("provider").is_some())
             {
-                return Ok(json!({arguments["resultView"].as_str().unwrap_or("items"):[]}));
+                return Ok(json!({view:[]}));
             }
             return Err(invalid(&format!("Watchlist {id} was not found.")).into());
         };
-        let view = arguments["resultView"].as_str().unwrap_or("items");
-        let all = data["items"].as_array().unwrap();
-        let mut selected = all.clone();
+        let mut selected: Vec<&WatchlistItem> = data.items.iter().collect();
         let mut exact = false;
         if operation == DiscoveryOperation::Find {
             let selectors = [
@@ -183,39 +315,40 @@ impl Watchlists {
                 arguments.get("query").is_some(),
             ];
             if selectors[0] {
-                let target = arguments["watchlistItemId"].as_i64().unwrap();
-                selected.retain(|item| item["id"] == target);
+                let Some(target) = arguments["watchlistItemId"].as_i64() else {
+                    return Err(invalid("Invalid watchlist item ID.").into());
+                };
+                selected.retain(|item| item.id == target);
                 exact = true;
             } else if selectors[1] {
+                let provider = arguments["provider"].as_str().map(str::trim);
+                let provider_id = arguments["providerId"].as_str().map(str::trim);
+                let media_type = arguments["mediaType"].as_str();
                 selected.retain(|item| {
-                    item["source"].as_str() == arguments["provider"].as_str().map(str::trim)
-                        && item["tmdbId"].as_str()
-                            == arguments["providerId"].as_str().map(str::trim)
-                        && item["mediaType"] == arguments["mediaType"]
+                    provider == Some(item.source.as_str())
+                        && provider_id == Some(item.tmdb_id.as_str())
+                        && media_type == Some(item.media_type.as_str())
                 });
                 exact = true;
             } else {
-                let query = arguments["query"].as_str().unwrap();
-                selected.retain(|item| matches(item, query.trim()));
+                let Some(query) = arguments["query"].as_str() else {
+                    return Err(invalid("A search query is required.").into());
+                };
+                let query = query.trim().to_ascii_lowercase();
+                selected.retain(|item| item.matches_text(&query));
             }
         }
         let values = if view == "titles" {
             if exact {
-                selected
-                    .iter()
-                    .map(|item| {
-                        let mut title = titles(std::slice::from_ref(item));
-                        title.remove(0)
-                    })
-                    .collect()
+                selected.iter().map(|item| title(item)).collect()
             } else {
                 titles(&selected)
             }
         } else {
-            selected.iter().map(mcp_item).collect()
+            selected.iter().map(|item| item_projection(item)).collect()
         };
         let mut result = if exact {
-            json!({view:values})
+            json!({view: values})
         } else {
             let mut binding = json!({"watchlistId":id,"pageSize":size(&arguments)});
             if let Some(query) = arguments.get("query") {
@@ -224,60 +357,43 @@ impl Watchlists {
             if view == "titles" {
                 binding["resultView"] = json!("titles");
             }
-            paginate(values, &arguments, binding, view)?
+            let (values, cursor) = paginate(values, &arguments, binding)?;
+            with_cursor(json!({view: values}), cursor)
         };
         if operation == DiscoveryOperation::Get {
-            result["watchlist"] = data["watchlist"].clone();
+            result["watchlist"] = summary_json(&data.watchlist);
             if view == "items" {
-                result["orderToken"] = data["orderToken"].clone();
+                result["orderToken"] = json!(data.order_token);
             }
         }
         Ok(result)
     }
-    async fn summaries(
+    async fn summary_page(
         &self,
         operation: DiscoveryOperation,
         arguments: Value,
-    ) -> Result<Value, DiscoveryError> {
+    ) -> Result<SummaryPage, DiscoveryError> {
         let order_by = arguments["orderBy"].as_str().unwrap_or("createdAt");
         let order = arguments["order"].as_str().unwrap_or("desc");
         let query = if operation == DiscoveryOperation::Search {
-            Some(folded(arguments["query"].as_str().unwrap().trim()))
+            let Some(query) = arguments["query"].as_str() else {
+                return Err(invalid("A search query is required.").into());
+            };
+            Some(folded(query.trim()))
         } else {
             None
         };
-        let mut summaries: Vec<Value> = self
-            .headers()
-            .await
-            .map_err(DiscoveryError::Database)?
-            .into_iter()
-            .filter(|list| {
-                query
-                    .as_ref()
-                    .is_none_or(|query| folded(list["name"].as_str().unwrap()).contains(query))
-            })
-            .collect();
-        let key = match order_by {
-            "lastWatched" => "lastWatchedAt",
-            "lastAdded" => "lastItemAddedAt",
-            _ => "createdAt",
-        };
-        summaries.sort_by(|left, right| {
-            let value = |list: &Value| {
-                list[key]
-                    .as_str()
-                    .or_else(|| {
-                        if key == "lastItemAddedAt" {
-                            list["createdAt"].as_str()
-                        } else {
-                            None
-                        }
-                    })
-                    .map(str::to_owned)
-            };
-            let compared = value(left)
-                .cmp(&value(right))
-                .then_with(|| left["id"].as_i64().cmp(&right["id"].as_i64()));
+        let mut headers: Vec<WatchlistRecord> =
+            self.headers().await.map_err(DiscoveryError::Database)?;
+        headers.retain(|list| {
+            query
+                .as_ref()
+                .is_none_or(|query| folded(&list.name).contains(query))
+        });
+        headers.sort_by(|left, right| {
+            let compared = sort_value(left, order_by)
+                .cmp(&sort_value(right, order_by))
+                .then_with(|| left.id.cmp(&right.id));
             if order == "desc" {
                 compared.reverse()
             } else {
@@ -288,18 +404,20 @@ impl Watchlists {
         if let Some(query) = query {
             binding["searchQuery"] = json!(query);
         }
-        let mut page = paginate(summaries, &arguments, binding, "watchlists")?;
-        let mut summaries = Vec::new();
-        for header in page["watchlists"].as_array().unwrap() {
+        let (headers, next_cursor) = paginate(headers, &arguments, binding)?;
+        let mut watchlists = Vec::new();
+        for header in headers {
             if let Some(summary) = self
-                .summary(header["id"].as_i64().unwrap())
+                .summary(header.id)
                 .await
                 .map_err(DiscoveryError::Database)?
             {
-                summaries.push(summary);
+                watchlists.push(summary);
             }
         }
-        page["watchlists"] = json!(summaries);
-        Ok(page)
+        Ok(SummaryPage {
+            watchlists,
+            next_cursor,
+        })
     }
 }

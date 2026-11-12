@@ -89,6 +89,8 @@ async fn existing_watchlist_renders_ids_order_filters_and_escaped_content_withou
     assert!(html.contains("Café 東京 &#60;collection&#62;"), "{html}");
     assert!(html.contains("Opening &#60;script&#62;"));
     assert!(!html.contains("Opening <script>"));
+    assert!(html.contains("https://image.tmdb.org/t/p/w200/poster.jpg"));
+    assert!(html.contains("https://images.example/poster.jpg"));
     assert!(
         html.find("data-item-id=\"102\"").unwrap() < html.find("data-item-id=\"101\"").unwrap()
     );
@@ -190,6 +192,15 @@ async fn mcp_discovers_and_reads_existing_watchlist_with_baseline_envelopes_and_
         data["watchlist"]["stats"]["nextUnwatched"]["authors"],
         json!(["Écrivain", "著者"])
     );
+    assert!(data["items"][0].get("authors").is_none());
+    assert!(data["items"][0].get("posterPath").is_none());
+    assert!(
+        data["watchlist"]["stats"]["nextUnwatched"]
+            .get("posterPath")
+            .is_some()
+    );
+    assert!(data["watchlist"]["stats"]["coverImage"].is_null());
+    assert_eq!(data["watchlist"]["stats"]["coverMediaType"], "episode");
     assert_eq!(
         serde_json::from_str::<Value>(read["content"][0]["text"].as_str().unwrap()).unwrap(),
         *data
@@ -491,6 +502,108 @@ async fn feature_discovery_shares_order_search_selection_and_cursor_rules() {
             .await,
         Err(DiscoveryError::InvalidInput(_))
     ));
+}
+
+#[tokio::test]
+async fn typed_reads_decode_stored_values_and_preserve_order_token_semantics() {
+    use janus_v2::{ItemOrderMode, Watchlists};
+    let fixture = Fixture::v1();
+    let lists = Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    let detail = lists.detail(41).await.unwrap().unwrap();
+    let record = &detail.watchlist.watchlist;
+    assert_eq!(record.name, "Café 東京 <collection>");
+    assert_eq!(
+        record.description.as_deref(),
+        Some("Existing v1 collection")
+    );
+    assert_eq!(record.item_order_mode, ItemOrderMode::Custom);
+    assert_eq!(record.created_at, "2020-01-01 12:30:00");
+    assert_eq!(
+        record.updated_at.as_deref(),
+        Some("2020-01-01T12:30:00.000Z")
+    );
+    assert!(record.paused_at.is_none());
+    assert_eq!(
+        detail.items.iter().map(|item| item.id).collect::<Vec<_>>(),
+        vec![102, 101, 103]
+    );
+    assert_eq!(detail.items[0].custom_rank, Some(1));
+    assert_eq!(detail.items[1].custom_rank, Some(2));
+    assert_eq!(detail.items[2].custom_rank, None);
+    assert_eq!(detail.items[0].is_watched, Some(true));
+    assert_eq!(detail.items[1].is_watched, None);
+    assert_eq!(detail.items[1].parent_title.as_deref(), Some("A Show"));
+    assert_eq!(detail.items[2].parent_title, None);
+    assert_eq!(detail.items[2].authors, Some(Vec::new()));
+    assert_eq!(
+        detail.items[1].authors.as_deref(),
+        Some(&["Écrivain".to_owned(), "著者".to_owned()][..])
+    );
+    let stats = &detail.watchlist.stats;
+    assert_eq!(stats.total_items, 3);
+    assert_eq!(stats.watched_items, 1);
+    assert_eq!(stats.progress, 33);
+    assert_eq!(stats.next_unwatched.as_ref().unwrap().id, 101);
+    assert_eq!(
+        stats.next_unwatched.as_ref().unwrap().authors.as_deref(),
+        Some(&["Écrivain".to_owned(), "著者".to_owned()][..])
+    );
+    assert_eq!(stats.cover_image, None);
+    assert_eq!(stats.cover_media_type.as_deref(), Some("episode"));
+    assert_eq!(
+        detail.order_token,
+        "sha256:ce9b1d84c7ca0623380b8e2cb789f812334604e53245204fd25c9214d3fd1a7b"
+    );
+}
+
+#[tokio::test]
+async fn watched_watchlist_stats_fall_back_to_first_ordered_cover() {
+    use janus_v2::Watchlists;
+    let fixture = Fixture::v1();
+    change_v1(&fixture, "watch-all");
+    let lists = Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    let stats = lists.detail(41).await.unwrap().unwrap().watchlist.stats;
+    assert_eq!(stats.total_items, 3);
+    assert_eq!(stats.watched_items, 3);
+    assert_eq!(stats.progress, 100);
+    assert!(stats.next_unwatched.is_none());
+    assert_eq!(stats.cover_image.as_deref(), Some("/poster.jpg"));
+    assert_eq!(stats.cover_media_type.as_deref(), Some("episode"));
+}
+
+#[tokio::test]
+async fn serialized_views_keep_reduced_items_and_full_next_unwatched_projection() {
+    use janus_v2::{DiscoveryOperation as Operation, DiscoveryRequest as Request, Watchlists};
+    let fixture = Fixture::v1();
+    let lists = Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    let read = lists
+        .discovery(
+            Operation::Get,
+            Request {
+                watchlist_id: Some(41),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    let item = &read["items"][1];
+    assert_eq!(item["id"], 101);
+    assert_eq!(item["provider"], "tmdb");
+    assert_eq!(item["providerId"], "ep-1");
+    assert_eq!(
+        item["parent"],
+        json!({"providerId": "show-1", "title": "A Show"})
+    );
+    assert!(item["isWatched"].is_null());
+    assert!(item.get("authors").is_none());
+    assert!(item.get("posterPath").is_none());
+    assert!(item.get("releaseDate").is_none());
+    let next = &read["watchlist"]["stats"]["nextUnwatched"];
+    assert_eq!(next["id"], 101);
+    assert_eq!(next["authors"], json!(["Écrivain", "著者"]));
+    assert_eq!(next["posterPath"], Value::Null);
+    assert!(read["watchlist"]["stats"]["coverImage"].is_null());
+    assert_eq!(read["watchlist"]["stats"]["coverMediaType"], "episode");
 }
 
 #[tokio::test]

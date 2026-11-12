@@ -1,4 +1,4 @@
-use super::Watchlists;
+use super::{ItemOrderMode, Watchlists};
 use askama::Template;
 use axum::{
     extract::{Path, Query, State},
@@ -61,46 +61,40 @@ pub async fn detail(
     Path(id): Path<i64>,
     Query(filters): Query<Filters>,
 ) -> Result<Html<String>, Failure> {
-    let data = lists
+    let detail = lists
         .detail(id)
         .await
         .map_err(failure)?
         .ok_or((StatusCode::NOT_FOUND, "Watchlist not found"))?;
-    let list = &data["watchlist"];
+    let list = &detail.watchlist.watchlist;
+    let stats = &detail.watchlist.stats;
     let query = filters.query.trim().to_ascii_lowercase();
-    let rows: Vec<Row> = data["items"]
-        .as_array()
-        .unwrap()
+    let rows: Vec<Row> = detail
+        .items
         .iter()
-        .filter(|item| {
-            ["title", "parentTitle", "episode"].iter().any(|key| {
-                item[key]
-                    .as_str()
-                    .unwrap_or("")
-                    .to_ascii_lowercase()
-                    .contains(&query)
-            })
-        })
+        .filter(|item| item.matches_text(&query))
         .map(|item| {
-            let date = item["releaseDate"].as_str().unwrap_or("").to_owned();
+            let date = item.release_date.clone().unwrap_or_default();
             Row {
-                id: item["id"].as_i64().unwrap(),
-                title: item["title"].as_str().unwrap_or("").into(),
-                parent: item["parentTitle"].as_str().unwrap_or("").into(),
-                episode: item["episode"].as_str().unwrap_or("").into(),
+                id: item.id,
+                title: item.title.clone(),
+                parent: item.parent_title.clone().unwrap_or_default(),
+                episode: item.episode.clone().unwrap_or_default(),
                 year: if date.is_empty() {
                     "TBA".into()
                 } else {
-                    date.split('-').next().unwrap().into()
+                    date.split_once('-')
+                        .map_or(date.as_str(), |(year, _)| year)
+                        .into()
                 },
                 date,
-                watched: item["isWatched"] == true,
-                poster: poster(item["posterPath"].as_str().unwrap_or("")),
-                media: item["mediaType"].as_str().unwrap_or("").into(),
+                watched: item.is_watched == Some(true),
+                poster: poster(item.poster_path.as_deref().unwrap_or("")),
+                media: item.media_type.clone(),
             }
         })
         .collect();
-    let release_mode = list["itemOrderMode"] == "release";
+    let release_mode = list.item_order_mode == ItemOrderMode::Release;
     let groups: Vec<&[Row]> = rows
         .chunk_by(|previous, next| {
             previous.watched == next.watched && (!release_mode || previous.year == next.year)
@@ -117,16 +111,16 @@ pub async fn detail(
         })
         .collect();
     Page {
-        name: list["name"].as_str().unwrap_or("").into(),
-        description: list["description"].as_str().unwrap_or("").into(),
-        mode: list["itemOrderMode"].as_str().unwrap_or("release").into(),
-        progress: list["stats"]["progress"].as_u64().unwrap(),
-        watched: list["stats"]["watchedItems"].as_u64().unwrap(),
-        total: list["stats"]["totalItems"].as_u64().unwrap(),
+        name: list.name.clone(),
+        description: list.description.clone().unwrap_or_default(),
+        mode: list.item_order_mode.as_str().into(),
+        progress: stats.progress,
+        watched: stats.watched_items as u64,
+        total: stats.total_items as u64,
         query: filters.query,
         unwatched: filters.unwatched,
         runs,
-        paused: !list["pausedAt"].is_null(),
+        paused: list.paused_at.is_some(),
     }
     .render()
     .map(Html)
@@ -176,8 +170,8 @@ pub async fn list(
     } else {
         DiscoveryOperation::Search
     };
-    let data = lists
-        .discovery(
+    let page = lists
+        .summaries(
             operation,
             DiscoveryRequest {
                 query: (!query.is_empty()).then(|| query.to_owned()),
@@ -194,19 +188,18 @@ pub async fn list(
             DiscoveryError::Database(error) => failure(error),
         })?;
     ListPage {
-        lists: data["watchlists"]
-            .as_array()
-            .unwrap()
+        lists: page
+            .watchlists
             .iter()
-            .map(|list| ListRow {
-                id: list["id"].as_i64().unwrap(),
-                name: list["name"].as_str().unwrap().into(),
-                total: list["stats"]["totalItems"].as_u64().unwrap(),
-                watched: list["stats"]["watchedItems"].as_u64().unwrap(),
+            .map(|summary| ListRow {
+                id: summary.watchlist.id,
+                name: summary.watchlist.name.clone(),
+                total: summary.stats.total_items as u64,
+                watched: summary.stats.watched_items as u64,
             })
             .collect(),
         query: filters.query,
-        next: data["nextCursor"].as_str().unwrap_or("").into(),
+        next: page.next_cursor.unwrap_or_default(),
     }
     .render()
     .map(Html)
