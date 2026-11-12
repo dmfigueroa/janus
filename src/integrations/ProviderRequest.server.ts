@@ -18,7 +18,6 @@ export class ProviderRequestError extends Error {
 
 const PROVIDER_REQUEST_TIMEOUT_MS = 5_000;
 const PROVIDER_REQUEST_TOTAL_TIMEOUT_MS = 20_000;
-const PROVIDER_RETRY_LIMIT = 2;
 const PROVIDER_RETRY_BACKOFF_LIMIT_MS = 2_000;
 const PROVIDER_RETRY_MAX_AFTER_MS = 5_000;
 
@@ -34,7 +33,6 @@ const PROVIDER_RETRY_STATUS_CODES = [408, 429, 500, 502, 503, 504];
  * non-retryable.
  */
 export const PROVIDER_RETRY_POLICY: RetryOptions = {
-  limit: PROVIDER_RETRY_LIMIT,
   methods: ["get", "head"],
   statusCodes: PROVIDER_RETRY_STATUS_CODES,
   afterStatusCodes: PROVIDER_RETRY_STATUS_CODES,
