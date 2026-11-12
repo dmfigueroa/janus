@@ -1,4 +1,7 @@
-use super::Watchlists;
+use super::{
+    Watchlists,
+    discovery::{DiscoveryError, DiscoveryOperation},
+};
 use rmcp::{ErrorData, RoleServer, ServerHandler, model::*, service::RequestContext};
 use serde_json::{Value, json};
 #[derive(Clone)]
@@ -85,14 +88,34 @@ impl ServerHandler for ReadMcp {
         if self.get_tool(&request.name).is_none() {
             return Err(ErrorData::method_not_found::<CallToolRequestMethod>());
         }
+        let operation = match request.name.as_ref() {
+            "list_watchlists" => DiscoveryOperation::List,
+            "search_watchlists" => DiscoveryOperation::Search,
+            "get_watchlist" => DiscoveryOperation::Get,
+            "find_watchlist_items" => DiscoveryOperation::Find,
+            _ => unreachable!(),
+        };
+        let arguments = normalize(
+            operation,
+            Value::Object(request.arguments.unwrap_or_default()),
+        );
         match self
             .0
-            .discover(
-                &request.name,
-                Value::Object(request.arguments.unwrap_or_default()),
-            )
+            .discover_arguments(operation, arguments)
             .await
-        {
+            .map_err(|error| match error {
+                DiscoveryError::InvalidInput(message) => message,
+                DiscoveryError::Database(_) => {
+                    if matches!(
+                        operation,
+                        DiscoveryOperation::List | DiscoveryOperation::Search
+                    ) {
+                        "Unable to load watchlists.".into()
+                    } else {
+                        "Unable to load watchlist.".into()
+                    }
+                }
+            }) {
             Ok(data) => {
                 let mut result = CallToolResult::structured(data);
                 result.result_type = None;
@@ -105,5 +128,62 @@ impl ServerHandler for ReadMcp {
                 Ok(result.into())
             }
         }
+    }
+}
+
+fn normalize(operation: DiscoveryOperation, mut arguments: Value) -> Value {
+    let fields: &[&str] = match operation {
+        DiscoveryOperation::List => &["orderBy", "order", "pageSize", "cursor"],
+        DiscoveryOperation::Search => &["query", "orderBy", "order", "pageSize", "cursor"],
+        DiscoveryOperation::Get => &["watchlistId", "pageSize", "cursor", "resultView"],
+        DiscoveryOperation::Find => &[
+            "watchlistId",
+            "watchlistItemId",
+            "provider",
+            "providerId",
+            "mediaType",
+            "query",
+            "pageSize",
+            "cursor",
+            "resultView",
+        ],
+    };
+    let object = arguments.as_object_mut().unwrap();
+    object.retain(|key, _| fields.contains(&key.as_str()));
+    if operation == DiscoveryOperation::Get
+        && let Some(value) = object.get_mut("watchlistId")
+        && let Some(number) = coerced_number(value, false).and_then(serde_json::Number::from_f64)
+    {
+        *value = Value::Number(number);
+    }
+    arguments
+}
+// Zod's get_watchlist selector uses JavaScript Number coercion. Other selectors
+// and page sizes accept JSON numbers only, including integral decimal notation.
+fn coerced_number(value: &Value, in_array: bool) -> Option<f64> {
+    match value {
+        Value::Number(number) => number.as_f64(),
+        Value::Bool(true) if !in_array => Some(1.0),
+        Value::String(text) => {
+            let text = text.trim();
+            let radix = if text.starts_with("0x") || text.starts_with("0X") {
+                Some(16)
+            } else if text.starts_with("0b") || text.starts_with("0B") {
+                Some(2)
+            } else if text.starts_with("0o") || text.starts_with("0O") {
+                Some(8)
+            } else {
+                None
+            };
+            if let Some(radix) = radix {
+                u64::from_str_radix(&text[2..], radix)
+                    .ok()
+                    .map(|number| number as f64)
+            } else {
+                text.parse().ok()
+            }
+        }
+        Value::Array(values) if values.len() == 1 => coerced_number(&values[0], true),
+        _ => None,
     }
 }

@@ -232,6 +232,10 @@ async fn mcp_discovers_and_reads_existing_watchlist_with_baseline_envelopes_and_
     }
     let coerced=result(rpc(&app,json!({"jsonrpc":"2.0","id":24,"method":"tools/call","params":{"name":"get_watchlist","arguments":{"watchlistId":"41.0","pageSize":1.0}}}),Some(&session)).await).await;
     assert_eq!(coerced["structuredContent"]["items"][0]["id"], 102);
+    for selector in [json!("0x29"), json!(["41"]), json!(41.0)] {
+        let response = result(rpc(&app, json!({"jsonrpc":"2.0","id":25,"method":"tools/call","params":{"name":"get_watchlist","arguments":{"watchlistId":selector,"pageSize":1,"query":false,"ignored":123}}}), Some(&session)).await).await;
+        assert_eq!(response["structuredContent"]["items"][0]["id"], 102);
+    }
     let greek=result(rpc(&app,json!({"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"search_watchlists","arguments":{"query":"ος"}}}),Some(&session)).await).await;
     assert_eq!(greek["structuredContent"]["watchlists"][0]["id"], 42);
     for (name, arguments) in [
@@ -377,4 +381,144 @@ async fn exclusive_v1_lock_fails_within_the_configured_startup_bound() {
             .expect("startup lock handling must be bounded")
             .is_err()
     );
+}
+
+#[tokio::test]
+async fn feature_discovery_shares_order_search_selection_and_cursor_rules() {
+    use janus_v2::{
+        DiscoveryError, DiscoveryOperation as Operation, DiscoveryRequest as Request, Watchlists,
+    };
+    let fixture = Fixture::v1();
+    let lists = Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    let page = lists
+        .discovery(
+            Operation::List,
+            Request {
+                page_size: Some(1),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(page["watchlists"][0]["id"], 42);
+    let cursor = page["nextCursor"].as_str().unwrap().to_owned();
+    let searched = lists
+        .discovery(
+            Operation::Search,
+            Request {
+                query: Some("CAFE\u{301}".into()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(searched["watchlists"][0]["id"], 41);
+    assert!(matches!(
+        lists
+            .discovery(
+                Operation::Search,
+                Request {
+                    query: Some("Café".into()),
+                    cursor: Some(cursor),
+                    ..Default::default()
+                }
+            )
+            .await,
+        Err(DiscoveryError::InvalidInput(_))
+    ));
+    let titles = lists
+        .discovery(
+            Operation::Get,
+            Request {
+                watchlist_id: Some(41),
+                result_view: Some("titles".into()),
+                page_size: Some(1),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(titles["titles"][0]["matchingItemCount"], 2);
+    assert!(matches!(
+        lists
+            .discovery(
+                Operation::Get,
+                Request {
+                    watchlist_id: Some(41),
+                    page_size: Some(1),
+                    cursor: Some(titles["nextCursor"].as_str().unwrap().into()),
+                    ..Default::default()
+                }
+            )
+            .await,
+        Err(DiscoveryError::InvalidInput(_))
+    ));
+    let exact = lists
+        .discovery(
+            Operation::Find,
+            Request {
+                watchlist_id: Some(41),
+                watchlist_item_id: Some(101),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(exact["items"][0]["id"], 101);
+    assert!(matches!(
+        lists
+            .discovery(
+                Operation::Find,
+                Request {
+                    watchlist_id: Some(999),
+                    watchlist_item_id: Some(101),
+                    page_size: Some(1),
+                    ..Default::default()
+                }
+            )
+            .await,
+        Err(DiscoveryError::InvalidInput(_))
+    ));
+    assert!(matches!(
+        lists
+            .discovery(
+                Operation::List,
+                Request {
+                    order: Some("sideways".into()),
+                    ..Default::default()
+                }
+            )
+            .await,
+        Err(DiscoveryError::InvalidInput(_))
+    ));
+}
+
+#[tokio::test]
+async fn web_discovery_distinguishes_invalid_cursor_from_database_failure() {
+    let fixture = Fixture::v1();
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let app = janus_v2::database_router(database.clone());
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v2/watchlists?cursor=invalid")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    database.close().await.unwrap();
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/v2/watchlists")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert!(!body(response).await.contains("pool"));
 }

@@ -33,16 +33,7 @@ fn paginate(
     binding: Value,
     key: &str,
 ) -> Result<Value, String> {
-    let size = arguments
-        .get("pageSize")
-        .map(|value| {
-            value
-                .as_u64()
-                .filter(|size| (1..=100).contains(size))
-                .ok_or_else(|| invalid("Invalid page size."))
-        })
-        .transpose()?
-        .unwrap_or(50) as usize;
+    let size = arguments["pageSize"].as_u64().unwrap_or(50) as usize;
     let offset = offset(arguments, &binding)?;
     let has_more = values.len().saturating_sub(offset) > size;
     let page: Vec<Value> = values.into_iter().skip(offset).take(size).collect();
@@ -94,45 +85,96 @@ fn titles(items: &[Value]) -> Vec<Value> {
     }
     grouped.into_iter().map(|((title,id,source,media),count)|json!({"provider":source,"providerId":id,"mediaType":media,"title":title,"matchingItemCount":count})).collect()
 }
-impl Watchlists {
-    pub async fn discover(&self, name: &str, arguments: Value) -> Result<Value, String> {
-        let arguments = super::validation::arguments(name, arguments)?;
-        if name == "list_watchlists" || name == "search_watchlists" {
-            return self.summaries(name, arguments).await;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiscoveryOperation {
+    List,
+    Search,
+    Get,
+    Find,
+}
+
+#[derive(Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoveryRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub query: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order_by: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub page_size: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub watchlist_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub watchlist_item_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub media_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result_view: Option<String>,
+}
+
+#[derive(Debug)]
+pub enum DiscoveryError {
+    InvalidInput(String),
+    Database(sea_orm::DbErr),
+}
+impl From<String> for DiscoveryError {
+    fn from(message: String) -> Self {
+        Self::InvalidInput(message)
+    }
+}
+impl std::fmt::Display for DiscoveryError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidInput(message) => formatter.write_str(message),
+            Self::Database(error) => write!(formatter, "{error}"),
         }
-        let id = arguments["watchlistId"]
-            .as_i64()
-            .or_else(|| {
-                if name != "get_watchlist" {
-                    return None;
-                }
-                arguments["watchlistId"]
-                    .as_str()
-                    .and_then(|id| id.parse().ok())
-            })
-            .filter(|id| *id > 0)
-            .ok_or_else(|| invalid("Invalid watchlist ID."))?;
-        let data = self
-            .detail(id)
+    }
+}
+impl Watchlists {
+    pub async fn discovery(
+        &self,
+        operation: DiscoveryOperation,
+        request: DiscoveryRequest,
+    ) -> Result<Value, DiscoveryError> {
+        self.discover_arguments(operation, serde_json::to_value(request).unwrap())
             .await
-            .map_err(|_| invalid("Unable to load watchlist."))?;
+    }
+    pub(super) async fn discover_arguments(
+        &self,
+        operation: DiscoveryOperation,
+        arguments: Value,
+    ) -> Result<Value, DiscoveryError> {
+        let arguments = super::validation::arguments(operation, arguments)?;
+        if matches!(
+            operation,
+            DiscoveryOperation::List | DiscoveryOperation::Search
+        ) {
+            return self.summaries(operation, arguments).await;
+        }
+        let id = arguments["watchlistId"].as_i64().unwrap();
+        let data = self.detail(id).await.map_err(DiscoveryError::Database)?;
         let Some(data) = data else {
-            if name == "find_watchlist_items"
+            if operation == DiscoveryOperation::Find
                 && (arguments.get("watchlistItemId").is_some()
                     || arguments.get("provider").is_some())
             {
                 return Ok(json!({arguments["resultView"].as_str().unwrap_or("items"):[]}));
             }
-            return Err(format!("Watchlist {id} was not found."));
+            return Err(invalid(&format!("Watchlist {id} was not found.")).into());
         };
         let view = arguments["resultView"].as_str().unwrap_or("items");
-        if !["items", "titles"].contains(&view) {
-            return Err(invalid("Invalid result view."));
-        }
         let all = data["items"].as_array().unwrap();
         let mut selected = all.clone();
         let mut exact = false;
-        if name == "find_watchlist_items" {
+        if operation == DiscoveryOperation::Find {
             let selectors = [
                 arguments.get("watchlistItemId").is_some(),
                 arguments.get("provider").is_some()
@@ -140,35 +182,11 @@ impl Watchlists {
                     || arguments.get("mediaType").is_some(),
                 arguments.get("query").is_some(),
             ];
-            if selectors.iter().filter(|selected| **selected).count() != 1 {
-                return Err(invalid("Provide one valid watchlist item selector."));
-            }
-            if (selectors[0] || selectors[1])
-                && (arguments.get("pageSize").is_some() || arguments.get("cursor").is_some())
-            {
-                return Err(invalid("Provide one valid watchlist item selector."));
-            }
             if selectors[0] {
-                let target = arguments["watchlistItemId"]
-                    .as_i64()
-                    .filter(|id| *id > 0)
-                    .ok_or_else(|| invalid("Provide one valid watchlist item selector."))?;
+                let target = arguments["watchlistItemId"].as_i64().unwrap();
                 selected.retain(|item| item["id"] == target);
                 exact = true;
             } else if selectors[1] {
-                if ["provider", "providerId", "mediaType"]
-                    .iter()
-                    .any(|key| arguments[key].as_str().unwrap_or("").trim().is_empty())
-                {
-                    return Err(invalid("Provide one valid watchlist item selector."));
-                }
-                if ![
-                    "movie", "episode", "game", "book", "comic", "anime", "manga",
-                ]
-                .contains(&arguments["mediaType"].as_str().unwrap())
-                {
-                    return Err(invalid("Provide one valid watchlist item selector."));
-                }
                 selected.retain(|item| {
                     item["source"].as_str() == arguments["provider"].as_str().map(str::trim)
                         && item["tmdbId"].as_str()
@@ -177,10 +195,7 @@ impl Watchlists {
                 });
                 exact = true;
             } else {
-                let query = arguments["query"]
-                    .as_str()
-                    .filter(|query| !query.trim().is_empty())
-                    .ok_or_else(|| invalid("Provide one valid watchlist item selector."))?;
+                let query = arguments["query"].as_str().unwrap();
                 selected.retain(|item| matches(item, query.trim()));
             }
         }
@@ -211,7 +226,7 @@ impl Watchlists {
             }
             paginate(values, &arguments, binding, view)?
         };
-        if name == "get_watchlist" {
+        if operation == DiscoveryOperation::Get {
             result["watchlist"] = data["watchlist"].clone();
             if view == "items" {
                 result["orderToken"] = data["orderToken"].clone();
@@ -219,29 +234,22 @@ impl Watchlists {
         }
         Ok(result)
     }
-    async fn summaries(&self, name: &str, arguments: Value) -> Result<Value, String> {
+    async fn summaries(
+        &self,
+        operation: DiscoveryOperation,
+        arguments: Value,
+    ) -> Result<Value, DiscoveryError> {
         let order_by = arguments["orderBy"].as_str().unwrap_or("createdAt");
         let order = arguments["order"].as_str().unwrap_or("desc");
-        if !["createdAt", "lastWatched", "lastAdded"].contains(&order_by)
-            || !["asc", "desc"].contains(&order)
-        {
-            return Err(invalid("Invalid watchlist order."));
-        }
-        let query = if name == "search_watchlists" {
-            Some(folded(
-                arguments["query"]
-                    .as_str()
-                    .filter(|query| !query.trim().is_empty())
-                    .ok_or_else(|| invalid("A search query is required."))?
-                    .trim(),
-            ))
+        let query = if operation == DiscoveryOperation::Search {
+            Some(folded(arguments["query"].as_str().unwrap().trim()))
         } else {
             None
         };
         let mut summaries: Vec<Value> = self
             .headers()
             .await
-            .map_err(|_| invalid("Unable to load watchlists."))?
+            .map_err(DiscoveryError::Database)?
             .into_iter()
             .filter(|list| {
                 query
@@ -286,7 +294,7 @@ impl Watchlists {
             if let Some(summary) = self
                 .summary(header["id"].as_i64().unwrap())
                 .await
-                .map_err(|_| invalid("Unable to load watchlists."))?
+                .map_err(DiscoveryError::Database)?
             {
                 summaries.push(summary);
             }
