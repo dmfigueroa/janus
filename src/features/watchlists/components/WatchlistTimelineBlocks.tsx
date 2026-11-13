@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
 import { ReorderableTimelineRow } from "./ReorderableTimelineRow";
 import { TimelineYearHeading } from "./TimelineYearHeading";
@@ -13,7 +14,9 @@ type BlockContentProps = {
   onToggleRun: (runKey: string) => void;
 };
 
-export function WatchlistTimelineBlockContent(props: BlockContentProps) {
+export const WatchlistTimelineBlockContent = memo(function WatchlistTimelineBlockContent(
+  props: BlockContentProps,
+) {
   const { block } = props;
   if (block.kind === "year") {
     return <TimelineYearHeading year={block.year} />;
@@ -24,7 +27,7 @@ export function WatchlistTimelineBlockContent(props: BlockContentProps) {
   }
 
   return <ItemBlock props={props} item={block.item} />;
-}
+});
 
 function ItemBlock({
   props,

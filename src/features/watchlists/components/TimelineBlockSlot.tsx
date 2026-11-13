@@ -1,4 +1,5 @@
 import { Box } from "@chakra-ui/react";
+import { memo } from "react";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
 import { WatchlistTimelineBlockContent } from "./WatchlistTimelineBlocks";
 import type { WatchlistTimelineBlock } from "./WatchlistTimeline.model";
@@ -20,7 +21,13 @@ export function TimelineBlockSlots({ slotProps }: { slotProps: TimelineBlockSlot
   return slotProps.map(TimelineBlockSlot);
 }
 
-function TimelineBlockSlot({
+function TimelineBlockSlot({ key, ...props }: TimelineBlockSlotProps) {
+  return <TimelineBlockSlotContent key={key} {...props} />;
+}
+
+// Slots keep stable props while scrolling, so memoizing skips Chakra style work for rows
+// that were already mounted before the virtual range changed.
+const TimelineBlockSlotContent = memo(function TimelineBlockSlotContent({
   block,
   index,
   start,
@@ -55,4 +62,4 @@ function TimelineBlockSlot({
       </Box>
     </div>
   );
-}
+});
