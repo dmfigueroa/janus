@@ -138,3 +138,7 @@ Use the five default triage labels. See `docs/agents/triage-labels.md`.
 ### Domain docs
 
 This is a single-context repository. See `docs/agents/domain.md`.
+
+## V2 Frontend
+
+- Use HTMX for all v2 browser HTTP requests. Prefer declarative hx-\* attributes; use htmx.ajax for imperative interactions such as drag-and-drop. Frontend requests must consume server-rendered HTML and let HTMX swap it into the page. Backend endpoints must also preserve JSON support for API callers through content negotiation. Do not use fetch or standalone XMLHttpRequest for frontend requests.

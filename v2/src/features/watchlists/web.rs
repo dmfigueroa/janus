@@ -1,9 +1,9 @@
 use super::{ItemOrderMode, Watchlists};
 use askama::Template;
 use axum::{
-    extract::{Path, Query, State},
+    extract::{FromRequest, Path, Query, Request, State},
     http::StatusCode,
-    response::Html,
+    response::{Html, IntoResponse, Response},
 };
 use serde::Deserialize;
 #[derive(Default, Deserialize)]
@@ -30,6 +30,15 @@ struct Page {
     unwatched: bool,
     runs: Vec<Run>,
     paused: bool,
+    message: String,
+}
+#[derive(Template)]
+#[template(path = "timeline.html")]
+struct Timeline<'a> {
+    id: i64,
+    mode: &'a str,
+    runs: &'a [Run],
+    message: &'a str,
 }
 #[derive(Clone)]
 struct Row {
@@ -62,6 +71,14 @@ pub async fn detail(
     Path(id): Path<i64>,
     Query(filters): Query<Filters>,
 ) -> Result<Html<String>, Failure> {
+    build_page(&lists, id, filters)
+        .await?
+        .render()
+        .map(Html)
+        .map_err(failure)
+}
+
+async fn build_page(lists: &Watchlists, id: i64, filters: Filters) -> Result<Page, Failure> {
     let detail = lists
         .detail(id)
         .await
@@ -111,7 +128,7 @@ pub async fn detail(
             rows: rows.to_vec(),
         })
         .collect();
-    Page {
+    Ok(Page {
         id,
         name: list.name.clone(),
         description: list.description.clone().unwrap_or_default(),
@@ -123,10 +140,8 @@ pub async fn detail(
         unwatched: filters.unwatched,
         runs,
         paused: list.paused_at.is_some(),
-    }
-    .render()
-    .map(Html)
-    .map_err(failure)
+        message: String::new(),
+    })
 }
 
 fn poster(path: &str) -> String {
@@ -218,7 +233,65 @@ pub struct ReorderRequest {
 pub async fn reorder(
     State(lists): State<Watchlists>,
     Path(id): Path<i64>,
-    axum::Json(request): axum::Json<ReorderRequest>,
+    Query(filters): Query<Filters>,
+    request: Request,
+) -> Response {
+    let html = request
+        .headers()
+        .get("hx-request")
+        .is_some_and(|value| value == "true")
+        || request
+            .headers()
+            .get("accept")
+            .and_then(|value| value.to_str().ok())
+            .is_some_and(|value| value.contains("text/html"));
+    let json_input = request
+        .headers()
+        .get("content-type")
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.starts_with("application/json"));
+    let input = if json_input {
+        match axum::Json::<ReorderRequest>::from_request(request, &()).await {
+            Ok(axum::Json(input)) => input,
+            Err(error) => return error.into_response(),
+        }
+    } else {
+        match axum::Form::<ReorderRequest>::from_request(request, &()).await {
+            Ok(axum::Form(input)) => input,
+            Err(error) => return error.into_response(),
+        }
+    };
+    let axum::Json(result) = reorder_result(&lists, id, input).await;
+    if !html {
+        return axum::Json(result).into_response();
+    }
+    match build_page(&lists, id, filters).await {
+        Ok(mut page) => {
+            page.message = result
+                .get("message")
+                .and_then(|value| value.as_str())
+                .unwrap_or("Order saved.")
+                .to_owned();
+            match (Timeline {
+                id: page.id,
+                mode: &page.mode,
+                runs: &page.runs,
+                message: &page.message,
+            })
+            .render()
+            {
+                Ok(body) => Html(body).into_response(),
+                Err(error) => failure(error).into_response(),
+            }
+        }
+        Err(error) => error.into_response(),
+    }
+}
+
+async fn reorder_result(
+    lists: &Watchlists,
+    id: i64,
+    request: ReorderRequest,
 ) -> axum::Json<serde_json::Value> {
     use super::reorder::{Reorder, ReorderFailure, ReorderOutcome, ReorderPosition};
     use serde_json::json;

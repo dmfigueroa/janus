@@ -16,25 +16,28 @@ class WatchlistReorder {
     this.timeline = timeline;
     this.busy = false;
     this.dragging = false;
-    this.status = document.getElementById("reorder-status");
     this.initializeGroups();
     this.timeline.addEventListener("keydown", (event) => this.onKeydown(event));
     document.addEventListener("htmx:beforeSwap", (event) => {
-      if (this.dragging || this.busy) event.preventDefault();
+      if (this.shouldBlockSwap(event)) event.preventDefault();
     });
   }
+  shouldBlockSwap(event) {
+    if (this.dragging) return true;
+    return this.busy && !this.isOwnRequest(event);
+  }
+  isOwnRequest(event) {
+    return event.detail?.requestConfig?.elt === this.timeline;
+  }
   announce(message) {
-    if (this.status) this.status.textContent = message;
+    const status = document.getElementById("reorder-status");
+    if (status) status.textContent = message;
   }
   rows() {
     return [...this.timeline.querySelectorAll("article[data-item-id]")];
   }
   visible() {
     return this.rows().filter((row) => row.getClientRects().length);
-  }
-  validateSave(response, result) {
-    if (![response.ok, result.success].every(Boolean))
-      throw new Error(result.message ?? "Unable to save order.");
   }
   async save(row, reference, position) {
     if (this.busy) return;
@@ -51,42 +54,52 @@ class WatchlistReorder {
       button.disabled = true;
     });
     this.announce("Saving order…");
-    try {
-      const response = await fetch(this.timeline.dataset.reorderUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          movedItemId: Number(row.dataset.itemId),
-          referenceItemId: Number(reference.dataset.itemId),
-          position,
-        }),
-      });
-      const result = await response.json();
-      this.validateSave(response, result);
-      this.announce("Order saved.");
-    } catch (error) {
-      this.announce(`${error.message} Restoring current order…`);
-    }
-    await this.reconcile(row);
-  }
-  async reconcile(row) {
-    // Always reconcile, including ambiguous network failures. Never retry the write.
-    try {
-      const response = await fetch(location.href);
-      if (!response.ok) throw new Error("Unable to reload order.");
-      const documentResult = new DOMParser().parseFromString(await response.text(), "text/html");
-      this.restore(documentResult, row);
-    } catch (error) {
-      this.announce(`${error.message} Refresh before reordering again.`);
-    }
-  }
-  restore(documentResult, row) {
     const expanded = [...this.timeline.querySelectorAll("details[open]")].flatMap((group) =>
       [...group.querySelectorAll("article")].map((item) => item.dataset.itemId),
     );
     const activeId = row.dataset.itemId;
     const scroll = window.scrollY;
-    this.timeline.innerHTML = documentResult.querySelector(".timeline").innerHTML;
+    const url = new URL(this.timeline.dataset.reorderUrl, location.href);
+    url.search = location.search;
+    try {
+      await this.request("POST", url.href, {
+        movedItemId: row.dataset.itemId,
+        referenceItemId: reference.dataset.itemId,
+        position,
+      });
+    } catch {
+      // A failed response may follow a committed write. Re-read without retrying it.
+      this.announce("Unable to save order. Restoring current order…");
+      try {
+        await this.request("GET", location.href);
+        this.announce("Current order restored. Check the order before trying again.");
+      } catch {
+        this.announce("Unable to reload order. Refresh before reordering again.");
+        return;
+      }
+    }
+    this.restore(expanded, activeId, scroll);
+  }
+  async request(method, url, values) {
+    let failed = false;
+    const checkResponse = (event) => {
+      failed = event.detail.xhr.status >= 400;
+    };
+    this.timeline.addEventListener("htmx:afterRequest", checkResponse);
+    try {
+      await htmx.ajax(method, url, {
+        source: this.timeline,
+        target: this.timeline,
+        select: ".timeline > *",
+        swap: "innerHTML",
+        values,
+      });
+      if (failed) throw new Error("Request failed.");
+    } finally {
+      this.timeline.removeEventListener("htmx:afterRequest", checkResponse);
+    }
+  }
+  restore(expanded, activeId, scroll) {
     this.timeline.querySelectorAll("details").forEach((group) => {
       group.open = [...group.querySelectorAll("article")].some(
         (item) => expanded.includes(item.dataset.itemId) || item.dataset.itemId === activeId,

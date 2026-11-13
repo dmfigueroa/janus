@@ -16,7 +16,7 @@ function timeline(itemIds) {
 }
 
 function page(itemIds) {
-  return `<p id="reorder-status" role="status"></p><form><input id="query" value="first" /></form>${timeline(itemIds)}`;
+  return `<form><input id="query" value="first" /></form>${timeline(itemIds).replace("</div>", '<p id="reorder-status" role="status"></p></div>')}`;
 }
 
 function setScrollPosition(window, scrollY) {
@@ -36,9 +36,16 @@ function openReorderPage(markup, respond, { scrollY = 0 } = {}) {
   window.HTMLElement.prototype.getClientRects = () => [1];
   window.eval(fs.readFileSync(path.join(root, "static/vendor/Sortable.min.js"), "utf8"));
   const calls = [];
-  window.fetch = async (url, options) => {
-    calls.push({ url, options });
-    return respond(url, options);
+  window.htmx = {
+    async ajax(method, url, context) {
+      const options =
+        method === "POST" ? { method, body: JSON.stringify(context.values) } : undefined;
+      calls.push({ url, options });
+      const response = await respond(url, options);
+      if (!response.ok) throw new Error("Request failed");
+      const result = new window.DOMParser().parseFromString(await response.text(), "text/html");
+      context.target.replaceChildren(...result.querySelector(".timeline").childNodes);
+    },
   };
   window.eval(fs.readFileSync(path.join(root, "static/app.js"), "utf8"));
   return { dom, window, calls, scrolled };
@@ -48,7 +55,10 @@ test("keyboard reorder saves intent and restores authoritative order and focus a
   const markup = page([1, 2]);
   const { dom, window, calls } = openReorderPage(markup, (_, options) =>
     options
-      ? { ok: true, json: async () => ({ success: false, message: "Stale anchor" }) }
+      ? {
+          ok: true,
+          text: async () => markup.replace('role="status"></p>', 'role="status">Stale anchor</p>'),
+        }
       : { ok: true, text: async () => markup },
   );
   const button = window.document.querySelector("button");
@@ -63,11 +73,11 @@ test("keyboard reorder saves intent and restores authoritative order and focus a
   assert.equal(swap.defaultPrevented, true, "fragment swaps wait for the save and reconcile");
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.deepEqual(JSON.parse(calls[0].options.body), {
-    movedItemId: 1,
-    referenceItemId: 2,
+    movedItemId: "1",
+    referenceItemId: "2",
     position: "after",
   });
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 1);
   assert.equal(window.document.querySelector("article").dataset.itemId, "1");
   assert.equal(window.document.activeElement.closest("article").dataset.itemId, "1");
   assert.match(window.document.getElementById("reorder-status").textContent, /Stale anchor/);
@@ -79,7 +89,11 @@ test("drops submit the visible anchor and preserve filters, scroll and focus on 
     page([1, 2]),
     (_, options) =>
       options
-        ? { ok: true, json: async () => ({ success: true }) }
+        ? {
+            ok: true,
+            text: async () =>
+              timeline([2, 1]).replace("</div>", '<p id="reorder-status">Order saved.</p></div>'),
+          }
         : { ok: true, text: async () => timeline([2, 1]) },
     { scrollY: 420 },
   );
@@ -101,12 +115,12 @@ test("drops submit the visible anchor and preserve filters, scroll and focus on 
   );
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.deepEqual(JSON.parse(calls[0].options.body), {
-    movedItemId: 2,
-    referenceItemId: 1,
+    movedItemId: "2",
+    referenceItemId: "1",
     position: "before",
   });
-  assert.equal(calls.length, 2);
-  assert.equal(calls[1].url, window.location.href);
+  assert.equal(calls.length, 1);
+  assert.equal(new URL(calls[0].url).search, window.location.search);
   assert.equal(window.document.getElementById("query").value, "first");
   assert.equal(window.document.getElementById("reorder-status").textContent, "Order saved.");
   assert.deepEqual(scrolled, [420]);
@@ -115,9 +129,7 @@ test("drops submit the visible anchor and preserve filters, scroll and focus on 
 });
 
 test("failed reconciliation requests a refresh instead of implying a saved order", async () => {
-  const { dom, window } = openReorderPage(page([1, 2]), (_, options) =>
-    options ? { ok: true, json: async () => ({ success: true }) } : { ok: false },
-  );
+  const { dom, window } = openReorderPage(page([1, 2]), () => ({ ok: false }));
   const button = window.document.querySelector("button");
   button.dispatchEvent(
     new window.KeyboardEvent("keydown", { key: "ArrowDown", altKey: true, bubbles: true }),
