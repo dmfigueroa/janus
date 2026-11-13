@@ -4,6 +4,7 @@ import {
   parseProviderData,
 } from "@/integrations/ProviderRequest.server";
 import { z } from "zod";
+import { serverLogger } from "@/shared/logging/ServerLog.server";
 
 const ComicIssueItemSchema = z.object({
   id: z.number(),
@@ -61,13 +62,25 @@ export async function fetchIssuePage(
   direction: ComicIssueSortDirection,
   signal?: AbortSignal,
 ): Promise<ComicIssueResponse> {
+  const context = { provider: "comicvine", operation: "fetch_issue_page" };
   const url = buildIssuePageUrl(volumeId, apiKey, offset, direction);
-  const rawData = await requestProviderJson(url, {
-    headers: { "User-Agent": "JanusApp/1.0" },
-    signal,
-  });
-  const data = parseProviderData(ComicIssueResponseSchema, rawData);
-  if (data.error !== "OK") throw new ProviderRequestError();
+  const rawData = await requestProviderJson(
+    url,
+    {
+      headers: { "User-Agent": "JanusApp/1.0" },
+      signal,
+    },
+    context,
+  );
+  const data = parseProviderData(ComicIssueResponseSchema, rawData, context);
+  if (data.error !== "OK") {
+    serverLogger("warn", "provider.response.failed", {
+      ...context,
+      outcome: "provider_error",
+      providerMessage: data.error,
+    });
+    throw new ProviderRequestError();
+  }
 
   return data;
 }

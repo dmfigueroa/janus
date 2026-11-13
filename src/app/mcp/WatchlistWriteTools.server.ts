@@ -75,7 +75,7 @@ function registerCreateWatchlists(server: McpServer) {
     },
     async ({ watchlists }) =>
       asMcpContent({
-        results: await executeWriteBatch(watchlists, createWatchlistResult),
+        results: await executeWriteBatch(watchlists, createWatchlistResult, "create_watchlists"),
       }),
   );
 }
@@ -93,7 +93,7 @@ function registerUpdateWatchlists(server: McpServer) {
     },
     async ({ watchlists }) =>
       asMcpContent({
-        results: await executeWriteBatch(watchlists, updateWatchlistResult),
+        results: await executeWriteBatch(watchlists, updateWatchlistResult, "update_watchlists"),
       }),
   );
 }
@@ -111,7 +111,7 @@ function registerDeleteWatchlists(server: McpServer) {
     },
     async ({ watchlistIds }) =>
       asMcpContent({
-        results: await executeWriteBatch(watchlistIds, deleteWatchlistResult),
+        results: await executeWriteBatch(watchlistIds, deleteWatchlistResult, "delete_watchlists"),
       }),
   );
 }
@@ -129,7 +129,7 @@ function registerSkipWatchlists(server: McpServer) {
     },
     async ({ watchlistIds }) =>
       asMcpContent({
-        results: await executeWriteBatch(watchlistIds, skipWatchlistResult),
+        results: await executeWriteBatch(watchlistIds, skipWatchlistResult, "skip_watchlists"),
       }),
   );
 }

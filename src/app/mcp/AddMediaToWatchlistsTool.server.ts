@@ -8,6 +8,7 @@ import {
 } from "@/features/watchlists/add/AddProviderMedia";
 import { addProviderMediaToWatchlist } from "@/features/watchlists/add/AddProviderMedia.server";
 import { asMcpContent } from "./McpToolResponse.server";
+import { serializeError, serverLogger } from "@/shared/logging/ServerLog.server";
 
 const mediaAdditionResultSchema = z.object({
   index: z.number().int().nonnegative(),
@@ -59,7 +60,7 @@ export function registerAddMediaToWatchlistsTool(server: McpServer) {
     },
     async ({ additions }) =>
       asMcpContent({
-        results: await executeWriteBatch(additions, addMediaResult),
+        results: await executeWriteBatch(additions, addMediaResult, "add_media_to_watchlists"),
       }),
   );
 }
@@ -91,12 +92,17 @@ function invalidMediaAdditionResult(
 }
 
 async function mediaAdditionResult(addition: ProviderMediaAddition, index: number) {
+  const startedAt = performance.now();
   const result = await addProviderMediaToWatchlist(addition).catch((error: unknown) => {
-    // Provider URLs can contain credentials. Log identifiers, never raw request errors.
-    console.error("Provider watchlist addition failed", {
+    serverLogger("error", "mcp.operation.failed", {
+      tool: "add_media_to_watchlists",
+      operation: "add_media",
+      index,
       watchlistId: addition.watchlistId,
       provider: addition.provider,
-      errorName: error instanceof Error ? error.name : "UnknownError",
+      outcome: "internal_error",
+      durationMs: Math.round(performance.now() - startedAt),
+      error: serializeError(error),
     });
     return {
       success: false as const,

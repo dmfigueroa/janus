@@ -4,6 +4,7 @@ import {
   parseProviderData,
 } from "@/integrations/ProviderRequest.server";
 import { z } from "zod";
+import { serverLogger } from "@/shared/logging/ServerLog.server";
 import {
   mapIssueToComicIssue,
   type ComicIssue,
@@ -44,12 +45,24 @@ export async function getComicIssue(
     api_key: apiKey,
     format: "json",
   }).toString();
-  const rawData = await requestProviderJson(url.toString(), {
-    headers: { "User-Agent": "JanusApp/1.0" },
-    signal,
-  });
-  const data = parseProviderData(ComicVineIssueDetailResponseSchema, rawData);
-  if (data.error !== "OK") throw new ProviderRequestError();
+  const context = { provider: "comicvine", operation: "get_issue_details" };
+  const rawData = await requestProviderJson(
+    url.toString(),
+    {
+      headers: { "User-Agent": "JanusApp/1.0" },
+      signal,
+    },
+    context,
+  );
+  const data = parseProviderData(ComicVineIssueDetailResponseSchema, rawData, context);
+  if (data.error !== "OK") {
+    serverLogger("warn", "provider.response.failed", {
+      ...context,
+      outcome: "provider_error",
+      providerMessage: data.error,
+    });
+    throw new ProviderRequestError();
+  }
 
   return {
     ...mapIssueToComicIssue(data.results),

@@ -1,3 +1,5 @@
+import { serializeError, serverLogger } from "@/shared/logging/ServerLog.server";
+
 type BatchOperationResult = { index: number; success: boolean; code: string; message: string };
 
 /** Write operations can depend on earlier writes. Each operation owns its transaction;
@@ -6,14 +8,22 @@ type BatchOperationResult = { index: number; success: boolean; code: string; mes
 export async function executeWriteBatch<Input, Result extends BatchOperationResult>(
   inputs: readonly Input[],
   operation: (input: Input, index: number) => Result | Promise<Result>,
+  toolName: string,
 ): Promise<Array<Result | BatchOperationResult>> {
   const results: Array<Result | BatchOperationResult> = [];
   for (const [index, input] of inputs.entries()) {
+    const startedAt = performance.now();
     try {
       results.push(await operation(input, index));
-    } catch {
-      // Exceptions may contain provider credentials or other sensitive request data.
-      console.error("MCP batch operation failed", { index });
+    } catch (error) {
+      serverLogger("error", "mcp.batch.operation_failed", {
+        tool: toolName,
+        index,
+        operationCount: inputs.length,
+        outcome: "internal_error",
+        durationMs: Math.round(performance.now() - startedAt),
+        error: serializeError(error),
+      });
       results.push({
         index,
         success: false,

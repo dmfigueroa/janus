@@ -7,7 +7,7 @@ import {
 import { z } from "zod";
 import { API_PAGE_SIZE } from "../Constants";
 import { type UnifiedMedia } from "../Media";
-import { getErrorMessage } from "../Utils";
+import { logMissingProviderConfiguration } from "@/integrations/ProviderLogging.server";
 
 const GoogleBookItemSchema = z.object({
   id: z.string(),
@@ -67,14 +67,18 @@ function formatBookSearch(data: z.infer<typeof GoogleBooksResponseSchema>) {
   };
 }
 
-const getGoogleBooksApiKey = () => {
+const getGoogleBooksApiKey = (operation: string) => {
   const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
-  if (!apiKey) throw new ProviderRequestError("provider_not_configured");
+  if (!apiKey) {
+    logMissingProviderConfiguration("google_books", operation);
+    throw new ProviderRequestError("provider_not_configured");
+  }
   return apiKey;
 };
 
 async function searchBooksRequest(query: string, page: number, signal?: AbortSignal) {
-  const apiKey = getGoogleBooksApiKey();
+  const context = { provider: "google_books", operation: "search_books" };
+  const apiKey = getGoogleBooksApiKey(context.operation);
   const maxResults = API_PAGE_SIZE;
   const startIndex = (page - 1) * maxResults;
   const url = new URL("https://www.googleapis.com/books/v1/volumes");
@@ -85,19 +89,20 @@ async function searchBooksRequest(query: string, page: number, signal?: AbortSig
     key: apiKey,
   }).toString();
 
-  const rawData = await requestProviderJson(url.toString(), { signal });
-  const data = parseProviderData(GoogleBooksResponseSchema, rawData);
+  const rawData = await requestProviderJson(url.toString(), { signal }, context);
+  const data = parseProviderData(GoogleBooksResponseSchema, rawData, context);
   return formatBookSearch(data);
 }
 
 async function getBookDetailsRequest(id: string, signal?: AbortSignal) {
-  const apiKey = getGoogleBooksApiKey();
+  const context = { provider: "google_books", operation: "get_book_details" };
+  const apiKey = getGoogleBooksApiKey(context.operation);
   const encodedId = encodeURIComponent(id);
   const url = new URL(`https://www.googleapis.com/books/v1/volumes/${encodedId}`);
   url.search = new URLSearchParams({ key: apiKey }).toString();
 
-  const item = await requestProviderJson(url.toString(), { signal });
-  return mapBook(parseProviderData(GoogleBookItemSchema, item));
+  const item = await requestProviderJson(url.toString(), { signal }, context);
+  return mapBook(parseProviderData(GoogleBookItemSchema, item, context));
 }
 
 export async function searchBooks(
@@ -108,8 +113,10 @@ export async function searchBooks(
   try {
     return await searchBooksRequest(query, page, signal);
   } catch (error) {
-    console.error("Google Books API Error:", getErrorMessage(error));
-    rethrowProviderFailure(error, "Google Books API Error");
+    rethrowProviderFailure(error, "Google Books API Error", {
+      provider: "google_books",
+      operation: "search_books",
+    });
   }
 }
 

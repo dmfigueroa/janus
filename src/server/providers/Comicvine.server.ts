@@ -7,7 +7,6 @@ import {
 } from "@/integrations/ProviderRequest.server";
 import { API_PAGE_SIZE } from "../Constants";
 import { type UnifiedMedia } from "../Media";
-import { getErrorMessage } from "../Utils";
 import {
   COMICVINE_ISSUE_PAGE_LIMIT,
   fetchIssuePage,
@@ -147,6 +146,16 @@ async function collectNewVolumeIssues(
   return newIssues;
 }
 
+const searchComicsContext = { provider: "comicvine", operation: "search_comics" };
+
+function requestComicVineJson(url: string, signal: AbortSignal | undefined) {
+  return requestProviderJson(
+    url,
+    { headers: { "User-Agent": "JanusApp/1.0" }, signal },
+    searchComicsContext,
+  );
+}
+
 async function searchComicsRequest(
   query: string,
   apiKey: string,
@@ -164,11 +173,8 @@ async function searchComicsRequest(
     limit: limit.toString(),
   }).toString();
 
-  const rawData = await requestProviderJson(url.toString(), {
-    headers: { "User-Agent": "JanusApp/1.0" },
-    signal,
-  });
-  const data = parseProviderData(ComicVineResponseSchema, rawData);
+  const rawData = await requestComicVineJson(url.toString(), signal);
+  const data = parseProviderData(ComicVineResponseSchema, rawData, searchComicsContext);
   return formatComicSearch(data);
 }
 
@@ -181,8 +187,7 @@ export async function searchComics(
   try {
     return await searchComicsRequest(query, apiKey, page, signal);
   } catch (error) {
-    console.error("ComicVine API Error:", getErrorMessage(error));
-    rethrowProviderFailure(error, "ComicVine API Error");
+    rethrowProviderFailure(error, "ComicVine API Error", searchComicsContext);
   }
 }
 
