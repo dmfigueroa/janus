@@ -44,7 +44,8 @@ impl ItemOrderMode {
         }
     }
 
-    fn order_sql(self) -> String {
+    /// The `ORDER BY` expression for this mode's stored item order.
+    pub(super) fn order_sql(self) -> String {
         let prefix = if self == Self::Custom {
             "custom_rank IS NULL,custom_rank,"
         } else {

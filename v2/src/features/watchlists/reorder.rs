@@ -1,4 +1,4 @@
-use super::Watchlists;
+use super::{ItemOrderMode, Watchlists};
 use sea_orm::{ConnectionTrait, DbBackend, DbErr, Statement, TransactionTrait};
 use serde::Deserialize;
 
@@ -84,7 +84,18 @@ impl Watchlists {
         if row.try_get::<String>("", "item_order_mode")? != "custom" {
             return Ok(ReorderOutcome::Rejected(ReorderFailure::NotCustomMode));
         }
-        let mut item_ids = transaction.query_all_raw(statement("SELECT id FROM watchlist_items WHERE watchlist_id=? ORDER BY custom_rank IS NULL,custom_rank,CASE WHEN release_date IS NULL OR release_date='' THEN 1 ELSE 0 END,release_date,id", vec![id.into()])).await?.iter().map(|row| row.try_get::<i64>("", "id")).collect::<Result<Vec<_>, _>>()?;
+        let mut item_ids = transaction
+            .query_all_raw(statement(
+                &format!(
+                    "SELECT id FROM watchlist_items WHERE watchlist_id=? ORDER BY {}",
+                    ItemOrderMode::Custom.order_sql()
+                ),
+                vec![id.into()],
+            ))
+            .await?
+            .iter()
+            .map(|row| row.try_get::<i64>("", "id"))
+            .collect::<Result<Vec<_>, _>>()?;
         let Some(source_index) = item_ids
             .iter()
             .position(|value| *value == input.moved_item_id)
