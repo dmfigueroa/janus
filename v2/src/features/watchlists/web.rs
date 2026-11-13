@@ -37,6 +37,8 @@ struct Page {
 #[template(path = "timeline.html")]
 struct Timeline<'a> {
     id: i64,
+    query: &'a str,
+    unwatched: bool,
     mode: &'a str,
     runs: &'a [Run],
     message: &'a str,
@@ -244,6 +246,8 @@ pub async fn reorder(
             let page = build_page(&lists, id, filters).await?;
             Timeline {
                 id: page.id,
+                query: &page.query,
+                unwatched: page.unwatched,
                 mode: &page.mode,
                 runs: &page.runs,
                 message: result.message.unwrap_or("Order saved."),

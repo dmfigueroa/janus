@@ -938,6 +938,7 @@ async fn json_input_can_request_filtered_html_with_accept_header() {
     );
     let html = body(response).await;
     assert!(html.contains("Order saved."));
+    assert!(html.contains("?query=nonexistent-title&amp;unwatched=true"));
     assert!(html.contains("No items match these filters."));
     assert!(!html.contains("data-item-id="));
 }

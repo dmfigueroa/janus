@@ -14,6 +14,7 @@ function initializeReorder() {
 class WatchlistReorder {
   constructor(timeline) {
     this.timeline = timeline;
+    this.recovery = document.getElementById("reorder-recovery");
     this.busy = false;
     this.dragging = false;
     this.initializeGroups();
@@ -27,7 +28,8 @@ class WatchlistReorder {
     return this.busy && !this.isOwnRequest(event);
   }
   isOwnRequest(event) {
-    return event.detail?.requestConfig?.elt === this.timeline;
+    const source = event.detail?.requestConfig?.elt;
+    return [this.timeline, this.recovery].includes(source);
   }
   announce(message) {
     const status = document.getElementById("reorder-status");
@@ -59,10 +61,8 @@ class WatchlistReorder {
     );
     const activeId = row.dataset.itemId;
     const scroll = window.scrollY;
-    const url = new URL(this.timeline.dataset.reorderUrl, location.href);
-    url.search = location.search;
     try {
-      await this.request("POST", url.href, {
+      await this.request(this.timeline, "reorder", {
         movedItemId: row.dataset.itemId,
         referenceItemId: reference.dataset.itemId,
         position,
@@ -71,7 +71,7 @@ class WatchlistReorder {
       // A failed response may follow a committed write. Re-read without retrying it.
       this.announce("Unable to save order. Restoring current order…");
       try {
-        await this.request("GET", location.href);
+        await this.request(this.recovery, "reconcile");
         this.announce("Current order restored. Check the order before trying again.");
       } catch {
         this.announce("Unable to reload order. Refresh before reordering again.");
@@ -80,24 +80,19 @@ class WatchlistReorder {
     }
     this.restore(expanded, activeId, scroll);
   }
-  async request(method, url, values) {
-    let failed = false;
-    const checkResponse = (event) => {
-      failed = event.detail.xhr.status >= 400;
-    };
-    this.timeline.addEventListener("htmx:afterRequest", checkResponse);
-    try {
-      await htmx.ajax(method, url, {
-        source: this.timeline,
-        target: this.timeline,
-        select: ".timeline > *",
-        swap: "innerHTML",
-        values,
-      });
-      if (failed) throw new Error("Request failed.");
-    } finally {
-      this.timeline.removeEventListener("htmx:afterRequest", checkResponse);
-    }
+  request(source, trigger, values) {
+    if (values) source.setAttribute("hx-vals", JSON.stringify(values));
+    return new Promise((resolve, reject) => {
+      source.addEventListener(
+        "htmx:afterRequest",
+        (event) => {
+          if (event.detail.successful) resolve();
+          else reject(new Error("Request failed."));
+        },
+        { once: true },
+      );
+      source.dispatchEvent(new CustomEvent(trigger, { bubbles: true }));
+    });
   }
   restore(expanded, activeId, scroll) {
     this.timeline.querySelectorAll("details").forEach((group) => {

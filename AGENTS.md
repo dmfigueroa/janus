@@ -141,4 +141,4 @@ This is a single-context repository. See `docs/agents/domain.md`.
 
 ## V2 Frontend
 
-- Use HTMX for all v2 browser HTTP requests. Prefer declarative hx-\* attributes; use htmx.ajax for imperative interactions such as drag-and-drop. Frontend requests must consume server-rendered HTML and let HTMX swap it into the page. Backend endpoints must also preserve JSON support for API callers through content negotiation. Do not use fetch or standalone XMLHttpRequest for frontend requests.
+- Use HTMX for all v2 browser HTTP requests. Declare requests, triggers, targets, and swaps with hx-\* attributes. Drag-and-drop and keyboard handlers may update request values and dispatch custom DOM events consumed by hx-trigger. Do not use htmx.ajax. Frontend requests must consume server-rendered HTML and let HTMX swap it into the page. Backend endpoints must also preserve JSON support for API callers through content negotiation. Do not use fetch or standalone XMLHttpRequest for frontend requests.

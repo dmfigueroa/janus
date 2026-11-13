@@ -12,11 +12,11 @@ function timeline(itemIds) {
         `<article data-item-id="${id}"><button class="reorder-handle">Move ${id}</button></article>`,
     )
     .join("");
-  return `<div class="timeline" data-reorder-url="/reorder" data-mode="custom">${rows}</div>`;
+  return `<div class="timeline" data-reorder-url="/reorder" data-mode="custom" hx-post="/reorder?query=first" hx-trigger="reorder" hx-target="this" hx-select=".timeline > *" hx-swap="innerHTML">${rows}</div>`;
 }
 
 function page(itemIds) {
-  return `<form><input id="query" value="first" /></form>${timeline(itemIds).replace("</div>", '<p id="reorder-status" role="status"></p></div>')}`;
+  return `<span id="reorder-recovery" hidden hx-get="" hx-trigger="reconcile" hx-target=".timeline" hx-select=".timeline > *" hx-swap="innerHTML"></span><form><input id="query" value="first" /></form>${timeline(itemIds).replace("</div>", '<p id="reorder-status" role="status"></p></div>')}`;
 }
 
 function setScrollPosition(window, scrollY) {
@@ -36,17 +36,32 @@ function openReorderPage(markup, respond, { scrollY = 0 } = {}) {
   window.HTMLElement.prototype.getClientRects = () => [1];
   window.eval(fs.readFileSync(path.join(root, "static/vendor/Sortable.min.js"), "utf8"));
   const calls = [];
-  window.htmx = {
-    async ajax(method, url, context) {
-      const options =
-        method === "POST" ? { method, body: JSON.stringify(context.values) } : undefined;
-      calls.push({ url, options });
-      const response = await respond(url, options);
-      if (!response.ok) throw new Error("Request failed");
+  function requestOptions(event) {
+    if (event.type === "reorder")
+      return { method: "POST", body: event.target.getAttribute("hx-vals") };
+  }
+  async function respondToTrigger(event) {
+    const source = event.target;
+    const options = requestOptions(event);
+    const detail = { path: source.getAttribute("hx-post") || window.location.href };
+    source.dispatchEvent(new window.CustomEvent("htmx:configRequest", { detail, bubbles: true }));
+    calls.push({ url: detail.path, options });
+    const response = await respond(detail.path, options);
+    if (response.ok) {
       const result = new window.DOMParser().parseFromString(await response.text(), "text/html");
-      context.target.replaceChildren(...result.querySelector(".timeline").childNodes);
-    },
-  };
+      window.document
+        .querySelector(".timeline")
+        .replaceChildren(...result.querySelector(".timeline").childNodes);
+    }
+    source.dispatchEvent(
+      new window.CustomEvent("htmx:afterRequest", {
+        detail: { successful: response.ok },
+        bubbles: true,
+      }),
+    );
+  }
+  window.document.addEventListener("reorder", respondToTrigger);
+  window.document.addEventListener("reconcile", respondToTrigger);
   window.eval(fs.readFileSync(path.join(root, "static/app.js"), "utf8"));
   return { dom, window, calls, scrolled };
 }
@@ -120,7 +135,7 @@ test("drops submit the visible anchor and preserve filters, scroll and focus on 
     position: "before",
   });
   assert.equal(calls.length, 1);
-  assert.equal(new URL(calls[0].url).search, window.location.search);
+  assert.equal(new URL(calls[0].url, window.location.href).search, window.location.search);
   assert.equal(window.document.getElementById("query").value, "first");
   assert.equal(window.document.getElementById("reorder-status").textContent, "Order saved.");
   assert.deepEqual(scrolled, [420]);

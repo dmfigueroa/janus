@@ -12,14 +12,14 @@ function timeline(itemIds) {
         `<article data-item-id="${id}"><button class="reorder-handle">Move ${id}</button></article>`,
     )
     .join("");
-  return `<div class="timeline" data-reorder-url="/reorder" data-mode="custom">${rows}</div>`;
+  return `<div class="timeline" data-reorder-url="/reorder" data-mode="custom" hx-post="/reorder?query=first" hx-trigger="reorder" hx-target="this" hx-select=".timeline > *" hx-swap="innerHTML">${rows}</div>`;
 }
 
 function page(itemIds) {
-  return `<form><input id="query" value="first" /></form>${timeline(itemIds).replace("</div>", '<p id="reorder-status" role="status"></p></div>')}`;
+  return `<span id="reorder-recovery" hidden hx-get="" hx-trigger="reconcile" hx-target=".timeline" hx-select=".timeline > *" hx-swap="innerHTML"></span><form><input id="query" value="first" /></form>${timeline(itemIds).replace("</div>", '<p id="reorder-status" role="status"></p></div>')}`;
 }
 
-test("real HTMX submits a form and swaps server HTML without a follow-up GET", async () => {
+async function verifyReorder({ failPost, methods, status }) {
   const http = require("node:http");
   const requests = [];
   const server = http.createServer((request, response) => {
@@ -29,6 +29,11 @@ test("real HTMX submits a form and swaps server HTML without a follow-up GET", a
     });
     request.on("end", () => {
       requests.push({ method: request.method, headers: request.headers, body });
+      if (failPost && request.method === "POST") {
+        response.writeHead(500);
+        response.end("Failed to save");
+        return;
+      }
       response.writeHead(200, { "Content-Type": "text/html" });
       response.end(page([2, 1]).replace('role="status"></p>', 'role="status">Order saved.</p>'));
     });
@@ -52,7 +57,7 @@ test("real HTMX submits a form and swaps server HTML without a follow-up GET", a
     window.eval(fs.readFileSync(path.join(root, "static/app.js"), "utf8"));
     await new Promise((resolve) => window.setTimeout(resolve, 20));
     const completed = new Promise((resolve) =>
-      window.document.addEventListener("htmx:afterRequest", resolve, { once: true }),
+      window.document.addEventListener("htmx:afterSwap", resolve, { once: true }),
     );
     window.document
       .querySelector("button")
@@ -61,16 +66,28 @@ test("real HTMX submits a form and swaps server HTML without a follow-up GET", a
       );
     await completed;
     await new Promise((resolve) => window.setTimeout(resolve, 30));
-    assert.equal(requests.length, 1);
+    assert.deepEqual(
+      requests.map((request) => request.method),
+      methods,
+    );
     assert.equal(requests[0].headers["hx-request"], "true");
     assert.match(requests[0].headers["content-type"], /application\/x-www-form-urlencoded/);
     assert.equal(new URLSearchParams(requests[0].body).get("movedItemId"), "1");
     assert.equal(window.document.querySelector("article").dataset.itemId, "2");
-    assert.equal(window.document.getElementById("reorder-status").textContent, "Order saved.");
+    assert.equal(window.document.getElementById("reorder-status").textContent, status);
     assert.equal(window.document.activeElement.closest("article").dataset.itemId, "1");
     assert.equal(window.document.querySelector(".timeline").hasAttribute("aria-busy"), false);
   } finally {
     dom.window.close();
     await new Promise((resolve) => server.close(resolve));
   }
-});
+}
+
+test("real HTMX uses hx-post and swaps server HTML without a follow-up GET", () =>
+  verifyReorder({ failPost: false, methods: ["POST"], status: "Order saved." }));
+test("real HTMX uses hx-get to recover from a failed save", () =>
+  verifyReorder({
+    failPost: true,
+    methods: ["POST", "GET"],
+    status: "Current order restored. Check the order before trying again.",
+  }));

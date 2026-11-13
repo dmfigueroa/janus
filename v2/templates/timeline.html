@@ -1,4 +1,13 @@
-<div class="timeline" data-reorder-url="/v2/watchlists/{{id}}/reorder" data-mode="{{mode}}">
+<div
+  class="timeline"
+  data-reorder-url="/v2/watchlists/{{id}}/reorder"
+  data-mode="{{mode}}"
+  hx-post="/v2/watchlists/{{id}}/reorder?query={{query|urlencode}}&amp;unwatched={{unwatched}}"
+  hx-trigger="reorder"
+  hx-target="this"
+  hx-select=".timeline > *"
+  hx-swap="innerHTML"
+>
   <p id="reorder-status" role="status" aria-live="polite">{{message}}</p>
   {% for run in runs %}{% if run.heading %}
   <h2>{{run.year}}</h2>

@@ -30,6 +30,15 @@
           <option value="false" {% if !unwatched %}selected{% endif %}>Show all</option></select
         ><button>Apply filters</button>
       </form>
+      <span
+        id="reorder-recovery"
+        hidden
+        hx-get=""
+        hx-trigger="reconcile"
+        hx-target=".timeline"
+        hx-select=".timeline > *"
+        hx-swap="innerHTML"
+      ></span>
       {% include "timeline.html" %}
     </main>
   </body>
