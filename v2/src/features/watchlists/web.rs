@@ -1,11 +1,12 @@
 use super::{ItemOrderMode, Watchlists};
+use crate::http::{FormOrJson, ResponseFormat};
 use askama::Template;
 use axum::{
-    extract::{FromRequest, Path, Query, Request, State},
+    extract::{Path, Query, State},
     http::StatusCode,
-    response::{Html, IntoResponse, Response},
+    response::{Html, Response},
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 #[derive(Default, Deserialize)]
 pub struct Filters {
     #[serde(default)]
@@ -234,80 +235,55 @@ pub async fn reorder(
     State(lists): State<Watchlists>,
     Path(id): Path<i64>,
     Query(filters): Query<Filters>,
-    request: Request,
-) -> Response {
-    let html = request
-        .headers()
-        .get("hx-request")
-        .is_some_and(|value| value == "true")
-        || request
-            .headers()
-            .get("accept")
-            .and_then(|value| value.to_str().ok())
-            .is_some_and(|value| value.contains("text/html"));
-    let json_input = request
-        .headers()
-        .get("content-type")
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| value.starts_with("application/json"));
-    let input = if json_input {
-        match axum::Json::<ReorderRequest>::from_request(request, &()).await {
-            Ok(axum::Json(input)) => input,
-            Err(error) => return error.into_response(),
-        }
-    } else {
-        match axum::Form::<ReorderRequest>::from_request(request, &()).await {
-            Ok(axum::Form(input)) => input,
-            Err(error) => return error.into_response(),
-        }
-    };
-    let axum::Json(result) = reorder_result(&lists, id, input).await;
-    if !html {
-        return axum::Json(result).into_response();
-    }
-    match build_page(&lists, id, filters).await {
-        Ok(mut page) => {
-            page.message = result
-                .get("message")
-                .and_then(|value| value.as_str())
-                .unwrap_or("Order saved.")
-                .to_owned();
-            match (Timeline {
+    format: ResponseFormat,
+    FormOrJson(request): FormOrJson<ReorderRequest>,
+) -> Result<Response, Failure> {
+    let result = reorder_result(&lists, id, request).await;
+    format
+        .respond(&result, async {
+            let page = build_page(&lists, id, filters).await?;
+            Timeline {
                 id: page.id,
                 mode: &page.mode,
                 runs: &page.runs,
-                message: &page.message,
-            })
-            .render()
-            {
-                Ok(body) => Html(body).into_response(),
-                Err(error) => failure(error).into_response(),
+                message: result.message.unwrap_or("Order saved."),
             }
+            .render()
+            .map(Html)
+            .map_err(failure)
+        })
+        .await
+}
+
+#[derive(Serialize)]
+struct ReorderResponse {
+    success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<&'static str>,
+}
+impl ReorderResponse {
+    fn rejected(code: &'static str, message: &'static str) -> Self {
+        Self {
+            success: false,
+            code: Some(code),
+            message: Some(message),
         }
-        Err(error) => error.into_response(),
     }
 }
 
-async fn reorder_result(
-    lists: &Watchlists,
-    id: i64,
-    request: ReorderRequest,
-) -> axum::Json<serde_json::Value> {
+async fn reorder_result(lists: &Watchlists, id: i64, request: ReorderRequest) -> ReorderResponse {
     use super::reorder::{Reorder, ReorderFailure, ReorderOutcome, ReorderPosition};
-    use serde_json::json;
     if request.moved_item_id == request.reference_item_id {
         let failure = ReorderFailure::InvalidReorder;
-        return axum::Json(
-            json!({"success":false,"code":failure.code(),"message":failure.message()}),
-        );
+        return ReorderResponse::rejected(failure.code(), failure.message());
     }
     let position = match request.position.as_str() {
         "before" => ReorderPosition::Before,
         "after" => ReorderPosition::After,
         _ => {
-            return axum::Json(
-                json!({"success":false,"code":"validation_error","message":"Invalid position"}),
-            );
+            return ReorderResponse::rejected("validation_error", "Invalid position");
         }
     };
     let input = Reorder {
@@ -315,14 +291,18 @@ async fn reorder_result(
         reference_item_id: request.reference_item_id,
         position,
     };
-    axum::Json(match lists.reorder(id, input).await {
-        Ok(ReorderOutcome::Reordered) => json!({"success":true}),
+    match lists.reorder(id, input).await {
+        Ok(ReorderOutcome::Reordered) => ReorderResponse {
+            success: true,
+            code: None,
+            message: None,
+        },
         Ok(ReorderOutcome::Rejected(failure)) => {
-            json!({"success":false,"code":failure.code(),"message":failure.message()})
+            ReorderResponse::rejected(failure.code(), failure.message())
         }
         Err(error) => {
             eprintln!("Reorder failed for watchlist {id}: {error}");
-            json!({"success":false,"code":"internal_error","message":"Unable to reorder watchlist items."})
+            ReorderResponse::rejected("internal_error", "Unable to reorder watchlist items.")
         }
-    })
+    }
 }
