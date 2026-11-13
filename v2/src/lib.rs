@@ -1,6 +1,7 @@
 mod database;
 pub use database::open_database;
 mod features;
+mod http;
 
 use axum::{
     Router,

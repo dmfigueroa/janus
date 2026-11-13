@@ -869,3 +869,76 @@ async fn web_reorder_preserves_validation_and_domain_failure_contracts() {
     }
     assert_eq!(lists.detail(41).await.unwrap().unwrap(), before);
 }
+
+#[tokio::test]
+async fn htmx_reorder_returns_html_with_authoritative_order_and_domain_errors() {
+    let fixture = Fixture::v1();
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let app = janus_v2::database_router(database);
+    for (reference, message) in [
+        (103, "Order saved."),
+        (999, "Reference item does not belong to this watchlist"),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/v2/watchlists/41/reorder?unwatched=false")
+                    .header("hx-request", "true")
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .body(Body::from(format!(
+                        "movedItemId=102&referenceItemId={reference}&position=after"
+                    )))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(
+            response.headers()["content-type"]
+                .to_str()
+                .unwrap()
+                .starts_with("text/html")
+        );
+        let html = body(response).await;
+        assert!(html.contains(message), "{html}");
+        assert!(!html.contains("<!doctype"));
+        assert!(
+            html.find("data-item-id=\"103\"").unwrap() < html.find("data-item-id=\"102\"").unwrap()
+        );
+    }
+}
+
+#[tokio::test]
+async fn json_input_can_request_filtered_html_with_accept_header() {
+    let fixture = Fixture::v1();
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let app = janus_v2::database_router(database);
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41/reorder?query=nonexistent-title")
+                .header("accept", "text/html")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"movedItemId":102,"referenceItemId":103,"position":"after"}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(
+        response.headers()["content-type"]
+            .to_str()
+            .unwrap()
+            .starts_with("text/html")
+    );
+    let html = body(response).await;
+    assert!(html.contains("Order saved."));
+    assert!(html.contains("?query=nonexistent-title&amp;unwatched=true"));
+    assert!(html.contains("No items match these filters."));
+    assert!(!html.contains("data-item-id="));
+}

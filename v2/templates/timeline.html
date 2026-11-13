@@ -1,0 +1,46 @@
+<div
+  class="timeline"
+  data-reorder-url="/v2/watchlists/{{id}}/reorder"
+  data-mode="{{mode}}"
+  hx-post="/v2/watchlists/{{id}}/reorder?query={{query|urlencode}}&amp;unwatched={{unwatched}}"
+  hx-trigger="reorder"
+  hx-target="this"
+  hx-select=".timeline > *"
+  hx-swap="innerHTML"
+>
+  <p id="reorder-status" role="status" aria-live="polite">{{message}}</p>
+  {% for run in runs %}{% if run.heading %}
+  <h2>{{run.year}}</h2>
+  {% endif %}{% if run.hidden %}
+  <details class="watched-run">
+    <summary>{{run.rows.len()}} watched items</summary>
+    {% endif %} {% for row in run.rows %}
+    <article data-item-id="{{row.id}}">
+      {% if mode == "custom" %}<button
+        type="button"
+        class="reorder-handle"
+        aria-label="Move {{row.title}}. Use Alt and arrow keys to reorder"
+      >
+        ↕</button
+      >{% endif %} {% if !row.poster.is_empty() %}<img
+        class="poster {{row.media}}"
+        src="{{row.poster}}"
+        alt=""
+        loading="lazy"
+        referrerpolicy="no-referrer"
+      />{% else %}
+      <div class="poster placeholder" aria-hidden="true">{{row.media}}</div>
+      {% endif %}
+      <div class="item-content">
+        <h3>{{row.title}}</h3>
+        <p>{{row.parent}} {{row.episode}}</p>
+        <p>{{row.date}}</p>
+      </div>
+      <span>{% if row.watched %}Watched{% else %}Unwatched{% endif %}</span>
+    </article>
+    {% endfor %}{% if run.hidden %}
+  </details>
+  {% endif %}{% else %}
+  <p role="status">No items match these filters.</p>
+  {% endfor %}
+</div>
