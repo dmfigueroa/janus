@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { eq } from "drizzle-orm";
 import * as schema from "@/db/Schema";
 import { createIsolatedTestDb, type IsolatedTestDb } from "@test/IsolatedDb";
+import { buildDetailOrderBy } from "@/features/watchlists/Order.server";
 import { reorderItems } from "@/features/watchlists/reorder/Mutation.server";
 
 const dbState = vi.hoisted(() => ({
@@ -33,7 +34,7 @@ beforeEach(async () => {
 });
 
 describe("reorderItems mutation", () => {
-  it("moves an item relative to an anchor and rewrites only the affected rank slice", async () => {
+  it("moves an item relative to an anchor and rewrites changed ranks", async () => {
     const [watchlist] = await db
       .insert(watchlists)
       .values({ name: "Test Watchlist", itemOrderMode: "custom" })
@@ -255,4 +256,143 @@ describe("reorderItems mutation", () => {
       { id: item2.id, customRank: 2 },
     ]);
   });
+
+  it("reorders against the displayed order when ranks are duplicated", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Duplicate Ranks", itemOrderMode: "custom" })
+      .returning();
+
+    const [itemA, itemB, itemC, itemD, itemE] = await db
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "a",
+          title: "A",
+          mediaType: "movie",
+          customRank: 1,
+          releaseDate: "2020-01-01",
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "b",
+          title: "B",
+          mediaType: "movie",
+          customRank: 2,
+          releaseDate: "2020-03-01",
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "c",
+          title: "C",
+          mediaType: "movie",
+          customRank: 2,
+          releaseDate: "2020-02-01",
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "d",
+          title: "D",
+          mediaType: "movie",
+          customRank: 3,
+          releaseDate: "2020-04-01",
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "e",
+          title: "E",
+          mediaType: "movie",
+          customRank: 4,
+          releaseDate: "2020-05-01",
+        },
+      ])
+      .returning();
+
+    // The timeline shows A, C, B, D, E: duplicate ranks fall back to release date.
+    const result = await reorderItems({
+      watchlistId: watchlist.id,
+      movedItemId: itemE.id,
+      referenceItemId: itemB.id,
+      position: "before",
+    });
+
+    expect(result.success).toBe(true);
+    expect(await readItemsInDisplayOrder(watchlist.id)).toEqual([
+      { id: itemA.id, customRank: 1 },
+      { id: itemC.id, customRank: 2 },
+      { id: itemE.id, customRank: 3 },
+      { id: itemB.id, customRank: 4 },
+      { id: itemD.id, customRank: 5 },
+    ]);
+  });
+
+  it("repairs null ranks into a contiguous order", async () => {
+    const [watchlist] = await db
+      .insert(watchlists)
+      .values({ name: "Null Ranks", itemOrderMode: "custom" })
+      .returning();
+
+    const [itemA, itemB, itemC, itemD] = await db
+      .insert(watchlistItems)
+      .values([
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "a",
+          title: "A",
+          mediaType: "movie",
+          customRank: 1,
+          releaseDate: "2020-01-01",
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "b",
+          title: "B",
+          mediaType: "movie",
+          customRank: null,
+          releaseDate: "2019-01-01",
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "c",
+          title: "C",
+          mediaType: "movie",
+          customRank: null,
+          releaseDate: "2018-01-01",
+        },
+        {
+          watchlistId: watchlist.id,
+          tmdbId: "d",
+          title: "D",
+          mediaType: "movie",
+          customRank: 2,
+          releaseDate: "2020-02-01",
+        },
+      ])
+      .returning();
+
+    // Display order is A, D, C, B: null ranks sort last by release date.
+    const result = await reorderItems({
+      watchlistId: watchlist.id,
+      movedItemId: itemB.id,
+      referenceItemId: itemA.id,
+      position: "before",
+    });
+
+    expect(result.success).toBe(true);
+    expect(await readItemsInDisplayOrder(watchlist.id)).toEqual([
+      { id: itemB.id, customRank: 1 },
+      { id: itemA.id, customRank: 2 },
+      { id: itemD.id, customRank: 3 },
+      { id: itemC.id, customRank: 4 },
+    ]);
+  });
 });
+
+async function readItemsInDisplayOrder(watchlistId: number) {
+  return db
+    .select({ id: watchlistItems.id, customRank: watchlistItems.customRank })
+    .from(watchlistItems)
+    .where(eq(watchlistItems.watchlistId, watchlistId))
+    .orderBy(...buildDetailOrderBy("custom"));
+}

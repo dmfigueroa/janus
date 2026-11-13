@@ -175,6 +175,14 @@
       }
     },
     {
+      "files": ["tools/bench/**"],
+      "rules": {
+        "complexity": "off",
+        "max-lines": "off",
+        "max-lines-per-function": "off"
+      }
+    },
+    {
       "files": ["**/*.test.{ts,tsx}"],
       "rules": {
         "complexity": "off",

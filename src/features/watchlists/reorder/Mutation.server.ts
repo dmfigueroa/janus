@@ -1,6 +1,7 @@
 import { getDb, type DatabaseTransaction } from "@/db/Db.server";
 import { watchlistItems, watchlists } from "@/db/Schema";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { buildDetailOrderBy } from "@/features/watchlists/Order.server";
+import { and, eq } from "drizzle-orm";
 import type { ReorderItemsInput } from "./Schema";
 
 export type ReorderItemsResult =
@@ -57,6 +58,9 @@ function reorderItemsInTransaction(
     };
   }
 
+  // Reorder against the same ordering the timeline displays. Ordering by rank and id alone
+  // disagrees with the detail query whenever ranks are duplicated or null, which would place
+  // a dropped row somewhere other than where the user dropped it.
   const existingItems = transaction
     .select({
       id: watchlistItems.id,
@@ -64,11 +68,7 @@ function reorderItemsInTransaction(
     })
     .from(watchlistItems)
     .where(eq(watchlistItems.watchlistId, watchlistId))
-    .orderBy(
-      sql`CASE WHEN ${watchlistItems.customRank} IS NULL THEN 1 ELSE 0 END`,
-      asc(watchlistItems.customRank),
-      asc(watchlistItems.id),
-    )
+    .orderBy(...buildDetailOrderBy("custom"))
     .all();
   return reorderExistingItems(transaction, existingItems, {
     watchlistId,
@@ -86,18 +86,36 @@ function reorderExistingItems(
   const missingItemError = findMissingItemError(existingItems, movedItemId, referenceItemId);
   if (missingItemError) return missingItemError;
 
-  const orderedIds = existingItems.map((item) => item.id);
-  const oldIndex = orderedIds.indexOf(movedItemId);
-  const remainingIds = orderedIds.filter((itemId) => itemId !== movedItemId);
+  const remainingIds = existingItems
+    .map((item) => item.id)
+    .filter((itemId) => itemId !== movedItemId);
   const referenceIndex = remainingIds.indexOf(referenceItemId);
+  remainingIds.splice(reorderInsertionIndex(position, referenceIndex), 0, movedItemId);
 
-  return applyItemReorder(transaction, {
-    watchlistId,
-    movedItemId,
-    position,
-    oldIndex,
-    referenceIndex,
-    remainingIds,
+  // Renumber the whole list, not just the moved slice. Duplicate and null ranks are what make
+  // the next drop unpredictable, so a reorder also repairs the list into contiguous 1..N ranks.
+  renumberRanks(transaction, watchlistId, existingItems, remainingIds);
+
+  return { success: true as const };
+}
+
+function renumberRanks(
+  transaction: DatabaseTransaction,
+  watchlistId: number,
+  existingItems: Array<{ id: number; customRank: number | null }>,
+  orderedIds: number[],
+) {
+  const rankByItemId = new Map(existingItems.map((item) => [item.id, item.customRank]));
+
+  orderedIds.forEach((itemId, index) => {
+    const nextRank = index + 1;
+    if (rankByItemId.get(itemId) === nextRank) return;
+
+    transaction
+      .update(watchlistItems)
+      .set({ customRank: nextRank })
+      .where(and(eq(watchlistItems.id, itemId), eq(watchlistItems.watchlistId, watchlistId)))
+      .run();
   });
 }
 
@@ -125,53 +143,6 @@ function findMissingItemError(
   }
 
   return null;
-}
-
-function applyItemReorder(
-  transaction: DatabaseTransaction,
-  {
-    watchlistId,
-    movedItemId,
-    position,
-    oldIndex,
-    referenceIndex,
-    remainingIds,
-  }: Pick<ReorderItemsInput, "watchlistId" | "movedItemId" | "position"> & {
-    oldIndex: number;
-    referenceIndex: number;
-    remainingIds: number[];
-  },
-) {
-  const nextIndex = reorderInsertionIndex(position, referenceIndex);
-  remainingIds.splice(nextIndex, 0, movedItemId);
-
-  const reorderedIndex = remainingIds.indexOf(movedItemId);
-
-  if (reorderedIndex === oldIndex) {
-    return { success: true as const };
-  }
-
-  const sliceStart = Math.min(oldIndex, reorderedIndex);
-  const sliceEnd = Math.max(oldIndex, reorderedIndex);
-  const affectedIds = remainingIds.slice(sliceStart, sliceEnd + 1);
-  updateAffectedRanks(transaction, watchlistId, affectedIds, sliceStart);
-
-  return { success: true as const };
-}
-
-function updateAffectedRanks(
-  transaction: DatabaseTransaction,
-  watchlistId: number,
-  affectedIds: number[],
-  sliceStart: number,
-) {
-  for (const [offset, itemId] of affectedIds.entries()) {
-    transaction
-      .update(watchlistItems)
-      .set({ customRank: sliceStart + offset + 1 })
-      .where(and(eq(watchlistItems.id, itemId), eq(watchlistItems.watchlistId, watchlistId)))
-      .run();
-  }
 }
 
 function reorderInsertionIndex(position: ReorderItemsInput["position"], referenceIndex: number) {
