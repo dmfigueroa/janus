@@ -390,7 +390,11 @@ async function measureSearchInput(page) {
  * single-block mount the timeline can trigger, so it doubles as the interaction probe.
  */
 async function measureRunExpansion(page) {
-  const disclosure = page.locator('button[aria-expanded="false"]').first();
+  // The filter probe ends on "All", where no watched runs are collapsed.
+  await page.getByRole("button", { name: "Unwatched", exact: true }).click();
+  await page.waitForTimeout(500);
+
+  const disclosure = page.getByRole("button", { name: /watched item/ }).first();
   if ((await disclosure.count()) === 0) return { supported: false };
 
   const heightBefore = await documentHeight(page);
