@@ -1,53 +1,78 @@
 // Run with the supported Node ABI; production migrations own this fixture schema.
+const assert = require("node:assert/strict");
 const Database = require("better-sqlite3");
 const { drizzle } = require("drizzle-orm/better-sqlite3");
 const { migrate } = require("drizzle-orm/better-sqlite3/migrator");
 const path = require("node:path");
 const database = new Database(process.argv[2]);
-if (process.argv[3] === "check-reorder") {
-  const assert = require("node:assert/strict");
-  assert.deepEqual(
+const customOrder = "ORDER BY custom_rank IS NULL, custom_rank, id";
+const watchlistItemIds = (watchlistId) =>
+  database
+    .prepare(`SELECT id FROM watchlist_items WHERE watchlist_id=? ${customOrder}`)
+    .all(watchlistId)
+    .map((row) => row.id);
+const watchlistItemRanks = (watchlistId) =>
+  database
+    .prepare(`SELECT id, custom_rank FROM watchlist_items WHERE watchlist_id=? ${customOrder}`)
+    .all(watchlistId);
+
+const actions = {
+  "check-reorder"() {
+    assert.deepEqual(watchlistItemIds(41), [101, 103, 102]);
+    database.prepare("UPDATE watchlist_items SET custom_rank=0 WHERE id=102").run();
+  },
+  "reject-rank"() {
+    database.exec(
+      "CREATE TRIGGER reject_rank BEFORE UPDATE OF custom_rank ON watchlist_items WHEN NEW.id=102 BEGIN SELECT RAISE(ABORT, 'test failure'); END",
+    );
+  },
+  gapped() {
     database
-      .prepare(
-        "SELECT id FROM watchlist_items WHERE watchlist_id=41 ORDER BY custom_rank IS NULL, custom_rank, id",
-      )
-      .all()
-      .map((row) => row.id),
-    [101, 103, 102],
-  );
-  database.prepare("UPDATE watchlist_items SET custom_rank=0 WHERE id=102").run();
-  database.close();
-  process.exit(0);
+      .prepare("INSERT INTO watchlists(id,name,item_order_mode) VALUES(43, 'Gapped', 'custom')")
+      .run();
+    const insert = database.prepare(
+      "INSERT INTO watchlist_items(id,watchlist_id,tmdb_id,source,media_type,title,custom_rank,release_date) VALUES(?,43,?,'tmdb','movie',?,?,?)",
+    );
+    [
+      [201, "g-1", "First", 1, "2020-01-01"],
+      [202, "g-2", "Second", 10, "2020-02-01"],
+      [203, "g-3", "Third", 11, "2020-03-01"],
+      [204, "g-4", "Fourth", 12, "2020-04-01"],
+    ].forEach(([id, tmdbId, title, rank, releaseDate]) =>
+      insert.run(id, tmdbId, title, rank, releaseDate),
+    );
+  },
+  "check-gapped-reorder"() {
+    assert.deepEqual(watchlistItemRanks(43), [
+      { id: 201, custom_rank: 1 },
+      { id: 202, custom_rank: 2 },
+      { id: 204, custom_rank: 3 },
+      { id: 203, custom_rank: 4 },
+    ]);
+  },
+  release() {
+    database.prepare("UPDATE watchlists SET item_order_mode = 'release' WHERE id = 41").run();
+  },
+  mutate() {
+    database.prepare("UPDATE watchlist_items SET is_watched = 1 WHERE id = 101").run();
+  },
+  "watch-all"() {
+    database.prepare("UPDATE watchlist_items SET is_watched = 1 WHERE watchlist_id = 41").run();
+  },
+  incompatible() {
+    database.exec("ALTER TABLE watchlists ADD COLUMN unexpected TEXT");
+  },
+  wal() {
+    database.pragma("journal_mode = WAL");
+  },
+};
+const requestedAction = process.argv[3];
+const action = actions[requestedAction];
+if (requestedAction && !action) {
+  throw new Error(`Unknown fixture action: ${requestedAction}`);
 }
-if (process.argv[3] === "reject-rank") {
-  database.exec(
-    "CREATE TRIGGER reject_rank BEFORE UPDATE OF custom_rank ON watchlist_items WHEN NEW.id=102 BEGIN SELECT RAISE(ABORT, 'test failure'); END",
-  );
-  database.close();
-  process.exit(0);
-}
-if (process.argv[3] === "release") {
-  database.prepare("UPDATE watchlists SET item_order_mode = 'release' WHERE id = 41").run();
-  database.close();
-  process.exit(0);
-}
-if (process.argv[3] === "mutate") {
-  database.prepare("UPDATE watchlist_items SET is_watched = 1 WHERE id = 101").run();
-  database.close();
-  process.exit(0);
-}
-if (process.argv[3] === "watch-all") {
-  database.prepare("UPDATE watchlist_items SET is_watched = 1 WHERE watchlist_id = 41").run();
-  database.close();
-  process.exit(0);
-}
-if (process.argv[3] === "incompatible") {
-  database.exec("ALTER TABLE watchlists ADD COLUMN unexpected TEXT");
-  database.close();
-  process.exit(0);
-}
-if (process.argv[3] === "wal") {
-  database.pragma("journal_mode = WAL");
+if (action) {
+  action();
   database.close();
   process.exit(0);
 }

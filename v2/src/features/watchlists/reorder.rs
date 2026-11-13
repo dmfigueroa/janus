@@ -84,21 +84,27 @@ impl Watchlists {
         if row.try_get::<String>("", "item_order_mode")? != "custom" {
             return Ok(ReorderOutcome::Rejected(ReorderFailure::NotCustomMode));
         }
-        let mut ids = transaction.query_all_raw(statement("SELECT id FROM watchlist_items WHERE watchlist_id=? ORDER BY custom_rank IS NULL,custom_rank,CASE WHEN release_date IS NULL OR release_date='' THEN 1 ELSE 0 END,release_date,id", vec![id.into()])).await?.iter().map(|row| row.try_get::<i64>("", "id")).collect::<Result<Vec<_>, _>>()?;
-        let Some(old) = ids.iter().position(|value| *value == input.moved_item_id) else {
+        let mut item_ids = transaction.query_all_raw(statement("SELECT id FROM watchlist_items WHERE watchlist_id=? ORDER BY custom_rank IS NULL,custom_rank,CASE WHEN release_date IS NULL OR release_date='' THEN 1 ELSE 0 END,release_date,id", vec![id.into()])).await?.iter().map(|row| row.try_get::<i64>("", "id")).collect::<Result<Vec<_>, _>>()?;
+        let Some(source_index) = item_ids
+            .iter()
+            .position(|value| *value == input.moved_item_id)
+        else {
             return Ok(ReorderOutcome::Rejected(ReorderFailure::InvalidItem));
         };
-        ids.remove(old);
-        let Some(anchor) = ids
+        item_ids.remove(source_index);
+        let Some(reference_index) = item_ids
             .iter()
             .position(|value| *value == input.reference_item_id)
         else {
             return Ok(ReorderOutcome::Rejected(ReorderFailure::InvalidReference));
         };
-        let next = anchor + usize::from(input.position == ReorderPosition::After);
-        ids.insert(next, input.moved_item_id);
-        if old != next {
-            for (index, item_id) in ids.iter().enumerate() {
+        let destination_index =
+            reference_index + usize::from(input.position == ReorderPosition::After);
+        item_ids.insert(destination_index, input.moved_item_id);
+        if source_index != destination_index {
+            // Renumber the complete sequence so the stored order stays contiguous even
+            // when deletions left rank gaps. V1 only rewrites the affected slice.
+            for (index, item_id) in item_ids.iter().enumerate() {
                 transaction
                     .execute_raw(statement(
                         "UPDATE watchlist_items SET custom_rank=? WHERE watchlist_id=? AND id=?",

@@ -23,6 +23,9 @@ class WatchlistReorder {
       if (this.dragging || this.busy) event.preventDefault();
     });
   }
+  announce(message) {
+    if (this.status) this.status.textContent = message;
+  }
   rows() {
     return [...this.timeline.querySelectorAll("article[data-item-id]")];
   }
@@ -47,7 +50,7 @@ class WatchlistReorder {
     this.timeline.querySelectorAll("button").forEach((button) => {
       button.disabled = true;
     });
-    this.status.textContent = "Saving order…";
+    this.announce("Saving order…");
     try {
       const response = await fetch(this.timeline.dataset.reorderUrl, {
         method: "POST",
@@ -60,9 +63,9 @@ class WatchlistReorder {
       });
       const result = await response.json();
       this.validateSave(response, result);
-      this.status.textContent = "Order saved.";
+      this.announce("Order saved.");
     } catch (error) {
-      this.status.textContent = `${error.message} Restoring current order…`;
+      this.announce(`${error.message} Restoring current order…`);
     }
     await this.reconcile(row);
   }
@@ -70,11 +73,11 @@ class WatchlistReorder {
     // Always reconcile, including ambiguous network failures. Never retry the write.
     try {
       const response = await fetch(location.href);
-      if (!response.ok) throw new Error("Unable to reload order. Refresh before reordering again.");
+      if (!response.ok) throw new Error("Unable to reload order.");
       const documentResult = new DOMParser().parseFromString(await response.text(), "text/html");
       this.restore(documentResult, row);
     } catch (error) {
-      this.status.textContent = error.message;
+      this.announce(`${error.message} Refresh before reordering again.`);
     }
   }
   restore(documentResult, row) {
