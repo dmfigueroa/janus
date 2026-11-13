@@ -30,7 +30,8 @@ compatibility reconciliation and regeneration of the v1 schema contract through 
 - [x] Watchlist listing and name search through web/MCP reads.
 - [ ] Watchlist create, edit, delete and merge.
 - [x] Existing detail reads, text filters, stored release/custom order and release-year/watched grouping.
-- [ ] Hidden-item-safe reorder and order-mode changes.
+- [x] Hidden-item-safe custom reorder.
+- [ ] Order-mode changes.
 - [ ] Provider search/details/pagination and additions; TV/comic expansions.
 - [ ] Custom additions, anchored insertion, duplicates and partial outcomes.
 - [ ] Edited metadata, item/parent removal and movement.
@@ -49,8 +50,8 @@ compatibility reconciliation and regeneration of the v1 schema contract through 
 
 ## MCP source inventory
 
-The four prerequisite read tools are implemented; the remaining tools are unported.
-Contracts live in src/app/mcp at the source revision above.
+The four prerequisite read tools and `reorder_watchlist_items` are implemented; the other
+tools are unported. Contracts live in src/app/mcp at the source revision above.
 
 - [ ] add_custom_items_to_watchlists
 - [ ] add_media_to_watchlists
@@ -70,7 +71,7 @@ Contracts live in src/app/mcp at the source revision above.
 - [ ] remove_watchlist_items
 - [ ] remove_watchlist_parents
 - [ ] reorder_lineups
-- [ ] reorder_watchlist_items
+- [x] reorder_watchlist_items
 - [ ] search_media
 - [x] search_watchlists
 - [ ] set_lineup_watchlists
@@ -166,10 +167,16 @@ The browser provides pointer/touch handles and Alt+Up/Down keyboard controls, bl
 local reorder writes while saving, and reconciles from the current filtered URL after
 success or failure. Expanded watched groups, focus and scroll are restored.
 
+Moves are evaluated against the complete displayed order and the resulting sequence is
+renumbered in full. Stored ranks therefore stay contiguous even when v1 deletions left
+gaps, instead of v1's slice-only update producing a different order from the new ranks.
+
 Automated coverage: disposable v1-migrated SQLite web/MCP success and invalid anchors,
-independent batch results, durable reopened reads, v1 rank reads/writes, and forced
-mid-write rollback. DOM coverage exercises optimistic keyboard movement, failed-save
-reconciliation, one write attempt and focus restoration. DOM tests do not establish
-real browser pointer/touch behavior. Existing database tests cover bounded locks and
-schema compatibility. No deployment, Access-authenticated client, physical-device or
-owner acceptance evidence is claimed for this change; those gates remain outstanding.
+independent batch results, durable reopened reads, v1 rank reads/writes, gapped-rank
+renumbering, and forced mid-write rollback. DOM coverage exercises optimistic keyboard
+movement, drop-intent anchors, blocked fragment swaps during drags and saves, failed-save
+reconciliation, failed-reconcile refresh guidance, one write attempt, and filter/scroll/focus
+restoration on success. DOM tests do not establish real browser pointer/touch behavior.
+Existing database tests cover bounded locks and schema compatibility. No deployment,
+Access-authenticated client, physical-device or owner acceptance evidence is claimed for
+this change; those gates remain outstanding.

@@ -1,7 +1,8 @@
-# Janus v2 read slice
+# Janus v2 reorder slice
 
-One Rust crate serves HTML, local assets and MCP. V1 remains the application for writes.
-Requires Rust 1.94.0 and a native C compiler. Production needs no Node runtime or frontend build.
+One Rust crate serves HTML, local assets and MCP. V1 remains the application for writes
+other than watchlist item reordering. Requires Rust 1.94.0 and a native C compiler.
+Production needs no Node runtime or frontend build.
 
 ```sh
 cd v2
@@ -28,7 +29,9 @@ The existing directory must be mounted, including WAL/SHM sidecars.
 - `/v2/watchlists`: paginated watchlist discovery and Unicode name search.
 - `/v2/watchlists/{id}`: existing items in release/custom order, text filtering, release-year
   grouping, expandable watched runs, stable IDs and nullable metadata.
-- `/v2/mcp`: `list_watchlists`, `search_watchlists`, `get_watchlist`, `find_watchlist_items`.
+- `/v2/watchlists/{id}/reorder`: atomic custom-order moves from web drag or keyboard intents.
+- `/v2/mcp`: `list_watchlists`, `search_watchlists`, `get_watchlist`, `find_watchlist_items`,
+  `reorder_watchlist_items`.
 - `/v2/health/live`: HTTP liveness.
 - `/v2/health/ready`: compatibility-validated application readiness.
 
@@ -45,7 +48,11 @@ this contract. Timestamps stay strings; JSON authors and nullable integer boolea
 v1 values. Name search uses NFC plus lowercase; detail text search intentionally retains
 SQLite LIKE's ASCII case behavior and treats wildcard characters literally.
 
-Future writes must explicitly preserve Drizzle's application-side `updatedAt` hook;
-SeaORM does not supply it automatically. Reordering now uses the shared web/MCP operation; other writes belong to following slices. See [PARITY.md](PARITY.md) for evidence and outstanding acceptance.
+Reorder writes renumber the complete displayed sequence, keeping ranks contiguous even
+when v1 deletions left gaps. Other future writes must explicitly preserve Drizzle's
+application-side `updatedAt` hook; SeaORM does not supply it automatically. Reordering uses
+the shared web/MCP operation; other writes belong to following slices. See
+[PARITY.md](PARITY.md) for evidence and outstanding acceptance.
 
-Reorder DOM regression: `node --test v2/tests/reorder-browser.cjs` (Node 24 with npm dependencies).
+Reorder DOM regression: `node --test v2/tests/reorder-browser.cjs` (Node 24.12 or later
+with npm dependencies).

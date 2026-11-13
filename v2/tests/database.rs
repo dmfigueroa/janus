@@ -636,10 +636,23 @@ async fn web_discovery_distinguishes_invalid_cursor_from_database_failure() {
     assert!(!body(response).await.contains("pool"));
 }
 
+async fn ordered_item_ids(lists: &janus_v2::Watchlists, watchlist_id: i64) -> Vec<i64> {
+    lists
+        .detail(watchlist_id)
+        .await
+        .unwrap()
+        .unwrap()
+        .items
+        .iter()
+        .map(|item| item.id)
+        .collect()
+}
+
 #[tokio::test]
-async fn reorder_preserves_hidden_items_and_rejects_invalid_anchors() {
+async fn reorder_preserves_complete_order_and_rejects_invalid_anchors() {
     let fixture = Fixture::v1();
     let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let lists = janus_v2::Watchlists(database.clone());
     let app = janus_v2::database_router(database.clone());
     for (reference, success) in [(103, true), (999, false)] {
         let response = app
@@ -659,19 +672,42 @@ async fn reorder_preserves_hidden_items_and_rejects_invalid_anchors() {
             .unwrap();
         let result: Value = serde_json::from_str(&body(response).await).unwrap();
         assert_eq!(result["success"], success);
-        assert_eq!(
-            janus_v2::Watchlists(database.clone())
-                .detail(41)
-                .await
-                .unwrap()
-                .unwrap()
-                .items
-                .iter()
-                .map(|item| item.id)
-                .collect::<Vec<_>>(),
-            vec![101, 103, 102]
-        );
+        assert_eq!(ordered_item_ids(&lists, 41).await, vec![101, 103, 102]);
     }
+}
+
+#[tokio::test]
+async fn reorder_renumbers_the_complete_order_when_v1_ranks_have_gaps() {
+    let fixture = Fixture::v1();
+    change_v1(&fixture, "gapped");
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let lists = janus_v2::Watchlists(database.clone());
+    assert_eq!(ordered_item_ids(&lists, 43).await, vec![201, 202, 203, 204]);
+    let app = janus_v2::database_router(database);
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/43/reorder")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"movedItemId":204,"referenceItemId":203,"position":"before"})
+                        .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&body(response).await).unwrap(),
+        json!({"success":true})
+    );
+    change_v1(&fixture, "check-gapped-reorder");
+    let reopened = janus_v2::Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    assert_eq!(
+        ordered_item_ids(&reopened, 43).await,
+        vec![201, 202, 204, 203]
+    );
 }
 
 #[tokio::test]
@@ -694,18 +730,7 @@ async fn mcp_reorders_are_independent_and_visible_after_reopen() {
         "reordered"
     );
     let reopened = janus_v2::Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
-    assert_eq!(
-        reopened
-            .detail(41)
-            .await
-            .unwrap()
-            .unwrap()
-            .items
-            .iter()
-            .map(|item| item.id)
-            .collect::<Vec<_>>(),
-        vec![101, 103, 102]
-    );
+    assert_eq!(ordered_item_ids(&reopened, 41).await, vec![101, 103, 102]);
     change_v1(&fixture, "reject-rank");
     let failed = result(rpc(&app,json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"reorder_watchlist_items","arguments":{"reorders":[{"watchlistId":41,"movedItemId":101,"referenceItemId":102,"position":"after"},{}]}}}),Some(&session)).await).await;
     assert_eq!(
