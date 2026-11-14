@@ -24,9 +24,16 @@ interface WatchlistTimelineProps {
   interactionDisabled?: boolean;
 }
 
-export function WatchlistTimeline(props: WatchlistTimelineProps) {
-  const { items, itemOrderMode, unwatchedOnly, onLoadMore } = props;
-  const reorder = props.reorder ?? readOnlyReorder(items);
+export function WatchlistTimeline({
+  items,
+  itemOrderMode,
+  unwatchedOnly,
+  onLoadMore,
+  hasMore,
+  isLoadingMore,
+  interactionDisabled,
+  reorder = readOnlyReorder(items),
+}: WatchlistTimelineProps) {
   const displayedItems = reorder.displayedItems;
   const { expandedRunKeys, toggleRun } = useExpandedWatchedRuns();
   const blocks = useMemo(
@@ -41,8 +48,8 @@ export function WatchlistTimeline(props: WatchlistTimelineProps) {
   );
   const sortableItemIds = useMemo(() => displayedItems.map((item) => item.id), [displayedItems]);
   const { ref } = useIntersectionObserver({
-    onIntersect: getLoadMoreHandler(Boolean(props.interactionDisabled), onLoadMore),
-    enabled: isLoadMoreEnabled(props),
+    onIntersect: getLoadMoreHandler(Boolean(interactionDisabled), onLoadMore),
+    enabled: isLoadMoreEnabled({ onLoadMore, hasMore, isLoadingMore, interactionDisabled }),
     rootMargin: "100px",
   });
 
@@ -70,11 +77,11 @@ export function WatchlistTimeline(props: WatchlistTimelineProps) {
           itemOrderMode={itemOrderMode}
           showHandleSlot={itemOrderMode === "custom"}
           showHandle={resolveShowHandle(itemOrderMode, reorder.reorderEnabled)}
-          interactionDisabled={Boolean(props.interactionDisabled)}
+          interactionDisabled={Boolean(interactionDisabled)}
           onToggleRun={toggleRun}
         />
       </SortableContext>
-      <WatchlistTimelineEndcap hasMore={props.hasMore} sentinelRef={ref} />
+      <WatchlistTimelineEndcap hasMore={hasMore} sentinelRef={ref} />
     </DndContext>
   );
 }

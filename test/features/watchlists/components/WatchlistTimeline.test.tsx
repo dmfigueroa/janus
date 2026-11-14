@@ -318,7 +318,7 @@ function TimelineHarness({
   return <Timeline {...props} reorder={reorder} />;
 }
 
-function WatchlistTimeline(props: React.ComponentProps<typeof TimelineHarness>) {
+function WatchlistTimeline({ ...props }: React.ComponentProps<typeof TimelineHarness>) {
   const [client] = React.useState(
     () => new QueryClient({ defaultOptions: { mutations: { retry: false } } }),
   );
