@@ -1,3 +1,25 @@
+vi.mock("@/features/watchlists/detail/Query", () => ({
+  watchlistDetailQueryKey: (filters: object) => ["watchlists", "detail", 1, filters],
+}));
+import * as React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useWatchlistReorder } from "@/features/watchlists/detail/useWatchlistReorder";
+const persistence = vi.hoisted(() => ({ prepare: vi.fn() }));
+vi.mock("@tanstack/react-start", () => ({ useServerFn: () => async () => ({ success: true }) }));
+vi.mock("@/features/watchlists/reorder/Mutation", () => ({ reorderWatchlistItems: vi.fn() }));
+vi.mock("@/app/Toaster", () => ({ toaster: { create: vi.fn() } }));
+vi.mock("@/features/watchlists/detail/WatchlistDetailCache", () => ({
+  optimisticallyReorderWatchlistItems: async (input: {
+    movedItemId: number;
+    referenceItemId: number;
+    position: "before" | "after";
+  }) => {
+    const ready = await persistence.prepare(input);
+    if (ready === false) throw new Error("Preparation failed");
+    return [];
+  },
+  restoreWatchlistDetailSnapshot: vi.fn(),
+}));
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -5,7 +27,7 @@ import { ChakraProvider } from "@chakra-ui/react";
 import type { DndContextProps, DragEndEvent, DragStartEvent } from "@dnd-kit/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistItem } from "@/db/Schema";
-import { WatchlistTimeline } from "@/features/watchlists/components/WatchlistTimeline";
+import { WatchlistTimeline as Timeline } from "@/features/watchlists/components/WatchlistTimeline";
 import { janusSystem } from "@/app/Theme";
 
 let latestDndContextProps: Pick<DndContextProps, "onDragStart" | "onDragEnd" | "cancelDrop"> = {};
@@ -267,4 +289,42 @@ describe("WatchlistTimeline reorder controls", () => {
 
 function renderWithProvider(ui: React.ReactElement) {
   return render(<ChakraProvider value={janusSystem}>{ui}</ChakraProvider>);
+}
+
+function TimelineHarness({
+  onReorder,
+  canReorder,
+  ...props
+}: Omit<React.ComponentProps<typeof Timeline>, "reorder"> & {
+  onReorder?: (
+    intent: import("@/features/watchlists/detail/Reorder").ReorderIntent,
+  ) => Promise<boolean> | void;
+  canReorder?: boolean;
+}) {
+  persistence.prepare.mockImplementation((input) =>
+    onReorder?.({
+      movedItemId: input.movedItemId,
+      referenceItemId: input.referenceItemId,
+      position: input.position,
+    }),
+  );
+  const reorder = useWatchlistReorder({
+    items: props.items,
+    itemOrderMode: props.itemOrderMode,
+    canReorder: Boolean(canReorder),
+    watchlistId: 1,
+    activeFilters: { watchlistId: 1, itemOrderMode: props.itemOrderMode, unwatchedOnly: false },
+  });
+  return <Timeline {...props} reorder={reorder} />;
+}
+
+function WatchlistTimeline(props: React.ComponentProps<typeof TimelineHarness>) {
+  const [client] = React.useState(
+    () => new QueryClient({ defaultOptions: { mutations: { retry: false } } }),
+  );
+  return (
+    <QueryClientProvider client={client}>
+      <TimelineHarness {...props} />
+    </QueryClientProvider>
+  );
 }

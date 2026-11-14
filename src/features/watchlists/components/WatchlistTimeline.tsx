@@ -4,12 +4,12 @@ import { DndContext, DragOverlay, closestCenter } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { WatchlistItem } from "@/db/Schema";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
-import type { ReorderIntent } from "@/features/watchlists/detail/Reorder";
+import type { WatchlistReorder } from "@/features/watchlists/detail/useWatchlistReorder";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
 import { useCallback, useMemo, useState } from "react";
 import { DragOverlayTimelineRow } from "./DragOverlayTimelineRow";
 import { WatchlistTimelineVirtualList } from "./WatchlistTimelineVirtualList";
-import { useWatchlistTimelineReorder } from "./useWatchlistTimelineReorder";
+
 import { WatchlistTimelineEndcap } from "./WatchlistTimelineEndcap";
 import { buildWatchlistTimelineBlocks } from "./WatchlistTimeline.model";
 
@@ -20,34 +20,26 @@ interface WatchlistTimelineProps {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
-  canReorder?: boolean;
+  reorder?: WatchlistReorder;
   interactionDisabled?: boolean;
-  onReorder?: (intent: ReorderIntent) => Promise<boolean> | void;
 }
 
 export function WatchlistTimeline(props: WatchlistTimelineProps) {
-  const { items, itemOrderMode, unwatchedOnly, onLoadMore, onReorder } = props;
-  const reorder = useWatchlistTimelineReorder({
-    items,
-    itemOrderMode,
-    canReorder: Boolean(props.canReorder),
-    onReorder,
-  });
+  const { items, itemOrderMode, unwatchedOnly, onLoadMore } = props;
+  const reorder = props.reorder ?? readOnlyReorder(items);
+  const displayedItems = reorder.displayedItems;
   const { expandedRunKeys, toggleRun } = useExpandedWatchedRuns();
   const blocks = useMemo(
     () =>
       buildWatchlistTimelineBlocks({
-        items: reorder.displayedItems,
+        items: displayedItems,
         itemOrderMode,
         unwatchedOnly,
         expandedRunKeys,
       }),
-    [reorder.displayedItems, itemOrderMode, unwatchedOnly, expandedRunKeys],
+    [displayedItems, itemOrderMode, unwatchedOnly, expandedRunKeys],
   );
-  const sortableItemIds = useMemo(
-    () => reorder.displayedItems.map((item) => item.id),
-    [reorder.displayedItems],
-  );
+  const sortableItemIds = useMemo(() => displayedItems.map((item) => item.id), [displayedItems]);
   const { ref } = useIntersectionObserver({
     onIntersect: getLoadMoreHandler(Boolean(props.interactionDisabled), onLoadMore),
     enabled: isLoadMoreEnabled(props),
@@ -156,4 +148,17 @@ function EmptyWatchlistState() {
       <Text fontSize="sm">Add movies and shows from the Search page.</Text>
     </Flex>
   );
+}
+
+function readOnlyReorder(items: WatchlistItem[]) {
+  return {
+    displayedItems: items,
+    activeItem: null,
+    reorderEnabled: false,
+    sensors: undefined,
+    handleDragStart: undefined,
+    handleDragCancel: undefined,
+    handleDragEnd: undefined,
+    prepareDrop: undefined,
+  };
 }

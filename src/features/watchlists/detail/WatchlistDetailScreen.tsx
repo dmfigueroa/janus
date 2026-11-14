@@ -12,8 +12,7 @@ import {
   watchlistDetailInfiniteQueryOptions,
   type WatchlistDetailQueryData,
 } from "@/features/watchlists/detail/Query";
-import { useReorderWatchlistItemsMutation } from "@/features/watchlists/detail/useReorderWatchlistItemsMutation";
-import { canReorderWatchlistItems } from "@/features/watchlists/detail/Reorder";
+import { useWatchlistReorder } from "@/features/watchlists/detail/useWatchlistReorder";
 import {
   useDeleteWatchlist,
   useToggleWatchlistPause,
@@ -75,20 +74,16 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
     [watchlistId, initialData.watchlist.itemOrderMode, normalizedSearchQuery],
   );
 
-  const reorderItemsMutation = useReorderWatchlistItemsMutation({
-    watchlistId,
-    activeFilters,
-  });
   const isWatchedTogglePending =
     useIsMutating({ mutationKey: ["watchlists", "toggle-watched", watchlistId] }) > 0;
-  const isReorderPending = reorderItemsMutation.isPending;
-
-  const canReorderItems = canReorderWatchlistItems({
-    itemOrderMode: initialData.watchlist.itemOrderMode,
-    itemCount: allItems.length,
-    isReorderPending,
-    isWatchedTogglePending,
+  const reorder = useWatchlistReorder({
+    watchlistId,
+    activeFilters,
+    items: allItems,
+    itemOrderMode: latestItemOrderMode,
+    canReorder: !isWatchedTogglePending && allItems.length > 1,
   });
+  const isReorderPending = reorder.isPending;
 
   const totalItems = latestWatchlist.stats.totalItems;
   const watchedItems = latestWatchlist.stats.watchedItems;
@@ -124,9 +119,8 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
           hasMore={hasNextPage}
           isLoadingMore={isFetchingNextPage}
           onLoadMore={getLoadMoreHandler(isReorderPending, fetchNextPage)}
-          canReorder={canReorderItems}
+          reorder={reorder}
           interactionDisabled={isReorderPending}
-          onReorder={reorderItemsMutation.prepare}
         />
       </Box>
     </Container>
