@@ -37,7 +37,7 @@ export function registerReorderWatchlistItemsTool(server: McpServer) {
     },
     async ({ reorders }) =>
       asMcpContent({
-        results: await executeWriteBatch(reorders, reorderResult),
+        results: await executeWriteBatch(reorders, reorderResult, "reorder_watchlist_items"),
       }),
   );
 }

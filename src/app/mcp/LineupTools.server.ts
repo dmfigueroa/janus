@@ -55,6 +55,21 @@ function batchDefaults(success: boolean, successCode: string) {
     : { code: "validation_error", message: "Lineup change failed." };
 }
 
+const createLineupResult = (input: unknown, index: number) =>
+  batchResult(input, index, createInput, ({ name }) => createLineup(name), "created");
+
+const updateLineupResult = (input: unknown, index: number) =>
+  batchResult(
+    input,
+    index,
+    updateInput,
+    (value) => updateLineup(value.reference, value),
+    "updated",
+  );
+
+const deleteLineupResult = (entry: unknown, index: number) =>
+  batchResult(entry, index, lineupReferenceSchema, deleteLineup, "deleted");
+
 export function registerLineupTools(server: McpServer) {
   server.registerTool(
     "list_lineups",
@@ -88,9 +103,7 @@ export function registerLineupTools(server: McpServer) {
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
     async ({ lineups }) => {
-      const results = await executeWriteBatch(lineups, (input, index) =>
-        batchResult(input, index, createInput, ({ name }) => createLineup(name), "created"),
-      );
+      const results = await executeWriteBatch(lineups, createLineupResult, "create_lineups");
       return asMcpContent({ results });
     },
   );
@@ -104,15 +117,7 @@ export function registerLineupTools(server: McpServer) {
       annotations: { readOnlyHint: false, destructiveHint: false },
     },
     async ({ lineups }) => {
-      const results = await executeWriteBatch(lineups, (input, index) =>
-        batchResult(
-          input,
-          index,
-          updateInput,
-          (value) => updateLineup(value.reference, value),
-          "updated",
-        ),
-      );
+      const results = await executeWriteBatch(lineups, updateLineupResult, "update_lineups");
       return asMcpContent({ results });
     },
   );
@@ -137,9 +142,7 @@ export function registerLineupTools(server: McpServer) {
       annotations: { readOnlyHint: false, destructiveHint: true },
     },
     async ({ lineups }) => {
-      const results = await executeWriteBatch(lineups, (entry, index) =>
-        batchResult(entry, index, lineupReferenceSchema, deleteLineup, "deleted"),
-      );
+      const results = await executeWriteBatch(lineups, deleteLineupResult, "delete_lineups");
       return asMcpContent({ results });
     },
   );

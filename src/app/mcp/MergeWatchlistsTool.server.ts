@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { mergeWatchlistsMutation } from "@/features/watchlists/merge/Mutation.server";
 import { asMcpContent } from "./McpToolResponse.server";
+import { serializeError, serverLogger } from "@/shared/logging/ServerLog.server";
 
 const mergeInputSchema = z
   .object({
@@ -35,7 +36,7 @@ export function registerMergeWatchlistsTool(server: McpServer) {
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     },
     async ({ merges }) => {
-      const results = await executeWriteBatch(merges, mergeResult);
+      const results = await executeWriteBatch(merges, mergeResult, "merge_watchlists");
       return asMcpContent({ results });
     },
   );
@@ -43,9 +44,18 @@ export function registerMergeWatchlistsTool(server: McpServer) {
 
 async function mergeResult(merge: z.infer<typeof mergeInputSchema>, index: number) {
   const sourceWatchlistIds = merge.sourceWatchlistIds ?? [];
+  const startedAt = performance.now();
   const result = await mergeWatchlistsMutation({ ...merge, sourceWatchlistIds }).catch(
     (error: unknown) => {
-      console.error("Watchlist merge failed", error);
+      serverLogger("error", "mcp.operation.failed", {
+        tool: "merge_watchlists",
+        operation: "merge_watchlists",
+        index,
+        targetWatchlistId: merge.targetWatchlistId,
+        outcome: "internal_error",
+        durationMs: Math.round(performance.now() - startedAt),
+        error: serializeError(error),
+      });
       return {
         success: false as const,
         code: "internal_error",

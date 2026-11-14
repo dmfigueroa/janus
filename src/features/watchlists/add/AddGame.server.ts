@@ -4,6 +4,7 @@ import { getGameDetails } from "@/server/providers/Rawg.server";
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
 import { rejectAdd, type WatchlistWriteResult } from "./AdditionOutcome";
 import { addGenericItemToWatchlist } from "./AddGeneric.server";
+import { logMissingProviderConfiguration } from "@/integrations/ProviderLogging.server";
 
 const RAWG_UNAVAILABLE_MESSAGE =
   "Game additions are unavailable because the RAWG integration is not configured.";
@@ -16,6 +17,7 @@ export async function addGameToWatchlist(
 ): Promise<WatchlistWriteResult> {
   const apiKey = process.env.RAWG_API_KEY;
   if (!apiKey) {
+    logMissingProviderConfiguration("rawg", "get_game_details");
     return rejectAdd(RAWG_UNAVAILABLE_MESSAGE, "provider_not_configured");
   }
 

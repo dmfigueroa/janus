@@ -39,7 +39,7 @@ export function registerMoveWatchlistItemsTool(server: McpServer) {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
     async ({ moves }) => {
-      const results = await executeWriteBatch(moves, moveItemResult);
+      const results = await executeWriteBatch(moves, moveItemResult, "move_watchlist_items");
       return asMcpContent({ results });
     },
   );

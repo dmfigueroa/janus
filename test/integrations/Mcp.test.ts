@@ -6,7 +6,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { asc, eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { captureServerLogs, restoreServerLogs } from "@test/support/LogCapture";
 
 function readFetchUrl(input: Request | string | URL) {
   return input instanceof Request ? input.url : input.toString();
@@ -35,9 +36,14 @@ describe("Janus MCP endpoint", () => {
     ({ mcpPostHandler: handleMcpRequest } = await import("@/routes/mcp"));
     client = new Client({ name: "janus-test-client", version: "1.0.0" });
     const transport = new StreamableHTTPClientTransport(new URL("http://janus.test/mcp"), {
+      requestInit: { headers: { "x-request-id": "mcp-test-request" } },
       fetch: async (input, init) => handleMcpRequest({ request: new Request(input, init) }),
     });
     await client.connect(transport);
+  });
+
+  afterEach(() => {
+    restoreServerLogs();
   });
 
   afterAll(async () => {
@@ -53,7 +59,7 @@ describe("Janus MCP endpoint", () => {
       .mockResolvedValueOnce({ success: true, code: "added", message: "Added", affectedCount: 1 })
       .mockRejectedValueOnce(new Error("private failure"))
       .mockResolvedValueOnce({ success: true, code: "added", message: "Added", affectedCount: 1 });
-    const logging = vi.spyOn(console, "error").mockImplementation(() => {});
+    captureServerLogs();
     try {
       const result = await client.callTool({
         name: "add_custom_items_to_watchlists",
@@ -81,7 +87,6 @@ describe("Janus MCP endpoint", () => {
       expect(operation).toHaveBeenCalledTimes(3);
     } finally {
       operation.mockRestore();
-      logging.mockRestore();
     }
   });
 
@@ -92,7 +97,7 @@ describe("Janus MCP endpoint", () => {
       .mockResolvedValueOnce({ success: true, removedCount: 1, message: "Removed." })
       .mockRejectedValueOnce(new Error("sensitive failure detail"))
       .mockResolvedValueOnce({ success: true, removedCount: 0, message: "Already removed." });
-    const logging = vi.spyOn(console, "error").mockImplementation(() => {});
+    const logs = captureServerLogs();
     try {
       const result = await client.callTool({
         name: "remove_watchlist_items",
@@ -109,11 +114,25 @@ describe("Janus MCP endpoint", () => {
         ],
       });
       expect(JSON.stringify(result)).not.toContain("sensitive failure detail");
-      expect(logging).toHaveBeenCalledWith("MCP batch operation failed", { index: 1 });
+      expect(logs).toContainEqual(
+        expect.objectContaining({
+          requestId: "mcp-test-request",
+          event: "mcp.batch.operation_failed",
+          tool: "remove_watchlist_items",
+          index: 1,
+          operationCount: 3,
+          outcome: "internal_error",
+          durationMs: expect.any(Number),
+        }),
+      );
+      expect(logs).toContainEqual(
+        expect.objectContaining({
+          error: expect.objectContaining({ message: "sensitive failure detail" }),
+        }),
+      );
       expect(operation).toHaveBeenCalledTimes(3);
     } finally {
       operation.mockRestore();
-      logging.mockRestore();
     }
   });
 
@@ -1136,7 +1155,7 @@ describe("Janus MCP endpoint", () => {
         poster_path: null,
       });
     });
-    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const logs = captureServerLogs();
     database
       .getDb()
       .$client.exec(
@@ -1168,14 +1187,22 @@ describe("Janus MCP endpoint", () => {
         .from(watchlistItems)
         .where(eq(watchlistItems.watchlistId, watchlist.id));
       expect(items.map((item) => item.tmdbId)).toEqual(["700", "702"]);
-      expect(errorLog).toHaveBeenCalledWith(
-        "Provider watchlist addition failed",
-        expect.objectContaining({ watchlistId: watchlist.id, provider: "tmdb" }),
+      expect(logs).toContainEqual(
+        expect.objectContaining({
+          requestId: "mcp-test-request",
+          event: "mcp.operation.failed",
+          tool: "add_media_to_watchlists",
+          operation: "add_media",
+          index: 1,
+          watchlistId: watchlist.id,
+          provider: "tmdb",
+          outcome: "internal_error",
+          durationMs: expect.any(Number),
+        }),
       );
     } finally {
       database.getDb().$client.exec("DROP TRIGGER fail_one_addition");
       fetchMock.mockRestore();
-      errorLog.mockRestore();
       vi.unstubAllEnvs();
     }
   });

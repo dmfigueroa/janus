@@ -4,6 +4,7 @@ import {
   parseProviderData,
 } from "@/integrations/ProviderRequest.server";
 import { z } from "zod";
+import { logMissingProviderConfiguration } from "@/integrations/ProviderLogging.server";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
@@ -62,18 +63,25 @@ const tmdbEpisodeSchema = z.object({
 const tmdbSeasonSchema = z.object({ episodes: z.array(tmdbEpisodeSchema) });
 export type TMDBEpisode = z.infer<typeof tmdbEpisodeSchema>;
 
-function getTmdbApiKey() {
+function getTmdbApiKey(operation: string) {
   const apiKey = process.env.TMDB_API_KEY;
-  if (!apiKey) throw new ProviderRequestError("provider_not_configured");
+  if (!apiKey) {
+    logMissingProviderConfiguration("tmdb", operation);
+    throw new ProviderRequestError("provider_not_configured");
+  }
   return apiKey;
 }
 
-async function fetchWithAuth(url: string, signal?: AbortSignal) {
-  const apiKey = getTmdbApiKey();
-  return requestProviderJson(url, {
-    headers: { Authorization: `Bearer ${apiKey}`, accept: "application/json" },
-    signal,
-  });
+async function fetchWithAuth(url: string, operation: string, signal?: AbortSignal) {
+  const apiKey = getTmdbApiKey(operation);
+  return requestProviderJson(
+    url,
+    {
+      headers: { Authorization: `Bearer ${apiKey}`, accept: "application/json" },
+      signal,
+    },
+    { provider: "tmdb", operation },
+  );
 }
 
 export async function fetchTmdbSearch(
@@ -95,7 +103,8 @@ export async function fetchTmdbSearch(
   url.searchParams.set("include_adult", "false");
   url.searchParams.set("language", "en-US");
 
-  const response = (await fetchWithAuth(url.toString(), signal)) as TMDBSearchResponse;
+  const operation = type === "movie" ? "search_movies" : "search_tv";
+  const response = (await fetchWithAuth(url.toString(), operation, signal)) as TMDBSearchResponse;
 
   response.results = response.results.map((item) => ({
     ...item,
@@ -108,7 +117,12 @@ export async function fetchTmdbSearch(
 export async function fetchTmdbTv(data: { id: number }, signal?: AbortSignal) {
   const input = z.object({ id: z.number() }).parse(data);
   const url = new URL(`${TMDB_BASE_URL}/tv/${input.id}`);
-  return parseProviderData(tmdbTvSchema, await fetchWithAuth(url.toString(), signal));
+  const context = { provider: "tmdb", operation: "get_tv_details" };
+  return parseProviderData(
+    tmdbTvSchema,
+    await fetchWithAuth(url.toString(), context.operation, signal),
+    context,
+  );
 }
 
 export async function fetchTmdbSeason(
@@ -117,11 +131,21 @@ export async function fetchTmdbSeason(
 ) {
   const input = z.object({ id: z.number(), seasonNumber: z.number() }).parse(data);
   const url = new URL(`${TMDB_BASE_URL}/tv/${input.id}/season/${input.seasonNumber}`);
-  return parseProviderData(tmdbSeasonSchema, await fetchWithAuth(url.toString(), signal));
+  const context = { provider: "tmdb", operation: "get_season_details" };
+  return parseProviderData(
+    tmdbSeasonSchema,
+    await fetchWithAuth(url.toString(), context.operation, signal),
+    context,
+  );
 }
 
 export async function fetchTmdbMovie(data: { id: number }, signal?: AbortSignal) {
   const input = z.object({ id: z.number() }).parse(data);
   const url = new URL(`${TMDB_BASE_URL}/movie/${input.id}`);
-  return parseProviderData(tmdbMovieSchema, await fetchWithAuth(url.toString(), signal));
+  const context = { provider: "tmdb", operation: "get_movie_details" };
+  return parseProviderData(
+    tmdbMovieSchema,
+    await fetchWithAuth(url.toString(), context.operation, signal),
+    context,
+  );
 }

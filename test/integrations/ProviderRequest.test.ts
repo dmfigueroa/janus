@@ -1,4 +1,6 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { CapturedLogRecord } from "@test/support/LogCapture";
+import { captureServerLogs, restoreServerLogs } from "@test/support/LogCapture";
 import { z } from "zod";
 import {
   ProviderRequestError,
@@ -20,8 +22,15 @@ function jsonResponse(body: unknown, init: ResponseInit = {}) {
 }
 
 describe("provider transport", () => {
+  let logs: CapturedLogRecord[];
+
   beforeEach(() => {
     vi.resetAllMocks();
+    logs = captureServerLogs();
+  });
+
+  afterEach(() => {
+    restoreServerLogs();
   });
 
   it("recovers from a transient transport failure", async () => {
@@ -55,6 +64,54 @@ describe("provider transport", () => {
       ProviderRequestError,
     );
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs provider failures with operation, outcome, and duration", async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({}, { status: 503 }));
+
+    await expect(
+      requestProviderJson(
+        "https://example.test/items?api_key=query-secret",
+        { retry: { ...fastRetry, limit: 0 } },
+        { provider: "rawg", operation: "search_games" },
+      ),
+    ).rejects.toBeInstanceOf(ProviderRequestError);
+
+    expect(logs).toContainEqual(
+      expect.objectContaining({
+        event: "provider.request.failed",
+        provider: "rawg",
+        operation: "search_games",
+        outcome: "http_error",
+        status: 503,
+        durationMs: expect.any(Number),
+        requestId: expect.any(String),
+      }),
+    );
+    expect(JSON.stringify(logs)).not.toContain("query-secret");
+  });
+
+  it("logs invalid provider responses without request bodies", async () => {
+    const schema = z.object({ id: z.number() });
+
+    expect(() =>
+      parseProviderData(
+        schema,
+        { unexpected: "sensitive payload" },
+        { provider: "tmdb", operation: "get_movie_details" },
+      ),
+    ).toThrow(ProviderRequestError);
+
+    expect(logs).toContainEqual(
+      expect.objectContaining({
+        event: "provider.response.invalid",
+        provider: "tmdb",
+        operation: "get_movie_details",
+        outcome: "invalid_response",
+        issueCount: 1,
+      }),
+    );
+    expect(JSON.stringify(logs)).not.toContain("sensitive payload");
   });
 
   it.each([500, 503])("retries status %i and honors Retry-After", async (status) => {

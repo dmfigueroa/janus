@@ -32,7 +32,11 @@ export function registerRemoveWatchlistItemsTool(server: McpServer) {
     },
     async ({ removals }) =>
       asMcpContent({
-        results: await executeWriteBatch(removals, removeWatchlistItemResult),
+        results: await executeWriteBatch(
+          removals,
+          removeWatchlistItemResult,
+          "remove_watchlist_items",
+        ),
       }),
   );
 }
