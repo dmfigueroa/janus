@@ -56,17 +56,61 @@ struct ItemQuery {
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum ItemSelector {
     Id(i64),
-    Provider {
-        provider: String,
-        provider_id: String,
-        media_type: String,
-    },
+    Provider(ProviderIdentity),
     Text,
 }
 
+/// The three fields that together identify an item's provider entry.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ProviderIdentity {
+    provider: String,
+    provider_id: String,
+    media_type: String,
+}
+
+impl ProviderIdentity {
+    /// Builds the identity only when all three fields are present. Partial
+    /// provider selections are invalid, so returning an `Option` here keeps
+    /// the incomplete case out of the rest of validation.
+    fn parse(
+        provider: Option<String>,
+        provider_id: Option<String>,
+        media_type: Option<String>,
+    ) -> Result<Option<Self>, DiscoveryError> {
+        match (provider, provider_id, media_type) {
+            (None, None, None) => Ok(None),
+            (Some(provider), Some(provider_id), Some(media_type)) => Ok(Some(Self {
+                provider,
+                provider_id,
+                media_type,
+            })),
+            _ => Err(invalid("Provide one valid watchlist item selector.")),
+        }
+    }
+}
+
 impl ItemSelector {
+    /// Resolves the exactly-one-of selector rules for a find request.
+    fn parse(
+        item_id: Option<i64>,
+        provider: Option<ProviderIdentity>,
+        has_query: bool,
+        page_requested: bool,
+    ) -> Result<Self, DiscoveryError> {
+        let selector = match (item_id, provider, has_query) {
+            (Some(id), None, false) => Self::Id(id),
+            (None, Some(provider), false) => Self::Provider(provider),
+            (None, None, true) => Self::Text,
+            _ => return Err(invalid("Provide one valid watchlist item selector.")),
+        };
+        if selector.is_exact() && page_requested {
+            return Err(invalid("Provide one valid watchlist item selector."));
+        }
+        Ok(selector)
+    }
+
     fn is_exact(&self) -> bool {
-        matches!(self, Self::Id(_) | Self::Provider { .. })
+        matches!(self, Self::Id(_) | Self::Provider(_))
     }
 }
 
@@ -94,49 +138,35 @@ impl ItemQuery {
         if operation.is_summary() {
             return Err(invalid("Invalid discovery operation."));
         }
-        let view = ResultView::parse(request.result_view.as_deref())?;
-        if request
-            .media_type
-            .as_deref()
-            .is_some_and(|media_type| !MEDIA_TYPES.contains(&media_type))
-        {
-            return Err(invalid("Invalid mediaType."));
-        }
-        let query = trimmed_text(request.query, "query")?;
-        let provider = trimmed_text(request.provider, "provider")?;
-        let provider_id = trimmed_text(request.provider_id, "providerId")?;
-        let watchlist_id = positive_id(request.watchlist_id, "watchlistId")?;
-        let watchlist_item_id = positive_id(request.watchlist_item_id, "watchlistItemId")?;
-        let page = Page::new(request.page_size, request.cursor.clone())?;
+        let DiscoveryRequest {
+            query,
+            page_size,
+            cursor,
+            watchlist_id,
+            watchlist_item_id,
+            provider,
+            provider_id,
+            media_type,
+            result_view,
+            ..
+        } = request;
+        let view = ResultView::parse(result_view.as_deref())?;
+        let media_type = validated_media_type(media_type)?;
+        let query = trimmed_text(query, "query")?;
+        let provider = trimmed_text(provider, "provider")?;
+        let provider_id = trimmed_text(provider_id, "providerId")?;
+        let watchlist_id = positive_id(watchlist_id, "watchlistId")?;
+        let watchlist_item_id = positive_id(watchlist_item_id, "watchlistItemId")?;
+        let page_requested = page_size.is_some() || cursor.is_some();
+        let page = Page::new(page_size, cursor)?;
         let watchlist_id = watchlist_id.ok_or_else(|| invalid("Invalid watchlist ID."))?;
         let selector = if operation == DiscoveryOperation::Find {
-            let provider_group =
-                provider.is_some() || provider_id.is_some() || request.media_type.is_some();
-            let selected = [watchlist_item_id.is_some(), provider_group, query.is_some()];
-            let count = selected.iter().filter(|selected| **selected).count();
-            let invalid_selector = count != 1
-                || (provider_group
-                    && (provider.is_none()
-                        || provider_id.is_none()
-                        || request.media_type.is_none()))
-                || ((watchlist_item_id.is_some() || provider_group)
-                    && (request.page_size.is_some() || request.cursor.is_some()));
-            if invalid_selector {
-                return Err(invalid("Provide one valid watchlist item selector."));
-            }
-            if let Some(target) = watchlist_item_id {
-                Some(ItemSelector::Id(target))
-            } else if let (Some(provider), Some(provider_id), Some(media_type)) =
-                (provider, provider_id, request.media_type)
-            {
-                Some(ItemSelector::Provider {
-                    provider,
-                    provider_id,
-                    media_type,
-                })
-            } else {
-                Some(ItemSelector::Text)
-            }
+            Some(ItemSelector::parse(
+                watchlist_item_id,
+                ProviderIdentity::parse(provider, provider_id, media_type)?,
+                query.is_some(),
+                page_requested,
+            )?)
         } else {
             None
         };
@@ -148,6 +178,15 @@ impl ItemQuery {
             view,
             page,
         })
+    }
+}
+
+fn validated_media_type(media_type: Option<String>) -> Result<Option<String>, DiscoveryError> {
+    match media_type {
+        Some(media_type) if !MEDIA_TYPES.contains(&media_type.as_str()) => {
+            Err(invalid("Invalid mediaType."))
+        }
+        media_type => Ok(media_type),
     }
 }
 
@@ -244,16 +283,12 @@ fn select(
             .into_iter()
             .filter(|item| item.id == *target)
             .collect(),
-        Some(ItemSelector::Provider {
-            provider,
-            provider_id,
-            media_type,
-        }) => items
+        Some(ItemSelector::Provider(provider)) => items
             .into_iter()
             .filter(|item| {
-                item.source == *provider
-                    && item.tmdb_id == *provider_id
-                    && item.media_type == *media_type
+                item.source == provider.provider
+                    && item.tmdb_id == provider.provider_id
+                    && item.media_type == provider.media_type
             })
             .collect(),
         Some(ItemSelector::Text) => {
@@ -300,5 +335,79 @@ fn single_title(item: &WatchlistItem) -> GroupedTitle {
         media_type: item.media_type.clone(),
         title: title.into(),
         matching_item_count: 1,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn provider_identity() -> ProviderIdentity {
+        ProviderIdentity {
+            provider: "tmdb".into(),
+            provider_id: "ep-1".into(),
+            media_type: "episode".into(),
+        }
+    }
+
+    #[test]
+    fn selector_accepts_exactly_one_selector_shape() {
+        assert!(matches!(
+            ItemSelector::parse(Some(1), None, false, false),
+            Ok(ItemSelector::Id(1))
+        ));
+        assert!(matches!(
+            ItemSelector::parse(None, Some(provider_identity()), false, false),
+            Ok(ItemSelector::Provider(ProviderIdentity { provider, .. })) if provider == "tmdb"
+        ));
+        assert!(matches!(
+            ItemSelector::parse(None, None, true, false),
+            Ok(ItemSelector::Text)
+        ));
+        for (item_id, provider, has_query) in [
+            (Some(1), None, true),
+            (Some(1), Some(provider_identity()), false),
+            (None, Some(provider_identity()), true),
+            (None, None, false),
+        ] {
+            assert!(
+                matches!(
+                    ItemSelector::parse(item_id, provider, has_query, false),
+                    Err(DiscoveryError::InvalidInput(_))
+                ),
+                "expected a selector conflict for {item_id:?}, query={has_query}"
+            );
+        }
+    }
+
+    #[test]
+    fn provider_selector_requires_every_identity_field() {
+        assert!(matches!(
+            ProviderIdentity::parse(None, None, None),
+            Ok(None)
+        ));
+        for identity in [
+            (Some("tmdb".to_owned()), None, None),
+            (Some("tmdb".to_owned()), Some("ep-1".to_owned()), None),
+            (None, Some("ep-1".to_owned()), Some("episode".to_owned())),
+        ] {
+            assert!(matches!(
+                ProviderIdentity::parse(identity.0, identity.1, identity.2),
+                Err(DiscoveryError::InvalidInput(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn exact_selector_rejects_page_requests() {
+        assert!(matches!(
+            ItemSelector::parse(Some(1), None, false, true),
+            Err(DiscoveryError::InvalidInput(_))
+        ));
+        assert!(matches!(
+            ItemSelector::parse(None, Some(provider_identity()), false, true),
+            Err(DiscoveryError::InvalidInput(_))
+        ));
+        assert!(ItemSelector::parse(None, None, true, true).is_ok());
     }
 }
