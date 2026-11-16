@@ -59,6 +59,12 @@ const actions = {
   "watch-all"() {
     database.prepare("UPDATE watchlist_items SET is_watched = 1 WHERE watchlist_id = 41").run();
   },
+  many() {
+    const insert = database.prepare("INSERT INTO watchlists(name) VALUES(?)");
+    for (let index = 0; index < 60; index += 1) {
+      insert.run(`Bulk list ${String(index).padStart(2, "0")}`);
+    }
+  },
   incompatible() {
     database.exec("ALTER TABLE watchlists ADD COLUMN unexpected TEXT");
   },

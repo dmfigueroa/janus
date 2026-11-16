@@ -1,127 +1,649 @@
 :root {
   color-scheme: light dark;
-  font-family: system-ui, sans-serif;
-  line-height: 1.6;
+  --bg-canvas: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f5f5f4;
+  --fg-default: #1a1a1a;
+  --fg-muted: #737373;
+  --border: #e5e5e5;
+  --accent: #ec4899;
+  --accent-strong: #db2777;
+  --green: #22c55e;
+  --danger: #dc2626;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  font-family:
+    "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol", "Noto Color Emoji";
+  line-height: 1.5;
 }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-canvas: #141218;
+    --bg-surface: #201d25;
+    --bg-subtle: #28242e;
+    --fg-default: #fafafa;
+    --fg-muted: #a8a4af;
+    --border: #28242e;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  padding: 1.5rem;
+  background: var(--bg-canvas);
+  color: var(--fg-default);
+  text-rendering: optimizeLegibility;
 }
-main {
-  max-width: 42rem;
-  margin: 10vh auto;
+
+[hidden] {
+  display: none !important;
 }
-h1 {
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Home */
+
+.home {
+  max-width: 80rem;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 1.25rem 1.5rem 7rem;
+}
+
+.home-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-bottom: 0.75rem;
+}
+
+.home-title {
+  margin: 0;
+  font-size: 1.875rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
   line-height: 1.2;
 }
-:focus-visible {
-  outline: 3px solid currentColor;
-  outline-offset: 4px;
+
+.home-totals {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--fg-muted);
 }
+
+.home-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.watchlist-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.watchlist-search input[type="search"] {
+  flex: 1 1 12rem;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+}
+
+.watchlist-search select {
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+}
+
+.watchlist-search button,
+.clear-search {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.watchlist-search button:hover,
+.clear-search:hover {
+  background: var(--bg-subtle);
+}
+
+.watchlist-search button:active,
+.clear-search:active {
+  transform: scale(0.98);
+}
+
+.browse-status,
+.htmx-indicator {
+  font-size: 0.875rem;
+  color: var(--fg-muted);
+}
+
+.browse-status:empty {
+  display: none;
+}
+
+.htmx-indicator {
+  display: none;
+}
+
+.htmx-indicator.htmx-request {
+  display: inline;
+}
+
+.browse-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.browse-heading h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+
+.browse-summary {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--fg-muted);
+}
+
+.watchlist-browse[aria-busy="true"] {
+  opacity: 0.75;
+}
+
+.watchlist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (min-width: 768px) {
+  .watchlist-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.5rem;
+  }
+}
+
+.watchlist-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 220px;
+  position: relative;
+}
+
+.card-cover {
+  position: relative;
+  display: block;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: 18px;
+  background: linear-gradient(to bottom right, #1f2937, #111827);
+  box-shadow: var(--shadow-card);
+  text-decoration: none;
+  transition: transform 120ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.card-cover:active {
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-cover {
+    transition: none;
+  }
+  .card-cover:active {
+    transform: none;
+  }
+}
+
+.cover-image,
+.cover-placeholder,
+.cover-episode {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.cover-image {
+  object-fit: cover;
+}
+
+.cover-placeholder {
+  background: linear-gradient(to bottom right, #1f2937, #111827);
+}
+
+.cover-episode {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #111827;
+}
+
+.cover-blur {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(24px);
+  transform: scale(1.5);
+  opacity: 0.8;
+}
+
+.cover-frame {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 12px;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.5);
+}
+
+.cover-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgb(0 0 0 / 0.7), transparent);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.card-info {
+  display: block;
+  padding: 0 0.25rem;
+  text-decoration: none;
+}
+
+.card-title {
+  margin: 0;
+  overflow: hidden;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.125rem 0 0.25rem;
+  font-size: 0.75rem;
+  color: var(--fg-muted);
+}
+
+.card-progress-value {
+  color: var(--accent);
+}
+
+.card-progress-value.complete {
+  color: var(--green);
+}
+
+.card-progress {
+  width: 100%;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--bg-subtle);
+}
+
+.card-progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.card-progress-bar.complete {
+  background: var(--green);
+}
+
+.card-next,
+.card-paused {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--fg-muted);
+}
+
+.card-next {
+  display: -webkit-box;
+  min-height: 2lh;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.watchlist-section {
+  margin-top: 2rem;
+}
+
+.watchlist-section summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 0.5rem 0;
+  list-style: none;
+  cursor: pointer;
+}
+
+.watchlist-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.watchlist-section h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.chevron {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-right: 2px solid var(--fg-muted);
+  border-bottom: 2px solid var(--fg-muted);
+  transform: rotate(45deg);
+  transition: transform 150ms ease-out;
+}
+
+.watchlist-section[open] .chevron {
+  transform: rotate(-135deg);
+}
+
+.empty-state {
+  padding: 2rem 0;
+  text-align: center;
+  color: var(--fg-muted);
+}
+
+.empty-state p {
+  margin: 0 0 0.75rem;
+}
+
+.pagination {
+  margin-top: 2rem;
+}
+
+.pagination a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-decoration: none;
+}
+
+.pagination a:hover {
+  background: var(--bg-subtle);
+}
+
+/* Bottom navigation */
+
+.bottom-nav {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: space-around;
+  padding: 0 1.5rem env(safe-area-inset-bottom);
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-canvas) 90%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  width: 5rem;
+  min-height: 44px;
+  padding: 0.5rem 0;
+  border-radius: 16px;
+  color: var(--fg-muted);
+  text-decoration: none;
+}
+
+.nav-item span {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.nav-item:hover {
+  background: var(--bg-subtle);
+  color: var(--fg-default);
+}
+
+.nav-item[aria-current="page"] {
+  color: var(--accent);
+}
+
+.request-error {
+  position: fixed;
+  right: 1rem;
+  bottom: 5.5rem;
+  left: 1rem;
+  z-index: 60;
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+  border-radius: 14px;
+  background: var(--danger);
+  color: #ffffff;
+  box-shadow: var(--shadow-lg);
+}
+
+/* Watchlist detail */
+
 .watchlist {
   max-width: 48rem;
   margin: 0 auto;
-  padding-bottom: 5rem;
+  padding: 1.5rem 1rem 7rem;
 }
+
+.breadcrumb {
+  font-size: 0.875rem;
+}
+
 .watchlist header {
-  margin: 2rem 0;
+  margin: 1rem 0 2rem;
 }
+
 .watchlist progress {
   width: 100%;
-  accent-color: #16a085;
+  accent-color: var(--accent);
 }
+
 .watchlist form {
   display: flex;
-  gap: 0.75rem;
-  align-items: center;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
 }
+
 .watchlist input[type="search"] {
   flex: 1;
   min-width: 8rem;
 }
+
 .watchlist button,
-.watchlist input[type="search"] {
+.watchlist input[type="search"],
+.watchlist select {
   min-height: 44px;
   padding: 0.5rem;
-  font: inherit;
 }
+
 .watchlist article {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  border: 1px solid light-dark(#ddd, #333);
-  border-radius: 0.75rem;
   padding: 1rem;
   margin: 0.5rem 0;
   overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
 }
+
+.watchlist h1 {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
 .watchlist h3,
 .watchlist article p {
   margin: 0;
 }
+
 .watchlist article p {
-  color: light-dark(#555, #bbb);
   font-size: 0.875rem;
+  color: var(--fg-muted);
 }
+
 .watchlist h2 {
   position: sticky;
   top: 0;
-  background: Canvas;
   padding: 0.5rem 0;
+  background: var(--bg-canvas);
 }
-.watchlist {
-  padding-top: 1rem;
-}
-.watchlist h1 {
-  font-size: clamp(1.5rem, 4vw, 2rem);
-  letter-spacing: -0.025em;
-  overflow-wrap: anywhere;
-}
-.watchlist article {
-  align-items: center;
-}
+
 .watchlist .item-content {
   flex: 1;
   min-width: 0;
 }
+
 .watchlist .poster {
+  flex-shrink: 0;
   width: 5rem;
   height: 7rem;
-  object-fit: cover;
   border-radius: 0.5rem;
-  flex-shrink: 0;
+  object-fit: cover;
 }
+
 .watchlist .poster.episode {
   height: 3.5rem;
 }
+
 .watchlist .placeholder {
   display: grid;
   place-items: center;
   font-size: 0.7rem;
-  background: light-dark(#f4f4f5, #27272a);
+  background: var(--bg-subtle);
 }
+
 .watchlist summary {
-  cursor: pointer;
-  min-height: 44px;
   display: list-item;
   align-content: center;
-  padding-inline: 0.75rem;
-}
-.watchlist select {
-  font: inherit;
   min-height: 44px;
-  padding: 0.5rem;
+  padding-inline: 0.75rem;
+  cursor: pointer;
 }
-.watchlist .badge {
+
+.badge {
   display: inline-block;
   padding: 0.2rem 0.5rem;
   border-radius: 0.4rem;
-  background: light-dark(#eee, #333);
+  background: var(--bg-subtle);
 }
+
+.reorder-handle {
+  min-width: 44px;
+  min-height: 44px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.reorder-handle:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
+.sortable-ghost {
+  opacity: 0.4;
+}
+
+.timeline[aria-busy="true"] {
+  opacity: 0.75;
+}
+
 @media (max-width: 480px) {
-  body {
-    padding: 1rem;
+  .home {
+    padding: 1rem 1rem 7rem;
+  }
+  .watchlist {
+    padding-inline: 0.5rem;
   }
   .watchlist article {
     gap: 0.5rem;
@@ -134,21 +656,4 @@ h1 {
   .watchlist article > span {
     font-size: 0.75rem;
   }
-}
-
-.reorder-handle {
-  min-width: 44px;
-  min-height: 44px;
-  cursor: grab;
-  touch-action: none;
-}
-.reorder-handle:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 3px;
-}
-.sortable-ghost {
-  opacity: 0.4;
-}
-.timeline[aria-busy="true"] {
-  opacity: 0.75;
 }

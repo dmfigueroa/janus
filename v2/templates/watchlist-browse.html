@@ -1,0 +1,44 @@
+<div id="watchlist-browse" class="watchlist-browse" aria-busy="false">
+  <div class="browse-heading">
+    <h2>{{view.heading}}</h2>
+    {% if !view.summary.is_empty() %}
+    <p class="browse-summary">{{view.summary}}</p>
+    {% endif %}
+  </div>
+
+  {% for section in view.sections %} {% if section.collapsible %}
+  <details class="watchlist-section">
+    <summary>
+      <h3>{{section.title.unwrap_or_default()}} ({{section.cards.len()}})</h3>
+      <span class="chevron" aria-hidden="true"></span>
+    </summary>
+    <div class="watchlist-grid">
+      {% for card in section.cards %} {% include "watchlist-card.html" %} {% endfor %}
+    </div>
+  </details>
+  {% else %}
+  <div class="watchlist-grid">
+    {% for card in section.cards %} {% include "watchlist-card.html" %} {% endfor %}
+  </div>
+  {% endif %} {% endfor %} {% if let Some(message) = view.empty_message %}
+  <div class="empty-state">
+    <p role="status">{{message}}</p>
+    {% if view.is_search %}
+    <a class="clear-search" href="/v2/watchlists">Clear search</a>
+    {% endif %}
+  </div>
+  {% endif %} {% if let Some(cursor) = view.next_cursor %}
+  <nav class="pagination" aria-label="Watchlist pages">
+    <a
+      href="/v2/watchlists?query={{view.query|urlencode}}&amp;orderBy={{view.order_param}}&amp;order={{view.direction_param}}&amp;cursor={{cursor|urlencode}}"
+      hx-get="/v2/watchlists?query={{view.query|urlencode}}&amp;orderBy={{view.order_param}}&amp;order={{view.direction_param}}&amp;cursor={{cursor|urlencode}}"
+      hx-target="#watchlist-browse"
+      hx-select="#watchlist-browse"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+      hx-indicator="#browse-indicator"
+      >Next page</a
+    >
+  </nav>
+  {% endif %}
+</div>

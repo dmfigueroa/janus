@@ -135,6 +135,110 @@ async fn existing_watchlist_renders_ids_order_filters_and_escaped_content_withou
         "reads must preserve database bytes, schema and migration metadata"
     );
 }
+#[tokio::test]
+async fn watchlist_home_renders_v1_cards_sections_and_local_navigation() {
+    let fixture = Fixture::v1();
+    let app = janus_v2::database_router(janus_v2::open_database(&fixture.0).await.unwrap());
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v2/watchlists")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let html = body(response).await;
+    assert!(
+        html.contains("<h1 class=\"home-title\">My Lists</h1>"),
+        "{html}"
+    );
+    assert!(html.contains("2 watchlists, 3 items"), "{html}");
+    assert!(html.contains("class=\"watchlist-card\""), "{html}");
+    assert!(html.contains("href=\"/v2/watchlists/41\""), "{html}");
+    assert!(html.contains("href=\"/v2/watchlists/42\""), "{html}");
+    assert!(html.contains("1 of 3 watched"), "{html}");
+    assert!(html.contains("class=\"cover-placeholder\""), "{html}");
+    assert!(
+        html.contains("Next: E1 • Opening &#60;script&#62;"),
+        "{html}"
+    );
+    assert!(html.contains("role=\"progressbar\""), "{html}");
+    assert!(html.contains("aria-label=\"Primary navigation\""), "{html}");
+    assert!(!html.contains("Completed (0)"), "{html}");
+
+    let detail = body(
+        app.oneshot(
+            Request::builder()
+                .uri("/v2/watchlists/41")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert!(
+        detail.contains("aria-label=\"Primary navigation\""),
+        "{detail}"
+    );
+    assert!(detail.contains("href=\"/v2/watchlists\""), "{detail}");
+}
+
+#[tokio::test]
+async fn watchlist_home_searches_sorts_pages_and_swaps_only_the_grid() {
+    let fixture = Fixture::v1();
+    change_v1(&fixture, "many");
+    let app = janus_v2::database_router(janus_v2::open_database(&fixture.0).await.unwrap());
+    let search = |uri: &str, htmx: bool| {
+        let mut request = Request::builder().uri(uri);
+        if htmx {
+            request = request.header("hx-request", "true");
+        }
+        app.clone().oneshot(request.body(Body::empty()).unwrap())
+    };
+
+    let response = search("/v2/watchlists?query=CAFE%CC%81", false)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let html = body(response).await;
+    assert!(html.contains("Search results"), "{html}");
+    assert!(html.contains("1 of 62 watchlists"), "{html}");
+    assert!(html.contains("href=\"/v2/watchlists/41\""), "{html}");
+    assert!(!html.contains("href=\"/v2/watchlists/42\""), "{html}");
+
+    let fragment = body(search("/v2/watchlists?query=list", true).await.unwrap()).await;
+    assert!(fragment.contains("id=\"watchlist-browse\""), "{fragment}");
+    assert!(!fragment.contains("<html"), "{fragment}");
+    assert!(fragment.contains("Bulk list 00"), "{fragment}");
+    assert!(fragment.contains("Next page"), "{fragment}");
+
+    let sorted = body(
+        search(
+            "/v2/watchlists?query=Bulk&orderBy=createdAt&order=desc",
+            false,
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert!(
+        sorted.find("href=\"/v2/watchlists/102\"").unwrap()
+            < sorted.find("href=\"/v2/watchlists/53\"").unwrap(),
+        "{sorted}"
+    );
+
+    let empty = body(search("/v2/watchlists?query=missing", false).await.unwrap()).await;
+    assert!(
+        empty.contains("No watchlists match your search."),
+        "{empty}"
+    );
+    assert!(empty.contains("Clear search"), "{empty}");
+}
+
 async fn rpc(
     app: &axum::Router,
     message: Value,

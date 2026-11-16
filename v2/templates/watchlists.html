@@ -1,37 +1,50 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Watchlists · Janus</title>
-    <link rel="stylesheet" href="/v2/static/app.css" />
-  </head>
-  <body>
-    <main class="watchlist">
-      <nav><a href="/">Janus v1</a></nav>
-      <h1>Watchlists</h1>
-      <form method="get">
-        <label for="query">Search watchlists</label
-        ><input name="query" id="query" type="search" value="{{query}}" /><button>Search</button>
-      </form>
-      {% for list in lists %}
-      <article>
-        <div class="item-content">
-          <h2><a href="/v2/watchlists/{{list.id}}">{{list.name}}</a></h2>
-          <p>{{list.watched}} of {{list.total}} watched</p>
-        </div>
-      </article>
-      {% else %}
-      <p role="status">No watchlists found.</p>
-      {% endfor %}{% if !next.is_empty() %}
-      <form method="get">
-        <input type="hidden" name="query" value="{{query}}" /><input
-          type="hidden"
-          name="cursor"
-          value="{{next}}"
-        /><button>Next page</button>
-      </form>
-      {% endif %}
-    </main>
-  </body>
-</html>
+{% extends "layout.html" %} {% block title %}Watchlists · Janus{% endblock %} {% block content %}
+<main class="home">
+  <header class="home-header">
+    <h1 class="home-title">My Lists</h1>
+    <p class="home-totals">{{view.totals}}</p>
+  </header>
+
+  <section class="home-content">
+    <form
+      id="watchlist-search"
+      class="watchlist-search"
+      role="search"
+      hx-get="/v2/watchlists"
+      hx-target="#watchlist-browse"
+      hx-select="#watchlist-browse"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+      hx-trigger="submit, input changed delay:300ms from:#query, change from:#orderBy"
+      hx-sync="this:replace"
+      hx-indicator="#browse-indicator"
+    >
+      <label class="visually-hidden" for="query">Search watchlists</label>
+      <input
+        id="query"
+        name="query"
+        type="search"
+        value="{{view.query}}"
+        placeholder="Search watchlists…"
+        autocomplete="off"
+      />
+      <label class="visually-hidden" for="orderBy">Sort watchlists</label>
+      <select id="orderBy" name="orderBy">
+        {% for option in view.order_options %}
+        <option value="{{option.value}}" {% if option.selected %}selected{% endif %}>
+          {{option.label}}
+        </option>
+        {% endfor %}
+      </select>
+      <button type="submit">Search</button>
+      {% if view.is_search %}<a class="clear-search" href="/v2/watchlists">Clear</a>{% endif %}
+      <span id="browse-indicator" class="htmx-indicator" role="status">Loading watchlists…</span>
+    </form>
+    <p id="browse-status" class="browse-status" role="status" aria-live="polite"></p>
+
+    {% include "watchlist-browse.html" %}
+  </section>
+</main>
+{% endblock %} {% block scripts %}
+<script defer src="/v2/static/browse.js"></script>
+{% endblock %}

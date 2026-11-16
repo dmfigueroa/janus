@@ -157,6 +157,28 @@ Unauthenticated external v1/v2 web/MCP requests returned 403; this alone does no
 Access-authenticated or real-client behavior. Physical-device, full PWA, write/reorder and
 owner acceptance gates remain outstanding in their respective slices.
 
+## Issue #256 browse-home evidence
+
+The web home now renders the v1 watchlist grid instead of a bare result list. Cards keep
+cover selection, the watched/total and progress line, progress bar, next-item label and paused
+date. Rotation lists stay in the stored recency order, while completed, empty and paused lists
+stay in their v1 collapsible sections. A shared layout adds the v1 bottom navigation to the
+home and existing detail page.
+
+`browse.rs` owns summary ordering (`recency`, `createdAt`, `lastWatched`, `lastAdded`), NFC plus
+lowercase name matching, page cursors bound to the query and sort, section grouping and card
+labels. `snapshot.rs` reads every summary in one transaction. Search, sort and pagination use
+HTMX, swap only `#watchlist-browse`, push the URL, announce pending/failed loads, and keep a
+non-JavaScript link fallback. Empty search results offer a clear action.
+
+Automated coverage: browse unit tests for recency and sort order, Unicode matching, bound
+cursors, lifecycle grouping, next-item markers, cover URLs and paused dates; fixture-backed
+HTTP tests for home cards, totals, cover placeholders, escaped labels, navigation, search,
+sorting, HTMX fragment-only swaps, continuation links and search empty states. `cargo fmt
+--check`, Clippy and all Rust tests pass with disposable v1 databases. No deployed, real-client,
+physical-device or owner acceptance is claimed for this slice. Create, edit, delete and merge
+controls remain outstanding in their own slices.
+
 ## Issue #307 watchlist read-state evidence
 
 Watchlist stored-row decoding and queries are private to `storage.rs`; `summary.rs` owns

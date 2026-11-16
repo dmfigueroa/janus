@@ -4,7 +4,7 @@
 //! are composed here from private SQLite mechanics and derived summary rules.
 //! Web and MCP adapters consume these types rather than coordinating queries.
 
-use sea_orm::{DbErr, TransactionTrait};
+use sea_orm::{ConnectionTrait, DbErr, TransactionTrait};
 use sha2::{Digest, Sha256};
 
 use super::ItemOrderMode;
@@ -117,33 +117,56 @@ impl Watchlists {
         storage::headers(&self.0).await
     }
 
+    /// Reads every watchlist summary in one consistent snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DbErr`] when a database read or stored-value decoding fails.
+    pub async fn all_summaries(&self) -> Result<Vec<WatchlistSummary>, DbErr> {
+        let transaction = self.0.begin().await?;
+        let headers = storage::headers(&transaction).await?;
+        let mut summaries = Vec::with_capacity(headers.len());
+        for header in headers {
+            if let Some(summary) = summary(&transaction, header.id).await? {
+                summaries.push(summary);
+            }
+        }
+        transaction.commit().await?;
+        Ok(summaries)
+    }
+
     /// Reads one summary without loading every item.
     ///
     /// # Errors
     ///
     /// Returns [`DbErr`] when the database read or stored-value decoding fails.
     pub(super) async fn summary(&self, id: i64) -> Result<Option<WatchlistSummary>, DbErr> {
-        let transaction = self.0.begin().await?;
-        let Some(watchlist) = storage::watchlist(&transaction, id).await? else {
-            return Ok(None);
-        };
-        let mode = watchlist.item_order_mode;
-        let counts = storage::counts(&transaction, id).await?;
-        let next_unwatched =
-            storage::first_item(&transaction, id, mode, storage::ItemFilter::Unwatched).await?;
-        let first_item = if next_unwatched.is_some() {
-            None
-        } else {
-            storage::first_item(&transaction, id, mode, storage::ItemFilter::All).await?
-        };
-        transaction.commit().await?;
-        let stats = summary::build_stats(
-            counts.total_items,
-            counts.watched_items,
-            SummarySelection::new(next_unwatched, first_item.as_ref()),
-        );
-        Ok(Some(WatchlistSummary { watchlist, stats }))
+        summary(&self.0, id).await
     }
+}
+
+async fn summary<C: ConnectionTrait>(
+    database: &C,
+    id: i64,
+) -> Result<Option<WatchlistSummary>, DbErr> {
+    let Some(watchlist) = storage::watchlist(database, id).await? else {
+        return Ok(None);
+    };
+    let mode = watchlist.item_order_mode;
+    let counts = storage::counts(database, id).await?;
+    let next_unwatched =
+        storage::first_item(database, id, mode, storage::ItemFilter::Unwatched).await?;
+    let first_item = if next_unwatched.is_some() {
+        None
+    } else {
+        storage::first_item(database, id, mode, storage::ItemFilter::All).await?
+    };
+    let stats = summary::build_stats(
+        counts.total_items,
+        counts.watched_items,
+        SummarySelection::new(next_unwatched, first_item.as_ref()),
+    );
+    Ok(Some(WatchlistSummary { watchlist, stats }))
 }
 
 fn order_token(id: i64, mode: ItemOrderMode, items: &[WatchlistItem]) -> String {

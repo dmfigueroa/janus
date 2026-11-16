@@ -65,6 +65,15 @@ fn base_router(database_ready: bool) -> Router {
             }),
         )
         .route(
+            "/v2/static/browse.js",
+            get(|| async {
+                (
+                    [(header::CONTENT_TYPE, "text/javascript")],
+                    include_str!("../static/browse.js"),
+                )
+            }),
+        )
+        .route(
             "/v2/static/vendor/htmx.min.js",
             get(|| async {
                 (

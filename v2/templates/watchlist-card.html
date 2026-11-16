@@ -1,0 +1,62 @@
+<div class="watchlist-card" role="group">
+  <a class="card-cover" href="/v2/watchlists/{{card.id}}" aria-label="{{card.name}}">
+    {% if card.cover.is_empty() %}
+    <div class="cover-placeholder" aria-hidden="true"></div>
+    {% else %} {% if card.cover_is_episode %}
+    <div class="cover-episode">
+      <img
+        class="cover-blur"
+        src="{{card.cover}}"
+        alt=""
+        loading="lazy"
+        referrerpolicy="no-referrer"
+      />
+      <img
+        class="cover-frame"
+        src="{{card.cover}}"
+        alt=""
+        loading="lazy"
+        referrerpolicy="no-referrer"
+      />
+    </div>
+    {% else %}
+    <img
+      class="cover-image"
+      src="{{card.cover}}"
+      alt=""
+      loading="lazy"
+      referrerpolicy="no-referrer"
+    />
+    {% endif %} {% endif %}
+    <div class="cover-shade" aria-hidden="true"></div>
+  </a>
+  <a class="card-info" href="/v2/watchlists/{{card.id}}">
+    <h3 class="card-title" title="{{card.name}}">{{card.name}}</h3>
+    <div class="card-meta">
+      <span>{{card.watched}} of {{card.total}} watched</span>
+      <span aria-hidden="true">•</span>
+      <span class="card-progress-value {% if card.complete %}complete{% endif %}"
+        >{{card.progress}}%</span
+      >
+    </div>
+    {% if card.show_progress %}
+    <div
+      class="card-progress"
+      role="progressbar"
+      aria-label="Watchlist progress"
+      aria-valuenow="{{card.progress}}"
+      aria-valuemin="0"
+      aria-valuemax="100"
+    >
+      <div
+        class="card-progress-bar {% if card.complete %}complete{% endif %}"
+        style="width: {{card.progress}}%"
+      ></div>
+    </div>
+    {% endif %} {% if let Some(label) = card.next_label %}
+    <p class="card-next" title="Next: {{label}}">Next: {{label}}</p>
+    {% endif %} {% if let Some(paused) = card.paused_since %}
+    <p class="card-paused">Paused since {{paused}}</p>
+    {% endif %}
+  </a>
+</div>

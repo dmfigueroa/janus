@@ -26,6 +26,7 @@ async fn browser_assets_are_served_locally() {
     for path in [
         "/v2/static/app.css",
         "/v2/static/app.js",
+        "/v2/static/browse.js",
         "/v2/static/vendor/htmx.min.js",
         "/v2/static/vendor/Sortable.min.js",
     ] {

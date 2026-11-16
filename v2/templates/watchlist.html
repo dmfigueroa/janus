@@ -1,48 +1,33 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>{{view.name}} · Janus</title>
-    <link rel="stylesheet" href="/v2/static/app.css" />
-    <script defer src="/v2/static/vendor/htmx.min.js"></script>
-    <script defer src="/v2/static/vendor/Sortable.min.js"></script>
-    <script defer src="/v2/static/app.js"></script>
-  </head>
-  <body>
-    <main class="watchlist">
-      <nav><a href="/v2/watchlists">Janus</a></nav>
-      <header>
-        <h1>{{view.name}}</h1>
-        {% if view.paused %}<span class="badge" role="status">Paused</span>{% endif %}
-        <p>{{view.description}}</p>
-        <p>{{view.watched}} of {{view.total}} watched · {{view.mode}} order</p>
-        <progress value="{{view.progress}}" max="100" aria-label="Watchlist progress">
-          {{view.progress}}%
-        </progress>
-      </header>
-      <form method="get">
-        <label for="query">Search items</label
-        ><input id="query" name="query" value="{{view.query}}" type="search" /><label
-          for="unwatched"
-          >Watched items</label
-        ><select name="unwatched" id="unwatched">
-          <option value="true" {% if view.unwatched %}selected{% endif %}>Collapse watched</option>
-          <option value="false" {% if !view.unwatched %}selected{% endif %}>
-            Show all
-          </option></select
-        ><button>Apply filters</button>
-      </form>
-      <span
-        id="reorder-recovery"
-        hidden
-        hx-get=""
-        hx-trigger="reconcile"
-        hx-target=".timeline"
-        hx-select=".timeline > *"
-        hx-swap="innerHTML"
-      ></span>
-      {% include "timeline.html" %}
-    </main>
-  </body>
-</html>
+{% extends "layout.html" %} {% block title %}{{view.name}} · Janus{% endblock %} {% block content %}
+<main class="watchlist">
+  <nav class="breadcrumb"><a href="/v2/watchlists">Janus</a></nav>
+  <header>
+    <h1>{{view.name}}</h1>
+    {% if view.paused %}<span class="badge" role="status">Paused</span>{% endif %}
+    <p>{{view.description}}</p>
+    <p>{{view.watched}} of {{view.total}} watched · {{view.mode}} order</p>
+    <progress value="{{view.progress}}" max="100" aria-label="Watchlist progress">
+      {{view.progress}}%
+    </progress>
+  </header>
+  <form method="get">
+    <label for="query">Search items</label
+    ><input id="query" name="query" value="{{view.query}}" type="search" /><label for="unwatched"
+      >Watched items</label
+    ><select name="unwatched" id="unwatched">
+      <option value="true" {% if view.unwatched %}selected{% endif %}>Collapse watched</option>
+      <option value="false" {% if !view.unwatched %}selected{% endif %}>Show all</option></select
+    ><button>Apply filters</button>
+  </form>
+  <span
+    id="reorder-recovery"
+    hidden
+    hx-get=""
+    hx-trigger="reconcile"
+    hx-target=".timeline"
+    hx-select=".timeline > *"
+    hx-swap="innerHTML"
+  ></span>
+  {% include "timeline.html" %}
+</main>
+{% endblock %}
