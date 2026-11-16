@@ -131,6 +131,7 @@ pub struct BrowseCard {
 pub struct BrowseOrderOption {
     pub value: &'static str,
     pub label: &'static str,
+    pub direction: &'static str,
     pub selected: bool,
 }
 
@@ -144,6 +145,7 @@ pub struct BrowseView {
     pub sections: Vec<BrowseSection>,
     pub order_options: Vec<BrowseOrderOption>,
     pub order_param: &'static str,
+    pub order_label: &'static str,
     pub direction_param: &'static str,
     pub next_cursor: Option<String>,
     pub empty_message: Option<&'static str>,
@@ -204,6 +206,7 @@ impl BrowseView {
             sections,
             order_options: order_options(filters.order_by),
             order_param: filters.order_by.as_str(),
+            order_label: filters.order_by.label(),
             direction_param: filters.direction.as_str(),
             next_cursor,
             empty_message: (total_matches == 0).then_some(if search.is_some() {
@@ -227,6 +230,7 @@ fn order_options(selected: BrowseOrder) -> Vec<BrowseOrderOption> {
     .map(|order| BrowseOrderOption {
         value: order.as_str(),
         label: order.label(),
+        direction: BrowseDirection::parse(None, order).as_str(),
         selected: order == selected,
     })
     .collect()

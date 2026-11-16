@@ -15,7 +15,7 @@
       hx-select="#watchlist-browse"
       hx-swap="outerHTML"
       hx-push-url="true"
-      hx-trigger="submit, input changed delay:300ms from:#query, change from:#orderBy"
+      hx-trigger="submit, input changed delay:300ms from:#query"
       hx-sync="this:replace"
       hx-indicator="#browse-indicator"
     >
@@ -28,16 +28,32 @@
         placeholder="Search watchlists…"
         autocomplete="off"
       />
-      <label class="visually-hidden" for="orderBy">Sort watchlists</label>
-      <span class="select-shell">
-        <select id="orderBy" name="orderBy">
+      <input type="hidden" id="orderBy" name="orderBy" value="{{view.order_param}}" />
+      <input type="hidden" id="orderDirection" name="order" value="{{view.direction_param}}" />
+      <details class="sort-menu" id="sort-menu">
+        <summary aria-label="Sort watchlists: {{view.order_label}}">
+          <span id="sort-label">{{view.order_label}}</span>
+          <span class="chevron" aria-hidden="true"></span>
+        </summary>
+        <div class="sort-options">
           {% for option in view.order_options %}
-          <option value="{{option.value}}" {% if option.selected %}selected{% endif %}>
-            {{option.label}}
-          </option>
+          <a
+            href="/v2/watchlists?query={{view.query|urlencode}}&amp;orderBy={{option.value}}&amp;order={{option.direction}}"
+            data-sort-value="{{option.value}}"
+            data-sort-direction="{{option.direction}}"
+            data-sort-label="{{option.label}}"
+            {%
+            if
+            option.selected
+            %}aria-current="true"
+            {%
+            endif
+            %}
+            >{{option.label}}</a
+          >
           {% endfor %}
-        </select>
-      </span>
+        </div>
+      </details>
       <button type="submit">Search</button>
       {% if view.is_search %}<a class="clear-search" href="/v2/watchlists">Clear</a>{% endif %}
       <span id="browse-indicator" class="htmx-indicator" role="status">Loading watchlists…</span>
