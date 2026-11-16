@@ -196,3 +196,57 @@ restoration on success. DOM tests do not establish real browser pointer/touch be
 Existing database tests cover bounded locks and schema compatibility. No deployment,
 Access-authenticated client, physical-device or owner acceptance evidence is claimed for
 this change; those gates remain outstanding.
+
+## Issue #255 validation checkpoint (2026-11-16)
+
+**Incomplete: this checkpoint does not satisfy deployed first-slice acceptance or
+permit broader porting or v1 replacement.** Source under test:
+`19c56901dc025d681785c45fc8232d25796058f8`.
+
+### Reproduced local evidence
+
+- `cargo fmt --manifest-path v2/Cargo.toml --check`: passes.
+- `JANUS_TEST_NODE=/home/niika/.local/share/mise/installs/node/24.18.0/bin/node cargo test --manifest-path v2/Cargo.toml --locked`:
+  49 tests pass (22 unit, 24 disposable database integration, three HTTP).
+- `cargo clippy --manifest-path v2/Cargo.toml --locked --all-targets -- -D warnings`: passes.
+- Node 24.18.0 `--test v2/tests/reorder-browser.cjs v2/tests/htmx-browser.cjs`:
+  seven tests pass, including real HTMX requests/swaps, keyboard intents, failure
+  reconciliation, focus/scroll/filter restoration and drag/swap coordination.
+  These use jsdom, not a rendered browser or physical touch device.
+- Disposable v1-migrated database tests cover schema/startup compatibility,
+  subsequent v1 writes, v2 reorder followed by v1 reads/writes, complete hidden-item
+  order, gapped ranks, rollback and bounded contention. This supersedes the historical
+  read-only limitation above for local automated evidence only.
+
+### Current deployed evidence
+
+Coolify deployment `ccasfwe3xlg0zodmperynvuo` finished at
+2026-11-16 20:54:57 UTC at the source revision above. Read-only Docker inspection on
+`ryumi` confirms both v1 and v2 running that revision. Both mount the exact named
+volume `h8gsos0k40kk8s8oo8o4ko0w-DB` at `/app/storage`. V2 is healthy;
+container-local GET `/v2/health/ready` and `/v2/watchlists` each return 200.
+Coolify still uses separate Dockerfile applications; the parent Compose topology
+requirement remains an explicit unresolved deviation.
+
+Unauthenticated external GET requests to the v1 root and v2 readiness both return 401. This establishes neither authenticated availability nor a real MCP client
+through Access. No production data writes were performed. Container-local v2 MCP initialization
+returned 200, application/json, a session header and the requested 2025-03-26
+protocol version; DELETE returned 200. This used curl, not a real
+Access-authenticated MCP client.
+
+### Remaining first-slice gates
+
+- Reconcile all v1 changes since the historical baseline before advancing it:
+  `git diff 669a385b8efa855adfad93f73b734cc5c9a4e709..19c56901dc025d681785c45fc8232d25796058f8 -- src public drizzle`
+  is nonempty. The older baseline is not current parity acceptance.
+- Compare deployed v1/v2 MCP JSON envelopes, initialization/session headers,
+  missing/expired sessions, DELETE and idle expiry; record a real Access-authenticated
+  client separately from internal protocol checks.
+- Rendered mouse/keyboard/touch checks, pending and error recovery, external-write
+  reconciliation, focus and announcement evidence; physical-device checks separately.
+- Controlled deployed reorder acceptance only after compatibility evidence and an
+  identified safe production workflow; retain nondestructive production handling.
+- Deployed restart/data-persistence evidence remains outstanding.
+- Full visual/accessibility parity, resource evidence and owner acceptance remain open.
+  Passing local tests establishes no new SeaORM/rmcp/no-build feasibility failure,
+  but does not close these interaction and deployment feasibility gates.
