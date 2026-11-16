@@ -593,6 +593,46 @@ async fn empty_watchlist_stats_report_zero_progress_and_no_selection() {
 }
 
 #[tokio::test]
+async fn summary_discovery_uses_efficient_counts_and_cover_fallback() {
+    use janus_v2::{DiscoveryOperation as Operation, DiscoveryRequest as Request, Watchlists};
+    let fixture = Fixture::v1();
+    let lists = Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    let summary = |result: serde_json::Value| {
+        result["watchlists"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|watchlist| watchlist["id"] == 41)
+            .unwrap()
+            .clone()
+    };
+    let partial = summary(
+        lists
+            .discovery(Operation::List, Request::default())
+            .await
+            .unwrap(),
+    );
+    assert_eq!(partial["stats"]["totalItems"], 3);
+    assert_eq!(partial["stats"]["watchedItems"], 1);
+    assert_eq!(partial["stats"]["progress"], 33);
+    assert_eq!(partial["stats"]["nextUnwatched"]["id"], 101);
+    assert!(partial["stats"]["coverImage"].is_null());
+    assert_eq!(partial["stats"]["coverMediaType"], "episode");
+
+    change_v1(&fixture, "watch-all");
+    let completed = summary(
+        lists
+            .discovery(Operation::List, Request::default())
+            .await
+            .unwrap(),
+    );
+    assert_eq!(completed["stats"]["progress"], 100);
+    assert!(completed["stats"]["nextUnwatched"].is_null());
+    assert_eq!(completed["stats"]["coverImage"], "/poster.jpg");
+    assert_eq!(completed["stats"]["coverMediaType"], "episode");
+}
+
+#[tokio::test]
 async fn serialized_views_keep_reduced_items_and_full_next_unwatched_projection() {
     use janus_v2::{DiscoveryOperation as Operation, DiscoveryRequest as Request, Watchlists};
     let fixture = Fixture::v1();

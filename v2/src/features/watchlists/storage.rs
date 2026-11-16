@@ -3,9 +3,14 @@
 //! resulting typed rows.
 
 use super::ItemOrderMode;
-use super::snapshot::{WatchlistItem, WatchlistRecord};
-use super::summary::SummaryCounts;
+use super::snapshot::{UNWATCHED_ITEM_SQL, WatchlistItem, WatchlistRecord};
 use sea_orm::{ConnectionTrait, DbBackend, DbErr, QueryResult, Statement};
+
+/// Stored item counts read without loading item rows.
+pub(super) struct ItemCounts {
+    pub total_items: usize,
+    pub watched_items: usize,
+}
 
 fn statement(sql: &str, values: Vec<sea_orm::Value>) -> Statement {
     Statement::from_sql_and_values(DbBackend::Sqlite, sql, values)
@@ -64,10 +69,7 @@ pub(super) async fn items<C: ConnectionTrait>(
 }
 
 /// Reads stored total and watched counts for one watchlist.
-pub(super) async fn counts<C: ConnectionTrait>(
-    database: &C,
-    id: i64,
-) -> Result<SummaryCounts, DbErr> {
+pub(super) async fn counts<C: ConnectionTrait>(database: &C, id: i64) -> Result<ItemCounts, DbErr> {
     let row = database
         .query_one_raw(statement(
             "SELECT count(*) AS total,\
@@ -77,7 +79,7 @@ pub(super) async fn counts<C: ConnectionTrait>(
         ))
         .await?
         .ok_or_else(|| DbErr::Custom("Missing watchlist item counts".to_owned()))?;
-    Ok(SummaryCounts {
+    Ok(ItemCounts {
         total_items: row.try_get::<i64>("", "total")? as usize,
         watched_items: row.try_get::<Option<i64>>("", "watched")?.unwrap_or(0) as usize,
     })
@@ -92,9 +94,9 @@ pub(super) async fn first_item<C: ConnectionTrait>(
     unwatched_only: bool,
 ) -> Result<Option<WatchlistItem>, DbErr> {
     let filter = if unwatched_only {
-        " AND COALESCE(is_watched,0)=0"
+        format!(" AND {UNWATCHED_ITEM_SQL}")
     } else {
-        ""
+        String::new()
     };
     database
         .query_one_raw(statement(

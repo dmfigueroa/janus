@@ -49,6 +49,12 @@ pub struct WatchlistItem {
 }
 
 impl WatchlistItem {
+    /// Whether this item is still waiting to be watched. Nullable watched state
+    /// counts as unwatched.
+    pub fn is_unwatched(&self) -> bool {
+        self.is_watched != Some(true)
+    }
+
     /// Matches the item's title, parent title or episode against a lowercase query.
     pub fn matches_text(&self, lowercase_query: &str) -> bool {
         [self.title.as_str()]
@@ -65,6 +71,9 @@ impl WatchlistItem {
         (id, title)
     }
 }
+
+/// SQL equivalent of [`WatchlistItem::is_unwatched`] for stored reads.
+pub(super) const UNWATCHED_ITEM_SQL: &str = "COALESCE(is_watched,0)=0";
 
 /// A consistent watchlist snapshot: summary, ordered items and order token.
 #[derive(Clone, Debug, PartialEq)]
@@ -126,7 +135,11 @@ impl Watchlists {
             storage::first_item(&transaction, id, mode, false).await?
         };
         transaction.commit().await?;
-        let stats = summary::build_stats(counts, SummarySelection::new(next_unwatched, first_item));
+        let stats = summary::build_stats(
+            counts.total_items,
+            counts.watched_items,
+            SummarySelection::new(next_unwatched, first_item),
+        );
         Ok(Some(WatchlistSummary { watchlist, stats }))
     }
 }

@@ -24,17 +24,11 @@ pub struct WatchlistSummary {
     pub stats: WatchlistStats,
 }
 
-/// Efficiently read item counts before deriving summary state.
-pub(super) struct SummaryCounts {
-    pub total_items: usize,
-    pub watched_items: usize,
-}
-
 /// The items selected for a summary, before their values are derived.
 pub(super) struct SummarySelection {
-    pub next_unwatched: Option<WatchlistItem>,
-    pub cover_image: Option<String>,
-    pub cover_media_type: Option<String>,
+    next_unwatched: Option<WatchlistItem>,
+    cover_image: Option<String>,
+    cover_media_type: Option<String>,
 }
 
 impl SummarySelection {
@@ -52,11 +46,15 @@ impl SummarySelection {
 }
 
 /// Builds summary state from stored counts and selected items.
-pub(super) fn build_stats(counts: SummaryCounts, selection: SummarySelection) -> WatchlistStats {
+pub(super) fn build_stats(
+    total_items: usize,
+    watched_items: usize,
+    selection: SummarySelection,
+) -> WatchlistStats {
     WatchlistStats {
-        total_items: counts.total_items,
-        watched_items: counts.watched_items,
-        progress: progress(counts.total_items, counts.watched_items),
+        total_items,
+        watched_items,
+        progress: progress(total_items, watched_items),
         next_unwatched: selection.next_unwatched,
         cover_image: selection.cover_image,
         cover_media_type: selection.cover_media_type,
@@ -69,16 +67,11 @@ pub(super) fn stats_from_items(items: &[WatchlistItem]) -> WatchlistStats {
         .iter()
         .filter(|item| item.is_watched == Some(true))
         .count();
-    let next_unwatched = items
-        .iter()
-        .find(|item| item.is_watched != Some(true))
-        .cloned();
+    let next_unwatched = items.iter().find(|item| item.is_unwatched()).cloned();
     let first_item = items.first().cloned();
     build_stats(
-        SummaryCounts {
-            total_items: items.len(),
-            watched_items,
-        },
+        items.len(),
+        watched_items,
         SummarySelection::new(next_unwatched, first_item),
     )
 }
@@ -156,10 +149,8 @@ mod tests {
     fn summary_builds_cover_from_the_selected_item_without_extra_state() {
         let next = item(2, None, Some("/next.jpg"), "episode");
         let stats = build_stats(
-            SummaryCounts {
-                total_items: 3,
-                watched_items: 1,
-            },
+            3,
+            1,
             SummarySelection::new(Some(next), Some(item(3, None, None, "book"))),
         );
         assert_eq!(stats.progress, 33);
