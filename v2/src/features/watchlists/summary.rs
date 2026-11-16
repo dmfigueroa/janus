@@ -34,9 +34,9 @@ pub(super) struct SummarySelection {
 impl SummarySelection {
     pub(super) fn new(
         next_unwatched: Option<WatchlistItem>,
-        first_item: Option<WatchlistItem>,
+        first_item: Option<&WatchlistItem>,
     ) -> Self {
-        let cover = next_unwatched.as_ref().or(first_item.as_ref());
+        let cover = next_unwatched.as_ref().or(first_item);
         Self {
             cover_image: cover.and_then(|item| item.poster_path.clone()),
             cover_media_type: cover.map(|item| item.media_type.clone()),
@@ -68,11 +68,10 @@ pub(super) fn stats_from_items(items: &[WatchlistItem]) -> WatchlistStats {
         .filter(|item| item.is_watched == Some(true))
         .count();
     let next_unwatched = items.iter().find(|item| item.is_unwatched()).cloned();
-    let first_item = items.first().cloned();
     build_stats(
         items.len(),
         watched_items,
-        SummarySelection::new(next_unwatched, first_item),
+        SummarySelection::new(next_unwatched, items.first()),
     )
 }
 
@@ -116,9 +115,17 @@ mod tests {
     }
 
     #[test]
-    fn progress_is_empty_at_zero_complete_at_total_and_partial_below_one_hundred() {
+    fn empty_list_reports_zero_progress() {
         assert_eq!(progress(0, 0), 0);
+    }
+
+    #[test]
+    fn completed_list_reports_one_hundred_progress() {
         assert_eq!(progress(4, 4), 100);
+    }
+
+    #[test]
+    fn partial_progress_stays_below_one_hundred() {
         assert_eq!(progress(3, 1), 33);
         assert_eq!(progress(100, 99), 99);
     }
@@ -148,11 +155,8 @@ mod tests {
     #[test]
     fn summary_builds_cover_from_the_selected_item_without_extra_state() {
         let next = item(2, None, Some("/next.jpg"), "episode");
-        let stats = build_stats(
-            3,
-            1,
-            SummarySelection::new(Some(next), Some(item(3, None, None, "book"))),
-        );
+        let first = item(3, None, None, "book");
+        let stats = build_stats(3, 1, SummarySelection::new(Some(next), Some(&first)));
         assert_eq!(stats.progress, 33);
         assert_eq!(stats.cover_image.as_deref(), Some("/next.jpg"));
         assert_eq!(stats.cover_media_type.as_deref(), Some("episode"));

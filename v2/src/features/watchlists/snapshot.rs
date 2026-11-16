@@ -4,12 +4,13 @@
 //! are composed here from private SQLite mechanics and derived summary rules.
 //! Web and MCP adapters consume these types rather than coordinating queries.
 
+use sea_orm::{DbErr, TransactionTrait};
+use sha2::{Digest, Sha256};
+
 use super::ItemOrderMode;
 use super::Watchlists;
 use super::storage;
 use super::summary::{self, SummarySelection, WatchlistSummary};
-use sea_orm::{DbErr, TransactionTrait};
-use sha2::{Digest, Sha256};
 
 /// One watchlist row without derived statistics.
 #[derive(Clone, Debug, PartialEq)]
@@ -128,17 +129,18 @@ impl Watchlists {
         };
         let mode = watchlist.item_order_mode;
         let counts = storage::counts(&transaction, id).await?;
-        let next_unwatched = storage::first_item(&transaction, id, mode, true).await?;
+        let next_unwatched =
+            storage::first_item(&transaction, id, mode, storage::ItemFilter::Unwatched).await?;
         let first_item = if next_unwatched.is_some() {
             None
         } else {
-            storage::first_item(&transaction, id, mode, false).await?
+            storage::first_item(&transaction, id, mode, storage::ItemFilter::All).await?
         };
         transaction.commit().await?;
         let stats = summary::build_stats(
             counts.total_items,
             counts.watched_items,
-            SummarySelection::new(next_unwatched, first_item),
+            SummarySelection::new(next_unwatched, first_item.as_ref()),
         );
         Ok(Some(WatchlistSummary { watchlist, stats }))
     }

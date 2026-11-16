@@ -2,9 +2,10 @@
 //! focused queries. Feature operations own transactions and compose the
 //! resulting typed rows.
 
+use sea_orm::{ConnectionTrait, DbBackend, DbErr, QueryResult, Statement};
+
 use super::ItemOrderMode;
 use super::snapshot::{UNWATCHED_ITEM_SQL, WatchlistItem, WatchlistRecord};
-use sea_orm::{ConnectionTrait, DbBackend, DbErr, QueryResult, Statement};
 
 /// Stored item counts read without loading item rows.
 pub(super) struct ItemCounts {
@@ -85,23 +86,28 @@ pub(super) async fn counts<C: ConnectionTrait>(database: &C, id: i64) -> Result<
     })
 }
 
-/// Reads the first item in the watchlist's stored order, optionally only
-/// considering unwatched items.
+/// Which stored items a first-item query considers.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum ItemFilter {
+    All,
+    Unwatched,
+}
+
+/// Reads the first item in the watchlist's stored order matching the filter.
 pub(super) async fn first_item<C: ConnectionTrait>(
     database: &C,
     id: i64,
     mode: ItemOrderMode,
-    unwatched_only: bool,
+    filter: ItemFilter,
 ) -> Result<Option<WatchlistItem>, DbErr> {
-    let filter = if unwatched_only {
-        format!(" AND {UNWATCHED_ITEM_SQL}")
-    } else {
-        String::new()
+    let predicate = match filter {
+        ItemFilter::All => String::new(),
+        ItemFilter::Unwatched => format!(" AND {UNWATCHED_ITEM_SQL}"),
     };
     database
         .query_one_raw(statement(
             &format!(
-                "SELECT * FROM watchlist_items WHERE watchlist_id=?{filter} \
+                "SELECT * FROM watchlist_items WHERE watchlist_id=?{predicate} \
                  ORDER BY {} LIMIT 1",
                 mode.order_sql()
             ),
