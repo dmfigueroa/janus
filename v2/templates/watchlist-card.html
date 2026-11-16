@@ -1,7 +1,24 @@
 <div class="watchlist-card" role="group">
   <a class="card-cover" href="/v2/watchlists/{{card.id}}" aria-label="{{card.name}}">
     {% if card.cover.is_empty() %}
-    <div class="cover-placeholder" aria-hidden="true"></div>
+    <div class="cover-placeholder" aria-hidden="true">
+      <svg
+        viewBox="0 0 24 24"
+        width="32"
+        height="32"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+      >
+        <line x1="8" y1="6" x2="21" y2="6"></line>
+        <line x1="8" y1="12" x2="21" y2="12"></line>
+        <line x1="8" y1="18" x2="21" y2="18"></line>
+        <line x1="3" y1="6" x2="3.01" y2="6"></line>
+        <line x1="3" y1="12" x2="3.01" y2="12"></line>
+        <line x1="3" y1="18" x2="3.01" y2="18"></line>
+      </svg>
+    </div>
     {% else %} {% if card.cover_is_episode %}
     <div class="cover-episode">
       <img

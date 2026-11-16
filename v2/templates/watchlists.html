@@ -20,14 +20,45 @@
       hx-indicator="#browse-indicator"
     >
       <label class="visually-hidden" for="query">Search watchlists</label>
-      <input
-        id="query"
-        name="query"
-        type="search"
-        value="{{view.query}}"
-        placeholder="Search watchlists…"
-        autocomplete="off"
-      />
+      <div class="search-field">
+        <svg
+          class="search-icon"
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          width="18"
+          height="18"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+        >
+          <circle cx="11" cy="11" r="7"></circle>
+          <line x1="16" y1="16" x2="21" y2="21"></line>
+        </svg>
+        <input
+          id="query"
+          name="query"
+          type="search"
+          value="{{view.query}}"
+          placeholder="Search watchlists…"
+          autocomplete="off"
+        />
+        <a class="clear-search" href="/v2/watchlists" aria-label="Clear search">
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+          </svg>
+        </a>
+      </div>
       <label class="visually-hidden" for="orderBy">Sort watchlists</label>
       <span class="select-shell">
         <select id="orderBy" name="orderBy">
@@ -38,8 +69,7 @@
           {% endfor %}
         </select>
       </span>
-      <button type="submit">Search</button>
-      {% if view.is_search %}<a class="clear-search" href="/v2/watchlists">Clear</a>{% endif %}
+      <noscript><button type="submit">Search</button></noscript>
       <span id="browse-indicator" class="htmx-indicator" role="status">Loading watchlists…</span>
     </form>
     <p id="browse-status" class="browse-status" role="status" aria-live="polite"></p>

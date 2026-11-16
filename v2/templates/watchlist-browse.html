@@ -1,6 +1,18 @@
 <div id="watchlist-browse" class="watchlist-browse" aria-busy="false">
-  <div class="browse-heading">
-    <h2 id="browse-heading" tabindex="-1">{{view.heading}}</h2>
+  <div class="browse-heading{% if !view.is_search %} browse-heading--compact{% endif %}">
+    <h2
+      id="browse-heading"
+      tabindex="-1"
+      {%
+      if
+      !view.is_search
+      %}class="visually-hidden"
+      {%
+      endif
+      %}
+    >
+      {{view.heading}}
+    </h2>
     {% if !view.summary.is_empty() %}
     <p class="browse-summary">{{view.summary}}</p>
     {% endif %}
