@@ -57,6 +57,16 @@ watched runs spanning years, empty results and unwatched-only filtering; HTTP an
 regressions remain covered by the fixture-backed `cargo test` suite and
 `node --test v2/tests/reorder-browser.cjs`.
 
+Watchlist read state is split by responsibility. `item_order.rs` owns stored order-mode
+decoding and the ordering SQL shared by reads and reorder; private `storage.rs` decodes rows
+and runs focused item queries; `summary.rs` owns progress, next-unwatched and cover
+selection; `snapshot.rs` composes typed records, detail snapshots and summary reads and owns
+their transactions. Summary reads use counts plus selected rows instead of loading every
+item, while detail derives the same summary rules from its already loaded snapshot. Order
+tokens keep the v1 SHA-256 input. Unit tests cover progress, cover selection and stored
+ordering; fixture-backed tests cover empty, partial and completed progress, nullable
+metadata, order-token bytes, reorder semantics and reads after v1 writes.
+
 Reorder writes renumber the complete displayed sequence, keeping ranks contiguous even
 when v1 deletions left gaps. Other future writes must explicitly preserve Drizzle's
 application-side `updatedAt` hook; SeaORM does not supply it automatically. Reordering uses
