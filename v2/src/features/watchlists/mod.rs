@@ -20,8 +20,6 @@ pub mod discovery;
 
 mod contracts;
 
-mod validation;
-
 pub mod reorder;
 
 mod timeline;
