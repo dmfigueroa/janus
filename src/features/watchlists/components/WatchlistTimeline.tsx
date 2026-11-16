@@ -32,8 +32,9 @@ export function WatchlistTimeline({
   hasMore,
   isLoadingMore,
   interactionDisabled,
-  reorder = readOnlyReorder(items),
+  reorder: providedReorder,
 }: WatchlistTimelineProps) {
+  const reorder = providedReorder ?? readOnlyReorder(items);
   const displayedItems = reorder.displayedItems;
   const { expandedRunKeys, toggleRun } = useExpandedWatchedRuns();
   const blocks = useMemo(
