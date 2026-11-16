@@ -15,8 +15,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NITRO_PRESET=node-server
 RUN npm run build
-# Compile migration script using esbuild (bundled with vite, or npx)
+# Compile migration and seed scripts using esbuild (bundled with vite, or npx)
 RUN npx esbuild src/db/Migrate.ts --bundle --platform=node --format=esm --outfile=.output/server/migrate.mjs --external:better-sqlite3 --external:drizzle-orm
+RUN npx esbuild src/db/Seed.ts --bundle --platform=node --format=esm --outfile=.output/server/seed.mjs --external:better-sqlite3 --external:drizzle-orm
 
 # Production image, copy all the files and run next
 FROM base AS prod-deps
@@ -40,5 +41,5 @@ COPY drizzle drizzle
 # Expose port
 EXPOSE 3000
 
-# Run migrations then start server
-CMD ["sh", "-c", "node .output/server/migrate.mjs && node .output/server/index.mjs"]
+# Run migrations, then seed (no-op unless SEED_ON_STARTUP=true), then start server
+CMD ["sh", "-c", "node .output/server/migrate.mjs && node .output/server/seed.mjs && node .output/server/index.mjs"]
