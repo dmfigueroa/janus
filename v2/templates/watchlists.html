@@ -29,13 +29,15 @@
         autocomplete="off"
       />
       <label class="visually-hidden" for="orderBy">Sort watchlists</label>
-      <select id="orderBy" name="orderBy">
-        {% for option in view.order_options %}
-        <option value="{{option.value}}" {% if option.selected %}selected{% endif %}>
-          {{option.label}}
-        </option>
-        {% endfor %}
-      </select>
+      <span class="select-shell">
+        <select id="orderBy" name="orderBy">
+          {% for option in view.order_options %}
+          <option value="{{option.value}}" {% if option.selected %}selected{% endif %}>
+            {{option.label}}
+          </option>
+          {% endfor %}
+        </select>
+      </span>
       <button type="submit">Search</button>
       {% if view.is_search %}<a class="clear-search" href="/v2/watchlists">Clear</a>{% endif %}
       <span id="browse-indicator" class="htmx-indicator" role="status">Loading watchlists…</span>
