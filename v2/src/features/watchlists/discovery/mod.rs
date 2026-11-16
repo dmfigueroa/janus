@@ -23,6 +23,13 @@ pub enum DiscoveryOperation {
     Find,
 }
 
+impl DiscoveryOperation {
+    /// Whether this operation reads watchlist summaries rather than items.
+    pub fn is_summary(self) -> bool {
+        matches!(self, Self::List | Self::Search)
+    }
+}
+
 /// Discovery arguments after adapter-owned transport normalization.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DiscoveryRequest {

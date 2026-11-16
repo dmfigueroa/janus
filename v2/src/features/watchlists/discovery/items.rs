@@ -31,7 +31,7 @@ pub enum ItemResults {
 /// A distinct title selected from a watchlist, with its matching item count.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GroupedTitle {
-    pub provider: String,
+    pub source: String,
     pub provider_id: String,
     pub media_type: String,
     pub title: String,
@@ -92,10 +92,7 @@ impl ItemQuery {
         operation: DiscoveryOperation,
         request: DiscoveryRequest,
     ) -> Result<Self, DiscoveryError> {
-        if !matches!(
-            operation,
-            DiscoveryOperation::Get | DiscoveryOperation::Find
-        ) {
+        if operation.is_summary() {
             return Err(invalid("Invalid discovery operation."));
         }
         let view = ResultView::parse(request.result_view.as_deref())?;
@@ -287,7 +284,7 @@ fn grouped_titles(items: &[&WatchlistItem]) -> Vec<GroupedTitle> {
         .into_iter()
         .map(
             |((title, id, source, media_type), matching_item_count)| GroupedTitle {
-                provider: source.into(),
+                source: source.into(),
                 provider_id: id.into(),
                 media_type: media_type.into(),
                 title: title.into(),
@@ -300,7 +297,7 @@ fn grouped_titles(items: &[&WatchlistItem]) -> Vec<GroupedTitle> {
 fn single_title(item: &WatchlistItem) -> GroupedTitle {
     let (id, title) = item.group_title();
     GroupedTitle {
-        provider: item.source.clone(),
+        source: item.source.clone(),
         provider_id: id.into(),
         media_type: item.media_type.clone(),
         title: title.into(),

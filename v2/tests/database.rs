@@ -201,6 +201,7 @@ async fn mcp_discovers_and_reads_existing_watchlist_with_baseline_envelopes_and_
     );
     assert!(data["items"][0].get("authors").is_none());
     assert!(data["items"][0].get("posterPath").is_none());
+    assert!(data["items"][0].get("releaseDate").is_none());
     assert!(
         data["watchlist"]["stats"]["nextUnwatched"]
             .get("posterPath")
@@ -234,6 +235,13 @@ async fn mcp_discovers_and_reads_existing_watchlist_with_baseline_envelopes_and_
         find["structuredContent"]["titles"][0]["matchingItemCount"],
         2
     );
+    let provider=result(rpc(&app,json!({"jsonrpc":"2.0","id":26,"method":"tools/call","params":{"name":"find_watchlist_items","arguments":{"watchlistId":41,"provider":"tmdb","providerId":"ep-1","mediaType":"episode"}}}),Some(&session)).await).await;
+    assert_eq!(provider["structuredContent"]["items"][0]["id"], 101);
+    assert!(provider["structuredContent"].get("watchlist").is_none());
+    assert!(provider["structuredContent"].get("nextCursor").is_none());
+    let missing=result(rpc(&app,json!({"jsonrpc":"2.0","id":27,"method":"tools/call","params":{"name":"find_watchlist_items","arguments":{"watchlistId":999,"watchlistItemId":101}}}),Some(&session)).await).await;
+    assert_eq!(missing["structuredContent"]["items"], json!([]));
+    assert!(missing.get("isError").is_none());
     let invalid_selector=result(rpc(&app,json!({"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"find_watchlist_items","arguments":{"watchlistId":41,"watchlistItemId":101,"pageSize":1}}}),Some(&session)).await).await;
     assert_eq!(invalid_selector["isError"], true);
 
@@ -303,6 +311,63 @@ async fn mcp_discovers_and_reads_existing_watchlist_with_baseline_envelopes_and_
         .status(),
         StatusCode::NOT_FOUND
     );
+}
+
+#[tokio::test]
+async fn mcp_discovery_reports_database_failures_without_internal_details() {
+    let fixture = Fixture::v1();
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let app = janus_v2::database_router(database.clone());
+    let initialized = rpc(
+        &app,
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"failure-test","version":"1"}}}),
+        None,
+    )
+    .await;
+    let session = initialized.headers()["mcp-session-id"]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let _ = result(initialized).await;
+    database.close().await.unwrap();
+    for (id, name, arguments, message) in [
+        (
+            2,
+            "list_watchlists",
+            json!({}),
+            "Unable to load watchlists.",
+        ),
+        (
+            3,
+            "search_watchlists",
+            json!({"query":"cafe"}),
+            "Unable to load watchlists.",
+        ),
+        (
+            4,
+            "get_watchlist",
+            json!({"watchlistId":41}),
+            "Unable to load watchlist.",
+        ),
+        (
+            5,
+            "find_watchlist_items",
+            json!({"watchlistId":41,"query":"show"}),
+            "Unable to load watchlist.",
+        ),
+    ] {
+        let response = result(
+            rpc(
+                &app,
+                json!({"jsonrpc":"2.0","id":id,"method":"tools/call","params":{"name":name,"arguments":arguments}}),
+                Some(&session),
+            )
+            .await,
+        )
+        .await;
+        assert_eq!(response["isError"], true, "{response}");
+        assert_eq!(response["content"][0]["text"], message, "{response}");
+    }
 }
 
 fn change_v1(fixture: &Fixture, action: &str) {

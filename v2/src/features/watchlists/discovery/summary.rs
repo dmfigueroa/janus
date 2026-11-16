@@ -89,12 +89,12 @@ impl SummaryQuery {
         operation: DiscoveryOperation,
         request: DiscoveryRequest,
     ) -> Result<Self, DiscoveryError> {
-        if !matches!(
-            operation,
-            DiscoveryOperation::List | DiscoveryOperation::Search
-        ) {
+        if !operation.is_summary() {
             return Err(invalid("Invalid discovery operation."));
         }
+        let order_by = SummaryOrderBy::parse(request.order_by.as_deref())?;
+        let order = SortOrder::parse(request.order.as_deref())?;
+        let page = Page::new(request.page_size, request.cursor)?;
         let query = trimmed_text(request.query, "query")?;
         let search = if operation == DiscoveryOperation::Search {
             let query = query
@@ -106,9 +106,9 @@ impl SummaryQuery {
         };
         Ok(Self {
             search,
-            order_by: SummaryOrderBy::parse(request.order_by.as_deref())?,
-            order: SortOrder::parse(request.order.as_deref())?,
-            page: Page::new(request.page_size, request.cursor)?,
+            order_by,
+            order,
+            page,
         })
     }
 }

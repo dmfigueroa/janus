@@ -197,25 +197,22 @@ impl ServerHandler for ReadMcp {
             Value::Object(request.arguments.unwrap_or_default()),
         );
         let discovered = match request_arguments(&arguments) {
-            Ok(request) => match operation {
-                DiscoveryOperation::List | DiscoveryOperation::Search => self
-                    .0
-                    .summaries(operation, request)
-                    .await
-                    .map(summary_envelope),
-                DiscoveryOperation::Get | DiscoveryOperation::Find => {
+            Ok(request) => {
+                if operation.is_summary() {
+                    self.0
+                        .summaries(operation, request)
+                        .await
+                        .map(summary_envelope)
+                } else {
                     self.0.items(operation, request).await.map(item_envelope)
                 }
-            },
+            }
             Err(message) => Err(DiscoveryError::InvalidInput(message)),
         };
         match discovered.map_err(|error| match error {
             DiscoveryError::InvalidInput(message) => message,
             DiscoveryError::Database(_) => {
-                if matches!(
-                    operation,
-                    DiscoveryOperation::List | DiscoveryOperation::Search
-                ) {
+                if operation.is_summary() {
                     "Unable to load watchlists.".into()
                 } else {
                     "Unable to load watchlist.".into()
@@ -340,7 +337,7 @@ fn summary_json(summary: &super::WatchlistSummary) -> Value {
 
 fn title_json(title: &GroupedTitle) -> Value {
     json!({
-        "provider": title.provider,
+        "provider": title.source,
         "providerId": title.provider_id,
         "mediaType": title.media_type,
         "title": title.title,
