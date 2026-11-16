@@ -1,8 +1,11 @@
 //! Item discovery: selectors, grouped titles, ordering and item pagination.
 //!
-//! Selectors are precedence-ordered exactly as before: an item ID, then a
-//! provider identity, then free text. A watchlist item's grouped title is
-//! its parent identity and title when present, otherwise its own.
+//! A get reads one watchlist and pages it. A find selects items by item ID,
+//! provider identity or free text. Those are separate operations, so each has
+//! its own validated query type and its own read path. Selector precedence is
+//! unchanged: an item ID, then a provider identity, then free text. A
+//! watchlist item's grouped title is its parent identity and title when
+//! present, otherwise its own.
 
 use super::{
     CursorBinding, DiscoveryError, DiscoveryOperation, DiscoveryRequest, Page, invalid, paginate,
@@ -22,9 +25,26 @@ pub struct ItemPage {
     pub order_token: Option<String>,
 }
 
+impl ItemPage {
+    fn empty(view: ResultView) -> Self {
+        let results = match view {
+            ResultView::Items => ItemResults::Items(Vec::new()),
+            ResultView::Titles => ItemResults::Titles(Vec::new()),
+        };
+        Self {
+            watchlist: None,
+            results,
+            next_cursor: None,
+            order_token: None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum ItemResults {
+    /// Stored items in discovery order.
     Items(Vec<WatchlistItem>),
+    /// Distinct title identities with their matching item counts.
     Titles(Vec<GroupedTitle>),
 }
 
@@ -43,21 +63,38 @@ pub(crate) const MEDIA_TYPES: &[&str] = &[
 ];
 
 /// A validated item request, after transport-level normalization.
-struct ItemQuery {
-    operation: DiscoveryOperation,
+enum ItemQuery {
+    Get(GetQuery),
+    Find(FindQuery),
+}
+
+/// A whole-watchlist read. Every item participates and the page window applies.
+struct GetQuery {
     watchlist_id: i64,
-    selector: Option<ItemSelector>,
-    /// The trimmed text query, also used for cursor binding.
-    query: Option<String>,
     view: ResultView,
     page: Page,
 }
 
+/// A selector read. Exact selectors return every match without a page window;
+/// text selectors filter and paginate.
+enum FindQuery {
+    Exact {
+        watchlist_id: i64,
+        selector: ExactSelector,
+        view: ResultView,
+    },
+    Text {
+        watchlist_id: i64,
+        query: String,
+        view: ResultView,
+        page: Page,
+    },
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum ItemSelector {
+enum ExactSelector {
     Id(i64),
     Provider(ProviderIdentity),
-    Text,
 }
 
 /// The three fields that together identify an item's provider entry.
@@ -69,9 +106,8 @@ struct ProviderIdentity {
 }
 
 impl ProviderIdentity {
-    /// Builds the identity only when all three fields are present. Partial
-    /// provider selections are invalid, so returning an `Option` here keeps
-    /// the incomplete case out of the rest of validation.
+    /// Returns `None` only when no provider field is present. A partial
+    /// selection is invalid, so the incomplete case never reaches selection.
     fn parse(
         provider: Option<String>,
         provider_id: Option<String>,
@@ -86,31 +122,6 @@ impl ProviderIdentity {
             })),
             _ => Err(invalid("Provide one valid watchlist item selector.")),
         }
-    }
-}
-
-impl ItemSelector {
-    /// Resolves the exactly-one-of selector rules for a find request.
-    fn parse(
-        item_id: Option<i64>,
-        provider: Option<ProviderIdentity>,
-        has_query: bool,
-        page_requested: bool,
-    ) -> Result<Self, DiscoveryError> {
-        let selector = match (item_id, provider, has_query) {
-            (Some(id), None, false) => Self::Id(id),
-            (None, Some(provider), false) => Self::Provider(provider),
-            (None, None, true) => Self::Text,
-            _ => return Err(invalid("Provide one valid watchlist item selector.")),
-        };
-        if selector.is_exact() && page_requested {
-            return Err(invalid("Provide one valid watchlist item selector."));
-        }
-        Ok(selector)
-    }
-
-    fn is_exact(&self) -> bool {
-        matches!(self, Self::Id(_) | Self::Provider(_))
     }
 }
 
@@ -135,9 +146,35 @@ impl ItemQuery {
         operation: DiscoveryOperation,
         request: DiscoveryRequest,
     ) -> Result<Self, DiscoveryError> {
-        if operation.is_summary() {
-            return Err(invalid("Invalid discovery operation."));
+        match operation {
+            DiscoveryOperation::Get => Ok(Self::Get(GetQuery::validate(request)?)),
+            DiscoveryOperation::Find => Ok(Self::Find(FindQuery::validate(request)?)),
+            DiscoveryOperation::List | DiscoveryOperation::Search => {
+                Err(invalid("Invalid discovery operation."))
+            }
         }
+    }
+}
+
+impl GetQuery {
+    fn validate(request: DiscoveryRequest) -> Result<Self, DiscoveryError> {
+        let DiscoveryRequest {
+            page_size,
+            cursor,
+            watchlist_id,
+            result_view,
+            ..
+        } = request;
+        Ok(Self {
+            view: ResultView::parse(result_view.as_deref())?,
+            watchlist_id: required_watchlist_id(watchlist_id)?,
+            page: Page::new(page_size, cursor)?,
+        })
+    }
+}
+
+impl FindQuery {
+    fn validate(request: DiscoveryRequest) -> Result<Self, DiscoveryError> {
         let DiscoveryRequest {
             query,
             page_size,
@@ -155,29 +192,29 @@ impl ItemQuery {
         let query = trimmed_text(query, "query")?;
         let provider = trimmed_text(provider, "provider")?;
         let provider_id = trimmed_text(provider_id, "providerId")?;
-        let watchlist_id = positive_id(watchlist_id, "watchlistId")?;
-        let watchlist_item_id = positive_id(watchlist_item_id, "watchlistItemId")?;
+        let item_id = positive_id(watchlist_item_id, "watchlistItemId")?;
+        let watchlist_id = required_watchlist_id(watchlist_id)?;
+        let provider_identity = ProviderIdentity::parse(provider, provider_id, media_type)?;
         let page_requested = page_size.is_some() || cursor.is_some();
-        let page = Page::new(page_size, cursor)?;
-        let watchlist_id = watchlist_id.ok_or_else(|| invalid("Invalid watchlist ID."))?;
-        let selector = if operation == DiscoveryOperation::Find {
-            Some(ItemSelector::parse(
-                watchlist_item_id,
-                ProviderIdentity::parse(provider, provider_id, media_type)?,
-                query.is_some(),
-                page_requested,
-            )?)
-        } else {
-            None
-        };
-        Ok(Self {
-            operation,
-            watchlist_id,
-            selector,
-            query,
-            view,
-            page,
-        })
+        match (item_id, provider_identity, query, page_requested) {
+            (Some(item_id), None, None, false) => Ok(Self::Exact {
+                watchlist_id,
+                selector: ExactSelector::Id(item_id),
+                view,
+            }),
+            (None, Some(provider), None, false) => Ok(Self::Exact {
+                watchlist_id,
+                selector: ExactSelector::Provider(provider),
+                view,
+            }),
+            (None, None, Some(query), _) => Ok(Self::Text {
+                watchlist_id,
+                query,
+                view,
+                page: Page::new(page_size, cursor)?,
+            }),
+            _ => Err(invalid("Provide one valid watchlist item selector.")),
+        }
     }
 }
 
@@ -188,6 +225,10 @@ fn validated_media_type(media_type: Option<String>) -> Result<Option<String>, Di
         }
         media_type => Ok(media_type),
     }
+}
+
+fn required_watchlist_id(watchlist_id: Option<i64>) -> Result<i64, DiscoveryError> {
+    positive_id(watchlist_id, "watchlistId")?.ok_or_else(|| invalid("Invalid watchlist ID."))
 }
 
 impl Watchlists {
@@ -202,88 +243,128 @@ impl Watchlists {
         operation: DiscoveryOperation,
         request: DiscoveryRequest,
     ) -> Result<ItemPage, DiscoveryError> {
-        let query = ItemQuery::validate(operation, request)?;
-        self.item_page(query).await
+        match ItemQuery::validate(operation, request)? {
+            ItemQuery::Get(query) => self.get_items(query).await,
+            ItemQuery::Find(query) => self.find_items(query).await,
+        }
     }
 
-    async fn item_page(&self, query: ItemQuery) -> Result<ItemPage, DiscoveryError> {
+    async fn get_items(&self, query: GetQuery) -> Result<ItemPage, DiscoveryError> {
+        let watchlist_id = query.watchlist_id;
         let Some(WatchlistDetail {
             watchlist,
-            items: stored,
+            items,
             order_token,
         }) = self
-            .detail(query.watchlist_id)
+            .detail(watchlist_id)
             .await
             .map_err(DiscoveryError::Database)?
         else {
-            if query.selector.as_ref().is_some_and(ItemSelector::is_exact) {
-                let results = match query.view {
-                    ResultView::Items => ItemResults::Items(Vec::new()),
-                    ResultView::Titles => ItemResults::Titles(Vec::new()),
+            return Err(watchlist_not_found(watchlist_id));
+        };
+        let binding = CursorBinding::Items {
+            watchlist_id,
+            page_size: query.page.size(),
+            query: None,
+            titles: query.view == ResultView::Titles,
+        };
+        let (results, next_cursor) = match query.view {
+            ResultView::Items => {
+                let (items, cursor) = paginate(items, &query.page, &binding)?;
+                (ItemResults::Items(items), cursor)
+            }
+            ResultView::Titles => {
+                let grouped = grouped_titles(&items);
+                let (titles, cursor) = paginate(grouped, &query.page, &binding)?;
+                (ItemResults::Titles(titles), cursor)
+            }
+        };
+        Ok(ItemPage {
+            watchlist: Some(watchlist),
+            results,
+            next_cursor,
+            order_token: (query.view == ResultView::Items).then_some(order_token),
+        })
+    }
+
+    async fn find_items(&self, query: FindQuery) -> Result<ItemPage, DiscoveryError> {
+        match query {
+            FindQuery::Exact {
+                watchlist_id,
+                selector,
+                view,
+            } => {
+                let Some(WatchlistDetail { items, .. }) = self
+                    .detail(watchlist_id)
+                    .await
+                    .map_err(DiscoveryError::Database)?
+                else {
+                    return Ok(ItemPage::empty(view));
                 };
-                return Ok(ItemPage {
+                let selected = select_exact(items, selector);
+                let results = match view {
+                    ResultView::Items => ItemResults::Items(selected),
+                    ResultView::Titles => {
+                        ItemResults::Titles(selected.iter().map(single_title).collect())
+                    }
+                };
+                Ok(ItemPage {
                     watchlist: None,
                     results,
                     next_cursor: None,
                     order_token: None,
-                });
+                })
             }
-            return Err(invalid(format!(
-                "Watchlist {} was not found.",
-                query.watchlist_id
-            )));
-        };
-        let selected = select(stored, query.selector.as_ref(), query.query.as_deref());
-        let paginated = !query.selector.as_ref().is_some_and(ItemSelector::is_exact);
-        let (results, next_cursor) = if paginated {
-            let binding = CursorBinding::Items {
-                watchlist_id: query.watchlist_id,
-                page_size: query.page.size(),
-                query: query.query.clone(),
-                titles: query.view == ResultView::Titles,
-            };
-            match query.view {
-                ResultView::Items => {
-                    let (page, cursor) = paginate(selected, &query.page, &binding)?;
-                    (ItemResults::Items(page), cursor)
-                }
-                ResultView::Titles => {
-                    let grouped = grouped_titles(&selected);
-                    let (page, cursor) = paginate(grouped, &query.page, &binding)?;
-                    (ItemResults::Titles(page), cursor)
-                }
+            FindQuery::Text {
+                watchlist_id,
+                query,
+                view,
+                page,
+            } => {
+                let Some(WatchlistDetail { items, .. }) = self
+                    .detail(watchlist_id)
+                    .await
+                    .map_err(DiscoveryError::Database)?
+                else {
+                    return Err(watchlist_not_found(watchlist_id));
+                };
+                let selected = filter_text(items, &query);
+                let binding = CursorBinding::Items {
+                    watchlist_id,
+                    page_size: page.size(),
+                    query: Some(query),
+                    titles: view == ResultView::Titles,
+                };
+                let (results, next_cursor) = match view {
+                    ResultView::Items => {
+                        let (items, cursor) = paginate(selected, &page, &binding)?;
+                        (ItemResults::Items(items), cursor)
+                    }
+                    ResultView::Titles => {
+                        let grouped = grouped_titles(&selected);
+                        let (titles, cursor) = paginate(grouped, &page, &binding)?;
+                        (ItemResults::Titles(titles), cursor)
+                    }
+                };
+                Ok(ItemPage {
+                    watchlist: None,
+                    results,
+                    next_cursor,
+                    order_token: None,
+                })
             }
-        } else {
-            match query.view {
-                ResultView::Items => (ItemResults::Items(selected), None),
-                ResultView::Titles => (
-                    ItemResults::Titles(selected.iter().map(single_title).collect()),
-                    None,
-                ),
-            }
-        };
-        let is_get = query.operation == DiscoveryOperation::Get;
-        Ok(ItemPage {
-            watchlist: is_get.then_some(watchlist),
-            results,
-            next_cursor,
-            order_token: (is_get && query.view == ResultView::Items).then_some(order_token),
-        })
+        }
     }
 }
 
-fn select(
-    items: Vec<WatchlistItem>,
-    selector: Option<&ItemSelector>,
-    query: Option<&str>,
-) -> Vec<WatchlistItem> {
+fn watchlist_not_found(watchlist_id: i64) -> DiscoveryError {
+    invalid(format!("Watchlist {watchlist_id} was not found."))
+}
+
+fn select_exact(items: Vec<WatchlistItem>, selector: ExactSelector) -> Vec<WatchlistItem> {
     match selector {
-        None => items,
-        Some(ItemSelector::Id(target)) => items
-            .into_iter()
-            .filter(|item| item.id == *target)
-            .collect(),
-        Some(ItemSelector::Provider(provider)) => items
+        ExactSelector::Id(target) => items.into_iter().filter(|item| item.id == target).collect(),
+        ExactSelector::Provider(provider) => items
             .into_iter()
             .filter(|item| {
                 item.source == provider.provider
@@ -291,14 +372,15 @@ fn select(
                     && item.media_type == provider.media_type
             })
             .collect(),
-        Some(ItemSelector::Text) => {
-            let query = query.unwrap_or_default().to_ascii_lowercase();
-            items
-                .into_iter()
-                .filter(|item| item.matches_text(&query))
-                .collect()
-        }
     }
+}
+
+fn filter_text(items: Vec<WatchlistItem>, query: &str) -> Vec<WatchlistItem> {
+    let query = query.to_ascii_lowercase();
+    items
+        .into_iter()
+        .filter(|item| item.matches_text(&query))
+        .collect()
 }
 
 fn grouped_titles(items: &[WatchlistItem]) -> Vec<GroupedTitle> {
@@ -342,57 +424,106 @@ fn single_title(item: &WatchlistItem) -> GroupedTitle {
 mod tests {
     use super::*;
 
-    fn provider_identity() -> ProviderIdentity {
-        ProviderIdentity {
-            provider: "tmdb".into(),
-            provider_id: "ep-1".into(),
-            media_type: "episode".into(),
+    fn find_request() -> DiscoveryRequest {
+        DiscoveryRequest {
+            watchlist_id: Some(41),
+            ..Default::default()
         }
+    }
+
+    fn validate_find(request: DiscoveryRequest) -> Result<ItemQuery, DiscoveryError> {
+        ItemQuery::validate(DiscoveryOperation::Find, request)
     }
 
     #[test]
     fn selector_accepts_exactly_one_selector_shape() {
+        let by_id = validate_find(DiscoveryRequest {
+            watchlist_item_id: Some(101),
+            ..find_request()
+        })
+        .unwrap();
         assert!(matches!(
-            ItemSelector::parse(Some(1), None, false, false),
-            Ok(ItemSelector::Id(1))
+            by_id,
+            ItemQuery::Find(FindQuery::Exact {
+                selector: ExactSelector::Id(101),
+                ..
+            })
         ));
+
+        let by_provider = validate_find(DiscoveryRequest {
+            provider: Some("tmdb".into()),
+            provider_id: Some("ep-1".into()),
+            media_type: Some("episode".into()),
+            ..find_request()
+        })
+        .unwrap();
         assert!(matches!(
-            ItemSelector::parse(None, Some(provider_identity()), false, false),
-            Ok(ItemSelector::Provider(ProviderIdentity { provider, .. })) if provider == "tmdb"
+            by_provider,
+            ItemQuery::Find(FindQuery::Exact {
+                selector: ExactSelector::Provider(ProviderIdentity { provider, .. }),
+                ..
+            }) if provider == "tmdb"
         ));
+
+        let by_text = validate_find(DiscoveryRequest {
+            query: Some("show".into()),
+            ..find_request()
+        })
+        .unwrap();
         assert!(matches!(
-            ItemSelector::parse(None, None, true, false),
-            Ok(ItemSelector::Text)
+            by_text,
+            ItemQuery::Find(FindQuery::Text { query, .. }) if query == "show"
         ));
-        for (item_id, provider, has_query) in [
-            (Some(1), None, true),
-            (Some(1), Some(provider_identity()), false),
-            (None, Some(provider_identity()), true),
-            (None, None, false),
+
+        for request in [
+            DiscoveryRequest {
+                watchlist_item_id: Some(101),
+                query: Some("show".into()),
+                ..find_request()
+            },
+            DiscoveryRequest {
+                watchlist_item_id: Some(101),
+                provider: Some("tmdb".into()),
+                provider_id: Some("ep-1".into()),
+                media_type: Some("episode".into()),
+                ..find_request()
+            },
+            DiscoveryRequest {
+                provider: Some("tmdb".into()),
+                provider_id: Some("ep-1".into()),
+                media_type: Some("episode".into()),
+                query: Some("show".into()),
+                ..find_request()
+            },
+            find_request(),
         ] {
             assert!(
-                matches!(
-                    ItemSelector::parse(item_id, provider, has_query, false),
-                    Err(DiscoveryError::InvalidInput(_))
-                ),
-                "expected a selector conflict for {item_id:?}, query={has_query}"
+                matches!(validate_find(request), Err(DiscoveryError::InvalidInput(_))),
+                "expected a selector conflict"
             );
         }
     }
 
     #[test]
     fn provider_selector_requires_every_identity_field() {
-        assert!(matches!(
-            ProviderIdentity::parse(None, None, None),
-            Ok(None)
-        ));
-        for identity in [
-            (Some("tmdb".to_owned()), None, None),
-            (Some("tmdb".to_owned()), Some("ep-1".to_owned()), None),
-            (None, Some("ep-1".to_owned()), Some("episode".to_owned())),
+        for request in [
+            DiscoveryRequest {
+                provider: Some("tmdb".into()),
+                ..find_request()
+            },
+            DiscoveryRequest {
+                provider: Some("tmdb".into()),
+                provider_id: Some("ep-1".into()),
+                ..find_request()
+            },
+            DiscoveryRequest {
+                provider_id: Some("ep-1".into()),
+                media_type: Some("episode".into()),
+                ..find_request()
+            },
         ] {
             assert!(matches!(
-                ProviderIdentity::parse(identity.0, identity.1, identity.2),
+                validate_find(request),
                 Err(DiscoveryError::InvalidInput(_))
             ));
         }
@@ -401,13 +532,49 @@ mod tests {
     #[test]
     fn exact_selector_rejects_page_requests() {
         assert!(matches!(
-            ItemSelector::parse(Some(1), None, false, true),
+            validate_find(DiscoveryRequest {
+                watchlist_item_id: Some(101),
+                page_size: Some(1),
+                ..find_request()
+            }),
             Err(DiscoveryError::InvalidInput(_))
         ));
         assert!(matches!(
-            ItemSelector::parse(None, Some(provider_identity()), false, true),
+            validate_find(DiscoveryRequest {
+                provider: Some("tmdb".into()),
+                provider_id: Some("ep-1".into()),
+                media_type: Some("episode".into()),
+                cursor: Some("cursor".into()),
+                ..find_request()
+            }),
             Err(DiscoveryError::InvalidInput(_))
         ));
-        assert!(ItemSelector::parse(None, None, true, true).is_ok());
+        assert!(
+            validate_find(DiscoveryRequest {
+                query: Some("show".into()),
+                page_size: Some(1),
+                ..find_request()
+            })
+            .is_ok()
+        );
+    }
+
+    #[test]
+    fn get_accepts_any_positive_watchlist_id() {
+        let query = ItemQuery::validate(
+            DiscoveryOperation::Get,
+            DiscoveryRequest {
+                watchlist_id: Some(41),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert!(matches!(
+            query,
+            ItemQuery::Get(GetQuery {
+                watchlist_id: 41,
+                ..
+            })
+        ));
     }
 }
