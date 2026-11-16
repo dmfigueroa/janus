@@ -404,12 +404,13 @@ async fn exclusive_v1_lock_fails_within_the_configured_startup_bound() {
 #[tokio::test]
 async fn feature_discovery_shares_order_search_selection_and_cursor_rules() {
     use janus_v2::{
-        DiscoveryError, DiscoveryOperation as Operation, DiscoveryRequest as Request, Watchlists,
+        DiscoveryError, DiscoveryOperation as Operation, DiscoveryRequest as Request, ItemResults,
+        Watchlists,
     };
     let fixture = Fixture::v1();
     let lists = Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
     let page = lists
-        .discovery(
+        .summaries(
             Operation::List,
             Request {
                 page_size: Some(1),
@@ -418,10 +419,10 @@ async fn feature_discovery_shares_order_search_selection_and_cursor_rules() {
         )
         .await
         .unwrap();
-    assert_eq!(page["watchlists"][0]["id"], 42);
-    let cursor = page["nextCursor"].as_str().unwrap().to_owned();
+    assert_eq!(page.watchlists[0].watchlist.id, 42);
+    let cursor = page.next_cursor.unwrap();
     let searched = lists
-        .discovery(
+        .summaries(
             Operation::Search,
             Request {
                 query: Some("CAFE\u{301}".into()),
@@ -430,10 +431,10 @@ async fn feature_discovery_shares_order_search_selection_and_cursor_rules() {
         )
         .await
         .unwrap();
-    assert_eq!(searched["watchlists"][0]["id"], 41);
+    assert_eq!(searched.watchlists[0].watchlist.id, 41);
     assert!(matches!(
         lists
-            .discovery(
+            .summaries(
                 Operation::Search,
                 Request {
                     query: Some("Café".into()),
@@ -445,7 +446,7 @@ async fn feature_discovery_shares_order_search_selection_and_cursor_rules() {
         Err(DiscoveryError::InvalidInput(_))
     ));
     let titles = lists
-        .discovery(
+        .items(
             Operation::Get,
             Request {
                 watchlist_id: Some(41),
@@ -456,15 +457,20 @@ async fn feature_discovery_shares_order_search_selection_and_cursor_rules() {
         )
         .await
         .unwrap();
-    assert_eq!(titles["titles"][0]["matchingItemCount"], 2);
+    let title_cursor = titles.next_cursor.clone().unwrap();
+    let ItemResults::Titles(grouped) = &titles.results else {
+        panic!("expected grouped titles");
+    };
+    assert_eq!(grouped[0].matching_item_count, 2);
+    assert_eq!(grouped[0].provider_id, "show-1");
     assert!(matches!(
         lists
-            .discovery(
+            .items(
                 Operation::Get,
                 Request {
                     watchlist_id: Some(41),
                     page_size: Some(1),
-                    cursor: Some(titles["nextCursor"].as_str().unwrap().into()),
+                    cursor: Some(title_cursor),
                     ..Default::default()
                 }
             )
@@ -472,7 +478,7 @@ async fn feature_discovery_shares_order_search_selection_and_cursor_rules() {
         Err(DiscoveryError::InvalidInput(_))
     ));
     let exact = lists
-        .discovery(
+        .items(
             Operation::Find,
             Request {
                 watchlist_id: Some(41),
@@ -482,10 +488,61 @@ async fn feature_discovery_shares_order_search_selection_and_cursor_rules() {
         )
         .await
         .unwrap();
-    assert_eq!(exact["items"][0]["id"], 101);
+    let ItemResults::Items(items) = &exact.results else {
+        panic!("expected selected items");
+    };
+    assert_eq!(items[0].id, 101);
+    assert!(exact.watchlist.is_none());
+    assert!(exact.next_cursor.is_none());
+    let provider = lists
+        .items(
+            Operation::Find,
+            Request {
+                watchlist_id: Some(41),
+                provider: Some("tmdb".into()),
+                provider_id: Some("ep-1".into()),
+                media_type: Some("episode".into()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    let ItemResults::Items(items) = &provider.results else {
+        panic!("expected provider-selected items");
+    };
+    assert_eq!(
+        items.iter().map(|item| item.id).collect::<Vec<_>>(),
+        vec![101]
+    );
+    let missing = lists
+        .items(
+            Operation::Find,
+            Request {
+                watchlist_id: Some(999),
+                watchlist_item_id: Some(101),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert!(missing.watchlist.is_none());
+    assert!(matches!(&missing.results, ItemResults::Items(items) if items.is_empty()));
     assert!(matches!(
         lists
-            .discovery(
+            .items(
+                Operation::Find,
+                Request {
+                    watchlist_id: Some(999),
+                    query: Some("show".into()),
+                    ..Default::default()
+                }
+            )
+            .await,
+        Err(DiscoveryError::InvalidInput(_))
+    ));
+    assert!(matches!(
+        lists
+            .items(
                 Operation::Find,
                 Request {
                     watchlist_id: Some(999),
@@ -499,7 +556,7 @@ async fn feature_discovery_shares_order_search_selection_and_cursor_rules() {
     ));
     assert!(matches!(
         lists
-            .discovery(
+            .summaries(
                 Operation::List,
                 Request {
                     order: Some("sideways".into()),
@@ -509,6 +566,63 @@ async fn feature_discovery_shares_order_search_selection_and_cursor_rules() {
             .await,
         Err(DiscoveryError::InvalidInput(_))
     ));
+}
+
+#[tokio::test]
+async fn discovery_cursors_keep_v1_binding_bytes_and_continue_old_pages() {
+    use janus_v2::{
+        DiscoveryOperation as Operation, DiscoveryRequest as Request, ItemResults, Watchlists,
+    };
+    let fixture = Fixture::v1();
+    let lists = Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    let page = lists
+        .summaries(
+            Operation::List,
+            Request {
+                page_size: Some(1),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        page.next_cursor.as_deref(),
+        Some("eyJvZmZzZXQiOjEsIm9yZGVyIjoiZGVzYyIsIm9yZGVyQnkiOiJjcmVhdGVkQXQifQ")
+    );
+    let items = lists
+        .items(
+            Operation::Get,
+            Request {
+                watchlist_id: Some(41),
+                page_size: Some(1),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        items.next_cursor.as_deref(),
+        Some("eyJvZmZzZXQiOjEsInBhZ2VTaXplIjoxLCJ3YXRjaGxpc3RJZCI6NDF9")
+    );
+    let continued = lists
+        .items(
+            Operation::Get,
+            Request {
+                watchlist_id: Some(41),
+                page_size: Some(1),
+                cursor: items.next_cursor,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    let ItemResults::Items(items) = &continued.results else {
+        panic!("expected continued items");
+    };
+    assert_eq!(
+        items.iter().map(|item| item.id).collect::<Vec<_>>(),
+        vec![101]
+    );
 }
 
 #[tokio::test]
@@ -597,48 +711,47 @@ async fn summary_discovery_uses_efficient_counts_and_cover_fallback() {
     use janus_v2::{DiscoveryOperation as Operation, DiscoveryRequest as Request, Watchlists};
     let fixture = Fixture::v1();
     let lists = Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
-    let summary = |result: serde_json::Value| {
-        result["watchlists"]
-            .as_array()
+    let summary = |page: janus_v2::SummaryPage| {
+        page.watchlists
+            .into_iter()
+            .find(|watchlist| watchlist.watchlist.id == 41)
             .unwrap()
-            .iter()
-            .find(|watchlist| watchlist["id"] == 41)
-            .unwrap()
-            .clone()
     };
     let partial = summary(
         lists
-            .discovery(Operation::List, Request::default())
+            .summaries(Operation::List, Request::default())
             .await
             .unwrap(),
     );
-    assert_eq!(partial["stats"]["totalItems"], 3);
-    assert_eq!(partial["stats"]["watchedItems"], 1);
-    assert_eq!(partial["stats"]["progress"], 33);
-    assert_eq!(partial["stats"]["nextUnwatched"]["id"], 101);
-    assert!(partial["stats"]["coverImage"].is_null());
-    assert_eq!(partial["stats"]["coverMediaType"], "episode");
+    assert_eq!(partial.stats.total_items, 3);
+    assert_eq!(partial.stats.watched_items, 1);
+    assert_eq!(partial.stats.progress, 33);
+    assert_eq!(partial.stats.next_unwatched.as_ref().unwrap().id, 101);
+    assert!(partial.stats.cover_image.is_none());
+    assert_eq!(partial.stats.cover_media_type.as_deref(), Some("episode"));
 
     change_v1(&fixture, "watch-all");
     let completed = summary(
         lists
-            .discovery(Operation::List, Request::default())
+            .summaries(Operation::List, Request::default())
             .await
             .unwrap(),
     );
-    assert_eq!(completed["stats"]["progress"], 100);
-    assert!(completed["stats"]["nextUnwatched"].is_null());
-    assert_eq!(completed["stats"]["coverImage"], "/poster.jpg");
-    assert_eq!(completed["stats"]["coverMediaType"], "episode");
+    assert_eq!(completed.stats.progress, 100);
+    assert!(completed.stats.next_unwatched.is_none());
+    assert_eq!(completed.stats.cover_image.as_deref(), Some("/poster.jpg"));
+    assert_eq!(completed.stats.cover_media_type.as_deref(), Some("episode"));
 }
 
 #[tokio::test]
-async fn serialized_views_keep_reduced_items_and_full_next_unwatched_projection() {
-    use janus_v2::{DiscoveryOperation as Operation, DiscoveryRequest as Request, Watchlists};
+async fn item_discovery_returns_typed_order_and_full_next_unwatched() {
+    use janus_v2::{
+        DiscoveryOperation as Operation, DiscoveryRequest as Request, ItemResults, Watchlists,
+    };
     let fixture = Fixture::v1();
     let lists = Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
     let read = lists
-        .discovery(
+        .items(
             Operation::Get,
             Request {
                 watchlist_id: Some(41),
@@ -647,24 +760,40 @@ async fn serialized_views_keep_reduced_items_and_full_next_unwatched_projection(
         )
         .await
         .unwrap();
-    let item = &read["items"][1];
-    assert_eq!(item["id"], 101);
-    assert_eq!(item["provider"], "tmdb");
-    assert_eq!(item["providerId"], "ep-1");
+    let ItemResults::Items(items) = &read.results else {
+        panic!("expected typed items");
+    };
     assert_eq!(
-        item["parent"],
-        json!({"providerId": "show-1", "title": "A Show"})
+        items.iter().map(|item| item.id).collect::<Vec<_>>(),
+        vec![102, 101, 103]
     );
-    assert!(item["isWatched"].is_null());
-    assert!(item.get("authors").is_none());
-    assert!(item.get("posterPath").is_none());
-    assert!(item.get("releaseDate").is_none());
-    let next = &read["watchlist"]["stats"]["nextUnwatched"];
-    assert_eq!(next["id"], 101);
-    assert_eq!(next["authors"], json!(["Écrivain", "著者"]));
-    assert_eq!(next["posterPath"], Value::Null);
-    assert!(read["watchlist"]["stats"]["coverImage"].is_null());
-    assert_eq!(read["watchlist"]["stats"]["coverMediaType"], "episode");
+    let item = &items[1];
+    assert_eq!(item.id, 101);
+    assert_eq!(item.source, "tmdb");
+    assert_eq!(item.tmdb_id, "ep-1");
+    assert_eq!(item.parent_id.as_deref(), Some("show-1"));
+    assert_eq!(item.parent_title.as_deref(), Some("A Show"));
+    assert_eq!(item.is_watched, None);
+    assert_eq!(
+        item.authors.as_deref(),
+        Some(&["Écrivain".to_owned(), "著者".to_owned()][..])
+    );
+    let next = &read.watchlist.as_ref().unwrap().stats.next_unwatched;
+    let next = next.as_ref().unwrap();
+    assert_eq!(next.id, 101);
+    assert_eq!(next.poster_path, None);
+    assert!(read.watchlist.as_ref().unwrap().stats.cover_image.is_none());
+    assert_eq!(
+        read.watchlist
+            .as_ref()
+            .unwrap()
+            .stats
+            .cover_media_type
+            .as_deref(),
+        Some("episode")
+    );
+    assert!(read.order_token.as_deref().unwrap().starts_with("sha256:"));
+    assert!(read.next_cursor.is_none());
 }
 
 #[tokio::test]

@@ -183,5 +183,8 @@ async fn legacy_json_response(response: axum::response::Response) -> axum::respo
 pub use features::watchlists::{
     ItemOrderMode, WatchlistDetail, WatchlistItem, WatchlistRecord, WatchlistStats,
     WatchlistSummary, Watchlists,
-    discovery::{DiscoveryError, DiscoveryOperation, DiscoveryRequest, SummaryPage},
+    discovery::{
+        DiscoveryError, DiscoveryOperation, DiscoveryRequest, GroupedTitle, ItemPage, ItemResults,
+        SummaryPage,
+    },
 };

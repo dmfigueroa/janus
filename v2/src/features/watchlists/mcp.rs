@@ -1,11 +1,21 @@
+//! MCP adapter: legacy argument normalization and protocol JSON projections.
+//!
+//! Discovery behavior lives in [`super::discovery`]; this adapter owns only the
+//! legacy coercion, unknown-field handling and JSON envelopes v1 exposed.
+
 use super::{
     Watchlists,
-    discovery::{DiscoveryError, DiscoveryOperation},
+    discovery::{
+        DiscoveryError, DiscoveryOperation, DiscoveryRequest, GroupedTitle, ItemPage, ItemResults,
+        SummaryPage,
+    },
 };
 use rmcp::{ErrorData, RoleServer, ServerHandler, model::*, service::RequestContext};
 use serde_json::{Value, json};
+
 #[derive(Clone)]
 pub struct ReadMcp(pub Watchlists);
+
 fn object_schema(properties: Value, required: Value) -> serde_json::Map<String, Value> {
     serde_json::Map::from_iter([
         ("type".into(), json!("object")),
@@ -13,6 +23,7 @@ fn object_schema(properties: Value, required: Value) -> serde_json::Map<String, 
         ("required".into(), required),
     ])
 }
+
 fn definitions() -> Vec<Tool> {
     let media =
         json!({"type":"string","enum":["movie","episode","game","book","comic","anime","manga"]});
@@ -79,11 +90,13 @@ fn definitions() -> Vec<Tool> {
     tools.push(reorder);
     tools
 }
+
 impl ServerHandler for ReadMcp {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::new("janus", "1.0.0"))
     }
+
     async fn list_tools(
         &self,
         _: Option<PaginatedRequestParams>,
@@ -94,9 +107,11 @@ impl ServerHandler for ReadMcp {
             ..Default::default()
         })
     }
+
     fn get_tool(&self, name: &str) -> Option<Tool> {
         definitions().into_iter().find(|tool| tool.name == name)
     }
+
     async fn call_tool(
         &self,
         request: CallToolRequestParams,
@@ -181,23 +196,32 @@ impl ServerHandler for ReadMcp {
             operation,
             Value::Object(request.arguments.unwrap_or_default()),
         );
-        match self
-            .0
-            .discover_arguments(operation, arguments)
-            .await
-            .map_err(|error| match error {
-                DiscoveryError::InvalidInput(message) => message,
-                DiscoveryError::Database(_) => {
-                    if matches!(
-                        operation,
-                        DiscoveryOperation::List | DiscoveryOperation::Search
-                    ) {
-                        "Unable to load watchlists.".into()
-                    } else {
-                        "Unable to load watchlist.".into()
-                    }
+        let discovered = match request_arguments(&arguments) {
+            Ok(request) => match operation {
+                DiscoveryOperation::List | DiscoveryOperation::Search => self
+                    .0
+                    .summaries(operation, request)
+                    .await
+                    .map(summary_envelope),
+                DiscoveryOperation::Get | DiscoveryOperation::Find => {
+                    self.0.items(operation, request).await.map(item_envelope)
                 }
-            }) {
+            },
+            Err(message) => Err(DiscoveryError::InvalidInput(message)),
+        };
+        match discovered.map_err(|error| match error {
+            DiscoveryError::InvalidInput(message) => message,
+            DiscoveryError::Database(_) => {
+                if matches!(
+                    operation,
+                    DiscoveryOperation::List | DiscoveryOperation::Search
+                ) {
+                    "Unable to load watchlists.".into()
+                } else {
+                    "Unable to load watchlist.".into()
+                }
+            }
+        }) {
             Ok(data) => {
                 let mut result = CallToolResult::structured(data);
                 result.result_type = None;
@@ -211,6 +235,169 @@ impl ServerHandler for ReadMcp {
             }
         }
     }
+}
+
+fn summary_envelope(page: SummaryPage) -> Value {
+    let mut value = json!({
+        "watchlists": page.watchlists.iter().map(summary_json).collect::<Vec<_>>(),
+    });
+    if let Some(cursor) = page.next_cursor {
+        value["nextCursor"] = json!(cursor);
+    }
+    value
+}
+
+fn item_envelope(page: ItemPage) -> Value {
+    let mut value = match &page.results {
+        ItemResults::Items(items) => json!({
+            "items": items.iter().map(item_projection).collect::<Vec<_>>(),
+        }),
+        ItemResults::Titles(titles) => json!({
+            "titles": titles.iter().map(title_json).collect::<Vec<_>>(),
+        }),
+    };
+    if let Some(cursor) = page.next_cursor {
+        value["nextCursor"] = json!(cursor);
+    }
+    if let Some(watchlist) = page.watchlist {
+        value["watchlist"] = summary_json(&watchlist);
+    }
+    if let Some(token) = page.order_token {
+        value["orderToken"] = json!(token);
+    }
+    value
+}
+
+/// Full stored-item projection used by detail stats.
+fn item_json(item: &super::WatchlistItem) -> Value {
+    json!({
+        "id": item.id,
+        "tmdbId": item.tmdb_id,
+        "source": item.source,
+        "mediaType": item.media_type,
+        "title": item.title,
+        "parentId": item.parent_id,
+        "parentTitle": item.parent_title,
+        "episode": item.episode,
+        "posterPath": item.poster_path,
+        "releaseDate": item.release_date,
+        "addedAt": item.added_at,
+        "watchlistId": item.watchlist_id,
+        "season": item.season,
+        "runtime": item.runtime,
+        "customRank": item.custom_rank,
+        "voteAverage": item.vote_average,
+        "isWatched": item.is_watched,
+        "authors": item.authors,
+    })
+}
+
+/// Reduced item projection returned by regular MCP item views.
+fn item_projection(item: &super::WatchlistItem) -> Value {
+    json!({
+        "id": item.id,
+        "watchlistId": item.watchlist_id,
+        "provider": item.source,
+        "providerId": item.tmdb_id,
+        "mediaType": item.media_type,
+        "title": item.title,
+        "parent": {"providerId": item.parent_id, "title": item.parent_title},
+        "episode": item.episode,
+        "isWatched": item.is_watched,
+    })
+}
+
+fn record_json(record: &super::WatchlistRecord) -> Value {
+    json!({
+        "id": record.id,
+        "name": record.name,
+        "description": record.description,
+        "itemOrderMode": record.item_order_mode.as_str(),
+        "createdAt": record.created_at,
+        "updatedAt": record.updated_at,
+        "lastWatchedAt": record.last_watched_at,
+        "lastItemAddedAt": record.last_item_added_at,
+        "pausedAt": record.paused_at,
+    })
+}
+
+fn stats_json(stats: &super::WatchlistStats) -> Value {
+    json!({
+        "totalItems": stats.total_items,
+        "watchedItems": stats.watched_items,
+        "progress": stats.progress,
+        "nextUnwatched": stats.next_unwatched.as_ref().map(item_json),
+        "coverImage": stats.cover_image,
+        "coverMediaType": stats.cover_media_type,
+    })
+}
+
+fn summary_json(summary: &super::WatchlistSummary) -> Value {
+    let mut value = record_json(&summary.watchlist);
+    value["stats"] = stats_json(&summary.stats);
+    value
+}
+
+fn title_json(title: &GroupedTitle) -> Value {
+    json!({
+        "provider": title.provider,
+        "providerId": title.provider_id,
+        "mediaType": title.media_type,
+        "title": title.title,
+        "matchingItemCount": title.matching_item_count,
+    })
+}
+
+/// Builds the typed request from normalized MCP arguments.
+///
+/// Unknown fields were already removed and the legacy `get_watchlist` selector
+/// was already coerced. Value types and integral numbers stay adapter concerns;
+/// semantic rules belong to discovery.
+fn request_arguments(arguments: &Value) -> Result<DiscoveryRequest, String> {
+    let object = arguments
+        .as_object()
+        .ok_or_else(|| "Invalid tool arguments.".to_owned())?;
+    let text = |key: &str| -> Result<Option<String>, String> {
+        object
+            .get(key)
+            .map(|value| {
+                value
+                    .as_str()
+                    .map(str::to_owned)
+                    .ok_or_else(|| format!("Invalid {key}."))
+            })
+            .transpose()
+    };
+    let number = |key: &str| -> Result<Option<i64>, String> {
+        object
+            .get(key)
+            .map(|value| {
+                value
+                    .as_f64()
+                    .filter(|number| {
+                        number.is_finite()
+                            && number.fract() == 0.0
+                            && *number > 0.0
+                            && *number < i64::MAX as f64
+                    })
+                    .map(|number| number as i64)
+                    .ok_or_else(|| format!("Invalid {key}."))
+            })
+            .transpose()
+    };
+    Ok(DiscoveryRequest {
+        query: text("query")?,
+        order_by: text("orderBy")?,
+        order: text("order")?,
+        page_size: number("pageSize")?,
+        cursor: text("cursor")?,
+        watchlist_id: number("watchlistId")?,
+        watchlist_item_id: number("watchlistItemId")?,
+        provider: text("provider")?,
+        provider_id: text("providerId")?,
+        media_type: text("mediaType")?,
+        result_view: text("resultView")?,
+    })
 }
 
 fn normalize(operation: DiscoveryOperation, mut arguments: Value) -> Value {

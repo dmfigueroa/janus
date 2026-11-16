@@ -67,6 +67,13 @@ tokens keep the v1 SHA-256 input. Unit tests cover progress, cover selection and
 ordering; fixture-backed tests cover empty, partial and completed progress, nullable
 metadata, order-token bytes, reorder semantics and reads after v1 writes.
 
+Discovery is split the same way. `discovery/summary.rs` owns watchlist ordering, Unicode
+name search and summary pages; `discovery/items.rs` owns item selectors, grouped titles and
+item pages; private discovery code owns page windows, cursor binding and shared input
+validation. Web and MCP build a typed `DiscoveryRequest`, call the typed operation and
+project the typed result themselves. Legacy MCP coercion, unknown-field filtering and JSON
+envelopes stay in `mcp.rs`.
+
 Reorder writes renumber the complete displayed sequence, keeping ranks contiguous even
 when v1 deletions left gaps. Other future writes must explicitly preserve Drizzle's
 application-side `updatedAt` hook; SeaORM does not supply it automatically. Reordering uses
