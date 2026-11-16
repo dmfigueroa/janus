@@ -91,6 +91,13 @@ async fn existing_watchlist_renders_ids_order_filters_and_escaped_content_withou
     assert!(!html.contains("Opening <script>"));
     assert!(html.contains("https://image.tmdb.org/t/p/w200/poster.jpg"));
     assert!(html.contains("https://images.example/poster.jpg"));
+    assert!(html.contains("class=\"timeline\""), "{html}");
+    assert!(html.contains("id=\"reorder-recovery\""), "{html}");
+    assert!(
+        html.contains("hx-post=\"/v2/watchlists/41/reorder?query=&amp;unwatched=true\""),
+        "{html}"
+    );
+    assert!(html.contains("<details class=\"watched-run\">"), "{html}");
     assert!(
         html.find("data-item-id=\"102\"").unwrap() < html.find("data-item-id=\"101\"").unwrap()
     );

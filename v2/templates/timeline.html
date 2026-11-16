@@ -1,22 +1,22 @@
 <div
   class="timeline"
-  data-reorder-url="/v2/watchlists/{{id}}/reorder"
-  data-mode="{{mode}}"
-  hx-post="/v2/watchlists/{{id}}/reorder?query={{query|urlencode}}&amp;unwatched={{unwatched}}"
+  data-reorder-url="/v2/watchlists/{{view.id}}/reorder"
+  data-mode="{{view.mode}}"
+  hx-post="/v2/watchlists/{{view.id}}/reorder?query={{view.query|urlencode}}&amp;unwatched={{view.unwatched}}"
   hx-trigger="reorder"
   hx-target="this"
   hx-select=".timeline > *"
   hx-swap="innerHTML"
 >
   <p id="reorder-status" role="status" aria-live="polite">{{message}}</p>
-  {% for run in runs %}{% if run.heading %}
+  {% for run in view.runs %}{% if run.heading %}
   <h2>{{run.year}}</h2>
-  {% endif %}{% if run.hidden %}
+  {% endif %}{% if run.collapsed %}
   <details class="watched-run">
     <summary>{{run.rows.len()}} watched items</summary>
     {% endif %} {% for row in run.rows %}
     <article data-item-id="{{row.id}}">
-      {% if mode == "custom" %}<button
+      {% if view.custom %}<button
         type="button"
         class="reorder-handle"
         aria-label="Move {{row.title}}. Use Alt and arrow keys to reorder"
@@ -38,7 +38,7 @@
       </div>
       <span>{% if row.watched %}Watched{% else %}Unwatched{% endif %}</span>
     </article>
-    {% endfor %}{% if run.hidden %}
+    {% endfor %}{% if run.collapsed %}
   </details>
   {% endif %}{% else %}
   <p role="status">No items match these filters.</p>

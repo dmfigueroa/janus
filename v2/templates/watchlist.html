@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>{{name}} · Janus</title>
+    <title>{{view.name}} · Janus</title>
     <link rel="stylesheet" href="/v2/static/app.css" />
     <script defer src="/v2/static/vendor/htmx.min.js"></script>
     <script defer src="/v2/static/vendor/Sortable.min.js"></script>
@@ -13,21 +13,24 @@
     <main class="watchlist">
       <nav><a href="/v2/watchlists">Janus</a></nav>
       <header>
-        <h1>{{name}}</h1>
-        {% if paused %}<span class="badge" role="status">Paused</span>{% endif %}
-        <p>{{description}}</p>
-        <p>{{watched}} of {{total}} watched · {{mode}} order</p>
-        <progress value="{{progress}}" max="100" aria-label="Watchlist progress">
-          {{progress}}%
+        <h1>{{view.name}}</h1>
+        {% if view.paused %}<span class="badge" role="status">Paused</span>{% endif %}
+        <p>{{view.description}}</p>
+        <p>{{view.watched}} of {{view.total}} watched · {{view.mode}} order</p>
+        <progress value="{{view.progress}}" max="100" aria-label="Watchlist progress">
+          {{view.progress}}%
         </progress>
       </header>
       <form method="get">
         <label for="query">Search items</label
-        ><input id="query" name="query" value="{{query}}" type="search" /><label for="unwatched"
+        ><input id="query" name="query" value="{{view.query}}" type="search" /><label
+          for="unwatched"
           >Watched items</label
         ><select name="unwatched" id="unwatched">
-          <option value="true" {% if unwatched %}selected{% endif %}>Collapse watched</option>
-          <option value="false" {% if !unwatched %}selected{% endif %}>Show all</option></select
+          <option value="true" {% if view.unwatched %}selected{% endif %}>Collapse watched</option>
+          <option value="false" {% if !view.unwatched %}selected{% endif %}>
+            Show all
+          </option></select
         ><button>Apply filters</button>
       </form>
       <span
