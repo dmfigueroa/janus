@@ -11,12 +11,35 @@ function announceBrowseFailure() {
   setBrowseStatus("Unable to load watchlists. Please try again.");
 }
 
+function isPageLink(element) {
+  if (!element) return false;
+  if (typeof element.matches !== "function") return false;
+  return element.matches("[data-page-link]");
+}
+
+function focusHeading(id) {
+  const heading = document.getElementById(id);
+  if (heading) heading.focus();
+}
+
+function requestElement(event) {
+  if (!event.detail) return null;
+  if (!event.detail.requestConfig) return null;
+  return event.detail.requestConfig.elt;
+}
+
+function focusPageResults(event) {
+  const element = requestElement(event);
+  if (!isPageLink(element)) return;
+  focusHeading("browse-heading");
+}
+
 document.addEventListener("htmx:responseError", announceBrowseFailure);
 document.addEventListener("htmx:sendError", announceBrowseFailure);
 document.addEventListener("htmx:beforeRequest", () => {
   setBrowseBusy(true);
-  setBrowseStatus("Loading watchlists…");
 });
+document.addEventListener("htmx:afterSwap", focusPageResults);
 document.addEventListener("htmx:afterRequest", (event) => {
   setBrowseBusy(false);
   if (event.detail?.successful) setBrowseStatus("");

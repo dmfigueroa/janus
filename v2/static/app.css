@@ -119,7 +119,9 @@ select {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  width: 100%;
+  max-width: 42rem;
+  margin: 0.25rem 0 0.75rem;
 }
 
 .watchlist-search input[type="search"] {
@@ -130,6 +132,9 @@ select {
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg-surface);
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
 }
 
 @media (min-width: 640px) {
@@ -180,6 +185,13 @@ select {
   background: var(--bg-surface);
   appearance: none;
   cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .watchlist-search select:hover {
+    background: var(--bg-subtle);
+  }
 }
 
 @supports (appearance: base-select) {
@@ -245,16 +257,21 @@ select {
   color: inherit;
   text-decoration: none;
   cursor: pointer;
+  transition:
+    transform 120ms ease-out,
+    background-color 150ms ease;
 }
 
-.watchlist-search button:hover,
-.clear-search:hover {
-  background: var(--bg-subtle);
+@media (hover: hover) and (pointer: fine) {
+  .watchlist-search button:hover,
+  .clear-search:hover {
+    background: var(--bg-subtle);
+  }
 }
 
 .watchlist-search button:active,
 .clear-search:active {
-  transform: scale(0.98);
+  transform: scale(0.97);
 }
 
 .browse-status,
@@ -295,6 +312,10 @@ select {
   margin: 0;
   font-size: 0.875rem;
   color: var(--fg-muted);
+}
+
+.watchlist-browse {
+  transition: opacity 150ms ease-out;
 }
 
 .watchlist-browse[aria-busy="true"] {
@@ -530,10 +551,19 @@ select {
   border: 1px solid var(--border);
   border-radius: 12px;
   text-decoration: none;
+  transition:
+    transform 120ms ease-out,
+    background-color 150ms ease;
 }
 
-.pagination a:hover {
-  background: var(--bg-subtle);
+@media (hover: hover) and (pointer: fine) {
+  .pagination a:hover {
+    background: var(--bg-subtle);
+  }
+}
+
+.pagination a:active {
+  transform: scale(0.97);
 }
 
 /* Bottom navigation */
@@ -563,6 +593,10 @@ select {
   border-radius: 16px;
   color: var(--fg-muted);
   text-decoration: none;
+  transition:
+    transform 120ms ease-out,
+    background-color 150ms ease,
+    color 150ms ease;
 }
 
 .nav-item span {
@@ -571,9 +605,15 @@ select {
   letter-spacing: 0.05em;
 }
 
-.nav-item:hover {
-  background: var(--bg-subtle);
-  color: var(--fg-default);
+@media (hover: hover) and (pointer: fine) {
+  .nav-item:hover {
+    background: var(--bg-subtle);
+    color: var(--fg-default);
+  }
+}
+
+.nav-item:active {
+  transform: scale(0.97);
 }
 
 .nav-item[aria-current="page"] {
@@ -747,5 +787,23 @@ select {
   }
   .watchlist article > span {
     font-size: 0.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .watchlist-search button,
+  .clear-search,
+  .pagination a,
+  .nav-item,
+  .watchlist-browse,
+  .select-shell::after,
+  .chevron {
+    transition: none;
+  }
+  .watchlist-search button:active,
+  .clear-search:active,
+  .pagination a:active,
+  .nav-item:active {
+    transform: none;
   }
 }

@@ -1,6 +1,6 @@
 <div id="watchlist-browse" class="watchlist-browse" aria-busy="false">
   <div class="browse-heading">
-    <h2>{{view.heading}}</h2>
+    <h2 id="browse-heading" tabindex="-1">{{view.heading}}</h2>
     {% if !view.summary.is_empty() %}
     <p class="browse-summary">{{view.summary}}</p>
     {% endif %}
@@ -37,6 +37,7 @@
       hx-swap="outerHTML"
       hx-push-url="true"
       hx-indicator="#browse-indicator"
+      data-page-link
       >Next page</a
     >
   </nav>
