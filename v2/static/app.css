@@ -384,9 +384,16 @@ select {
 
 .watchlist-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 8.5rem), 1fr));
   gap: 1.25rem 0.75rem;
   align-items: start;
+}
+
+@media (min-width: 640px) {
+  .watchlist-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr));
+    gap: 1.5rem 0.75rem;
+  }
 }
 
 @media (min-width: 768px) {

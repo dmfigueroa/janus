@@ -50,7 +50,10 @@ fn base_router(database_ready: bool) -> Router {
             "/v2/static/app.css",
             get(|| async {
                 (
-                    [(header::CONTENT_TYPE, "text/css")],
+                    [
+                        (header::CONTENT_TYPE, "text/css"),
+                        (header::CACHE_CONTROL, "no-cache"),
+                    ],
                     include_str!("../static/app.css"),
                 )
             }),
@@ -59,7 +62,10 @@ fn base_router(database_ready: bool) -> Router {
             "/v2/static/app.js",
             get(|| async {
                 (
-                    [(header::CONTENT_TYPE, "text/javascript")],
+                    [
+                        (header::CONTENT_TYPE, "text/javascript"),
+                        (header::CACHE_CONTROL, "no-cache"),
+                    ],
                     include_str!("../static/app.js"),
                 )
             }),
@@ -68,7 +74,10 @@ fn base_router(database_ready: bool) -> Router {
             "/v2/static/browse.js",
             get(|| async {
                 (
-                    [(header::CONTENT_TYPE, "text/javascript")],
+                    [
+                        (header::CONTENT_TYPE, "text/javascript"),
+                        (header::CACHE_CONTROL, "no-cache"),
+                    ],
                     include_str!("../static/browse.js"),
                 )
             }),
@@ -77,7 +86,10 @@ fn base_router(database_ready: bool) -> Router {
             "/v2/static/vendor/htmx.min.js",
             get(|| async {
                 (
-                    [(header::CONTENT_TYPE, "text/javascript")],
+                    [
+                        (header::CONTENT_TYPE, "text/javascript"),
+                        (header::CACHE_CONTROL, "no-cache"),
+                    ],
                     include_str!("../static/vendor/htmx.min.js"),
                 )
             }),
@@ -86,7 +98,10 @@ fn base_router(database_ready: bool) -> Router {
             "/v2/static/vendor/Sortable.min.js",
             get(|| async {
                 (
-                    [(header::CONTENT_TYPE, "text/javascript")],
+                    [
+                        (header::CONTENT_TYPE, "text/javascript"),
+                        (header::CACHE_CONTROL, "no-cache"),
+                    ],
                     include_str!("../static/vendor/Sortable.min.js"),
                 )
             }),
