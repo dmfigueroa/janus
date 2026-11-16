@@ -579,6 +579,20 @@ async fn watched_watchlist_stats_fall_back_to_first_ordered_cover() {
 }
 
 #[tokio::test]
+async fn empty_watchlist_stats_report_zero_progress_and_no_selection() {
+    use janus_v2::Watchlists;
+    let fixture = Fixture::v1();
+    let lists = Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    let stats = lists.detail(42).await.unwrap().unwrap().watchlist.stats;
+    assert_eq!(stats.total_items, 0);
+    assert_eq!(stats.watched_items, 0);
+    assert_eq!(stats.progress, 0);
+    assert!(stats.next_unwatched.is_none());
+    assert!(stats.cover_image.is_none());
+    assert!(stats.cover_media_type.is_none());
+}
+
+#[tokio::test]
 async fn serialized_views_keep_reduced_items_and_full_next_unwatched_projection() {
     use janus_v2::{DiscoveryOperation as Operation, DiscoveryRequest as Request, Watchlists};
     let fixture = Fixture::v1();

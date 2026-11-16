@@ -157,6 +157,22 @@ Unauthenticated external v1/v2 web/MCP requests returned 403; this alone does no
 Access-authenticated or real-client behavior. Physical-device, full PWA, write/reorder and
 owner acceptance gates remain outstanding in their respective slices.
 
+## Issue #307 watchlist read-state evidence
+
+Watchlist stored-row decoding and queries are private to `storage.rs`; `summary.rs` owns
+progress, next-unwatched and cover selection; `snapshot.rs` composes typed record, item,
+detail and summary reads and owns their transactions; `item_order.rs` owns the stored order
+mode shared by reads and reorder. Summary reads still use counts plus selected rows rather
+than loading every item. Reorder keeps its writer lock, complete renumber, rollback and
+commit behavior and only imports the shared order-mode decoding.
+
+Validation: `cargo fmt --check`, `cargo clippy --locked --all-targets -- -D warnings`, and
+`cargo test --locked` pass under Node 24.18 for disposable v1 fixtures. The suite covers
+empty/partial/completed progress, nullable watched state, decoded authors/timestamps,
+release/custom/null-rank ordering, exact order-token bytes, summary/next-unwatched/cover
+selection, reads after v1 writes, reorder rollback and HTMX/MCP contracts. No deployed or
+real-client acceptance is claimed.
+
 ## Issue #254 reorder slice
 
 Web and MCP call the same atomic custom-order operation. Intents identify moved and
