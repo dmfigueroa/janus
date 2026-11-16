@@ -38,7 +38,7 @@ pub struct GroupedTitle {
     pub matching_item_count: usize,
 }
 
-const MEDIA_TYPES: &[&str] = &[
+pub(crate) const MEDIA_TYPES: &[&str] = &[
     "movie", "episode", "game", "book", "comic", "anime", "manga",
 ];
 
@@ -51,7 +51,6 @@ struct ItemQuery {
     query: Option<String>,
     view: ResultView,
     page: Page,
-    paginated: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -141,7 +140,6 @@ impl ItemQuery {
         } else {
             None
         };
-        let paginated = !selector.as_ref().is_some_and(ItemSelector::is_exact);
         Ok(Self {
             operation,
             watchlist_id,
@@ -149,7 +147,6 @@ impl ItemQuery {
             query,
             view,
             page,
-            paginated,
         })
     }
 }
@@ -197,8 +194,9 @@ impl Watchlists {
                 query.watchlist_id
             )));
         };
-        let selected = select(&stored, query.selector.as_ref(), query.query.as_deref());
-        let (results, next_cursor) = if query.paginated {
+        let selected = select(stored, query.selector.as_ref(), query.query.as_deref());
+        let paginated = !query.selector.as_ref().is_some_and(ItemSelector::is_exact);
+        let (results, next_cursor) = if paginated {
             let binding = CursorBinding::Items {
                 watchlist_id: query.watchlist_id,
                 page_size: query.page.size(),
@@ -208,10 +206,7 @@ impl Watchlists {
             match query.view {
                 ResultView::Items => {
                     let (page, cursor) = paginate(selected, &query.page, &binding)?;
-                    (
-                        ItemResults::Items(page.into_iter().cloned().collect()),
-                        cursor,
-                    )
+                    (ItemResults::Items(page), cursor)
                 }
                 ResultView::Titles => {
                     let grouped = grouped_titles(&selected);
@@ -221,12 +216,9 @@ impl Watchlists {
             }
         } else {
             match query.view {
-                ResultView::Items => (
-                    ItemResults::Items(selected.into_iter().cloned().collect()),
-                    None,
-                ),
+                ResultView::Items => (ItemResults::Items(selected), None),
                 ResultView::Titles => (
-                    ItemResults::Titles(selected.iter().map(|item| single_title(item)).collect()),
+                    ItemResults::Titles(selected.iter().map(single_title).collect()),
                     None,
                 ),
             }
@@ -241,20 +233,23 @@ impl Watchlists {
     }
 }
 
-fn select<'a>(
-    items: &'a [WatchlistItem],
+fn select(
+    items: Vec<WatchlistItem>,
     selector: Option<&ItemSelector>,
     query: Option<&str>,
-) -> Vec<&'a WatchlistItem> {
+) -> Vec<WatchlistItem> {
     match selector {
-        None => items.iter().collect(),
-        Some(ItemSelector::Id(target)) => items.iter().filter(|item| item.id == *target).collect(),
+        None => items,
+        Some(ItemSelector::Id(target)) => items
+            .into_iter()
+            .filter(|item| item.id == *target)
+            .collect(),
         Some(ItemSelector::Provider {
             provider,
             provider_id,
             media_type,
         }) => items
-            .iter()
+            .into_iter()
             .filter(|item| {
                 item.source == *provider
                     && item.tmdb_id == *provider_id
@@ -264,22 +259,25 @@ fn select<'a>(
         Some(ItemSelector::Text) => {
             let query = query.unwrap_or_default().to_ascii_lowercase();
             items
-                .iter()
+                .into_iter()
                 .filter(|item| item.matches_text(&query))
                 .collect()
         }
     }
 }
 
-fn grouped_titles(items: &[&WatchlistItem]) -> Vec<GroupedTitle> {
+fn grouped_titles(items: &[WatchlistItem]) -> Vec<GroupedTitle> {
     // Keys borrow from `items`, which outlives the grouping map.
-    let mut grouped = BTreeMap::<(&str, &str, &str, &str), usize>::new();
-    for item in items {
-        let (id, title) = item.group_title();
-        *grouped
-            .entry((title, id, &item.source, &item.media_type))
-            .or_default() += 1;
-    }
+    let grouped = items.iter().fold(
+        BTreeMap::<(&str, &str, &str, &str), usize>::new(),
+        |mut grouped, item| {
+            let (id, title) = item.group_title();
+            *grouped
+                .entry((title, id, &item.source, &item.media_type))
+                .or_default() += 1;
+            grouped
+        },
+    );
     grouped
         .into_iter()
         .map(

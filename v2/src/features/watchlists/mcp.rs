@@ -4,7 +4,7 @@
 //! legacy coercion, unknown-field handling and JSON envelopes v1 exposed.
 
 use super::{
-    Watchlists,
+    WatchlistItem, WatchlistRecord, WatchlistStats, WatchlistSummary, Watchlists,
     discovery::{
         DiscoveryError, DiscoveryOperation, DiscoveryRequest, GroupedTitle, ItemPage, ItemResults,
         SummaryPage,
@@ -25,8 +25,7 @@ fn object_schema(properties: Value, required: Value) -> serde_json::Map<String, 
 }
 
 fn definitions() -> Vec<Tool> {
-    let media =
-        json!({"type":"string","enum":["movie","episode","game","book","comic","anime","manga"]});
+    let media = json!({"type":"string","enum": super::discovery::MEDIA_TYPES});
     let mut page = json!({"orderBy":{"type":"string","enum":["createdAt","lastWatched","lastAdded"]},"order":{"type":"string","enum":["asc","desc"]},"pageSize":{"type":"integer","minimum":1,"maximum":100},"cursor":{"type":"string"}});
     let list = page.clone();
     page["query"] = json!({"type":"string","minLength":1});
@@ -192,11 +191,8 @@ impl ServerHandler for ReadMcp {
             "find_watchlist_items" => DiscoveryOperation::Find,
             _ => unreachable!(),
         };
-        let arguments = normalize(
-            operation,
-            Value::Object(request.arguments.unwrap_or_default()),
-        );
-        let discovered = match request_arguments(&arguments) {
+        let arguments = normalize(operation, request.arguments.unwrap_or_default());
+        let discovered = match request_from_arguments(&arguments) {
             Ok(request) => {
                 if operation.is_summary() {
                     self.0
@@ -266,7 +262,7 @@ fn item_envelope(page: ItemPage) -> Value {
 }
 
 /// Full stored-item projection used by detail stats.
-fn item_json(item: &super::WatchlistItem) -> Value {
+fn item_json(item: &WatchlistItem) -> Value {
     json!({
         "id": item.id,
         "tmdbId": item.tmdb_id,
@@ -290,7 +286,7 @@ fn item_json(item: &super::WatchlistItem) -> Value {
 }
 
 /// Reduced item projection returned by regular MCP item views.
-fn item_projection(item: &super::WatchlistItem) -> Value {
+fn item_projection(item: &WatchlistItem) -> Value {
     json!({
         "id": item.id,
         "watchlistId": item.watchlist_id,
@@ -304,7 +300,7 @@ fn item_projection(item: &super::WatchlistItem) -> Value {
     })
 }
 
-fn record_json(record: &super::WatchlistRecord) -> Value {
+fn record_json(record: &WatchlistRecord) -> Value {
     json!({
         "id": record.id,
         "name": record.name,
@@ -318,7 +314,7 @@ fn record_json(record: &super::WatchlistRecord) -> Value {
     })
 }
 
-fn stats_json(stats: &super::WatchlistStats) -> Value {
+fn stats_json(stats: &WatchlistStats) -> Value {
     json!({
         "totalItems": stats.total_items,
         "watchedItems": stats.watched_items,
@@ -329,7 +325,7 @@ fn stats_json(stats: &super::WatchlistStats) -> Value {
     })
 }
 
-fn summary_json(summary: &super::WatchlistSummary) -> Value {
+fn summary_json(summary: &WatchlistSummary) -> Value {
     let mut value = record_json(&summary.watchlist);
     value["stats"] = stats_json(&summary.stats);
     value
@@ -350,7 +346,7 @@ fn title_json(title: &GroupedTitle) -> Value {
 /// Unknown fields were already removed and the legacy `get_watchlist` selector
 /// was already coerced. Value types and integral numbers stay adapter concerns;
 /// semantic rules belong to discovery.
-fn request_arguments(arguments: &Value) -> Result<DiscoveryRequest, String> {
+fn request_from_arguments(arguments: &Value) -> Result<DiscoveryRequest, String> {
     let object = arguments
         .as_object()
         .ok_or_else(|| "Invalid tool arguments.".to_owned())?;
@@ -397,7 +393,10 @@ fn request_arguments(arguments: &Value) -> Result<DiscoveryRequest, String> {
     })
 }
 
-fn normalize(operation: DiscoveryOperation, mut arguments: Value) -> Value {
+fn normalize(
+    operation: DiscoveryOperation,
+    mut arguments: serde_json::Map<String, Value>,
+) -> Value {
     let fields: &[&str] = match operation {
         DiscoveryOperation::List => &["orderBy", "order", "pageSize", "cursor"],
         DiscoveryOperation::Search => &["query", "orderBy", "order", "pageSize", "cursor"],
@@ -414,15 +413,14 @@ fn normalize(operation: DiscoveryOperation, mut arguments: Value) -> Value {
             "resultView",
         ],
     };
-    let object = arguments.as_object_mut().unwrap();
-    object.retain(|key, _| fields.contains(&key.as_str()));
+    arguments.retain(|key, _| fields.contains(&key.as_str()));
     if operation == DiscoveryOperation::Get
-        && let Some(value) = object.get_mut("watchlistId")
+        && let Some(value) = arguments.get_mut("watchlistId")
         && let Some(number) = coerced_number(value, false).and_then(serde_json::Number::from_f64)
     {
         *value = Value::Number(number);
     }
-    arguments
+    Value::Object(arguments)
 }
 // Zod's get_watchlist selector uses JavaScript Number coercion. Other selectors
 // and page sizes accept JSON numbers only, including integral decimal notation.

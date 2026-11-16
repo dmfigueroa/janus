@@ -11,6 +11,8 @@ mod summary;
 pub use items::{GroupedTitle, ItemPage, ItemResults};
 pub use summary::SummaryPage;
 
+pub(crate) use items::MEDIA_TYPES;
+
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde_json::{Value, json};
 
@@ -56,6 +58,15 @@ pub enum DiscoveryError {
 impl From<String> for DiscoveryError {
     fn from(message: String) -> Self {
         Self::InvalidInput(message)
+    }
+}
+
+impl std::error::Error for DiscoveryError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Database(error) => Some(error),
+            Self::InvalidInput(_) => None,
+        }
     }
 }
 
@@ -158,7 +169,7 @@ pub(super) fn paginate<T>(
     binding: &CursorBinding,
 ) -> Result<(Vec<T>, Option<String>), DiscoveryError> {
     let offset = match &page.cursor {
-        Some(cursor) => offset(cursor, binding)?,
+        Some(cursor) => cursor_offset(cursor, binding)?,
         None => 0,
     };
     let has_more = values.len().saturating_sub(offset) > page.size;
@@ -173,7 +184,7 @@ pub(super) fn paginate<T>(
     Ok((page_values, next))
 }
 
-fn offset(cursor: &str, binding: &CursorBinding) -> Result<usize, DiscoveryError> {
+fn cursor_offset(cursor: &str, binding: &CursorBinding) -> Result<usize, DiscoveryError> {
     let decoded = URL_SAFE_NO_PAD
         .decode(cursor)
         .map_err(|_| invalid("Invalid cursor."))?;
