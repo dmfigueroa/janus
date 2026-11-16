@@ -172,6 +172,6 @@ impl Watchlists {
     }
 }
 
-fn folded(value: &str) -> String {
+pub(crate) fn folded(value: &str) -> String {
     value.nfc().collect::<String>().to_lowercase()
 }

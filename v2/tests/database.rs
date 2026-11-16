@@ -169,6 +169,22 @@ async fn watchlist_home_renders_v1_cards_sections_and_local_navigation() {
     assert!(html.contains("aria-label=\"Primary navigation\""), "{html}");
     assert!(!html.contains("Completed (0)"), "{html}");
 
+    let json_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v2/watchlists?query=caf%C3%A9")
+                .header("accept", "application/json")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(json_response.headers()["content-type"], "application/json");
+    let json: serde_json::Value = serde_json::from_str(&body(json_response).await).unwrap();
+    assert_eq!(json["query"], "café");
+    assert_eq!(json["sections"][0]["cards"][0]["id"], 41);
+
     let detail = body(
         app.oneshot(
             Request::builder()

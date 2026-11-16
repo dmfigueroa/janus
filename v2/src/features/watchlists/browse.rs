@@ -5,11 +5,10 @@
 //! the card labels v1 showed. Web responses only choose the full page or the
 //! search fragment; they do not re-implement these rules.
 
+use super::discovery::folded;
 use super::{WatchlistItem, WatchlistSummary};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde::{Deserialize, Serialize};
-use unicode_normalization::UnicodeNormalization;
-
 const PAGE_SIZE: usize = 50;
 const TMDB_POSTER_PREFIX: &str = "https://image.tmdb.org/t/p/w500/";
 
@@ -104,7 +103,7 @@ impl std::fmt::Display for BrowseError {
 impl std::error::Error for BrowseError {}
 
 /// One rendered section of the home grid.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct BrowseSection {
     pub title: Option<&'static str>,
     pub collapsible: bool,
@@ -112,7 +111,7 @@ pub struct BrowseSection {
 }
 
 /// One watchlist summary card with v1 display labels.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct BrowseCard {
     pub id: i64,
     pub name: String,
@@ -128,7 +127,7 @@ pub struct BrowseCard {
 }
 
 /// One sort option in the search form.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct BrowseOrderOption {
     pub value: &'static str,
     pub label: &'static str,
@@ -136,7 +135,7 @@ pub struct BrowseOrderOption {
 }
 
 /// A complete home or search result, ready for the template.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct BrowseView {
     pub query: String,
     pub heading: &'static str,
@@ -486,10 +485,6 @@ fn encode(
         .map_err(|_| BrowseError::InvalidCursor)
 }
 
-fn folded(value: &str) -> String {
-    value.nfc().collect::<String>().to_lowercase()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -627,6 +622,15 @@ mod tests {
         assert_eq!(view.sections[0].cards.len(), 1);
         assert_eq!(view.sections[0].cards[0].id, 41);
         assert_eq!(view.summary, "1 of 2 watchlists");
+        let greek = BrowseView::build(
+            &summaries,
+            &BrowseFilters {
+                query: "ος".into(),
+                ..filters()
+            },
+        )
+        .unwrap();
+        assert_eq!(greek.sections[0].cards[0].id, 42);
     }
 
     #[test]

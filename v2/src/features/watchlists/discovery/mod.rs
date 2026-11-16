@@ -11,6 +11,8 @@ mod summary;
 pub use items::{GroupedTitle, ItemPage, ItemResults};
 pub use summary::SummaryPage;
 
+pub(crate) use summary::folded;
+
 pub(crate) use items::MEDIA_TYPES;
 
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};

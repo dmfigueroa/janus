@@ -4,9 +4,10 @@ use super::timeline::{TimelineFilters, TimelineView};
 use crate::http::{FormOrJson, ResponseFormat};
 use askama::Template;
 use axum::{
+    Json,
     extract::{Path, Query, State},
-    http::{HeaderMap, StatusCode},
-    response::{Html, Response},
+    http::{HeaderMap, StatusCode, header},
+    response::{Html, IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
 #[derive(Deserialize)]
@@ -68,19 +69,19 @@ pub struct ListFilters {
 }
 #[derive(Template)]
 #[template(path = "watchlists.html")]
-struct ListPage {
-    view: BrowseView,
+struct ListPage<'a> {
+    view: &'a BrowseView,
 }
 #[derive(Template)]
 #[template(path = "watchlist-browse.html")]
-struct BrowseFragment {
-    view: BrowseView,
+struct BrowseFragment<'a> {
+    view: &'a BrowseView,
 }
 pub async fn list(
     State(lists): State<Watchlists>,
     headers: HeaderMap,
     Query(filters): Query<ListFilters>,
-) -> Result<Html<String>, Failure> {
+) -> Result<Response, Failure> {
     use super::browse::{BrowseDirection, BrowseError, BrowseFilters, BrowseOrder, BrowseView};
     let order_by = BrowseOrder::parse(filters.order_by.as_deref());
     let filters = BrowseFilters {
@@ -99,13 +100,20 @@ pub async fn list(
     let htmx = headers
         .get("hx-request")
         .is_some_and(|value| value == "true");
-    if htmx {
-        BrowseFragment { view }.render()
+    let json = headers
+        .get(header::ACCEPT)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.contains("application/json"));
+    let page = if htmx {
+        BrowseFragment { view: &view }.render()
+    } else if json {
+        return Ok(([(header::VARY, "HX-Request, Accept")], Json(view)).into_response());
     } else {
-        ListPage { view }.render()
+        ListPage { view: &view }.render()
     }
     .map(Html)
-    .map_err(failure)
+    .map_err(failure)?;
+    Ok(([(header::VARY, "HX-Request, Accept")], page).into_response())
 }
 
 #[derive(Deserialize)]
