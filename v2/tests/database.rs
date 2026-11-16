@@ -232,6 +232,27 @@ async fn watchlist_home_searches_sorts_pages_and_swaps_only_the_grid() {
     assert!(fragment.contains("Bulk list 00"), "{fragment}");
     assert!(fragment.contains("Next page"), "{fragment}");
 
+    let restored = body(
+        app.clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/v2/watchlists?query=list")
+                    .header("hx-request", "true")
+                    .header("hx-history-restore-request", "true")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(restored.contains("<!doctype html>"), "{restored}");
+    assert!(restored.contains("id=\"watchlist-search\""), "{restored}");
+    assert!(
+        restored.contains("aria-label=\"Primary navigation\""),
+        "{restored}"
+    );
+
     let sorted = body(
         search(
             "/v2/watchlists?query=Bulk&orderBy=createdAt&order=desc",

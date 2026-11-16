@@ -100,11 +100,14 @@ pub async fn list(
     let htmx = headers
         .get("hx-request")
         .is_some_and(|value| value == "true");
+    let restoring = headers
+        .get("hx-history-restore-request")
+        .is_some_and(|value| value == "true");
     let json = headers
         .get(header::ACCEPT)
         .and_then(|value| value.to_str().ok())
         .is_some_and(|value| value.contains("application/json"));
-    let page = if htmx {
+    let page = if htmx && !restoring {
         BrowseFragment { view: &view }.render()
     } else if json {
         return Ok(([(header::VARY, "HX-Request, Accept")], Json(view)).into_response());

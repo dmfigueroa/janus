@@ -141,7 +141,10 @@ impl Watchlists {
     ///
     /// Returns [`DbErr`] when the database read or stored-value decoding fails.
     pub(super) async fn summary(&self, id: i64) -> Result<Option<WatchlistSummary>, DbErr> {
-        summary(&self.0, id).await
+        let transaction = self.0.begin().await?;
+        let summary = summary(&transaction, id).await?;
+        transaction.commit().await?;
+        Ok(summary)
     }
 }
 
