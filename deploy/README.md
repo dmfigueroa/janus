@@ -46,3 +46,34 @@ existing MCP clients on v1. Use the existing Coolify-managed build server and se
 deployment server; no separate GitHub Actions image-publishing pipeline is introduced.
 
 No final traffic cutover, v1 retirement or schema ownership transfer is included.
+
+## Preview environment seeding
+
+`src/db/Seed.ts` seeds demo watchlists and items into an empty database. It is compiled
+to `.output/server/seed.mjs` in the image and runs after migrations at container start,
+between `migrate.mjs` and `index.mjs`. It only writes when `SEED_ON_STARTUP=true`, so the
+production app — which never sets that variable — is unaffected.
+
+Enabling it on a Coolify preview deployment:
+
+1. Set `SEED_ON_STARTUP=true` on the preview deployment's environment.
+2. Point the preview at a **disposable** database. Do not mount the shared production volume
+   `h8gsos0k40kk8s8oo8o4ko0w-DB`: seeding (and ordinary app writes) on that volume would
+   modify production data. Give the preview its own empty volume.
+
+Behavior:
+
+- Idempotent: skips seeding when the `watchlists` table already has rows, so preview restarts
+  do not duplicate data.
+- Seeds only `watchlists` and `watchlist_items`. The five system lineups are created lazily by
+  `LineupConfiguration.server.ts` on first read; system lineup membership is derived from each
+  watchlist's next-unwatched media type, so no `lineup_watchlists` rows are required.
+- Demo watchlists: Marvel Cinematic Universe, Star Wars, Anime & Manga (release order), and
+  Reading List (custom order). Poster paths are left empty so previews do not depend on TMDB.
+
+Local run against a disposable database:
+
+```bash
+SEED_ON_STARTUP=true DATABASE_URL=/tmp/janus-preview.sqlite npm run migrate
+SEED_ON_STARTUP=true DATABASE_URL=/tmp/janus-preview.sqlite npm run seed
+```

@@ -14,7 +14,8 @@
     "format:check": "oxfmt . --check",
     "typecheck": "tsc --noEmit",
     "prepare": "simple-git-hooks",
-    "migrate": "npx -y tsx --env-file=.env src/db/Migrate.ts"
+    "migrate": "npx -y tsx --env-file=.env src/db/Migrate.ts",
+    "seed": "npx -y tsx --env-file=.env src/db/Seed.ts"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.1",
