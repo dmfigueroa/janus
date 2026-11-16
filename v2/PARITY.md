@@ -167,7 +167,9 @@ home and existing detail page.
 
 `browse.rs` owns summary ordering (`recency`, `createdAt`, `lastWatched`, `lastAdded`), NFC plus
 lowercase name matching, page cursors bound to the query and sort, section grouping and card
-labels. `snapshot.rs` reads every summary in one transaction. Search, sort and pagination use
+labels. `snapshot.rs` reads every summary in one transaction using grouped counts and
+mode-specific ranked item selections, reducing the home read from per-watchlist queries to
+four statements. Search, sort and pagination use
 HTMX, swap only `#watchlist-browse`, push the URL, announce pending/failed loads, and keep a
 non-JavaScript link fallback. Empty search results offer a clear action. These web controls are
 the web projection of the MCP discovery contract; v1's home itself only ordered by recency, and
@@ -176,8 +178,8 @@ v1's `list_watchlists`/`search_watchlists` inputs and ordering are unchanged.
 Automated coverage: browse unit tests for recency and sort order, Unicode matching, bound
 cursors, lifecycle grouping, next-item markers, cover URLs and paused dates; fixture-backed
 HTTP tests for home cards, totals, cover placeholders, escaped labels, navigation, search,
-sorting, HTMX fragment-only swaps, continuation links, JSON content negotiation and search
-empty states. `cargo fmt --check`, Clippy and all Rust tests pass with disposable v1 databases.
+sorting, HTMX fragment-only swaps, continuation links, JSON content negotiation, bulk summary
+consistency and search empty states. `cargo fmt --check`, Clippy and all Rust tests pass with disposable v1 databases.
 No deployed, real-client, physical-device or owner acceptance is claimed for this slice.
 Create, edit, delete, merge, watch/skip/pause and their card menus remain outstanding in their
 own slices.

@@ -6,6 +6,7 @@
 
 use sea_orm::{ConnectionTrait, DbErr, TransactionTrait};
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 
 use super::ItemOrderMode;
 use super::Watchlists;
@@ -125,14 +126,42 @@ impl Watchlists {
     pub async fn all_summaries(&self) -> Result<Vec<WatchlistSummary>, DbErr> {
         let transaction = self.0.begin().await?;
         let headers = storage::headers(&transaction).await?;
-        let mut summaries = Vec::with_capacity(headers.len());
-        for header in headers {
-            if let Some(summary) = summary(&transaction, header.id).await? {
-                summaries.push(summary);
-            }
+        let counts = storage::all_counts(&transaction).await?;
+        let mut selections = HashMap::new();
+        for mode in [ItemOrderMode::Release, ItemOrderMode::Custom] {
+            let ids = headers
+                .iter()
+                .filter(|header| header.item_order_mode == mode)
+                .map(|header| header.id)
+                .collect::<Vec<_>>();
+            selections.extend(storage::summary_selections(&transaction, &ids, mode).await?);
         }
         transaction.commit().await?;
-        Ok(summaries)
+        Ok(headers
+            .into_iter()
+            .map(|header| {
+                let id = header.id;
+                let counts = counts.get(&id).copied().unwrap_or(storage::ItemCounts {
+                    total_items: 0,
+                    watched_items: 0,
+                });
+                let selection = selections.remove(&id).map(|selected| {
+                    let storage::SelectedSummary {
+                        next_unwatched,
+                        cover_item,
+                    } = selected;
+                    SummarySelection::new(next_unwatched, Some(&cover_item))
+                });
+                WatchlistSummary {
+                    watchlist: header,
+                    stats: summary::build_stats(
+                        counts.total_items,
+                        counts.watched_items,
+                        selection.unwrap_or_else(|| SummarySelection::new(None, None)),
+                    ),
+                }
+            })
+            .collect())
     }
 
     /// Reads one summary without loading every item.

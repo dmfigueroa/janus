@@ -913,6 +913,42 @@ async fn empty_watchlist_stats_report_zero_progress_and_no_selection() {
 }
 
 #[tokio::test]
+async fn all_summaries_matches_individual_reads_for_empty_partial_and_completed_lists() {
+    use janus_v2::Watchlists;
+    let fixture = Fixture::v1();
+    let lists = Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    let summaries = lists.all_summaries().await.unwrap();
+    let partial = summaries
+        .iter()
+        .find(|summary| summary.watchlist.id == 41)
+        .unwrap();
+    assert_eq!(partial.stats.total_items, 3);
+    assert_eq!(partial.stats.watched_items, 1);
+    assert_eq!(partial.stats.progress, 33);
+    assert_eq!(partial.stats.next_unwatched.as_ref().unwrap().id, 101);
+    assert!(partial.stats.cover_image.is_none());
+    assert_eq!(partial.stats.cover_media_type.as_deref(), Some("episode"));
+    let empty = summaries
+        .iter()
+        .find(|summary| summary.watchlist.id == 42)
+        .unwrap();
+    assert_eq!(empty.stats.total_items, 0);
+    assert!(empty.stats.next_unwatched.is_none());
+
+    change_v1(&fixture, "watch-all");
+    let completed = lists
+        .all_summaries()
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|summary| summary.watchlist.id == 41)
+        .unwrap();
+    assert_eq!(completed.stats.progress, 100);
+    assert!(completed.stats.next_unwatched.is_none());
+    assert_eq!(completed.stats.cover_image.as_deref(), Some("/poster.jpg"));
+}
+
+#[tokio::test]
 async fn summary_discovery_uses_efficient_counts_and_cover_fallback() {
     use janus_v2::{DiscoveryOperation as Operation, DiscoveryRequest as Request, Watchlists};
     let fixture = Fixture::v1();

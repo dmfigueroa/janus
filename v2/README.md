@@ -79,8 +79,9 @@ envelopes stay in `mcp.rs`.
 The browse home is separate from MCP discovery. `browse.rs` turns one typed summary snapshot
 into v1-style cards: stored recency ordering, optional `createdAt`/`lastWatched`/`lastAdded`
 sorting, NFC-plus-lowercase name matching, bound continuation cursors, lifecycle sections,
-cover selection, progress, next-item labels and paused dates. `snapshot.rs` reads every
-summary in one transaction for the home. `web.rs` chooses the full page or the grid fragment;
+cover selection, progress, next-item labels and paused dates. `snapshot.rs` reads the home
+summaries in one transaction with grouped counts and mode-specific ranked selections instead
+of loading every item or issuing per-list queries. `web.rs` chooses the full page or the grid fragment;
 HTMX search, sorting and pagination swap only `#watchlist-browse` and push the new URL. A
 shared layout provides the v1 bottom navigation on the home and detail pages. Create, edit,
 delete and merge controls remain with their own slices.
