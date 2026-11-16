@@ -1,4 +1,5 @@
-use super::{ItemOrderMode, Watchlists};
+use super::Watchlists;
+use super::timeline::{TimelineFilters, TimelineView};
 use crate::http::{FormOrJson, ResponseFormat};
 use askama::Template;
 use axum::{
@@ -7,7 +8,7 @@ use axum::{
     response::{Html, Response},
 };
 use serde::{Deserialize, Serialize};
-#[derive(Default, Deserialize)]
+#[derive(Deserialize)]
 pub struct Filters {
     #[serde(default)]
     query: String,
@@ -15,51 +16,12 @@ pub struct Filters {
     unwatched: bool,
 }
 fn default_unwatched() -> bool {
-    true
+    TimelineFilters::default().unwatched
 }
-#[derive(Template)]
-#[template(path = "watchlist.html")]
-struct Page {
-    id: i64,
-    name: String,
-    description: String,
-    mode: String,
-    progress: u64,
-    watched: u64,
-    total: u64,
-    query: String,
-    unwatched: bool,
-    runs: Vec<Run>,
-    paused: bool,
-    message: String,
-}
-#[derive(Template)]
-#[template(path = "timeline.html")]
-struct Timeline<'a> {
-    id: i64,
-    query: &'a str,
-    unwatched: bool,
-    mode: &'a str,
-    runs: &'a [Run],
-    message: &'a str,
-}
-#[derive(Clone)]
-struct Row {
-    id: i64,
-    title: String,
-    parent: String,
-    episode: String,
-    date: String,
-    year: String,
-    watched: bool,
-    poster: String,
-    media: String,
-}
-struct Run {
-    year: String,
-    heading: bool,
-    hidden: bool,
-    rows: Vec<Row>,
+impl Filters {
+    fn timeline(self) -> TimelineFilters {
+        TimelineFilters::new(self.query, self.unwatched)
+    }
 }
 type Failure = (StatusCode, &'static str);
 fn failure(error: impl std::fmt::Display) -> Failure {
@@ -74,90 +36,24 @@ pub async fn detail(
     Path(id): Path<i64>,
     Query(filters): Query<Filters>,
 ) -> Result<Html<String>, Failure> {
-    build_page(&lists, id, filters)
+    load_timeline(&lists, id, filters.timeline())
         .await?
-        .render()
+        .render_page()
         .map(Html)
         .map_err(failure)
 }
 
-async fn build_page(lists: &Watchlists, id: i64, filters: Filters) -> Result<Page, Failure> {
+async fn load_timeline(
+    lists: &Watchlists,
+    id: i64,
+    filters: TimelineFilters,
+) -> Result<TimelineView, Failure> {
     let detail = lists
         .detail(id)
         .await
         .map_err(failure)?
         .ok_or((StatusCode::NOT_FOUND, "Watchlist not found"))?;
-    let list = &detail.watchlist.watchlist;
-    let stats = &detail.watchlist.stats;
-    let query = filters.query.trim().to_ascii_lowercase();
-    let rows: Vec<Row> = detail
-        .items
-        .iter()
-        .filter(|item| item.matches_text(&query))
-        .map(|item| {
-            let date = item.release_date.clone().unwrap_or_default();
-            Row {
-                id: item.id,
-                title: item.title.clone(),
-                parent: item.parent_title.clone().unwrap_or_default(),
-                episode: item.episode.clone().unwrap_or_default(),
-                year: if date.is_empty() {
-                    "TBA".into()
-                } else {
-                    date.split_once('-')
-                        .map_or(date.as_str(), |(year, _)| year)
-                        .into()
-                },
-                date,
-                watched: item.is_watched == Some(true),
-                poster: poster(item.poster_path.as_deref().unwrap_or("")),
-                media: item.media_type.clone(),
-            }
-        })
-        .collect();
-    let release_mode = list.item_order_mode == ItemOrderMode::Release;
-    let groups: Vec<&[Row]> = rows
-        .chunk_by(|previous, next| {
-            previous.watched == next.watched && (!release_mode || previous.year == next.year)
-        })
-        .collect();
-    let runs = groups
-        .iter()
-        .enumerate()
-        .map(|(index, rows)| Run {
-            year: rows[0].year.clone(),
-            heading: release_mode && (index == 0 || groups[index - 1][0].year != rows[0].year),
-            hidden: filters.unwatched && rows[0].watched,
-            rows: rows.to_vec(),
-        })
-        .collect();
-    Ok(Page {
-        id,
-        name: list.name.clone(),
-        description: list.description.clone().unwrap_or_default(),
-        mode: list.item_order_mode.as_str().into(),
-        progress: stats.progress,
-        watched: stats.watched_items as u64,
-        total: stats.total_items as u64,
-        query: filters.query,
-        unwatched: filters.unwatched,
-        runs,
-        paused: list.paused_at.is_some(),
-        message: String::new(),
-    })
-}
-
-fn poster(path: &str) -> String {
-    if path.is_empty() {
-        String::new()
-    } else if path.starts_with("https://") || path.starts_with("http://") {
-        path.into()
-    } else {
-        format!(
-            "https://image.tmdb.org/t/p/w200/{}",
-            path.trim_start_matches('/')
-        )
-    }
+    Ok(TimelineView::new(&detail, &filters))
 }
 
 #[derive(Deserialize, Default)]
@@ -243,18 +139,11 @@ pub async fn reorder(
     let result = reorder_result(&lists, id, request).await;
     format
         .respond(&result, async {
-            let page = build_page(&lists, id, filters).await?;
-            Timeline {
-                id: page.id,
-                query: &page.query,
-                unwatched: page.unwatched,
-                mode: &page.mode,
-                runs: &page.runs,
-                message: result.message.unwrap_or("Order saved."),
-            }
-            .render()
-            .map(Html)
-            .map_err(failure)
+            load_timeline(&lists, id, filters.timeline())
+                .await?
+                .render_fragment(result.message.unwrap_or("Order saved."))
+                .map(Html)
+                .map_err(failure)
         })
         .await
 }

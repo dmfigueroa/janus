@@ -48,6 +48,15 @@ this contract. Timestamps stay strings; JSON authors and nullable integer boolea
 v1 values. Name search uses NFC plus lowercase; detail text search intentionally retains
 SQLite LIKE's ASCII case behavior and treats wildcard characters literally.
 
+Detail pages and reorder fragments share one feature-owned presentation module,
+`src/features/watchlists/timeline.rs`. It turns a typed detail snapshot and filters into
+the page or fragment with no Axum or database access, leaving HTTP extraction, content
+negotiation, failures and response selection in the web adapter. Focused unit tests cover
+title matching, release years and missing dates, poster resolution, custom/release ordering,
+watched runs spanning years, empty results and unwatched-only filtering; HTTP and HTMX
+regressions remain covered by the fixture-backed `cargo test` suite and
+`node --test v2/tests/reorder-browser.cjs`.
+
 Reorder writes renumber the complete displayed sequence, keeping ranks contiguous even
 when v1 deletions left gaps. Other future writes must explicitly preserve Drizzle's
 application-side `updatedAt` hook; SeaORM does not supply it automatically. Reordering uses
