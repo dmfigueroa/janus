@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const { JSDOM } = require("jsdom");
 const fs = require("node:fs");
 const path = require("node:path");
+const { installReorderModules } = require("./reorder-browser-fixtures.cjs");
 const root = path.resolve(__dirname, "..");
 
 function timeline(itemIds) {
@@ -55,7 +56,7 @@ async function verifyReorder({ failPost, methods, status }) {
     window.eval(fs.readFileSync(path.join(root, "static/vendor/htmx.min.js"), "utf8"));
     window.eval(fs.readFileSync(path.join(root, "static/vendor/Sortable.min.js"), "utf8"));
     window.eval(fs.readFileSync(path.join(root, "static/app.js"), "utf8"));
-    window.eval(fs.readFileSync(path.join(root, "static/watchlist-reorder.js"), "utf8"));
+    installReorderModules(window);
     await new Promise((resolve) => window.setTimeout(resolve, 20));
     const completed = new Promise((resolve) =>
       window.document.addEventListener("htmx:afterSwap", resolve, { once: true }),

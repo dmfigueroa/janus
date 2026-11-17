@@ -10,7 +10,14 @@
     <script defer src="{{ crate::assets::VENDOR_SORTABLE_MIN_JS_URL }}"></script>
     <script defer src="{{ crate::assets::WATCHLIST_DIALOG_JS_URL }}"></script>
     <script defer src="{{ crate::assets::APP_JS_URL }}"></script>
-    <script defer src="{{ crate::assets::WATCHLIST_REORDER_JS_URL }}"></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "@janus/watchlist-reorder-groups": "{{ crate::assets::WATCHLIST_REORDER_GROUPS_JS_URL|safe }}"
+        }
+      }
+    </script>
+    <script type="module" src="{{ crate::assets::WATCHLIST_REORDER_JS_URL }}"></script>
     {% block scripts %}{% endblock %}
   </head>
   <body>

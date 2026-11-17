@@ -1865,6 +1865,145 @@ async fn web_update_changes_only_submitted_fields_and_reports_stale_targets() {
 }
 
 #[tokio::test]
+async fn switching_to_custom_order_initializes_release_ranks_and_round_trips() {
+    let fixture = Fixture::v1();
+    let status = Command::new(std::env::var("JANUS_TEST_NODE").unwrap_or("node".into()))
+        .arg(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/create_v1_fixture.cjs"
+        ))
+        .arg(&fixture.0)
+        .arg("release-no-ranks")
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let lists = janus_v2::Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    let app = janus_v2::database_router(lists.0.clone());
+    let before = lists.detail(41).await.unwrap().unwrap();
+    let release_ids = before.items.iter().map(|item| item.id).collect::<Vec<_>>();
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"itemOrderMode":"custom"}).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let custom = lists.detail(41).await.unwrap().unwrap();
+    assert_eq!(
+        custom.watchlist.watchlist.item_order_mode,
+        janus_v2::ItemOrderMode::Custom
+    );
+    assert_eq!(
+        custom.items.iter().map(|item| item.id).collect::<Vec<_>>(),
+        release_ids
+    );
+    assert!(
+        custom
+            .items
+            .iter()
+            .enumerate()
+            .all(|(index, item)| item.custom_rank == Some((index + 1) as i64))
+    );
+
+    let reordered = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41/reorder")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({
+                        "movedItemId": release_ids[2],
+                        "referenceItemId": release_ids[0],
+                        "position": "before"
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(reordered.status(), StatusCode::OK);
+    let manually_ordered = lists.detail(41).await.unwrap().unwrap();
+    let manual_ids = manually_ordered
+        .items
+        .iter()
+        .map(|item| item.id)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        manual_ids,
+        vec![release_ids[2], release_ids[0], release_ids[1]]
+    );
+    let manual_ranks = manually_ordered
+        .items
+        .iter()
+        .map(|item| item.custom_rank)
+        .collect::<Vec<_>>();
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"itemOrderMode":"release"}).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let release = lists.detail(41).await.unwrap().unwrap();
+    assert_eq!(
+        release.watchlist.watchlist.item_order_mode,
+        janus_v2::ItemOrderMode::Release
+    );
+    assert_eq!(
+        release.items.iter().map(|item| item.id).collect::<Vec<_>>(),
+        release_ids
+    );
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"itemOrderMode":"custom"}).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let round_trip = lists.detail(41).await.unwrap().unwrap();
+    assert_eq!(
+        round_trip
+            .items
+            .iter()
+            .map(|item| item.id)
+            .collect::<Vec<_>>(),
+        manual_ids
+    );
+    assert_eq!(
+        round_trip
+            .items
+            .iter()
+            .map(|item| item.custom_rank)
+            .collect::<Vec<_>>(),
+        manual_ranks
+    );
+}
+
+#[tokio::test]
 async fn mcp_create_and_update_keep_ordered_independent_batch_outcomes() {
     let fixture = Fixture::v1();
     let lists = janus_v2::Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
@@ -1982,4 +2121,96 @@ async fn mcp_create_and_update_keep_ordered_independent_batch_outcomes() {
     );
     assert!(detail.watchlist.watchlist.updated_at.is_some());
     change_v1(&fixture, "check-mcp-created");
+}
+
+#[tokio::test]
+async fn mcp_update_watchlists_preserves_custom_ranks_across_order_modes() {
+    let fixture = Fixture::v1();
+    let status = Command::new(std::env::var("JANUS_TEST_NODE").unwrap_or("node".into()))
+        .arg(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/create_v1_fixture.cjs"
+        ))
+        .arg(&fixture.0)
+        .arg("release")
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let lists = janus_v2::Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    let release_items = lists
+        .detail(41)
+        .await
+        .unwrap()
+        .unwrap()
+        .items
+        .iter()
+        .map(|item| (item.id, item.custom_rank))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        release_items,
+        vec![(101, Some(2)), (102, Some(1)), (103, None)]
+    );
+    let app = janus_v2::database_router(lists.0.clone());
+    let initialized = rpc(
+        &app,
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"order-mode-test","version":"1"}}}),
+        None,
+    )
+    .await;
+    let session = initialized.headers()["mcp-session-id"]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let _ = result(initialized).await;
+
+    let response = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"update_watchlists","arguments":{"watchlists":[{"watchlistId":41,"itemOrderMode":"custom"}]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(response["structuredContent"]["results"][0]["success"], true);
+
+    let custom = lists.detail(41).await.unwrap().unwrap();
+    assert_eq!(
+        custom
+            .items
+            .iter()
+            .map(|item| (item.id, item.custom_rank))
+            .collect::<Vec<_>>(),
+        vec![(102, Some(1)), (101, Some(2)), (103, None)]
+    );
+
+    let response = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"update_watchlists","arguments":{"watchlists":[{"watchlistId":41,"itemOrderMode":"release"}]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(response["structuredContent"]["results"][0]["success"], true);
+    let response = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"update_watchlists","arguments":{"watchlists":[{"watchlistId":41,"itemOrderMode":"custom"}]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(response["structuredContent"]["results"][0]["success"], true);
+    let round_trip = lists.detail(41).await.unwrap().unwrap();
+    assert_eq!(
+        round_trip
+            .items
+            .iter()
+            .map(|item| (item.id, item.custom_rank))
+            .collect::<Vec<_>>(),
+        vec![(102, Some(1)), (101, Some(2)), (103, None)]
+    );
 }

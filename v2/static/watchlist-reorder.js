@@ -1,3 +1,5 @@
+import { WatchlistReorderGroups } from "@janus/watchlist-reorder-groups";
+
 class WatchlistReorder extends HTMLElement {
   constructor() {
     super();
@@ -142,36 +144,10 @@ class WatchlistReorder extends HTMLElement {
     return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 0 : 150;
   }
   initializeGroups() {
-    [this, ...this.querySelectorAll("details")].forEach((container) => {
-      if (Sortable.get(container)) return;
-      Sortable.create(container, {
-        group: {
-          name: "watchlist-items",
-          put: () => !container.matches("details:not([open])"),
-        },
-        draggable: "article",
-        handle: ".reorder-handle",
-        animation: this.dragDuration(),
-        delay: 180,
-        delayOnTouchOnly: true,
-        touchStartThreshold: 5,
-        onMove: () => !this.busy,
-        onStart: () => {
-          this.dragging = true;
-        },
-        onEnd: (event) => {
-          this.dragging = false;
-          if (this.busy) return;
-          if (this.unchanged(event)) return;
-          this.saveDrop(event.item);
-        },
-      });
-    });
+    WatchlistReorderGroups.initialize(this);
   }
   destroyGroups() {
-    [this, ...this.querySelectorAll("details")].forEach((container) =>
-      Sortable.get(container)?.destroy(),
-    );
+    WatchlistReorderGroups.destroy(this);
   }
   saveDrop(row) {
     const order = this.visible();

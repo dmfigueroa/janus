@@ -100,6 +100,40 @@ impl Watchlists {
             return Ok(UpdateOutcome::NotFound);
         }
 
+        if changes.item_order_mode == Some(ItemOrderMode::Custom) {
+            let row = transaction
+                .query_one_raw(statement(
+                    "SELECT item_order_mode FROM watchlists WHERE id=?",
+                    vec![changes.watchlist_id.into()],
+                ))
+                .await?
+                .ok_or_else(|| DbErr::Custom("Locked watchlist disappeared".to_owned()))?;
+            let current_mode =
+                ItemOrderMode::from_stored(&row.try_get::<String>("", "item_order_mode")?)?;
+            if current_mode == ItemOrderMode::Release {
+                transaction
+                    .execute_raw(statement(
+                        &format!(
+                            "WITH release_order AS (\
+                               SELECT id, ROW_NUMBER() OVER (ORDER BY {}) AS rank \
+                               FROM watchlist_items WHERE watchlist_id=?\
+                             ) \
+                             UPDATE watchlist_items \
+                             SET custom_rank=(SELECT rank FROM release_order WHERE release_order.id=watchlist_items.id) \
+                             WHERE watchlist_id=? \
+                               AND NOT EXISTS (SELECT 1 FROM watchlist_items WHERE watchlist_id=? AND custom_rank IS NOT NULL)",
+                            ItemOrderMode::Release.order_sql()
+                        ),
+                        vec![
+                            changes.watchlist_id.into(),
+                            changes.watchlist_id.into(),
+                            changes.watchlist_id.into(),
+                        ],
+                    ))
+                    .await?;
+            }
+        }
+
         let mut assignments = vec!["updated_at=CURRENT_TIMESTAMP"];
         let mut values = Vec::new();
         if let Some(name) = changes.name {

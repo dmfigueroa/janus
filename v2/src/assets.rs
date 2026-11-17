@@ -96,6 +96,7 @@ mod tests {
         for url in [
             APP_CSS_URL,
             APP_JS_URL,
+            WATCHLIST_REORDER_GROUPS_JS_URL,
             WATCHLIST_REORDER_JS_URL,
             WATCHLIST_DIALOG_JS_URL,
             VENDOR_HTMX_MIN_JS_URL,
@@ -104,6 +105,8 @@ mod tests {
         ] {
             assert!(layout.contains(url), "{url} missing from {layout}");
         }
+        assert!(layout.contains("<script type=\"importmap\">"));
+        assert!(layout.contains("<script type=\"module\""));
         assert!(!layout.contains("app.css\""));
     }
 

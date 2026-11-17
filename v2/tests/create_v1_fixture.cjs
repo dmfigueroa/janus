@@ -54,6 +54,10 @@ const actions = {
   release() {
     database.prepare("UPDATE watchlists SET item_order_mode = 'release' WHERE id = 41").run();
   },
+  "release-no-ranks"() {
+    database.prepare("UPDATE watchlists SET item_order_mode = 'release' WHERE id = 41").run();
+    database.prepare("UPDATE watchlist_items SET custom_rank = NULL WHERE watchlist_id = 41").run();
+  },
   mutate() {
     database.prepare("UPDATE watchlist_items SET is_watched = 1 WHERE id = 101").run();
   },

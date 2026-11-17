@@ -3,7 +3,12 @@ const assert = require("node:assert/strict");
 const { JSDOM } = require("jsdom");
 const fs = require("node:fs");
 const path = require("node:path");
-const { page, timeline, openReorderPage } = require("./reorder-browser-fixtures.cjs");
+const {
+  page,
+  timeline,
+  openReorderPage,
+  installReorderModules,
+} = require("./reorder-browser-fixtures.cjs");
 const root = path.resolve(__dirname, "..");
 
 test("keyboard reorder saves intent and restores authoritative order and focus after failure", async () => {
@@ -143,7 +148,7 @@ test("collapsed watched groups reject incoming drops while expanded groups accep
   const { window } = dom;
   window.eval(fs.readFileSync(path.join(root, "static/vendor/Sortable.min.js"), "utf8"));
   window.eval(fs.readFileSync(path.join(root, "static/app.js"), "utf8"));
-  window.eval(fs.readFileSync(path.join(root, "static/watchlist-reorder.js"), "utf8"));
+  installReorderModules(window);
   const timelineElement = window.document.querySelector("watchlist-reorder");
   const group = window.document.querySelector("details");
   const source = window.Sortable.get(timelineElement);

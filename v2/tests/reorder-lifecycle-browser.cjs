@@ -1,5 +1,6 @@
 const { test, before, after } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const path = require("node:path");
 const { launchPinnedBrowser } = require("../../tools/playwright-browser.cjs");
 
@@ -26,7 +27,17 @@ test("reorder custom element upgrades, rebinds after HTMX swaps and releases det
         </watchlist-reorder>
       </main>`);
     await page.addScriptTag({ path: path.join(root, "static/vendor/Sortable.min.js") });
-    await page.addScriptTag({ path: path.join(root, "static/watchlist-reorder.js") });
+    const groups = fs.readFileSync(path.join(root, "static/watchlist-reorder-groups.js"), "utf8");
+    const reorder = fs.readFileSync(path.join(root, "static/watchlist-reorder.js"), "utf8");
+    await page.addScriptTag({
+      type: "importmap",
+      content: JSON.stringify({
+        imports: {
+          "@janus/watchlist-reorder-groups": `data:text/javascript;base64,${Buffer.from(groups).toString("base64")}`,
+        },
+      }),
+    });
+    await page.addScriptTag({ type: "module", content: reorder });
 
     const upgrade = await page.evaluate(async () => {
       await customElements.whenDefined("watchlist-reorder");
