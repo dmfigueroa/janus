@@ -9,6 +9,7 @@ use sea_orm::sea_query::Value;
 use sea_orm::{ConnectionTrait, DbBackend, DbErr, Statement, TransactionTrait};
 
 /// A validated new watchlist. Omitted optional values keep v1's insert defaults.
+#[derive(Debug)]
 pub struct NewWatchlist {
     pub name: String,
     pub description: Option<String>,
@@ -17,6 +18,7 @@ pub struct NewWatchlist {
 
 /// A validated partial update. An absent field is unchanged; a present
 /// description may be cleared with `None`.
+#[derive(Debug)]
 pub struct WatchlistChanges {
     pub watchlist_id: i64,
     pub name: Option<String>,

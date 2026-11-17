@@ -134,6 +134,7 @@ impl DialogFailure {
 }
 
 /// Validated write produced by a dialog submission.
+#[derive(Debug)]
 pub enum WatchlistMutation {
     Create(NewWatchlist),
     Update(WatchlistChanges),
@@ -274,5 +275,213 @@ fn retained_form(
             error,
             ..WatchlistForm::edit(record)
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn record() -> WatchlistRecord {
+        WatchlistRecord {
+            id: 41,
+            name: "Stored".into(),
+            description: Some("Stored description".into()),
+            item_order_mode: ItemOrderMode::Release,
+            created_at: "2026-01-01 00:00:00".into(),
+            updated_at: None,
+            last_watched_at: None,
+            last_item_added_at: None,
+            paused_at: None,
+        }
+    }
+
+    fn input(
+        name: Option<Option<&str>>,
+        description: Option<Option<&str>>,
+        item_order_mode: Option<Option<&str>>,
+    ) -> WatchlistDialogInput {
+        let owned = |value: Option<&str>| value.map(str::to_owned);
+        WatchlistDialogInput {
+            name: name.map(owned),
+            description: description.map(owned),
+            item_order_mode: item_order_mode.map(owned),
+        }
+    }
+
+    #[test]
+    fn submit_create_rejects_a_missing_name_and_retains_submitted_values() {
+        let input = input(None, Some(Some("Draft description")), Some(Some("custom")));
+        let rejection = submit(DialogTarget::Create, &input).unwrap_err();
+        assert_eq!(
+            rejection.failure,
+            DialogFailure::Validation("Name is required")
+        );
+        assert_eq!(rejection.form.description, "Draft description");
+        assert_eq!(rejection.form.item_order_mode, "custom");
+        assert_eq!(rejection.form.action, "/v2/watchlists");
+    }
+
+    #[test]
+    fn submit_create_rejects_a_null_description() {
+        let input = input(Some(Some("Name")), Some(None), None);
+        let rejection = submit(DialogTarget::Create, &input).unwrap_err();
+        assert_eq!(
+            rejection.failure,
+            DialogFailure::Validation("Invalid description.")
+        );
+    }
+
+    #[test]
+    fn submit_create_treats_a_null_order_mode_as_absent() {
+        let input = input(Some(Some("Name")), None, Some(None));
+        let Ok(WatchlistMutation::Create(new_watchlist)) = submit(DialogTarget::Create, &input)
+        else {
+            panic!("expected a create mutation");
+        };
+        assert_eq!(new_watchlist.item_order_mode, None);
+        assert_eq!(new_watchlist.description, None);
+    }
+
+    #[test]
+    fn submit_create_keeps_the_untrimmed_name_for_storage() {
+        let input = input(Some(Some("  Spaced  ")), None, Some(Some("release")));
+        let Ok(WatchlistMutation::Create(new_watchlist)) = submit(DialogTarget::Create, &input)
+        else {
+            panic!("expected a create mutation");
+        };
+        assert_eq!(new_watchlist.name, "  Spaced  ");
+    }
+
+    #[test]
+    fn submit_edit_updates_only_submitted_fields() {
+        let record = record();
+        let input = input(None, Some(Some("New description")), None);
+        let Ok(WatchlistMutation::Update(changes)) = submit(DialogTarget::Edit(&record), &input)
+        else {
+            panic!("expected an update mutation");
+        };
+        assert_eq!(changes.watchlist_id, 41);
+        assert_eq!(changes.name, None);
+        assert_eq!(changes.description, Some(Some("New description".into())));
+        assert_eq!(changes.item_order_mode, None);
+    }
+
+    #[test]
+    fn submit_edit_accepts_clearing_the_description() {
+        let record = record();
+        let input = input(None, Some(None), None);
+        let Ok(WatchlistMutation::Update(changes)) = submit(DialogTarget::Edit(&record), &input)
+        else {
+            panic!("expected an update mutation");
+        };
+        assert_eq!(changes.description, Some(None));
+    }
+
+    #[test]
+    fn submit_edit_rejects_an_empty_body_and_retains_record_values() {
+        let record = record();
+        let rejection = submit(DialogTarget::Edit(&record), &input(None, None, None)).unwrap_err();
+        assert_eq!(
+            rejection.failure,
+            DialogFailure::Validation("No fields to update.")
+        );
+        assert_eq!(rejection.form.name, "Stored");
+        assert_eq!(rejection.form.description, "Stored description");
+        assert_eq!(rejection.form.item_order_mode, "release");
+        assert_eq!(rejection.form.action, "/v2/watchlists/41");
+    }
+
+    #[test]
+    fn submit_edit_rejects_a_whitespace_name() {
+        let record = record();
+        let rejection = submit(
+            DialogTarget::Edit(&record),
+            &input(Some(Some("  ")), None, None),
+        )
+        .unwrap_err();
+        assert_eq!(
+            rejection.failure,
+            DialogFailure::Validation("Name is required")
+        );
+        assert_eq!(rejection.form.name, "  ");
+    }
+
+    #[test]
+    fn submit_edit_rejects_a_null_order_mode() {
+        let record = record();
+        let rejection =
+            submit(DialogTarget::Edit(&record), &input(None, None, Some(None))).unwrap_err();
+        assert_eq!(
+            rejection.failure,
+            DialogFailure::Validation("Invalid order mode.")
+        );
+    }
+
+    #[test]
+    fn submit_edit_rejects_an_unknown_order_mode() {
+        let record = record();
+        let rejection = submit(
+            DialogTarget::Edit(&record),
+            &input(None, None, Some(Some("shuffled"))),
+        )
+        .unwrap_err();
+        assert_eq!(
+            rejection.failure,
+            DialogFailure::Validation("Invalid order mode.")
+        );
+    }
+
+    #[test]
+    fn edit_rejection_falls_back_to_record_values_for_unsubmitted_fields() {
+        let record = record();
+        let input = input(Some(Some("")), Some(None), None);
+        let rejection = submit(DialogTarget::Edit(&record), &input).unwrap_err();
+        assert_eq!(rejection.form.name, "");
+        assert_eq!(rejection.form.description, "Stored description");
+        assert_eq!(rejection.form.item_order_mode, "release");
+    }
+
+    #[test]
+    fn rejected_uses_the_create_message_and_code() {
+        let rejection = rejected(
+            DialogTarget::Create,
+            &input(Some(Some("Name")), None, None),
+            DialogFailure::Internal,
+        );
+        assert_eq!(rejection.failure.code(), "internal_error");
+        assert_eq!(
+            rejection.form.error.as_deref(),
+            Some("Unable to create watchlist. Please try again.")
+        );
+    }
+
+    #[test]
+    fn rejected_uses_the_edit_message_for_a_missing_watchlist() {
+        let record = record();
+        let rejection = rejected(
+            DialogTarget::Edit(&record),
+            &input(None, None, None),
+            DialogFailure::NotFound,
+        );
+        assert_eq!(rejection.failure.code(), "not_found");
+        assert_eq!(
+            rejection.form.error.as_deref(),
+            Some("Watchlist not found.")
+        );
+        assert_eq!(rejection.form.watchlist_id, Some(41));
+    }
+
+    #[test]
+    fn missing_watchlist_rejection_renders_the_edit_dialog() {
+        let rejection = DialogRejection::missing(7);
+        assert_eq!(rejection.failure.code(), "not_found");
+        assert_eq!(rejection.form.watchlist_id, Some(7));
+        assert_eq!(rejection.form.mode, "edit");
+        assert_eq!(rejection.form.action, "/v2/watchlists/7");
+        assert_eq!(
+            rejection.form.error.as_deref(),
+            Some("Watchlist not found.")
+        );
     }
 }
