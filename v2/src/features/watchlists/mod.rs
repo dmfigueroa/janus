@@ -22,7 +22,7 @@ mod browse;
 
 mod contracts;
 
-mod form;
+mod dialog;
 
 pub mod reorder;
 
