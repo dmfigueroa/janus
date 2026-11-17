@@ -84,7 +84,8 @@
     "web-vitals": "^5.1.0"
   },
   "simple-git-hooks": {
-    "pre-commit": "npx lint-staged --concurrent 1"
+    "pre-commit": "npx lint-staged --concurrent 1",
+    "pre-push": "sh -c 'if [ -d node_modules ]; then npm run format:check; else echo \"skipping format:check: no node_modules, run npm ci\"; fi'"
   },
   "lint-staged": {
     "v2/**/*.rs": [
