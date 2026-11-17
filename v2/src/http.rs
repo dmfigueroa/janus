@@ -85,9 +85,10 @@ fn select_representation(method: &Method, headers: &HeaderMap) -> ResponseFormat
             .and_then(|value| value.to_str().ok())
             .is_some_and(|value| value.contains(media_type))
     };
-    // HTMX restores history with a GET. Mutations never enter browser history,
-    // so they keep returning fragments or JSON for their existing callers.
-    let navigation = method == Method::GET;
+    // HTMX restores history with a GET, and Axum routes HEAD through the GET
+    // handler, so both share navigation metadata. Mutations never enter browser
+    // history and keep returning fragments or JSON for their existing callers.
+    let navigation = method == Method::GET || method == Method::HEAD;
     let representation = if navigation {
         if enabled("hx-history-restore-request") {
             Representation::Page
@@ -278,6 +279,32 @@ mod tests {
             let bytes = response.into_body().collect().await.unwrap().to_bytes();
             assert_eq!(bytes.as_ref(), expected.as_bytes(), "{headers:?}");
         }
+    }
+
+    #[tokio::test]
+    async fn head_navigation_advertises_the_get_representation() {
+        let response = Router::new()
+            .route("/", get(navigation_handler))
+            .oneshot(
+                Request::builder()
+                    .method("HEAD")
+                    .uri("/")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(
+            response.headers()[header::CONTENT_TYPE]
+                .to_str()
+                .unwrap()
+                .starts_with("text/html")
+        );
+        assert_eq!(
+            response.headers()[header::VARY],
+            "HX-Request, HX-History-Restore-Request, Accept"
+        );
     }
 
     #[test]
