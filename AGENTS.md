@@ -6,12 +6,13 @@
 - `CONTRIBUTING.md` is the placement guide for new files and incremental migrations.
 - `deploy/README.md` documents deployment topology, production Coolify applications and PR preview URLs. Read it before debugging routing or preview behavior.
 - v1 app routes, feature boundaries, and frontend code style: [`docs/agents/v1-app.md`](docs/agents/v1-app.md).
+- Before exploring `v2/` source for routes, module ownership, or local setup/check/test commands, read [`v2/README.md`](v2/README.md); it is the entry document for v2.
+- Before recording or checking parity and acceptance evidence for v2, read [`v2/PARITY.md`](v2/PARITY.md) for the baseline, existing evidence and outstanding acceptance; [`v2/V1-UI-MAP.md`](v2/V1-UI-MAP.md) locates the v1 counterpart of a UI area.
 - When adding files, moving modules, or introducing new boundaries, read those docs first and follow them.
 - Apply the target structure to new code and touched areas. Do not do broad drive-by reorganizations unless the user asks for them.
 
 ## Running Commands
 
-- v2 setup, checks, tests and module layout: [`v2/README.md`](v2/README.md).
 - Run commands inside the repository devcontainer: start it with `devcontainer up --workspace-folder . --docker-path podman`, then run commands with `devcontainer exec --workspace-folder . --docker-path podman <command>`.
 - The host toolchain is a fallback for when the container cannot start. When using Podman directly, locate the container with `podman ps -a --filter "label=devcontainer.local_folder=$(pwd)"`, confirm it belongs to the current checkout, then run commands with `podman exec --workdir /workspaces/janus <container> <command>`. Never use an unrelated Toolbox or development container.
 - Run root `npm ci` once per checkout before v2 tests and never borrow another checkout's `node_modules`. `npm run test:v2` pins `JANUS_TEST_NODE` to the `.tool-versions` Node and forwards arguments to `cargo test --locked`; `engines` accepts Node `>=24.12 <26` and the pinned version wins. Run host Node commands through `mise exec --` (for example `mise exec -- npm ci`): a bare `node` can be a newer major, which npm now rejects before installing.
