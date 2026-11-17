@@ -126,6 +126,7 @@ Before writing new Rust or reviewing Rust changes under `v2/`, load the `rust-be
 
 ## V2 Frontend
 
+- Shared browser code uses named ES module exports and imports. Enforcement: `npm run check:v2-modules` rejects classes assigned to `window` in `v2/static/*.js`.
 - Use relative units and Open Props tokens for spacing, type and sizing. Add fixed units only where the browser requires them, such as hairline borders.
 - Before changing V2 visuals, run `npm run preview:local` and compare local v1 and v2 screenshots with `npm run visual:compare -- --route /watchlists`; inspect both images, and never use a Coolify preview as the development loop. Measure both versions at `390x844` and `1280x800` before offering any layout option or parity claim (see [`v2/README.md`](v2/README.md) parity layout rule).
 - A new V2 affordance needs a V1 counterpart or an explicit user request. Confirm the counterpart in the [`v2/PARITY.md`](v2/PARITY.md) ledger, which records the parity baseline and outstanding acceptance, using [`v2/V1-UI-MAP.md`](v2/V1-UI-MAP.md) to find the v1 control. In review, treat a control, glyph or interaction that v1 has no counterpart for and the request did not name as a defect to remove rather than a feature to keep. This is a review judgement call, not a lint rule, and it is not a reason to ask before every UI edit.
