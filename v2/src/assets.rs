@@ -105,6 +105,8 @@ mod tests {
         ] {
             assert!(layout.contains(url), "{url} missing from {layout}");
         }
+        assert!(layout.contains("<script type=\"importmap\">"));
+        assert!(layout.contains("<script type=\"module\""));
         assert!(!layout.contains("app.css\""));
     }
 

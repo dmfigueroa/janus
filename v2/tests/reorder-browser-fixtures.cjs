@@ -3,6 +3,16 @@ const fs = require("node:fs");
 const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 
+function installReorderModules(window) {
+  const groups = fs
+    .readFileSync(path.join(root, "static/watchlist-reorder-groups.js"), "utf8")
+    .replace(/^export /m, "");
+  const reorder = fs
+    .readFileSync(path.join(root, "static/watchlist-reorder.js"), "utf8")
+    .replace(/^import .*;\n/, "");
+  window.eval(`${groups}\n${reorder}`);
+}
+
 function timeline(itemIds) {
   const rows = itemIds
     .map(
@@ -73,9 +83,8 @@ function openReorderPage(markup, respond, { scrollY = 0 } = {}) {
   window.document.addEventListener("reorder", respondToTrigger);
   window.document.addEventListener("reconcile", respondToTrigger);
   window.eval(fs.readFileSync(path.join(root, "static/app.js"), "utf8"));
-  window.eval(fs.readFileSync(path.join(root, "static/watchlist-reorder-groups.js"), "utf8"));
-  window.eval(fs.readFileSync(path.join(root, "static/watchlist-reorder.js"), "utf8"));
+  installReorderModules(window);
   return { dom, window, calls, scrolled };
 }
 
-module.exports = { page, timeline, openReorderPage };
+module.exports = { page, timeline, openReorderPage, installReorderModules };

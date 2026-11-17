@@ -1,3 +1,5 @@
+import { WatchlistReorderGroups } from "@janus/watchlist-reorder-groups";
+
 class WatchlistReorder extends HTMLElement {
   constructor() {
     super();
@@ -142,10 +144,10 @@ class WatchlistReorder extends HTMLElement {
     return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 0 : 150;
   }
   initializeGroups() {
-    window.WatchlistReorderGroups.initialize(this);
+    WatchlistReorderGroups.initialize(this);
   }
   destroyGroups() {
-    window.WatchlistReorderGroups.destroy(this);
+    WatchlistReorderGroups.destroy(this);
   }
   saveDrop(row) {
     const order = this.visible();

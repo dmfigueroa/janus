@@ -1,4 +1,4 @@
-window.WatchlistReorderGroups = class {
+export class WatchlistReorderGroups {
   static containers(watchlist) {
     return [watchlist, ...watchlist.querySelectorAll("details")];
   }
@@ -33,4 +33,4 @@ window.WatchlistReorderGroups = class {
   static destroy(watchlist) {
     this.containers(watchlist).forEach((container) => Sortable.get(container)?.destroy());
   }
-};
+}
