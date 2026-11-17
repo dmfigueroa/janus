@@ -3,68 +3,8 @@ const assert = require("node:assert/strict");
 const { JSDOM } = require("jsdom");
 const fs = require("node:fs");
 const path = require("node:path");
+const { page, timeline, openReorderPage } = require("./reorder-browser-fixtures.cjs");
 const root = path.resolve(__dirname, "..");
-
-function timeline(itemIds) {
-  const rows = itemIds
-    .map(
-      (id) =>
-        `<article data-item-id="${id}"><button class="reorder-handle">Move ${id}</button></article>`,
-    )
-    .join("");
-  return `<div class="timeline" data-reorder-url="/reorder" data-mode="custom" hx-post="/reorder?query=first" hx-trigger="reorder" hx-target="this" hx-select=".timeline > *" hx-swap="innerHTML">${rows}</div>`;
-}
-
-function page(itemIds) {
-  return `<span id="reorder-recovery" hidden hx-get="" hx-trigger="reconcile" hx-target=".timeline" hx-select=".timeline > *" hx-swap="innerHTML"></span><form><input id="query" value="first" /></form>${timeline(itemIds).replace("</div>", '<p id="reorder-status" role="status"></p></div>')}`;
-}
-
-function setScrollPosition(window, scrollY) {
-  if (!scrollY) return;
-  Object.defineProperty(window, "scrollY", { value: scrollY, configurable: true });
-}
-
-function openReorderPage(markup, respond, { scrollY = 0 } = {}) {
-  const dom = new JSDOM(markup, {
-    url: "https://janus.example/v2/watchlists/41?query=first",
-    runScripts: "outside-only",
-  });
-  const { window } = dom;
-  const scrolled = [];
-  window.scrollTo = ({ top }) => scrolled.push(top);
-  setScrollPosition(window, scrollY);
-  window.HTMLElement.prototype.getClientRects = () => [1];
-  window.eval(fs.readFileSync(path.join(root, "static/vendor/Sortable.min.js"), "utf8"));
-  const calls = [];
-  function requestOptions(event) {
-    if (event.type === "reorder")
-      return { method: "POST", body: event.target.getAttribute("hx-vals") };
-  }
-  async function respondToTrigger(event) {
-    const source = event.target;
-    const options = requestOptions(event);
-    const detail = { path: source.getAttribute("hx-post") || window.location.href };
-    source.dispatchEvent(new window.CustomEvent("htmx:configRequest", { detail, bubbles: true }));
-    calls.push({ url: detail.path, options });
-    const response = await respond(detail.path, options);
-    if (response.ok) {
-      const result = new window.DOMParser().parseFromString(await response.text(), "text/html");
-      window.document
-        .querySelector(".timeline")
-        .replaceChildren(...result.querySelector(".timeline").childNodes);
-    }
-    source.dispatchEvent(
-      new window.CustomEvent("htmx:afterRequest", {
-        detail: { successful: response.ok },
-        bubbles: true,
-      }),
-    );
-  }
-  window.document.addEventListener("reorder", respondToTrigger);
-  window.document.addEventListener("reconcile", respondToTrigger);
-  window.eval(fs.readFileSync(path.join(root, "static/app.js"), "utf8"));
-  return { dom, window, calls, scrolled };
-}
 
 test("keyboard reorder saves intent and restores authoritative order and focus after failure", async () => {
   const markup = page([1, 2]);
@@ -83,7 +23,10 @@ test("keyboard reorder saves intent and restores authoritative order and focus a
   );
   assert.equal(window.document.querySelector("article").dataset.itemId, "2");
   assert.equal(window.document.getElementById("reorder-status").textContent, "Saving order…");
-  const swap = new window.Event("htmx:beforeSwap", { cancelable: true });
+  const swap = new window.CustomEvent("htmx:beforeSwap", {
+    detail: { target: window.document.querySelector("watchlist-reorder") },
+    cancelable: true,
+  });
   window.document.dispatchEvent(swap);
   assert.equal(swap.defaultPrevented, true, "fragment swaps wait for the save and reconcile");
   await new Promise((resolve) => setTimeout(resolve, 20));
@@ -107,12 +50,15 @@ test("drops submit the visible anchor and preserve filters, scroll and focus on 
         ? {
             ok: true,
             text: async () =>
-              timeline([2, 1]).replace("</div>", '<p id="reorder-status">Order saved.</p></div>'),
+              timeline([2, 1]).replace(
+                "</watchlist-reorder>",
+                '<p id="reorder-status">Order saved.</p></watchlist-reorder>',
+              ),
           }
         : { ok: true, text: async () => timeline([2, 1]) },
     { scrollY: 420 },
   );
-  const timelineElement = window.document.querySelector(".timeline");
+  const timelineElement = window.document.querySelector("watchlist-reorder");
   const sortable = window.Sortable.get(timelineElement);
   const first = timelineElement.querySelector('[data-item-id="1"]');
   const second = timelineElement.querySelector('[data-item-id="2"]');
@@ -162,10 +108,13 @@ test("active drags block fragment swaps and swaps do not duplicate initializatio
   const { dom, window } = openReorderPage(page([1, 2]), () => {
     throw new Error("No request expected");
   });
-  const timelineElement = window.document.querySelector(".timeline");
+  const timelineElement = window.document.querySelector("watchlist-reorder");
   const sortable = window.Sortable.get(timelineElement);
   sortable.options.onStart();
-  const duringDrag = new window.Event("htmx:beforeSwap", { cancelable: true });
+  const duringDrag = new window.CustomEvent("htmx:beforeSwap", {
+    detail: { target: timelineElement },
+    cancelable: true,
+  });
   window.document.dispatchEvent(duringDrag);
   assert.equal(duringDrag.defaultPrevented, true);
   sortable.options.onEnd({
@@ -175,7 +124,10 @@ test("active drags block fragment swaps and swaps do not duplicate initializatio
     oldIndex: 0,
     newIndex: 0,
   });
-  const afterDrag = new window.Event("htmx:beforeSwap", { cancelable: true });
+  const afterDrag = new window.CustomEvent("htmx:beforeSwap", {
+    detail: { target: timelineElement },
+    cancelable: true,
+  });
   window.document.dispatchEvent(afterDrag);
   assert.equal(afterDrag.defaultPrevented, false);
   window.document.dispatchEvent(new window.Event("htmx:load"));
@@ -185,13 +137,14 @@ test("active drags block fragment swaps and swaps do not duplicate initializatio
 
 test("collapsed watched groups reject incoming drops while expanded groups accept them", () => {
   const dom = new JSDOM(
-    '<p id="reorder-status"></p><div class="timeline" data-reorder-url="/reorder" data-mode="custom"><article data-item-id="1"></article><details><summary>Watched</summary><article data-item-id="2"></article></details><article data-item-id="3"></article></div>',
+    '<watchlist-reorder class="timeline"><p id="reorder-status"></p><article data-item-id="1"></article><details><summary>Watched</summary><article data-item-id="2"></article></details><article data-item-id="3"></article></watchlist-reorder>',
     { url: "https://janus.example/v2/watchlists/41", runScripts: "outside-only" },
   );
   const { window } = dom;
   window.eval(fs.readFileSync(path.join(root, "static/vendor/Sortable.min.js"), "utf8"));
   window.eval(fs.readFileSync(path.join(root, "static/app.js"), "utf8"));
-  const timelineElement = window.document.querySelector(".timeline");
+  window.eval(fs.readFileSync(path.join(root, "static/watchlist-reorder.js"), "utf8"));
+  const timelineElement = window.document.querySelector("watchlist-reorder");
   const group = window.document.querySelector("details");
   const source = window.Sortable.get(timelineElement);
   const destination = window.Sortable.get(group);

@@ -123,6 +123,11 @@ watched runs spanning years, empty results and unwatched-only filtering; HTTP re
 remain covered by the fixture-backed `cargo test` suite, and `npm run test:v2:dom` covers the
 HTMX and reorder DOM behavior.
 
+Custom-order detail pages render their timeline as a Light DOM `<watchlist-reorder>` element.
+HTMX owns row rendering and recovery responses; the element owns drag/keyboard interaction,
+Sortable lifecycle and swap protection scoped to its subtree. Release-order pages use ordinary
+timeline markup and do not register reorder behavior.
+
 Watchlist read state is split by responsibility. `item_order.rs` owns stored order-mode
 decoding and the ordering SQL shared by reads and reorder; private `storage.rs` decodes rows
 and runs focused item queries; `summary.rs` owns progress, next-unwatched and cover
