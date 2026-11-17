@@ -4,7 +4,7 @@
 //! the page and fragment markup shared by web responses. It has no Axum or
 //! database dependency, so behavior is exercised directly from snapshots.
 
-use super::form::WatchlistForm;
+use super::dialog::WatchlistForm;
 use super::{ItemOrderMode, WatchlistDetail, WatchlistItem};
 use askama::Template;
 

@@ -1,8 +1,11 @@
 use super::Watchlists;
 use super::browse::BrowseView;
-use super::form::WatchlistForm;
+use super::dialog::{
+    self, DialogFailure, DialogRejection, DialogTarget, WatchlistDialogInput, WatchlistForm,
+    WatchlistMutation,
+};
 use super::timeline::{TimelineFilters, TimelineView};
-use super::write::{NewWatchlist, UpdateOutcome, WatchlistChanges};
+use super::write::UpdateOutcome;
 use crate::http::{BrowseFormat, FormOrJson, ResponseFormat};
 use askama::Template;
 use axum::{
@@ -117,7 +120,7 @@ const WRITE_VARY: &str = "HX-Request, Accept";
 
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
-pub struct CreateWatchlistInput {
+pub struct WatchlistFields {
     #[serde(deserialize_with = "nullable_field")]
     name: Option<Option<String>>,
     #[serde(deserialize_with = "nullable_field")]
@@ -126,15 +129,14 @@ pub struct CreateWatchlistInput {
     item_order_mode: Option<Option<String>>,
 }
 
-#[derive(Deserialize, Default)]
-#[serde(rename_all = "camelCase", default)]
-pub struct UpdateWatchlistInput {
-    #[serde(deserialize_with = "nullable_field")]
-    name: Option<Option<String>>,
-    #[serde(deserialize_with = "nullable_field")]
-    description: Option<Option<String>>,
-    #[serde(deserialize_with = "nullable_field")]
-    item_order_mode: Option<Option<String>>,
+impl From<WatchlistFields> for WatchlistDialogInput {
+    fn from(fields: WatchlistFields) -> Self {
+        Self {
+            name: fields.name,
+            description: fields.description,
+            item_order_mode: fields.item_order_mode,
+        }
+    }
 }
 
 fn nullable_field<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
@@ -194,112 +196,46 @@ fn form_failure(form: WatchlistForm, status: StatusCode) -> Response {
     }
 }
 
-fn parse_mode(value: Option<&str>) -> Result<Option<super::ItemOrderMode>, &'static str> {
-    value
-        .map(|mode| super::ItemOrderMode::parse(mode).ok_or("Invalid order mode."))
-        .transpose()
-}
-
-fn rejection(
-    htmx: bool,
-    format: ResponseFormat,
-    form: WatchlistForm,
-    status: StatusCode,
-    code: &str,
-    watchlist_id: Option<i64>,
-) -> Response {
+fn rejection_response(htmx: bool, format: ResponseFormat, rejection: DialogRejection) -> Response {
+    let DialogRejection { failure, form } = rejection;
     if htmx || matches!(format, ResponseFormat::Html) {
-        return form_failure(form, StatusCode::OK);
+        return form_failure(*form, StatusCode::OK);
     }
+    let status = match failure {
+        DialogFailure::Validation(_) => StatusCode::BAD_REQUEST,
+        DialogFailure::NotFound => StatusCode::NOT_FOUND,
+        DialogFailure::Internal => StatusCode::INTERNAL_SERVER_ERROR,
+    };
     let mut body = serde_json::json!({
         "success": false,
-        "code": code,
+        "code": failure.code(),
         "message": form.error,
     });
-    if let Some(watchlist_id) = watchlist_id {
+    if let Some(watchlist_id) = form.watchlist_id {
         body["watchlistId"] = serde_json::json!(watchlist_id);
     }
     json_response(status, body)
-}
-
-fn create_form(input: &CreateWatchlistInput, error: Option<String>) -> WatchlistForm {
-    WatchlistForm {
-        name: input.name.clone().flatten().unwrap_or_default(),
-        description: input.description.clone().flatten().unwrap_or_default(),
-        item_order_mode: input
-            .item_order_mode
-            .clone()
-            .flatten()
-            .unwrap_or_else(|| "release".into()),
-        error,
-        ..WatchlistForm::create()
-    }
-}
-
-fn update_form(
-    record: &super::WatchlistRecord,
-    input: &UpdateWatchlistInput,
-    error: Option<String>,
-) -> WatchlistForm {
-    WatchlistForm {
-        name: input
-            .name
-            .clone()
-            .flatten()
-            .unwrap_or_else(|| record.name.clone()),
-        description: input
-            .description
-            .clone()
-            .flatten()
-            .unwrap_or_else(|| record.description.clone().unwrap_or_default()),
-        item_order_mode: input
-            .item_order_mode
-            .clone()
-            .flatten()
-            .unwrap_or_else(|| record.item_order_mode.as_str().into()),
-        error,
-        ..WatchlistForm::edit(record)
-    }
 }
 
 pub async fn create(
     State(lists): State<Watchlists>,
     format: ResponseFormat,
     headers: HeaderMap,
-    FormOrJson(input): FormOrJson<CreateWatchlistInput>,
+    FormOrJson(fields): FormOrJson<WatchlistFields>,
 ) -> Response {
     let htmx = htmx_request(&headers);
-    let rendered = |form: WatchlistForm| {
-        rejection(
-            htmx,
-            format,
-            form,
-            StatusCode::BAD_REQUEST,
-            "validation_error",
-            None,
-        )
-    };
-    let Some(Some(name)) = input.name.as_ref() else {
-        return rendered(create_form(&input, Some("Name is required".into())));
-    };
-    if name.trim().is_empty() {
-        return rendered(create_form(&input, Some("Name is required".into())));
-    }
-    let description = match input.description.clone() {
-        None => None,
-        Some(Some(description)) => Some(description),
-        Some(None) => {
-            return rendered(create_form(&input, Some("Invalid description.".into())));
+    let input = WatchlistDialogInput::from(fields);
+    let new_watchlist = match dialog::submit(DialogTarget::Create, &input) {
+        Ok(WatchlistMutation::Create(new_watchlist)) => new_watchlist,
+        Ok(WatchlistMutation::Update(_)) => {
+            eprintln!("Create dialog produced an update mutation");
+            return rejection_response(
+                htmx,
+                format,
+                dialog::rejected(DialogTarget::Create, &input, DialogFailure::Internal),
+            );
         }
-    };
-    let mode = match parse_mode(input.item_order_mode.as_ref().and_then(Option::as_deref)) {
-        Ok(mode) => mode,
-        Err(message) => return rendered(create_form(&input, Some(message.into()))),
-    };
-    let new_watchlist = NewWatchlist {
-        name: name.to_owned(),
-        description,
-        item_order_mode: mode,
+        Err(rejection) => return rejection_response(htmx, format, rejection),
     };
     match lists.create_watchlist(new_watchlist).await {
         Ok(record) => {
@@ -330,16 +266,10 @@ pub async fn create(
         }
         Err(error) => {
             eprintln!("Watchlist create failed: {error}");
-            rejection(
+            rejection_response(
                 htmx,
                 format,
-                create_form(
-                    &input,
-                    Some("Unable to create watchlist. Please try again.".into()),
-                ),
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "internal_error",
-                None,
+                dialog::rejected(DialogTarget::Create, &input, DialogFailure::Internal),
             )
         }
     }
@@ -350,76 +280,29 @@ pub async fn update(
     Path(id): Path<i64>,
     format: ResponseFormat,
     headers: HeaderMap,
-    FormOrJson(input): FormOrJson<UpdateWatchlistInput>,
+    FormOrJson(fields): FormOrJson<WatchlistFields>,
 ) -> Result<Response, Failure> {
     let htmx = htmx_request(&headers);
-    let record = lists.record(id).await.map_err(failure)?;
-    let Some(record) = record else {
-        if htmx || matches!(format, ResponseFormat::Html) {
-            return Ok(form_failure(WatchlistForm::missing(id), StatusCode::OK));
-        }
-        return Ok(json_response(
-            StatusCode::NOT_FOUND,
-            serde_json::json!({
-                "success": false,
-                "code": "not_found",
-                "message": "Watchlist not found.",
-                "watchlistId": id,
-            }),
-        ));
-    };
-    if input.name.is_none() && input.description.is_none() && input.item_order_mode.is_none() {
-        return Ok(rejection(
+    let input = WatchlistDialogInput::from(fields);
+    let Some(record) = lists.record(id).await.map_err(failure)? else {
+        return Ok(rejection_response(
             htmx,
             format,
-            update_form(&record, &input, Some("No fields to update.".into())),
-            StatusCode::BAD_REQUEST,
-            "validation_error",
-            Some(id),
+            DialogRejection::missing(id),
         ));
-    }
-    let name = match input.name.as_ref() {
-        None => None,
-        Some(Some(name)) if !name.trim().is_empty() => Some(name.clone()),
-        Some(_) => {
-            return Ok(rejection(
+    };
+    let target = DialogTarget::Edit(&record);
+    let changes = match dialog::submit(target, &input) {
+        Ok(WatchlistMutation::Update(changes)) => changes,
+        Ok(WatchlistMutation::Create(_)) => {
+            eprintln!("Update dialog produced a create mutation for watchlist {id}");
+            return Ok(rejection_response(
                 htmx,
                 format,
-                update_form(&record, &input, Some("Name is required".into())),
-                StatusCode::BAD_REQUEST,
-                "validation_error",
-                Some(id),
+                dialog::rejected(target, &input, DialogFailure::Internal),
             ));
         }
-    };
-    if matches!(input.item_order_mode, Some(None)) {
-        return Ok(rejection(
-            htmx,
-            format,
-            update_form(&record, &input, Some("Invalid order mode.".into())),
-            StatusCode::BAD_REQUEST,
-            "validation_error",
-            Some(id),
-        ));
-    }
-    let mode = match parse_mode(input.item_order_mode.as_ref().and_then(Option::as_deref)) {
-        Ok(mode) => mode,
-        Err(message) => {
-            return Ok(rejection(
-                htmx,
-                format,
-                update_form(&record, &input, Some(message.into())),
-                StatusCode::BAD_REQUEST,
-                "validation_error",
-                Some(id),
-            ));
-        }
-    };
-    let changes = WatchlistChanges {
-        watchlist_id: id,
-        name,
-        description: input.description.clone(),
-        item_order_mode: mode,
+        Err(rejection) => return Ok(rejection_response(htmx, format, rejection)),
     };
     match lists.update_watchlist(changes).await {
         Ok(UpdateOutcome::Updated) => {
@@ -443,27 +326,17 @@ pub async fn update(
                 ))
             }
         }
-        Ok(UpdateOutcome::NotFound) => Ok(rejection(
+        Ok(UpdateOutcome::NotFound) => Ok(rejection_response(
             htmx,
             format,
-            update_form(&record, &input, Some("Watchlist not found.".into())),
-            StatusCode::NOT_FOUND,
-            "not_found",
-            Some(id),
+            dialog::rejected(target, &input, DialogFailure::NotFound),
         )),
         Err(error) => {
             eprintln!("Watchlist update failed for {id}: {error}");
-            Ok(rejection(
+            Ok(rejection_response(
                 htmx,
                 format,
-                update_form(
-                    &record,
-                    &input,
-                    Some("Unable to update watchlist. Please try again.".into()),
-                ),
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "internal_error",
-                Some(id),
+                dialog::rejected(target, &input, DialogFailure::Internal),
             ))
         }
     }
