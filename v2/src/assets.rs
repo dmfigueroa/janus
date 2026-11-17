@@ -1,35 +1,65 @@
-//! Content-addressed browser assets served by the application.
+//! Content-addressed static assets embedded into the binary at build time.
 use axum::{
-    extract::Query,
+    extract::{Path, Query},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
 use std::collections::HashMap;
 
-/// Content version of the stylesheet bytes embedded in this build.
-pub const APP_CSS_VERSION: &str = env!("JANUS_APP_CSS_VERSION");
+/// A static file embedded with the URL version derived from its bytes.
+pub struct EmbeddedAsset {
+    /// Path below `/v2/static`, using `/` as the separator.
+    pub path: &'static str,
+    /// Content version of [`Self::bytes`].
+    pub version: &'static str,
+    /// Versioned URL referenced by templates.
+    pub url: &'static str,
+    /// Browser content type declared when serving the asset.
+    pub content_type: &'static str,
+    /// Asset bytes as shipped in this build.
+    pub bytes: &'static [u8],
+}
 
-/// Stylesheet URL whose query changes whenever the stylesheet bytes change.
-pub const APP_CSS_URL: &str = concat!("/v2/static/app.css?v=", env!("JANUS_APP_CSS_VERSION"));
+include!(concat!(env!("OUT_DIR"), "/static_assets.rs"));
 
-/// Stylesheet source shipped with this build.
-const APP_CSS: &str = include_str!("../static/app.css");
+/// Assets embedded in this build, ordered by path.
+pub fn static_assets() -> &'static [EmbeddedAsset] {
+    EMBEDDED_ASSETS
+}
+
+/// Versioned URL for an embedded asset path, or `None` when no such asset was embedded.
+pub fn asset_url(path: &str) -> Option<&'static str> {
+    EMBEDDED_ASSETS
+        .iter()
+        .find(|asset| asset.path == path)
+        .map(|asset| asset.url)
+}
 
 /// Versioned URLs are immutable; other URLs must revalidate against the ETag.
 const VERSIONED_CACHE: &str = "public, max-age=31536000, immutable";
 const REVALIDATING_CACHE: &str = "no-cache";
 
-/// Serve the stylesheet with cache policy and validator derived from its bytes.
-pub async fn app_css(headers: HeaderMap, Query(query): Query<HashMap<String, String>>) -> Response {
-    let versioned = query.get("v").is_some_and(|value| value == APP_CSS_VERSION);
-    let etag = format!("\"{APP_CSS_VERSION}\"");
+/// Serve an embedded asset with cache policy and validator derived from its bytes.
+pub async fn serve(
+    Path(path): Path<String>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let Some(asset) = EMBEDDED_ASSETS.iter().find(|asset| asset.path == path) else {
+        return (StatusCode::NOT_FOUND, "Asset not found").into_response();
+    };
+    let versioned = query.get("v").is_some_and(|value| value == asset.version);
+    let etag = format!("\"{}\"", asset.version);
     let cache_control = if versioned {
         VERSIONED_CACHE
     } else {
         REVALIDATING_CACHE
     };
-    let validators = [
-        (header::CONTENT_TYPE, HeaderValue::from_static("text/css")),
+    let validators = HeaderMap::from_iter([
+        (
+            header::CONTENT_TYPE,
+            HeaderValue::from_static(asset.content_type),
+        ),
         (
             header::CACHE_CONTROL,
             HeaderValue::from_static(cache_control),
@@ -38,11 +68,17 @@ pub async fn app_css(headers: HeaderMap, Query(query): Query<HashMap<String, Str
             header::ETAG,
             HeaderValue::from_str(&etag).expect("a quoted hash is a valid header value"),
         ),
-    ];
+    ]);
+
     if not_modified(&headers, &etag) {
-        return (StatusCode::NOT_MODIFIED, validators).into_response();
+        let mut response = Response::new(axum::body::Body::empty());
+        *response.status_mut() = StatusCode::NOT_MODIFIED;
+        *response.headers_mut() = validators;
+        return response;
     }
-    (validators, APP_CSS).into_response()
+    let mut response = Response::new(axum::body::Body::from(asset.bytes));
+    *response.headers_mut() = validators;
+    response
 }
 
 fn not_modified(headers: &HeaderMap, etag: &str) -> bool {
@@ -70,24 +106,24 @@ mod tests {
     struct LayoutProbe;
 
     #[test]
-    fn shared_layout_references_the_content_addressed_stylesheet() {
+    fn shared_layout_references_every_versioned_entry_asset() {
         let layout = LayoutProbe.render().unwrap();
-        assert!(
-            layout.contains(&format!("href=\"{APP_CSS_URL}\"")),
-            "{layout}"
-        );
-        assert!(!layout.contains("app.css?v=4"), "{layout}");
+        for url in [
+            APP_CSS_URL,
+            APP_JS_URL,
+            WATCHLIST_DIALOG_JS_URL,
+            VENDOR_HTMX_MIN_JS_URL,
+            VENDOR_SORTABLE_MIN_JS_URL,
+            VENDOR_OPEN_PROPS_MIN_CSS_URL,
+        ] {
+            assert!(layout.contains(url), "{url} missing from {layout}");
+        }
+        assert!(!layout.contains("app.css\""));
     }
 
     #[test]
-    fn stylesheet_url_carries_the_current_version() {
-        let versioned = url_version(APP_CSS_URL);
-        assert_eq!(versioned, APP_CSS_VERSION);
-    }
-
-    fn url_version(url: &str) -> &str {
-        url.rsplit_once("?v=")
-            .map(|(_, version)| version)
-            .expect("the stylesheet URL carries a version query")
+    fn assets_without_a_browser_content_type_stay_private() {
+        assert!(asset_url("vendor/README.md").is_none());
+        assert!(asset_url("vendor/htmx.LICENSE").is_none());
     }
 }
