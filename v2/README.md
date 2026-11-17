@@ -33,8 +33,8 @@ npm run visual:compare -- --route /watchlists/1 \
   --click-v1 "button=Watchlist actions" \
   --click-v1 "menuitem=Edit watchlist" \
   --click-v2 "button=Edit watchlist" \
-  --wait "#watchlist-dialog" \
-  --assert-in-viewport "#watchlist-dialog"
+  --wait ":is(dialog,[role=dialog]):visible" \
+  --assert-in-viewport ":is(dialog,[role=dialog]):visible"
 ```
 
 The second command opens the dialog in both versions and writes `-v1.png` and `-v2.png`

@@ -94,8 +94,17 @@ async function scrollPage(page, scroll) {
   if (scroll > 0) await page.evaluate((top) => window.scrollTo(0, top), scroll);
 }
 
+async function waitForHydration(page, legacy) {
+  if (!legacy) return;
+  await page
+    .waitForFunction(() => Boolean(window.__TSR_ROUTER__), null, { timeout: 5000 })
+    .catch(() => {});
+  await page.waitForTimeout(300);
+}
+
 async function preparePage(page, captureOptions) {
-  const { clicks, scroll, waits } = captureOptions;
+  const { clicks, legacy, scroll, waits } = captureOptions;
+  await waitForHydration(page, legacy);
   await scrollPage(page, scroll);
   await runClicks(page, clicks);
   await waitForSelectors(page, waits);
@@ -147,6 +156,7 @@ async function main() {
     const v2 = path.join(directory, `${slug}-v2.png`);
     await capture(browser, `http://localhost:3000${route}`, {
       clicks: clickV1,
+      legacy: true,
       scroll,
       waits,
       assertSelector,
@@ -155,6 +165,7 @@ async function main() {
     });
     await capture(browser, `http://localhost:3001/v2${v2Path(route)}`, {
       clicks: clickV2,
+      legacy: false,
       scroll,
       waits,
       assertSelector,
