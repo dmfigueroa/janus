@@ -38,22 +38,22 @@ function createTile() {
   return document.querySelector(".watchlist-grid .create-tile");
 }
 
-function siblingCards(tile) {
-  return [...tile.parentElement.querySelectorAll(".watchlist-card:not(.create-tile)")];
+function siblingCovers(tile) {
+  return [...tile.parentElement.querySelectorAll(".card-cover")];
 }
 
-function cardHeight(card) {
-  return card.getBoundingClientRect().height;
+function coverHeight(cover) {
+  return cover.getBoundingClientRect().height;
 }
 
-function tallestCard(cards) {
-  return Math.max(0, ...cards.map(cardHeight));
+function tallestCover(covers) {
+  return Math.max(0, ...covers.map(coverHeight));
 }
 
 function setCreateTileHeight() {
   const tile = createTile();
   if (!tile) return;
-  const height = tallestCard(siblingCards(tile));
+  const height = tallestCover(siblingCovers(tile));
   if (height > 0) tile.style.height = `${height}px`;
 }
 
