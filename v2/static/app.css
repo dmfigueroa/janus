@@ -520,28 +520,20 @@ select {
   bottom: 0;
   z-index: 50;
   display: flex;
+  align-items: center;
   justify-content: center;
-  padding-bottom: env(safe-area-inset-bottom);
+  gap: 0.5rem;
+  min-height: calc(4rem + env(safe-area-inset-bottom, 0px));
+  padding: 0 0.75rem env(safe-area-inset-bottom, 0px);
   border-top: 1px solid var(--border);
   background: color-mix(in srgb, var(--bg-canvas) 90%, transparent);
   backdrop-filter: blur(12px);
 }
 
-.bottom-nav-items {
-  display: flex;
-  justify-content: center;
-  gap: 0.5rem;
-  width: 100%;
-  max-width: 28rem;
-  height: 4rem;
-  margin: 0 auto;
-  padding: 0 0.75rem;
-}
-
 @media (min-width: 480px) {
-  .bottom-nav-items {
+  .bottom-nav {
     gap: 1.5rem;
-    padding: 0 1.5rem;
+    padding-inline: 1.5rem;
   }
 }
 
