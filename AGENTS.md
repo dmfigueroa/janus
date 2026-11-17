@@ -121,8 +121,11 @@ skills:
 - task: "notFound handling, error boundaries, and route error behavior"
   load: "node_modules/@tanstack/router-core/skills/router-core/not-found-and-errors/SKILL.md"
 - task: "createServerFn, server/client execution boundaries, and server-only imports"
-load: "node_modules/@tanstack/start-client-core/skills/start-core/server-functions/SKILL.md"
+  load: "node_modules/@tanstack/start-client-core/skills/start-core/server-functions/SKILL.md"
+
 <!-- intent-skills:end -->
+
+Regenerate the mappings above with `npx @tanstack/intent install`. Keep each `load` indented under its own `task` item and keep the blank line before the end marker, otherwise `oxfmt` dedents the final `load` and the mapping stops resolving. `npm run check:agents` verifies the block and runs as part of `npm run lint`.
 
 ## Agent skills
 
