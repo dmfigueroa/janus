@@ -10,14 +10,11 @@
 
 ## Running Commands
 
-- Prefer the repository's devcontainer because it provides the supported Node.js version and native build tools.
-- Start or create it with `devcontainer up --workspace-folder . --docker-path podman`.
-- Run project commands with `devcontainer exec --workspace-folder . --docker-path podman <command>`, for example `devcontainer exec --workspace-folder . --docker-path podman npm run lint`.
-- When using Podman directly, locate the container with `podman ps -a --filter "label=devcontainer.local_folder=$(pwd)"` and confirm it belongs to the current checkout before using it.
-- Start the selected container if needed, then run commands with `podman exec --workdir /workspaces/janus <container> <command>`.
-- Never use an unrelated Toolbox or development container. Native Node modules such as `better-sqlite3` must run with the same Node.js ABI used when `npm install` compiled them.
-- Host execution is supported only with Node.js 24.12 or later and the native compiler toolchain required by `better-sqlite3`.
-- If the devcontainer command or container is unavailable, run on the host and run `npm ci` in this worktree first. Worktrees do not include `node_modules`; do not symlink dependencies from another checkout.
+- v2 setup, checks, tests and module layout: [`v2/README.md`](v2/README.md).
+- Prefer the repository's devcontainer when the `devcontainer` CLI is available: start it with `devcontainer up --workspace-folder . --docker-path podman`, then run commands with `devcontainer exec --workspace-folder . --docker-path podman <command>`.
+- When using Podman directly, locate the container with `podman ps -a --filter "label=devcontainer.local_folder=$(pwd)"`, confirm it belongs to the current checkout, then run commands with `podman exec --workdir /workspaces/janus <container> <command>`. Never use an unrelated Toolbox or development container.
+- On the host, run root `npm ci` once per checkout before v2 tests. Native modules such as `better-sqlite3` must be compiled by the Node that runs the tests: use the `.tool-versions` pin (`mise exec -- <command>`) and set `JANUS_TEST_NODE` when the shell's `node` differs. Never borrow another checkout's `node_modules`.
+- The `24.12` engine floor is a minimum, not the test Node; the pinned version wins.
 
 ## Git Conventions
 
@@ -140,6 +137,10 @@ Use the five default triage labels. See `docs/agents/triage-labels.md`.
 ### Domain docs
 
 This is a single-context repository. See `docs/agents/domain.md`.
+
+## V2 Rust
+
+Before writing new Rust or reviewing Rust changes under `v2/`, load the `rust-best-practices` skill and apply it as the review baseline while implementing. If that skill is unavailable, work from Apollo's upstream handbook at <https://github.com/apollographql/rust-best-practices> instead and say which source you used.
 
 ## V2 Frontend
 

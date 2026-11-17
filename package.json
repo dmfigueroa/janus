@@ -80,6 +80,9 @@
     "pre-commit": "npx lint-staged --concurrent 1"
   },
   "lint-staged": {
+    "v2/**/*.rs": [
+      "cargo fmt --manifest-path v2/Cargo.toml -- --check"
+    ],
     "*.tsx": [
       "oxlint --fix --config tools/oxlint/StagedTsx.oxlintrc.json",
       "oxfmt --write"

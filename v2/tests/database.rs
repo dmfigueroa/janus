@@ -517,19 +517,22 @@ async fn mcp_discovery_reports_database_failures_without_internal_details() {
     }
 }
 
-fn change_v1(fixture: &Fixture, action: &str) {
+fn change_database(path: &std::path::Path, action: &str) {
     assert!(
         Command::new(std::env::var("JANUS_TEST_NODE").unwrap_or("node".into()))
             .arg(concat!(
                 env!("CARGO_MANIFEST_DIR"),
                 "/tests/create_v1_fixture.cjs"
             ))
-            .arg(&fixture.0)
+            .arg(path)
             .arg(action)
             .status()
             .unwrap()
             .success()
     );
+}
+fn change_v1(fixture: &Fixture, action: &str) {
+    change_database(&fixture.0, action);
 }
 #[tokio::test]
 async fn incompatible_schema_is_rejected_and_existing_wal_database_remains_readable() {
@@ -989,6 +992,114 @@ async fn summary_discovery_uses_efficient_counts_and_cover_fallback() {
     assert!(completed.stats.next_unwatched.is_none());
     assert_eq!(completed.stats.cover_image.as_deref(), Some("/poster.jpg"));
     assert_eq!(completed.stats.cover_media_type.as_deref(), Some("episode"));
+}
+
+#[tokio::test]
+async fn summary_discovery_hydrates_only_the_selected_page() {
+    use janus_v2::{DiscoveryOperation as Operation, DiscoveryRequest as Request, Watchlists};
+    let fixture = Fixture::v1();
+    let lists = Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    let first = lists
+        .summaries(
+            Operation::List,
+            Request {
+                page_size: Some(1),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(first.watchlists.len(), 1);
+    assert_eq!(first.watchlists[0].watchlist.id, 42);
+    assert_eq!(first.watchlists[0].stats.total_items, 0);
+    assert!(first.watchlists[0].stats.next_unwatched.is_none());
+
+    let second = lists
+        .summaries(
+            Operation::List,
+            Request {
+                page_size: Some(1),
+                cursor: first.next_cursor,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(second.watchlists.len(), 1);
+    let partial = &second.watchlists[0];
+    assert_eq!(partial.watchlist.id, 41);
+    assert_eq!(partial.stats.total_items, 3);
+    assert_eq!(partial.stats.watched_items, 1);
+    assert_eq!(partial.stats.next_unwatched.as_ref().unwrap().id, 101);
+    assert!(second.next_cursor.is_none());
+}
+
+#[tokio::test]
+async fn summary_discovery_page_matches_all_summaries() {
+    use janus_v2::{DiscoveryOperation as Operation, DiscoveryRequest as Request, Watchlists};
+    let fixture = Fixture::v1();
+    let lists = Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    let expected = lists.all_summaries().await.unwrap();
+    let page = lists
+        .summaries(Operation::List, Request::default())
+        .await
+        .unwrap();
+    assert_eq!(page.watchlists.len(), expected.len());
+    for summary in &page.watchlists {
+        let matches = expected
+            .iter()
+            .find(|candidate| candidate.watchlist.id == summary.watchlist.id)
+            .unwrap();
+        assert_eq!(summary, matches);
+    }
+}
+
+#[tokio::test]
+async fn summary_discovery_stays_coherent_during_concurrent_writes() {
+    use janus_v2::{DiscoveryOperation as Operation, DiscoveryRequest as Request, Watchlists};
+    let fixture = Fixture::v1();
+    let lists = Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    let path = fixture.0.clone();
+    let writer = std::thread::spawn(move || {
+        for action in ["watch-all", "mutate", "watch-all", "mutate"] {
+            change_database(&path, action);
+        }
+    });
+    for _ in 0..20 {
+        let page = lists
+            .summaries(Operation::List, Request::default())
+            .await
+            .unwrap();
+        let partial = page
+            .watchlists
+            .iter()
+            .find(|summary| summary.watchlist.id == 41)
+            .unwrap();
+        let stats = &partial.stats;
+        assert_eq!(stats.total_items, 3);
+        match stats.watched_items {
+            3 => {
+                assert_eq!(stats.progress, 100);
+                assert!(stats.next_unwatched.is_none());
+                assert_eq!(stats.cover_image.as_deref(), Some("/poster.jpg"));
+            }
+            1 | 2 => {
+                assert_eq!(
+                    stats.progress,
+                    if stats.watched_items == 1 { 33 } else { 67 }
+                );
+                let next = stats.next_unwatched.as_ref().unwrap();
+                assert_eq!(next.id, if stats.watched_items == 1 { 101 } else { 103 });
+                assert_eq!(stats.cover_image, next.poster_path);
+                assert_eq!(
+                    stats.cover_media_type.as_deref(),
+                    Some(next.media_type.as_str())
+                );
+            }
+            watched => panic!("unexpected watched count: {watched}"),
+        }
+    }
+    writer.join().unwrap();
 }
 
 #[tokio::test]
