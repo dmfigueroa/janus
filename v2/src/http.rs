@@ -42,13 +42,8 @@ where
 const API_VARY: &str = "HX-Request, Accept";
 const BROWSE_VARY: &str = "HX-Request, HX-History-Restore-Request, Accept";
 
-/// HTML is the deploy's unversioned entry point, so it must be revalidated before reuse.
 const HTML_CACHE: &str = "no-cache";
 
-/// Make every HTML response revalidate so new markup cannot reuse an older deploy's assets.
-///
-/// Versioned asset URLs still serve as immutable; this policy covers the document that
-/// references them, which is the only response whose URL does not change with its bytes.
 pub async fn revalidate_html(request: Request, next: Next) -> Response {
     let revalidating = matches!(*request.method(), Method::GET | Method::HEAD);
     let if_none_match = request.headers().get(header::IF_NONE_MATCH).cloned();
@@ -90,13 +85,11 @@ fn is_html(response: &Response) -> bool {
         .is_some_and(|value| value.starts_with("text/html"))
 }
 
-/// Strong validator derived from the exact bytes of a response body.
 fn content_etag(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
     format!("\"{:x}\"", Sha256::digest(bytes))
 }
 
-/// Whether an `If-None-Match` field value admits the strong validator `etag`.
 pub(crate) fn if_none_match_matches(value: Option<&HeaderValue>, etag: &str) -> bool {
     value
         .and_then(|value| value.to_str().ok())

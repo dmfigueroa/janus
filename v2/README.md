@@ -81,8 +81,8 @@ The existing directory must be mounted, including WAL/SHM sidecars.
   current version is served as immutable; any other version revalidates against its ETag, so
   an old cached copy cannot pair with new markup. Files without a browser content type are
   left out of the binary and are not served. HTML responses are the deploy's unversioned
-  entry point, so every page and fragment is served `Cache-Control: no-cache` with a content
-  ETag and answers a matching `If-None-Match` with `304`.
+  entry point, so every GET page and fragment is served `Cache-Control: no-cache` with a
+  content ETag and answers a matching `If-None-Match` with `304`.
 - `/v2/watchlists`: v1-style home grid with covers, progress, next item, paused dates,
   lifecycle sections, Unicode name search and continuation pages. Search swaps only the grid
   through HTMX and keeps the URL in sync. Create tile and mobile button open the native dialog.
