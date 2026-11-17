@@ -164,9 +164,10 @@ Reorder writes renumber the complete displayed sequence, keeping ranks contiguou
 when v1 deletions left gaps. Watchlist creation writes v1's pause and rotation defaults;
 updates set `updated_at` explicitly because SeaORM does not supply Drizzle's application-side
 hook. Omitted creation fields keep stored defaults, and updates treat an empty description as
-null. Web dialogs validate, announce pending/failed requests, restore focus and refresh their
-list or detail surface through HTMX. See [PARITY.md](PARITY.md) for evidence and outstanding
-acceptance.
+null. `watchlist-dialog.js` keeps dialog state and lifecycle handlers in a single controller;
+dialog and form styles are scoped to the native dialog. Web dialogs validate, announce
+pending/failed requests, restore focus and refresh their list or detail surface through HTMX.
+See [PARITY.md](PARITY.md) for evidence and outstanding acceptance.
 
 V2 DOM regressions: `npm run test:v2:dom` runs `v2/tests/htmx-browser.cjs` and
 `v2/tests/reorder-browser.cjs` with Node's test runner. The suites use jsdom to exercise real

@@ -1,237 +1,189 @@
-let dialogReturnFocus = null;
-let pendingFocus = null;
-let notificationTimeout = 0;
-
-function watchlistDialog() {
-  return document.getElementById("watchlist-dialog");
-}
-
-function focusName(dialog) {
-  const input = dialog.querySelector("#watchlist-name");
-  if (input) input.focus();
-}
-
-function clearFormError(dialog) {
-  const error = dialog.querySelector("#watchlist-form-error");
-  if (error) error.textContent = "";
-}
-
-function resetWatchlistForm(dialog) {
-  const form = dialog.querySelector("#watchlist-form");
-  if (form) form.reset();
-  clearFormError(dialog);
-  dialog.querySelector("#watchlist-name")?.removeAttribute("aria-invalid");
-}
-
-function showNotification(message) {
-  const notification = document.getElementById("notification");
-  if (!notification) return;
-  notification.textContent = message;
-  notification.removeAttribute("hidden");
-  window.clearTimeout(notificationTimeout);
-  notificationTimeout = window.setTimeout(hideNotification, 4000);
-}
-
-function hideNotification() {
-  const notification = document.getElementById("notification");
-  if (notification) notification.setAttribute("hidden", "");
-}
-
-function openWatchlistDialog(trigger) {
-  const dialog = watchlistDialog();
-  if (!dialog) return;
-  if (dialog.open) return;
-  resetWatchlistForm(dialog);
-  dialogReturnFocus = trigger;
-  dialog.showModal();
-  focusName(dialog);
-}
-
-function dialogIsBusy(dialog) {
-  return dialog?.getAttribute("aria-busy") === "true";
-}
-
-function dialogIsOpen(dialog) {
-  return Boolean(dialog?.open);
-}
-
-function dialogCanClose(dialog, force) {
-  if (!dialogIsOpen(dialog)) return false;
-  return force || !dialogIsBusy(dialog);
-}
-
-function closeWatchlistDialog(force = false) {
-  const dialog = watchlistDialog();
-  if (!dialogCanClose(dialog, force)) return;
-  dialog.close();
-}
-
-function setCloseControlsDisabled(dialog, disabled) {
-  dialog.querySelectorAll("[data-watchlist-dialog-close]").forEach((control) => {
-    control.disabled = disabled;
-  });
-}
-
-function restoreDialogFocus() {
-  const trigger = dialogReturnFocus;
-  if (trigger?.isConnected) trigger.focus();
-  dialogReturnFocus = null;
-}
-
-function onDialogClick(event) {
-  const target = event.target;
-  const opener = target.closest("[data-watchlist-dialog-open]");
-  if (opener) {
-    event.preventDefault();
-    openWatchlistDialog(opener);
-    return;
-  }
-  if (target.closest("[data-watchlist-dialog-close]")) {
-    event.preventDefault();
-    closeWatchlistDialog();
-  }
-}
-
-function triggerIdentity() {
-  const trigger = dialogReturnFocus;
-  if (!trigger) return null;
-  return trigger.dataset.watchlistDialogTrigger;
-}
-
-function savedMessage(event) {
-  const detail = event.detail;
-  if (detail && detail.message) return detail.message;
-  return "Changes saved.";
-}
-
-function savedMode(event) {
-  const detail = event.detail;
-  if (detail && detail.mode) return detail.mode;
-  return null;
-}
-
-function onWatchlistSaved(event) {
-  pendingFocus = { mode: savedMode(event), trigger: triggerIdentity() };
-  closeWatchlistDialog(true);
-  showNotification(savedMessage(event));
-}
-
-function dialogFromRequest(event) {
-  const detail = event.detail;
-  if (!detail) return null;
-  const element = detail.elt;
-  if (!element) return null;
-  return element.closest("#watchlist-dialog");
-}
-
-function onDialogRequest(event) {
-  const dialog = dialogFromRequest(event);
-  if (!dialog) return;
-  dialog.setAttribute("aria-busy", "true");
-  setCloseControlsDisabled(dialog, true);
-}
-
-function onDialogRequestDone() {
-  document.querySelectorAll("#watchlist-dialog[aria-busy]").forEach((dialog) => {
-    dialog.removeAttribute("aria-busy");
-    setCloseControlsDisabled(dialog, false);
-  });
-}
-
-function dialogFromElement(element) {
-  if (!element) return null;
-  return element.closest("#watchlist-dialog");
-}
-
-function dialogForSwapTarget(target) {
-  if (!target) return null;
-  if (target.id === "watchlist-form") return watchlistDialog();
-  return dialogFromElement(target);
-}
-
-function onDialogSwap(event) {
-  const detail = event.detail;
-  if (!detail) return;
-  const dialog = dialogForSwapTarget(detail.target);
-  if (dialog) focusName(dialog);
-}
-
-function targetId(target) {
-  return target ? target.id : null;
-}
-
-function targetMatchesWatchlist(target) {
-  if (!target) return false;
-  if (typeof target.matches !== "function") return false;
-  return target.matches(".watchlist");
-}
-
-function isRefreshTarget(target) {
-  return targetId(target) === "watchlist-browse" || targetMatchesWatchlist(target);
-}
-
-function settledTarget(event) {
-  const detail = event.detail;
-  if (!detail) return null;
-  return detail.target;
-}
-
-function savedFocusSelector({ mode, trigger }) {
-  const base = `[data-watchlist-dialog-open="${mode}"]`;
-  return trigger ? `${base}[data-watchlist-dialog-trigger="${trigger}"]` : base;
-}
-
-function focusSavedTrigger(selector) {
-  const trigger = document.querySelector(selector);
-  if (trigger) trigger.focus();
-}
-
-function onRefreshSettled(event) {
-  if (!pendingFocus) return;
-  if (!isRefreshTarget(settledTarget(event))) return;
-  focusSavedTrigger(savedFocusSelector(pendingFocus));
+class WatchlistDialog {
+  pendingRequests = new Set();
+  returnFocus = null;
   pendingFocus = null;
+  notificationTimeout = 0;
+  pressedOutside = false;
+
+  constructor(dialog) {
+    this.dialog = dialog;
+  }
+
+  connect() {
+    document.addEventListener("click", this.onClick);
+    document.addEventListener("watchlist-saved", this.onSaved);
+    document.addEventListener("htmx:beforeRequest", this.onRequest);
+    document.addEventListener("htmx:afterRequest", this.onRequestDone);
+    document.addEventListener("htmx:afterSwap", this.onSwap);
+    document.addEventListener("htmx:afterSettle", this.onRefreshSettled);
+    this.dialog.addEventListener("cancel", this.onCancel);
+    this.dialog.addEventListener("close", this.restoreFocus);
+    this.dialog.addEventListener("pointerdown", this.onPointerDown);
+    this.dialog.addEventListener("pointerup", this.onPointerUp);
+    window.addEventListener("pagehide", this.disconnect, { once: true });
+  }
+
+  disconnect = () => {
+    document.removeEventListener("click", this.onClick);
+    document.removeEventListener("watchlist-saved", this.onSaved);
+    document.removeEventListener("htmx:beforeRequest", this.onRequest);
+    document.removeEventListener("htmx:afterRequest", this.onRequestDone);
+    document.removeEventListener("htmx:afterSwap", this.onSwap);
+    document.removeEventListener("htmx:afterSettle", this.onRefreshSettled);
+    this.dialog.removeEventListener("cancel", this.onCancel);
+    this.dialog.removeEventListener("close", this.restoreFocus);
+    this.dialog.removeEventListener("pointerdown", this.onPointerDown);
+    this.dialog.removeEventListener("pointerup", this.onPointerUp);
+    window.clearTimeout(this.notificationTimeout);
+    window.removeEventListener("pagehide", this.disconnect);
+    this.pendingRequests.clear();
+  };
+
+  onClick = (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const opener = target.closest("[data-watchlist-dialog-open]");
+    if (opener) {
+      event.preventDefault();
+      this.open(opener);
+      return;
+    }
+    if (target.closest("[data-watchlist-dialog-close]")) {
+      event.preventDefault();
+      this.close();
+    }
+  };
+
+  onSaved = (event) => {
+    const detail = event.detail;
+    this.pendingFocus = {
+      mode: detail?.mode || null,
+      trigger: this.returnFocus?.dataset.watchlistDialogTrigger || null,
+    };
+    this.close(true);
+    this.showNotification(detail?.message || "Changes saved.");
+  };
+
+  onRequest = (event) => {
+    const form = this.formFromRequest(event);
+    if (!form) return;
+    const request = event.detail?.xhr || form;
+    this.pendingRequests.add(request);
+    this.setBusy(true);
+  };
+
+  onRequestDone = (event) => {
+    const form = this.formFromRequest(event);
+    if (!form) return;
+    const request = event.detail?.xhr || form;
+    this.pendingRequests.delete(request);
+    this.setBusy(this.pendingRequests.size > 0);
+  };
+
+  onSwap = (event) => {
+    const target = event.detail?.target;
+    if (!target) return;
+    const replacesForm = target.id === "watchlist-form";
+    if (replacesForm || this.dialog.contains(target)) this.focusName();
+  };
+
+  onRefreshSettled = (event) => {
+    if (!this.pendingFocus || !this.isRefreshTarget(event.detail?.target)) return;
+    const { mode, trigger } = this.pendingFocus;
+    const triggerSelector = trigger
+      ? `[data-watchlist-dialog-open="${mode}"][data-watchlist-dialog-trigger="${trigger}"]`
+      : `[data-watchlist-dialog-open="${mode}"]`;
+    document.querySelector(triggerSelector)?.focus();
+    this.pendingFocus = null;
+  };
+
+  onCancel = (event) => {
+    if (this.isBusy()) event.preventDefault();
+  };
+
+  onPointerDown = (event) => {
+    if ("closedBy" in HTMLDialogElement.prototype) return;
+    this.pressedOutside = this.isOutside(event);
+  };
+
+  onPointerUp = (event) => {
+    if ("closedBy" in HTMLDialogElement.prototype) return;
+    const dismiss = this.pressedOutside && this.isOutside(event);
+    this.pressedOutside = false;
+    if (dismiss) this.close();
+  };
+
+  restoreFocus = () => {
+    if (this.returnFocus?.isConnected) this.returnFocus.focus();
+    this.returnFocus = null;
+  };
+
+  open(trigger) {
+    if (this.dialog.open) return;
+    this.resetForm();
+    this.returnFocus = trigger;
+    this.dialog.showModal();
+    this.focusName();
+  }
+
+  close(force = false) {
+    if (!this.dialog.open || (!force && this.isBusy())) return;
+    this.dialog.close();
+  }
+
+  resetForm() {
+    this.dialog.querySelector("#watchlist-form")?.reset();
+    const error = this.dialog.querySelector("#watchlist-form-error");
+    if (error) error.textContent = "";
+    this.dialog.querySelector("#watchlist-name")?.removeAttribute("aria-invalid");
+  }
+
+  focusName() {
+    this.dialog.querySelector("#watchlist-name")?.focus();
+  }
+
+  formFromRequest(event) {
+    const element = event.detail?.elt || event.detail?.requestConfig?.elt;
+    return element instanceof Element ? element.closest("#watchlist-form") : null;
+  }
+
+  setBusy(busy) {
+    if (busy) this.dialog.setAttribute("aria-busy", "true");
+    else this.dialog.removeAttribute("aria-busy");
+    this.dialog.querySelectorAll("[data-watchlist-dialog-close]").forEach((control) => {
+      control.disabled = busy;
+    });
+  }
+
+  isBusy() {
+    return this.dialog.getAttribute("aria-busy") === "true";
+  }
+
+  isRefreshTarget(target) {
+    return target?.id === "watchlist-browse" || target?.matches?.(".watchlist");
+  }
+
+  isOutside(event) {
+    const bounds = this.dialog.getBoundingClientRect();
+    return (
+      event.clientX < bounds.left ||
+      event.clientX > bounds.right ||
+      event.clientY < bounds.top ||
+      event.clientY > bounds.bottom
+    );
+  }
+
+  showNotification(message) {
+    const notification = document.getElementById("notification");
+    if (!notification) return;
+    notification.textContent = message;
+    notification.removeAttribute("hidden");
+    window.clearTimeout(this.notificationTimeout);
+    this.notificationTimeout = window.setTimeout(() => {
+      notification.setAttribute("hidden", "");
+    }, 4000);
+  }
 }
 
-function onDialogCancel(event) {
-  if (dialogIsBusy(event.currentTarget)) event.preventDefault();
-}
-
-function outsideRange(value, minimum, maximum) {
-  return value < minimum || value > maximum;
-}
-
-function isOutsideDialog(event, dialog) {
-  const bounds = dialog.getBoundingClientRect();
-  return (
-    outsideRange(event.clientX, bounds.left, bounds.right) ||
-    outsideRange(event.clientY, bounds.top, bounds.bottom)
-  );
-}
-
-function installLightDismissFallback(dialog) {
-  if (!dialog || "closedBy" in HTMLDialogElement.prototype) return;
-  let pressedOutside = false;
-  dialog.addEventListener("pointerdown", (event) => {
-    pressedOutside = isOutsideDialog(event, dialog);
-  });
-  dialog.addEventListener("pointerup", (event) => {
-    const dismiss = pressedOutside && isOutsideDialog(event, dialog);
-    pressedOutside = false;
-    if (dismiss) closeWatchlistDialog();
-  });
-}
-
-const watchlistDialogElement = watchlistDialog();
-
-document.addEventListener("click", onDialogClick);
-document.addEventListener("watchlist-saved", onWatchlistSaved);
-document.addEventListener("htmx:beforeRequest", onDialogRequest);
-document.addEventListener("htmx:afterRequest", onDialogRequestDone);
-document.addEventListener("htmx:afterSwap", onDialogSwap);
-document.addEventListener("htmx:afterSettle", onRefreshSettled);
-if (watchlistDialogElement) {
-  watchlistDialogElement.addEventListener("cancel", onDialogCancel);
-  watchlistDialogElement.addEventListener("close", restoreDialogFocus);
-  installLightDismissFallback(watchlistDialogElement);
-}
+const watchlistDialogElement = document.getElementById("watchlist-dialog");
+if (watchlistDialogElement) new WatchlistDialog(watchlistDialogElement).connect();
