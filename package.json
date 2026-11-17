@@ -8,6 +8,7 @@
     "preview": "vite preview",
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",
+    "test:v2": "JANUS_TEST_NODE=\"${JANUS_TEST_NODE:-$(mise which node 2>/dev/null || command -v node)}\" cargo test --manifest-path v2/Cargo.toml --locked",
     "test:lint-plugin": "vitest run tools/oxlint/ComponentRendering.test.tsx",
     "lint": "oxlint . && npm run lint:css && npm run check:agents",
     "check:agents": "node tools/check-agent-skill-mappings.mjs",
