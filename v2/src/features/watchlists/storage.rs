@@ -124,6 +124,7 @@ pub(super) async fn summary_selections<C: ConnectionTrait>(
     }
     let placeholders = vec!["?"; watchlist_ids.len()].join(",");
     let order = mode.order_sql();
+    // `COALESCE(is_watched,0)=0` must stay equivalent to `WatchlistItem::is_unwatched`.
     let sql = format!(
         "SELECT * FROM (\
            SELECT watchlist_items.*,\

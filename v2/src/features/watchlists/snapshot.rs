@@ -121,13 +121,12 @@ impl Watchlists {
         Ok(summaries)
     }
 
-    /// Reads the summaries chosen by `select` from one consistent snapshot.
-    ///
     /// `select` receives every stored watchlist header, applies the caller's
     /// selection policy and returns the chosen identifiers in result order
     /// alongside a caller-owned value. Headers, counts and cover selections for
     /// those identifiers are then read inside one transaction, so a page never
-    /// mixes states from different writes.
+    /// mixes states from different writes. Identifiers absent from the read
+    /// headers are skipped.
     ///
     /// # Errors
     ///
@@ -148,8 +147,8 @@ impl Watchlists {
     }
 }
 
-/// Hydrates the selected watchlists from already read headers, their stored
-/// counts and one cover selection per order mode.
+/// One cover selection per order mode; identifiers absent from `headers` are
+/// skipped.
 async fn hydrate<C: ConnectionTrait>(
     database: &C,
     headers: Vec<WatchlistRecord>,
