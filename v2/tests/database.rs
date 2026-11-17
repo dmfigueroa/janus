@@ -92,6 +92,8 @@ async fn existing_watchlist_renders_ids_order_filters_and_escaped_content_withou
     assert!(html.contains("https://image.tmdb.org/t/p/w200/poster.jpg"));
     assert!(html.contains("https://images.example/poster.jpg"));
     assert!(html.contains("class=\"timeline\""), "{html}");
+    assert!(html.contains("<watchlist-reorder"), "{html}");
+    assert!(!html.contains("data-mode=\"custom\""), "{html}");
     assert!(html.contains("id=\"reorder-recovery\""), "{html}");
     assert!(html.contains("closedby=\"any\""), "{html}");
     assert!(html.contains("id=\"watchlist-dialog-help\""), "{html}");

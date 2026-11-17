@@ -12,11 +12,11 @@ function timeline(itemIds) {
         `<article data-item-id="${id}"><button class="reorder-handle">Move ${id}</button></article>`,
     )
     .join("");
-  return `<div class="timeline" data-reorder-url="/reorder" data-mode="custom" hx-post="/reorder?query=first" hx-trigger="reorder" hx-target="this" hx-select=".timeline > *" hx-swap="innerHTML">${rows}</div>`;
+  return `<watchlist-reorder class="timeline" hx-post="/reorder?query=first" hx-trigger="reorder" hx-target="this" hx-select=".timeline > *" hx-swap="innerHTML">${rows}</watchlist-reorder>`;
 }
 
 function page(itemIds) {
-  return `<span id="reorder-recovery" hidden hx-get="" hx-trigger="reconcile" hx-target=".timeline" hx-select=".timeline > *" hx-swap="innerHTML"></span><form><input id="query" value="first" /></form>${timeline(itemIds).replace("</div>", '<p id="reorder-status" role="status"></p></div>')}`;
+  return `<span id="reorder-recovery" hidden hx-get="" hx-trigger="reconcile" hx-target=".timeline" hx-select=".timeline > *" hx-swap="innerHTML"></span><form><input id="query" value="first" /></form>${timeline(itemIds).replace("</watchlist-reorder>", '<p id="reorder-status" role="status"></p></watchlist-reorder>')}`;
 }
 
 async function verifyReorder({ failPost, methods, status }) {
@@ -55,6 +55,7 @@ async function verifyReorder({ failPost, methods, status }) {
     window.eval(fs.readFileSync(path.join(root, "static/vendor/htmx.min.js"), "utf8"));
     window.eval(fs.readFileSync(path.join(root, "static/vendor/Sortable.min.js"), "utf8"));
     window.eval(fs.readFileSync(path.join(root, "static/app.js"), "utf8"));
+    window.eval(fs.readFileSync(path.join(root, "static/watchlist-reorder.js"), "utf8"));
     await new Promise((resolve) => window.setTimeout(resolve, 20));
     const completed = new Promise((resolve) =>
       window.document.addEventListener("htmx:afterSwap", resolve, { once: true }),

@@ -123,6 +123,11 @@ watched runs spanning years, empty results and unwatched-only filtering; HTTP re
 remain covered by the fixture-backed `cargo test` suite, and `npm run test:v2:dom` covers the
 HTMX and reorder DOM behavior.
 
+Custom-order detail pages render their timeline as a Light DOM `<watchlist-reorder>` element.
+HTMX owns row rendering and recovery responses; the element owns drag/keyboard interaction,
+Sortable lifecycle and swap protection scoped to its subtree. Release-order pages use ordinary
+timeline markup and do not register reorder behavior.
+
 Watchlist read state is split by responsibility. `item_order.rs` owns stored order-mode
 decoding and the ordering SQL shared by reads and reorder; private `storage.rs` decodes rows
 and runs focused item queries; `summary.rs` owns progress, next-unwatched and cover
@@ -143,7 +148,12 @@ envelopes stay in `mcp.rs`.
 The browse home is separate from MCP discovery. `browse.rs` turns one typed summary snapshot
 into v1-style cards: stored recency ordering, NFC-plus-lowercase name matching, bound
 continuation cursors, lifecycle sections, cover selection, progress, next-item labels and
-paused dates. `snapshot.rs` reads the home summaries in one transaction with grouped counts
+paused dates. A Light DOM `<watchlist-browser>` owns search, continuation, busy state, status
+announcements and request coordination; its HTMX listeners only handle requests initiated
+inside that element. Search and continuation share a replace policy, so a newer query cancels
+an older page request instead of allowing stale results to win. The server-rendered cursor
+still replaces the current result page and remains bound to the normalized query.
+`snapshot.rs` reads the home summaries in one transaction with grouped counts
 and mode-specific ranked selections instead of loading every item or issuing per-list
 queries. `web.rs` chooses the full page or the grid fragment;
 HTMX search and pagination swap only `#watchlist-browse` and push the new URL. A
@@ -154,9 +164,10 @@ Reorder writes renumber the complete displayed sequence, keeping ranks contiguou
 when v1 deletions left gaps. Watchlist creation writes v1's pause and rotation defaults;
 updates set `updated_at` explicitly because SeaORM does not supply Drizzle's application-side
 hook. Omitted creation fields keep stored defaults, and updates treat an empty description as
-null. Web dialogs validate, announce pending/failed requests, restore focus and refresh their
-list or detail surface through HTMX. See [PARITY.md](PARITY.md) for evidence and outstanding
-acceptance.
+null. `watchlist-dialog.js` keeps dialog state and lifecycle handlers in a single controller;
+dialog and form styles are scoped to the native dialog. Web dialogs validate, announce
+pending/failed requests, restore focus and refresh their list or detail surface through HTMX.
+See [PARITY.md](PARITY.md) for evidence and outstanding acceptance.
 
 V2 DOM regressions: `npm run test:v2:dom` runs `v2/tests/htmx-browser.cjs` and
 `v2/tests/reorder-browser.cjs` with Node's test runner. The suites use jsdom to exercise real

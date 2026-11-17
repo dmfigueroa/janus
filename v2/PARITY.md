@@ -229,6 +229,21 @@ Existing database tests cover bounded locks and schema compatibility. No deploym
 Access-authenticated client, physical-device or owner acceptance evidence is claimed for
 this change; those gates remain outstanding.
 
+### Reorder interaction ownership
+
+Custom-order timelines are server-rendered as a Light DOM `<watchlist-reorder>` element;
+release-order timelines remain ordinary `<div>` markup. HTMX owns the rendered rows,
+filter state and recovery response. The element owns Sortable setup/teardown, keyboard
+intents, busy state and status announcements. It unregisters document listeners and destroys
+Sortable instances on disconnect, and it suppresses swaps only when the target intersects
+its own subtree or would detach it. The separate recovery trigger remains page-owned.
+
+Added coverage verifies the server markup contract, reorder behavior in the DOM suite, and
+Chromium custom-element upgrade, inner-fragment replacement, stale-listener cleanup and
+target-scoped swap suppression. Pointer/touch drag behavior remains covered only by the
+existing Sortable interaction code; this refactor adds no real-browser drag simulation, so
+DOM tests do not establish pointer/touch parity. No additional v1 visual parity claim is made.
+
 ## Issue #256 visual parity follow-up
 
 The shared shell now follows v1 measurements more closely. The bottom navigation keeps

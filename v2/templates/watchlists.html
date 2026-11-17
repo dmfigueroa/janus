@@ -5,7 +5,7 @@
     <p class="home-totals">{{view.totals}}</p>
   </header>
 
-  <section class="home-content">
+  <watchlist-browser class="home-content">
     <form
       id="watchlist-search"
       class="watchlist-search"
@@ -16,7 +16,7 @@
       hx-swap="outerHTML"
       hx-push-url="true"
       hx-trigger="submit, input changed delay:300ms from:#query"
-      hx-sync="this:replace"
+      hx-sync="closest watchlist-browser:replace"
       hx-indicator="#browse-indicator"
     >
       <label class="visually-hidden" for="query">Search watchlists</label>
@@ -65,7 +65,7 @@
     <p id="browse-status" class="browse-status" role="status" aria-live="polite"></p>
 
     {% include "watchlist-browse.html" %}
-  </section>
+  </watchlist-browser>
 </main>
 <span
   id="watchlist-refresh"
