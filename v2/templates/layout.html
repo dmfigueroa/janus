@@ -4,14 +4,17 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>{% block title %}Janus{% endblock %}</title>
-    <link rel="stylesheet" href="/v2/static/app.css?v=3" />
+    <link rel="stylesheet" href="/v2/static/vendor/open-props.min.css" />
+    <link rel="stylesheet" href="/v2/static/app.css?v=4" />
     <script defer src="/v2/static/vendor/htmx.min.js"></script>
     <script defer src="/v2/static/vendor/Sortable.min.js"></script>
+    <script defer src="/v2/static/watchlist-dialog.js"></script>
     <script defer src="/v2/static/app.js"></script>
     {% block scripts %}{% endblock %}
   </head>
   <body>
     {% block content %}{% endblock %} {% include "bottom-nav.html" %}
+    <p id="notification" class="notification" role="status" aria-live="polite" hidden></p>
     <p id="request-error" class="request-error" role="alert" hidden>
       Request failed. Please try again.
     </p>

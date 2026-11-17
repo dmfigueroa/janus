@@ -59,6 +59,28 @@ const actions = {
   "watch-all"() {
     database.prepare("UPDATE watchlist_items SET is_watched = 1 WHERE watchlist_id = 41").run();
   },
+  "check-web-created"() {
+    const row = database.prepare("SELECT * FROM watchlists WHERE name = 'From v2'").get();
+    assert.ok(row, "v2-created watchlist is readable after reopening through v1 tooling");
+    assert.equal(row.description, "");
+    assert.equal(row.item_order_mode, "release");
+    assert.equal(row.paused_at, null);
+    assert.equal(row.updated_at, null);
+    assert.match(row.created_at, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    assert.match(row.last_watched_at, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/);
+    const htmx = database.prepare("SELECT * FROM watchlists WHERE name = 'HTMX created'").get();
+    assert.ok(htmx, "HTMX-created watchlist is readable after reopening through v1 tooling");
+    assert.equal(htmx.description, "");
+    assert.equal(htmx.item_order_mode, "custom");
+  },
+  "check-mcp-created"() {
+    const row = database.prepare("SELECT * FROM watchlists WHERE name = 'MCP created'").get();
+    assert.ok(row, "MCP-created watchlist is readable after reopening through v1 tooling");
+    assert.equal(row.description, null);
+    assert.equal(row.item_order_mode, "release");
+    assert.equal(row.paused_at, null);
+    assert.ok(row.updated_at, "MCP update must set the Drizzle-compatible updated timestamp");
+  },
   many() {
     const insert = database.prepare("INSERT INTO watchlists(name) VALUES(?)");
     for (let index = 0; index < 60; index += 1) {

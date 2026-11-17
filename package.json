@@ -9,13 +9,16 @@
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",
     "test:lint-plugin": "vitest run tools/oxlint/ComponentRendering.test.tsx",
-    "lint": "oxlint .",
+    "lint": "oxlint . && npm run lint:css",
     "format": "oxfmt . --write",
     "format:check": "oxfmt . --check",
     "typecheck": "tsc --noEmit",
     "prepare": "simple-git-hooks",
     "migrate": "npx -y tsx --env-file=.env src/db/Migrate.ts",
-    "seed": "npx -y tsx --env-file=.env src/db/Seed.ts"
+    "seed": "npx -y tsx --env-file=.env src/db/Seed.ts",
+    "lint:css": "stylelint \"v2/static/*.css\"",
+    "preview:local": "bash tools/preview-local.sh",
+    "visual:compare": "node tools/visual-compare.cjs"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.1",
@@ -68,8 +71,10 @@
     "lint-staged": "^16.2.7",
     "oxfmt": "^0.24.0",
     "oxlint": "^1.39.0",
+    "playwright-core": "^1.65.1",
     "readdirp": "^5.0.0",
     "simple-git-hooks": "^2.13.1",
+    "stylelint": "^18.0.0",
     "typescript": "^5.7.2",
     "vite": "^7.1.7",
     "vite-plugin-pwa": "^1.2.0",
@@ -96,6 +101,9 @@
     ],
     "*.{js,ts,jsx,tsx,mjs,cjs}": [
       "vitest related --run --passWithNoTests"
+    ],
+    "*.css": [
+      "stylelint --fix"
     ]
   },
   "engines": {

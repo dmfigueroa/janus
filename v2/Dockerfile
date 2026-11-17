@@ -24,7 +24,12 @@ RUN mkdir -p src \
 COPY v2/src ./src
 COPY v2/templates ./templates
 COPY v2/static ./static
-RUN cargo build --locked --release
+# Cargo compares source mtimes with the stub artifacts. Git checkout files can be older
+# than the stub build, so touch the copied sources to force the application crate to
+# rebuild while keeping dependency artifacts cached.
+RUN find src templates static -type f -exec touch {} + \
+  && cargo build --locked --release \
+  && test "$(stat -c %s target/release/janus-v2)" -gt 1000000
 
 # ---------------------------------------------------------------------------
 # runner — minimal image with only the binary and the healthcheck's curl.

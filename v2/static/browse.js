@@ -34,6 +34,29 @@ function focusPageResults(event) {
   focusHeading("browse-heading");
 }
 
+function createTile() {
+  return document.querySelector(".watchlist-grid .create-tile");
+}
+
+function siblingCovers(tile) {
+  return [...tile.parentElement.querySelectorAll(".card-cover")];
+}
+
+function coverHeight(cover) {
+  return cover.getBoundingClientRect().height;
+}
+
+function tallestCover(covers) {
+  return Math.max(0, ...covers.map(coverHeight));
+}
+
+function setCreateTileHeight() {
+  const tile = createTile();
+  if (!tile) return;
+  const height = tallestCover(siblingCovers(tile));
+  if (height > 0) tile.style.height = `${height}px`;
+}
+
 document.addEventListener("htmx:responseError", announceBrowseFailure);
 document.addEventListener("htmx:sendError", announceBrowseFailure);
 document.addEventListener("htmx:beforeRequest", () => {
@@ -44,3 +67,6 @@ document.addEventListener("htmx:afterRequest", (event) => {
   setBrowseBusy(false);
   if (event.detail?.successful) setBrowseStatus("");
 });
+document.addEventListener("htmx:afterSwap", setCreateTileHeight);
+window.addEventListener("resize", setCreateTileHeight);
+setCreateTileHeight();

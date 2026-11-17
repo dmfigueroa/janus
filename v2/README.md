@@ -1,7 +1,9 @@
-# Janus v2 reorder slice
+# Janus v2
 
-One Rust crate serves HTML, local assets and MCP. V1 remains the application for writes
-other than watchlist item reordering. Requires Rust 1.94.0 and a native C compiler.
+One Rust crate serves HTML, local assets and MCP. Dialog and layout values use
+[browser-ready Open Props tokens](https://open-props.style/) served from `static/vendor`. V2 owns watchlist reads, create/edit,
+reordering and their MCP tools; v1 remains the application for the remaining writes.
+Requires Rust 1.94.0 and a native C compiler.
 Production needs no Node runtime or frontend build.
 
 ```sh
@@ -13,6 +15,25 @@ cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked
 cargo build --locked --release
 ```
+
+For visual work, `npm run preview:local` seeds a disposable database, builds and starts
+the v2 process, and starts the v1 dev server. It prints both local URLs. During `npm run dev`
+from the repository root, Nitro proxies `/v2` and `/v2/**` to `127.0.0.1:3001`, so the v1 dev
+server can preview the separate v2 process at `http://localhost:3000/v2`. This development
+proxy is not part of the production v1 bundle; deployment routing remains the separate
+Traefik/Coolify service.
+
+Compare the two UIs with Playwright screenshots after `preview:local`:
+
+```sh
+npm run visual:compare -- --route /watchlists
+npm run visual:compare -- --route /watchlists --click "Create New List"
+```
+
+The second command opens the dialog in both versions and writes `-v1.png` and `-v2.png`
+under the system temporary directory. Inspect both images rather than relying on measured
+values alone. If no Chromium build is available, run `npx playwright-core install chromium`
+once (or set `PLAYWRIGHT_CHROMIUM` to an existing executable).
 
 Tests require root `npm ci` under a supported Node version because their disposable SQLite
 files are created by the actual v1 Drizzle migrator. Set `JANUS_TEST_NODE` to that Node
@@ -28,12 +49,17 @@ The existing directory must be mounted, including WAL/SHM sidecars.
 - `/v2`: development landing page.
 - `/v2/watchlists`: v1-style home grid with covers, progress, next item, paused dates,
   lifecycle sections, Unicode name search and continuation pages. Search swaps only the grid
-  through HTMX and keeps the URL in sync.
+  through HTMX and keeps the URL in sync. Create tile and mobile button open the native dialog.
+  `POST /v2/watchlists` creates through the shared operation; HTMX swaps the refreshed grid,
+  while JSON callers receive the structured result.
 - `/v2/watchlists/{id}`: existing items in release/custom order, text filtering, release-year
-  grouping, expandable watched runs, stable IDs and nullable metadata.
+  grouping, expandable watched runs, stable IDs and nullable metadata. The edit dialog updates
+  name, description and order mode, then refreshes the header in place.
+- `POST /v2/watchlists/{id}`: shared metadata update with v1's timestamp and empty-description
+  semantics.
 - `/v2/watchlists/{id}/reorder`: atomic custom-order moves from web drag or keyboard intents.
 - `/v2/mcp`: `list_watchlists`, `search_watchlists`, `get_watchlist`, `find_watchlist_items`,
-  `reorder_watchlist_items`.
+  `create_watchlists`, `update_watchlists`, `reorder_watchlist_items`.
 - `/v2/health/live`: HTTP liveness.
 - `/v2/health/ready`: compatibility-validated application readiness.
 
@@ -87,10 +113,13 @@ shared layout provides the v1 bottom navigation on the home and detail pages. Cr
 delete and merge controls remain with their own slices.
 
 Reorder writes renumber the complete displayed sequence, keeping ranks contiguous even
-when v1 deletions left gaps. Other future writes must explicitly preserve Drizzle's
-application-side `updatedAt` hook; SeaORM does not supply it automatically. Reordering uses
-the shared web/MCP operation; other writes belong to following slices. See
-[PARITY.md](PARITY.md) for evidence and outstanding acceptance.
+when v1 deletions left gaps. Watchlist creation writes v1's pause and rotation defaults;
+updates set `updated_at` explicitly because SeaORM does not supply Drizzle's application-side
+hook. Omitted creation fields keep stored defaults, and updates treat an empty description as
+null. Web dialogs validate, announce pending/failed requests, restore focus and refresh their
+list or detail surface through HTMX. See [PARITY.md](PARITY.md) for evidence and outstanding
+acceptance.
 
 Reorder DOM regression: `node --test v2/tests/reorder-browser.cjs` (Node 24.12 or later
-with npm dependencies).
+with npm dependencies). Dialog DOM regression: `node --test v2/tests/watchlist-form-browser.cjs`. Browse card sizing:
+`node --test v2/tests/browse-browser.cjs`.

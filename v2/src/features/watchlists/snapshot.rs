@@ -106,6 +106,15 @@ impl Watchlists {
         }))
     }
 
+    /// Reads one watchlist row without loading its items or statistics.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DbErr`] when the database read or stored-value decoding fails.
+    pub async fn record(&self, id: i64) -> Result<Option<WatchlistRecord>, DbErr> {
+        storage::watchlist(&self.0, id).await
+    }
+
     /// Reads every watchlist summary in one consistent snapshot.
     ///
     /// # Errors

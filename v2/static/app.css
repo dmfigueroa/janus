@@ -11,8 +11,9 @@
   --green: #22c55e;
   --danger: #dc2626;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.05);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-card: 0 0.0625rem 0.125rem rgb(0 0 0 / 0.05);
+  --shadow-lg:
+    0 0.625rem 0.9375rem -0.1875rem rgb(0 0 0 / 0.1), 0 0.25rem 0.375rem -0.25rem rgb(0 0 0 / 0.1);
   font-family:
     "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
     "Segoe UI Symbol", "Noto Color Emoji";
@@ -27,8 +28,9 @@
     --fg-default: #fafafa;
     --fg-muted: #a8a4af;
     --border: #28242e;
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+    --shadow-card: 0 0.0625rem 0.125rem rgb(0 0 0 / 0.4);
+    --shadow-lg:
+      0 0.625rem 0.9375rem -0.1875rem rgb(0 0 0 / 0.5), 0 0.25rem 0.375rem -0.25rem rgb(0 0 0 / 0.4);
   }
 }
 
@@ -37,7 +39,7 @@
 }
 
 html {
-  scroll-padding-block-end: calc(4rem + env(safe-area-inset-bottom, 0px));
+  scroll-padding-block-end: calc(4rem + env(safe-area-inset-bottom, 0));
 }
 
 body {
@@ -57,14 +59,15 @@ a {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
   color: inherit;
 }
 
 :focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 3px;
+  outline: 0.1875rem solid var(--accent);
+  outline-offset: 0.1875rem;
 }
 
 ::selection {
@@ -74,10 +77,10 @@ select {
 
 .visually-hidden {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  width: 0.0625rem;
+  height: 0.0625rem;
   padding: 0;
-  margin: -1px;
+  margin: -0.0625rem;
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
@@ -151,10 +154,10 @@ select {
 .watchlist-search input[type="search"] {
   width: 100%;
   min-width: 0;
-  min-height: 44px;
+  min-height: 2.75rem;
   padding: 0.5rem 2.75rem 0.5rem 2.5rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 0.0625rem solid var(--border);
+  border-radius: 0.75rem;
   background: var(--bg-surface);
   transition:
     border-color 150ms var(--ease-out),
@@ -174,10 +177,10 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
+  min-height: 2.75rem;
   padding: 0.5rem 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 0.0625rem solid var(--border);
+  border-radius: 0.75rem;
   background: var(--bg-surface);
   color: inherit;
   text-decoration: none;
@@ -208,7 +211,7 @@ select {
   min-height: 2rem;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-round);
   background: transparent;
   color: var(--fg-muted);
 }
@@ -275,7 +278,7 @@ select {
   align-items: start;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 48rem) {
   .watchlist-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 1.5rem;
@@ -287,7 +290,7 @@ select {
   flex-direction: column;
   gap: 0.5rem;
   width: 100%;
-  max-width: 220px;
+  max-width: 13.75rem;
   min-width: 0;
   position: relative;
 }
@@ -297,7 +300,7 @@ select {
   display: block;
   aspect-ratio: 2 / 3;
   overflow: hidden;
-  border-radius: 18px;
+  border-radius: 1.125rem;
   background: linear-gradient(to bottom right, #1f2937, #111827);
   box-shadow: var(--shadow-card);
   text-decoration: none;
@@ -348,7 +351,7 @@ select {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: blur(24px);
+  filter: blur(1.5rem);
   transform: scale(1.5);
   opacity: 0.8;
 }
@@ -359,8 +362,8 @@ select {
   width: 100%;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  border-radius: 12px;
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.5);
+  border-radius: 0.75rem;
+  box-shadow: 0 0.625rem 0.9375rem -0.1875rem rgb(0 0 0 / 0.5);
 }
 
 .cover-shade {
@@ -406,15 +409,15 @@ select {
 
 .card-progress {
   width: 100%;
-  height: 4px;
+  height: 0.25rem;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--radius-round);
   background: var(--bg-subtle);
 }
 
 .card-progress-bar {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-round);
   background: var(--accent);
 }
 
@@ -446,7 +449,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 44px;
+  min-height: 2.75rem;
   padding: 0.5rem 0;
   list-style: none;
   cursor: pointer;
@@ -492,10 +495,10 @@ select {
 .pagination a {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
+  min-height: 2.75rem;
   padding: 0.5rem 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 0.0625rem solid var(--border);
+  border-radius: 0.75rem;
   text-decoration: none;
   transition:
     transform 120ms ease-out,
@@ -523,12 +526,12 @@ select {
   align-items: center;
   justify-content: space-around;
   gap: 0.5rem;
-  min-height: calc(4rem + env(safe-area-inset-bottom, 0px));
-  padding-block-end: env(safe-area-inset-bottom, 0px);
+  min-height: calc(4rem + env(safe-area-inset-bottom, 0));
+  padding-block-end: env(safe-area-inset-bottom, 0);
   padding-inline: max(1.5rem, calc((100% - 25rem) / 2));
-  border-top: 1px solid var(--border);
+  border-top: 0.0625rem solid var(--border);
   background: color-mix(in srgb, var(--bg-canvas) 90%, transparent);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(0.75rem);
 }
 
 .nav-item {
@@ -538,9 +541,9 @@ select {
   justify-content: center;
   gap: 0.25rem;
   width: 5rem;
-  min-height: 44px;
+  min-height: 2.75rem;
   padding: 0.5rem 0;
-  border-radius: 16px;
+  border-radius: 1rem;
   color: var(--fg-muted);
   text-decoration: none;
   transition: all 300ms ease-out;
@@ -572,7 +575,7 @@ select {
   max-width: 28rem;
   margin: 0 auto;
   padding: 0.75rem 1rem;
-  border-radius: 14px;
+  border-radius: 0.875rem;
   background: var(--danger);
   color: #ffffff;
   box-shadow: var(--shadow-lg);
@@ -586,7 +589,7 @@ select {
   padding: 1.5rem 1rem 7rem;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 48rem) {
   .watchlist {
     padding-inline: 2rem;
   }
@@ -637,13 +640,13 @@ select {
   height: 0.5rem;
   margin-top: 0.5rem;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--radius-round);
   background: var(--bg-subtle);
 }
 
 .progress-fill {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-round);
   background: var(--accent);
 }
 
@@ -683,23 +686,20 @@ select {
 .item-search input[type="search"] {
   width: 100%;
   min-width: 0;
+  padding-left: 2.5rem;
 }
 
 .watchlist button,
 .watchlist input[type="search"],
 .watchlist select {
-  min-height: 44px;
+  min-height: 2.75rem;
   padding: 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 0.0625rem solid var(--border);
+  border-radius: 0.75rem;
   background: var(--bg-surface);
   transition:
     transform 120ms ease-out,
     background-color 150ms ease;
-}
-
-.item-search input[type="search"] {
-  padding-left: 2.5rem;
 }
 
 .watchlist button {
@@ -725,7 +725,7 @@ select {
   padding: 1rem;
   margin: 0.5rem 0;
   overflow-wrap: anywhere;
-  border: 1px solid var(--border);
+  border: 0.0625rem solid var(--border);
   border-radius: 0.75rem;
 }
 
@@ -737,7 +737,7 @@ select {
   overflow-wrap: anywhere;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 48rem) {
   .watchlist h1 {
     font-size: 1.875rem;
   }
@@ -759,8 +759,8 @@ select {
   height: 2rem;
   margin: 1.5rem 0 0.5rem;
   padding: 0 1rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  border: 0.0625rem solid var(--border);
+  border-radius: var(--radius-round);
   font-size: 0.75rem;
   font-weight: 700;
   background: var(--bg-canvas);
@@ -793,7 +793,7 @@ select {
 .watchlist summary {
   display: list-item;
   align-content: center;
-  min-height: 44px;
+  min-height: 2.75rem;
   padding-inline: 0.75rem;
   cursor: pointer;
 }
@@ -802,22 +802,22 @@ select {
   display: inline-block;
   flex-shrink: 0;
   padding: 0.25rem 0.5rem;
-  border-radius: 14px;
+  border-radius: 0.875rem;
   background: var(--bg-subtle);
   font-size: 0.75rem;
   font-weight: 600;
 }
 
 .reorder-handle {
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
   cursor: grab;
   touch-action: none;
 }
 
 .reorder-handle:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 3px;
+  outline: 0.125rem solid currentColor;
+  outline-offset: 0.1875rem;
 }
 
 .sortable-ghost {
@@ -828,7 +828,7 @@ select {
   opacity: 0.75;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 30rem) {
   .home {
     padding: 1rem 1rem 7rem;
   }
@@ -862,6 +862,300 @@ select {
   .clear-search:active,
   .pagination a:active,
   .watchlist button:active {
+    transform: none;
+  }
+}
+
+/* Watchlist create/edit */
+
+.create-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-height: 12rem;
+  padding: 0.75rem;
+  border: 0.125rem dashed var(--border);
+  border-radius: 1.125rem;
+  color: var(--fg-muted);
+  text-align: center;
+  text-decoration: none;
+  transition:
+    border-color 150ms var(--ease-out),
+    background-color 150ms var(--ease-out),
+    color 150ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .create-tile:hover {
+    border-color: var(--fg-muted);
+    background: var(--bg-subtle);
+    color: var(--fg-default);
+  }
+}
+
+.create-tile:active {
+  transform: scale(0.98);
+}
+
+.create-tile-art {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius-round);
+  background: var(--bg-subtle);
+}
+
+.create-tile-title {
+  font-weight: 600;
+}
+
+.create-watchlist-floating {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 6rem;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: var(--radius-round);
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: var(--shadow-lg);
+  text-decoration: none;
+  transition:
+    transform 120ms ease-out,
+    background-color 150ms ease-out;
+}
+
+@media (min-width: 48rem) {
+  .create-watchlist-floating {
+    display: none;
+  }
+}
+
+.watchlist-edit {
+  margin-left: auto;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.9rem;
+  border: 0.0625rem solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--bg-surface);
+  cursor: pointer;
+}
+
+.dialog {
+  position: relative;
+  width: min(24rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  padding: 0;
+  overflow: auto;
+  border: 0;
+  border-radius: var(--size-2);
+  background: var(--bg-surface);
+  color: var(--fg-default);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  box-shadow: var(--shadow-lg);
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 0.55);
+}
+
+.dialog-header {
+  padding: var(--size-5) var(--size-5) var(--size-3);
+}
+
+.dialog-header h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: var(--size-6);
+}
+
+.dialog-help {
+  margin: var(--size-1) 0 0;
+  font-size: 0.875rem;
+  line-height: var(--size-4);
+  color: var(--fg-muted);
+}
+
+.dialog-close {
+  position: absolute;
+  top: var(--size-3);
+  right: var(--size-3);
+  display: grid;
+  place-items: center;
+  width: calc(var(--size-7) + var(--size-2) + var(--size-1));
+  height: calc(var(--size-7) + var(--size-2) + var(--size-1));
+  padding: 0;
+  border: 0;
+  border-radius: var(--size-2);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dialog-close:hover {
+    background: var(--bg-subtle);
+    color: var(--fg-default);
+  }
+}
+
+.dialog-form {
+  display: flex;
+  flex-direction: column;
+  padding: var(--size-2) var(--size-5) var(--size-3);
+}
+
+.dialog-form[aria-busy="true"] {
+  opacity: 0.8;
+}
+
+.dialog-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--size-2) * 0.75);
+  min-width: 0;
+}
+
+.form-field > label,
+.order-field .field-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: var(--size-4);
+}
+
+.form-field input[type="text"],
+.form-field textarea {
+  width: 100%;
+  min-height: calc(var(--size-7) + var(--size-2));
+  padding: 0 calc(var(--size-2) + var(--size-1));
+  border: var(--border-size-1) solid var(--border);
+  border-radius: var(--size-2);
+  background: var(--bg-canvas);
+  font-size: 0.875rem;
+  line-height: var(--size-4);
+}
+
+.form-field textarea {
+  height: calc(2 * var(--size-4) + var(--size-3) + 2 * var(--border-size-1));
+  padding-block: var(--size-2);
+  resize: vertical;
+}
+
+.field-error,
+.form-error {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: var(--size-4);
+  color: var(--danger);
+}
+
+.form-error:empty {
+  display: none;
+}
+
+.order-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2);
+}
+
+.order-field label {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--size-2) + var(--size-1) * 0.5);
+  min-height: var(--size-4);
+  font-size: 0.875rem;
+  line-height: var(--size-4);
+}
+
+.order-field input[type="radio"] {
+  width: var(--size-4);
+  height: var(--size-4);
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--size-3);
+  margin-top: var(--size-5);
+  padding-top: var(--size-2);
+}
+
+.dialog-footer .htmx-indicator {
+  margin-right: auto;
+}
+
+.button-primary,
+.button-secondary {
+  min-height: calc(var(--size-7) + var(--size-2) + var(--size-1));
+  padding: 0 var(--size-3);
+  border-radius: var(--size-2);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: var(--size-4);
+  cursor: pointer;
+}
+
+.button-primary {
+  border: var(--border-size-1) solid var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.button-secondary {
+  border: var(--border-size-1) solid var(--border);
+  background: var(--bg-surface);
+}
+
+.button-primary:disabled,
+.button-secondary:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.notification {
+  position: fixed;
+  right: var(--size-3);
+  bottom: calc(var(--size-12) * 0.55);
+  left: var(--size-3);
+  z-index: 60;
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: var(--size-3);
+  border-radius: var(--size-2);
+  background: var(--fg-default);
+  color: var(--bg-canvas);
+  box-shadow: var(--shadow-lg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .create-tile,
+  .create-watchlist-floating {
+    transition: none;
+  }
+  .create-tile:active {
     transform: none;
   }
 }

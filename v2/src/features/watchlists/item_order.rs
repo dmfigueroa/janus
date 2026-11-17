@@ -26,6 +26,15 @@ impl ItemOrderMode {
         }
     }
 
+    /// Parses an order mode supplied by a web or MCP caller.
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "release" => Some(Self::Release),
+            "custom" => Some(Self::Custom),
+            _ => None,
+        }
+    }
+
     /// The stored value for this mode.
     pub fn as_str(self) -> &'static str {
         match self {

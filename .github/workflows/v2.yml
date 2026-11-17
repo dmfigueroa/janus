@@ -56,6 +56,8 @@ jobs:
       - run: npm ci
         working-directory: .
       - run: cargo test --locked
+      - name: Browser DOM tests
+        run: node --test tests/browse-browser.cjs tests/watchlist-form-browser.cjs tests/reorder-browser.cjs
       - uses: Swatinem/rust-cache@v2
         if: github.event_name == 'push'
         with:
@@ -63,3 +65,11 @@ jobs:
           shared-key: v2-release
       - run: cargo build --locked --release
         if: github.event_name == 'push'
+
+  image:
+    name: Rust Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build v2 image
+        run: docker build -f v2/Dockerfile -t janus-v2:ci .

@@ -4,6 +4,7 @@
 
 - `ARCHITECTURE.md` is the source of truth for Janus's target file structure, ownership model, and dependency rules.
 - `CONTRIBUTING.md` is the placement guide for new files and incremental migrations.
+- `deploy/README.md` documents deployment topology, production Coolify applications and PR preview URLs. Read it before debugging routing or preview behavior.
 - When adding files, moving modules, or introducing new boundaries, read those docs first and follow them.
 - Apply the target structure to new code and touched areas. Do not do broad drive-by reorganizations unless the user asks for them.
 
@@ -143,4 +144,6 @@ Before writing new Rust or reviewing Rust changes under `v2/`, load the `rust-be
 
 ## V2 Frontend
 
+- Use relative units and Open Props tokens for spacing, type and sizing. Add fixed units only where the browser requires them, such as hairline borders.
+- Before changing V2 visuals, run `npm run preview:local`, then compare local v1 and v2 screenshots with `npm run visual:compare -- --route /watchlists`. Inspect both images; do not use a Coolify preview as the development loop.
 - Use HTMX for all v2 browser HTTP requests. Declare requests, triggers, targets, and swaps with hx-\* attributes. Drag-and-drop and keyboard handlers may update request values and dispatch custom DOM events consumed by hx-trigger. Do not use htmx.ajax. Frontend requests must consume server-rendered HTML and let HTMX swap it into the page. Backend endpoints must also preserve JSON support for API callers through content negotiation. Do not use fetch or standalone XMLHttpRequest for frontend requests.

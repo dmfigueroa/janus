@@ -4,6 +4,15 @@
     <div class="watchlist-title">
       <h1>{{view.name}}</h1>
       {% if view.paused %}<span class="badge" role="status">Paused</span>{% endif %}
+      <button
+        type="button"
+        class="watchlist-edit"
+        data-watchlist-dialog-open="edit"
+        data-watchlist-dialog-trigger="header"
+        aria-label="Edit watchlist"
+      >
+        Edit
+      </button>
     </div>
     {% if !view.description.is_empty() %}
     <p class="watchlist-description">{{view.description}}</p>
@@ -69,4 +78,13 @@
   ></span>
   {% include "timeline.html" %}
 </main>
-{% endblock %}
+<span
+  id="watchlist-refresh"
+  hidden
+  hx-get=""
+  hx-trigger="watchlist-saved from:body"
+  hx-target=".watchlist"
+  hx-select=".watchlist"
+  hx-swap="outerHTML"
+></span>
+{% include "watchlist-dialog.html" %} {% endblock %}
