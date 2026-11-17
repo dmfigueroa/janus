@@ -170,3 +170,16 @@ visible "Watchlists" heading regresses. Expected values come from
 `JANUS_LAYOUT_RECORD=1 node --test v2/tests/layout-browser.cjs` (set `JANUS_V1_BASE_URL` for a
 different v1 address). It needs Chromium: install it once with
 `npx playwright-core install chromium` or point `PLAYWRIGHT_CHROMIUM` at an existing executable.
+
+Watchlists home layout: `node --test v2/tests/watchlists-home-browser.cjs` (also
+`npm run test:v2:home`). It boots the same disposable fixture database and v2
+process, then renders `/v2/watchlists` at `320x568`, `390x844`, `768x1024` and `1280x800`. It
+fails with measured and expected values when the grid density per width (two phone columns and
+four tablet/desktop columns, with the expected rows), horizontal overflow, a sort control, the
+hidden empty-search clear control, or the populated clear control's placement inside the search
+field regresses. Failed viewports write full-page screenshots to
+`v2/tests/artifacts/watchlists-home` (override the directory with `JANUS_VISUAL_ARTIFACTS`), and
+CI uploads them as artifacts. The check launches only the Chromium build pinned by the
+checked-in `playwright-core` version, so install exactly that build once with
+`npx playwright-core install chromium`; it does not use whichever cached Playwright browser or
+in-app browser connection is available.
