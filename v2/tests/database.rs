@@ -93,6 +93,12 @@ async fn existing_watchlist_renders_ids_order_filters_and_escaped_content_withou
     assert!(html.contains("https://images.example/poster.jpg"));
     assert!(html.contains("class=\"timeline\""), "{html}");
     assert!(html.contains("id=\"reorder-recovery\""), "{html}");
+    assert!(html.contains("closedby=\"any\""), "{html}");
+    assert!(html.contains("id=\"watchlist-dialog-help\""), "{html}");
+    assert!(
+        html.contains("aria-describedby=\"watchlist-dialog-help\""),
+        "{html}"
+    );
     assert!(
         html.contains("data-watchlist-dialog-open=\"edit\""),
         "{html}"
@@ -1742,6 +1748,10 @@ async fn web_update_changes_only_submitted_fields_and_reports_stale_targets() {
     assert!(html.contains("Name is required"), "{html}");
     assert!(html.contains("Still here"), "{html}");
     assert!(html.contains("id=\"watchlist-form\""), "{html}");
+    assert!(
+        html.contains("aria-describedby=\"watchlist-form-error\""),
+        "{html}"
+    );
 }
 
 #[tokio::test]

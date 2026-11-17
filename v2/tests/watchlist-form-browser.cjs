@@ -68,6 +68,7 @@ test("saving closes the dialog and announces the v1 success message", () => {
   opener.focus();
   opener.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
   window.document.getElementById("watchlist-name").value = "Created locally";
+  window.document.getElementById("watchlist-dialog").setAttribute("aria-busy", "true");
 
   window.document.dispatchEvent(
     new window.CustomEvent("watchlist-saved", {
@@ -119,6 +120,67 @@ test("dialog requests expose pending state and focus replaced validation forms",
     window.document.getElementById("watchlist-form-error").textContent,
     "Name is required",
   );
+  dom.window.close();
+});
+
+test("pending dialogs ignore close controls and cancel requests", () => {
+  const { dom, window } = openPage();
+  const opener = window.document.getElementById("opener");
+  opener.focus();
+  opener.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+  const dialog = window.document.getElementById("watchlist-dialog");
+  const form = window.document.getElementById("watchlist-form");
+
+  window.document.dispatchEvent(
+    new window.CustomEvent("htmx:beforeRequest", {
+      bubbles: true,
+      detail: { elt: form },
+    }),
+  );
+  const cancel = new window.Event("cancel", { bubbles: true, cancelable: true });
+  dialog.dispatchEvent(cancel);
+  assert.equal(cancel.defaultPrevented, true);
+  window.document
+    .querySelector("[data-watchlist-dialog-close]")
+    .dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+  assert.equal(dialog.open, true);
+
+  window.document.dispatchEvent(
+    new window.CustomEvent("htmx:afterRequest", {
+      bubbles: true,
+      detail: { elt: form, successful: false },
+    }),
+  );
+  window.document
+    .querySelector("[data-watchlist-dialog-close]")
+    .dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+  assert.equal(dialog.open, false);
+  dom.window.close();
+});
+
+test("light dismiss waits for a press and release outside the dialog", () => {
+  const { dom, window } = openPage();
+  const opener = window.document.getElementById("opener");
+  opener.focus();
+  opener.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+  const dialog = window.document.getElementById("watchlist-dialog");
+  dialog.getBoundingClientRect = () => ({
+    left: 100,
+    right: 300,
+    top: 100,
+    bottom: 400,
+  });
+  const pointer = (type, clientX, clientY) =>
+    new window.PointerEvent(type, { bubbles: true, clientX, clientY });
+
+  dialog.dispatchEvent(pointer("pointerdown", 20, 20));
+  dialog.dispatchEvent(pointer("pointerup", 200, 200));
+  assert.equal(dialog.open, true);
+
+  dialog.dispatchEvent(pointer("pointerdown", 20, 20));
+  dialog.dispatchEvent(pointer("pointerup", 20, 20));
+  assert.equal(dialog.open, false);
+  assert.equal(window.document.activeElement.id, "opener");
   dom.window.close();
 });
 

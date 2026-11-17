@@ -959,11 +959,61 @@ textarea {
   color: var(--fg-default);
   font-size: 0.875rem;
   line-height: 1.25rem;
+  opacity: 0;
   box-shadow: var(--shadow-lg);
+  transition-property: opacity, display, overlay;
+  transition-duration: 180ms;
+  transition-timing-function: var(--ease-out);
+  transition-behavior: allow-discrete;
+}
+
+.dialog:modal {
+  overscroll-behavior: contain;
+}
+
+.dialog[open] {
+  opacity: 1;
 }
 
 .dialog::backdrop {
-  background: rgb(0 0 0 / 0.55);
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background-color: transparent;
+  transition: background-color 180ms var(--ease-out);
+}
+
+.dialog[open]::backdrop {
+  background-color: rgb(0 0 0 / 0.55);
+
+  @starting-style {
+    background-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dialog {
+    transform: scale(0.97);
+    transition-property: opacity, transform, display, overlay;
+  }
+
+  .dialog[open] {
+    transform: scale(1);
+
+    @starting-style {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog {
+    transition-duration: 100ms;
+  }
+
+  .dialog::backdrop {
+    transition: none;
+  }
 }
 
 .dialog-header {
@@ -1014,8 +1064,8 @@ textarea {
   padding: var(--size-2) var(--size-5) var(--size-3);
 }
 
-.dialog-form[aria-busy="true"] {
-  opacity: 0.8;
+.dialog[aria-busy="true"] .dialog-fields {
+  opacity: 0.6;
 }
 
 .dialog-fields {
@@ -1026,6 +1076,7 @@ textarea {
   margin: 0;
   padding: 0;
   border: 0;
+  transition: opacity 150ms ease;
 }
 
 .form-field {
@@ -1107,6 +1158,22 @@ textarea {
   margin-right: auto;
 }
 
+.dialog button {
+  transition:
+    transform 120ms ease-out,
+    background-color 150ms ease-out,
+    border-color 150ms ease-out;
+}
+
+.dialog button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.dialog button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .button-primary,
 .button-secondary {
   min-height: calc(var(--size-7) + var(--size-2) + var(--size-1));
@@ -1129,10 +1196,29 @@ textarea {
   background: var(--bg-surface);
 }
 
-.button-primary:disabled,
-.button-secondary:disabled {
-  cursor: wait;
-  opacity: 0.7;
+@media (hover: hover) and (pointer: fine) {
+  .button-primary:not(:disabled):hover {
+    border-color: var(--accent-strong);
+    background: var(--accent-strong);
+  }
+
+  .button-secondary:not(:disabled):hover {
+    background: var(--bg-subtle);
+  }
+}
+
+@media (pointer: coarse) {
+  .dialog button,
+  .dialog-close,
+  .form-field input[type="text"],
+  .order-field label {
+    min-height: 2.75rem;
+  }
+
+  .dialog-close {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
 }
 
 .notification {
@@ -1152,10 +1238,14 @@ textarea {
 
 @media (prefers-reduced-motion: reduce) {
   .create-tile,
-  .create-watchlist-floating {
+  .create-watchlist-floating,
+  .dialog-fields,
+  .dialog button {
     transition: none;
   }
-  .create-tile:active {
+
+  .create-tile:active,
+  .dialog button:active:not(:disabled) {
     transform: none;
   }
 }

@@ -47,9 +47,29 @@ function openWatchlistDialog(trigger) {
   focusName(dialog);
 }
 
-function closeWatchlistDialog() {
+function dialogIsBusy(dialog) {
+  return dialog?.getAttribute("aria-busy") === "true";
+}
+
+function dialogIsOpen(dialog) {
+  return Boolean(dialog?.open);
+}
+
+function dialogCanClose(dialog, force) {
+  if (!dialogIsOpen(dialog)) return false;
+  return force || !dialogIsBusy(dialog);
+}
+
+function closeWatchlistDialog(force = false) {
   const dialog = watchlistDialog();
-  if (dialog?.open) dialog.close();
+  if (!dialogCanClose(dialog, force)) return;
+  dialog.close();
+}
+
+function setCloseControlsDisabled(dialog, disabled) {
+  dialog.querySelectorAll("[data-watchlist-dialog-close]").forEach((control) => {
+    control.disabled = disabled;
+  });
 }
 
 function restoreDialogFocus() {
@@ -92,7 +112,7 @@ function savedMode(event) {
 
 function onWatchlistSaved(event) {
   pendingFocus = { mode: savedMode(event), trigger: triggerIdentity() };
-  closeWatchlistDialog();
+  closeWatchlistDialog(true);
   showNotification(savedMessage(event));
 }
 
@@ -106,12 +126,15 @@ function dialogFromRequest(event) {
 
 function onDialogRequest(event) {
   const dialog = dialogFromRequest(event);
-  if (dialog) dialog.setAttribute("aria-busy", "true");
+  if (!dialog) return;
+  dialog.setAttribute("aria-busy", "true");
+  setCloseControlsDisabled(dialog, true);
 }
 
 function onDialogRequestDone() {
   document.querySelectorAll("#watchlist-dialog[aria-busy]").forEach((dialog) => {
     dialog.removeAttribute("aria-busy");
+    setCloseControlsDisabled(dialog, false);
   });
 }
 
@@ -170,8 +193,33 @@ function onRefreshSettled(event) {
   pendingFocus = null;
 }
 
-function onDialogElementClick(event) {
-  if (event.target === watchlistDialog()) closeWatchlistDialog();
+function onDialogCancel(event) {
+  if (dialogIsBusy(event.currentTarget)) event.preventDefault();
+}
+
+function outsideRange(value, minimum, maximum) {
+  return value < minimum || value > maximum;
+}
+
+function isOutsideDialog(event, dialog) {
+  const bounds = dialog.getBoundingClientRect();
+  return (
+    outsideRange(event.clientX, bounds.left, bounds.right) ||
+    outsideRange(event.clientY, bounds.top, bounds.bottom)
+  );
+}
+
+function installLightDismissFallback(dialog) {
+  if (!dialog || "closedBy" in HTMLDialogElement.prototype) return;
+  let pressedOutside = false;
+  dialog.addEventListener("pointerdown", (event) => {
+    pressedOutside = isOutsideDialog(event, dialog);
+  });
+  dialog.addEventListener("pointerup", (event) => {
+    const dismiss = pressedOutside && isOutsideDialog(event, dialog);
+    pressedOutside = false;
+    if (dismiss) closeWatchlistDialog();
+  });
 }
 
 const watchlistDialogElement = watchlistDialog();
@@ -183,6 +231,7 @@ document.addEventListener("htmx:afterRequest", onDialogRequestDone);
 document.addEventListener("htmx:afterSwap", onDialogSwap);
 document.addEventListener("htmx:afterSettle", onRefreshSettled);
 if (watchlistDialogElement) {
+  watchlistDialogElement.addEventListener("cancel", onDialogCancel);
   watchlistDialogElement.addEventListener("close", restoreDialogFocus);
-  watchlistDialogElement.addEventListener("click", onDialogElementClick);
+  installLightDismissFallback(watchlistDialogElement);
 }

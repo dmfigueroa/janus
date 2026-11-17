@@ -8,7 +8,13 @@
   hx-swap="outerHTML"
   hx-disabled-elt="find button[type='submit']"
   hx-indicator="#watchlist-form-pending"
-  aria-describedby="watchlist-form-error"
+  {%
+  if
+  form.error.is_some()
+  %}aria-describedby="watchlist-form-error"
+  {%
+  endif
+  %}
 >
   {% if let Some(id) = form.watchlist_id %}
   <input type="hidden" name="watchlistId" value="{{id}}" />
