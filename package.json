@@ -9,7 +9,8 @@
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",
     "test:lint-plugin": "vitest run tools/oxlint/ComponentRendering.test.tsx",
-    "lint": "oxlint . && npm run lint:css",
+    "lint": "oxlint . && npm run lint:css && npm run check:agents",
+    "check:agents": "node tools/check-agent-skill-mappings.mjs",
     "format": "oxfmt . --write",
     "format:check": "oxfmt . --check",
     "typecheck": "tsc --noEmit",
@@ -98,6 +99,9 @@
     ],
     "*.{json,css,html,md}": [
       "oxfmt --write"
+    ],
+    "AGENTS.md": [
+      "node tools/check-agent-skill-mappings.mjs"
     ],
     "*.{js,ts,jsx,tsx,mjs,cjs}": [
       "vitest related --run --passWithNoTests"
