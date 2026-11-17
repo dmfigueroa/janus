@@ -150,6 +150,10 @@ async fn watchlist_home_renders_v1_cards_sections_and_local_navigation() {
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers()["vary"],
+        "HX-Request, HX-History-Restore-Request, Accept"
+    );
     let html = body(response).await;
     assert!(
         html.contains("<h1 class=\"home-title\">My Lists</h1>"),
@@ -239,6 +243,7 @@ async fn watchlist_home_searches_and_pages_by_v1_recency() {
                     .uri("/v2/watchlists?query=list")
                     .header("hx-request", "true")
                     .header("hx-history-restore-request", "true")
+                    .header("accept", "application/json")
                     .body(Body::empty())
                     .unwrap(),
             )
