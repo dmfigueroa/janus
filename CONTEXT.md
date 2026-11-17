@@ -44,6 +44,10 @@ _Avoid_: Create/edit modal
 One MCP tool whose result is a paginated envelope: a page of summaries, items, or grouped titles, with an optional cursor. A page contract owns its declaration, the argument fields it accepts, its output schema, and its projection together, so what it advertises, what it accepts, and what it returns cannot drift apart. Compare *MCP batch contract*.
 _Avoid_: Read tool, paginated tool
 
+**MCP batch contract**:
+One MCP tool whose result is an ordered list of per-entry outcomes: create, update, and reorder. Each entry is processed independently, so one failure never aborts the rest; the whole request is rejected only when the entry array itself is malformed. A batch contract owns its declaration, accepted arguments, output schema, and per-entry rules. Compare *MCP page contract*.
+_Avoid_: Bulk operation, mutation tool
+
 **MCP contract table**:
 The single per-tool entry that produces a tool's declaration, accepted fields, and output schema. One table per contract shape; the adapter reads it to list tools, check membership, and dispatch calls, and a test reads it to prove the schema and the projection agree.
 _Avoid_: Tool registry, schema map
