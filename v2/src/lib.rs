@@ -1,4 +1,6 @@
+mod assets;
 mod database;
+pub use assets::{EmbeddedAsset, asset_url, static_assets};
 pub use database::open_database;
 mod features;
 mod http;
@@ -46,90 +48,7 @@ fn base_router(database_ready: bool) -> Router {
                 }
             }),
         )
-        .route(
-            "/v2/static/vendor/open-props.min.css",
-            get(|| async {
-                (
-                    [
-                        (header::CONTENT_TYPE, "text/css"),
-                        (header::CACHE_CONTROL, "no-cache"),
-                    ],
-                    include_str!("../static/vendor/open-props.min.css"),
-                )
-            }),
-        )
-        .route(
-            "/v2/static/app.css",
-            get(|| async {
-                (
-                    [
-                        (header::CONTENT_TYPE, "text/css"),
-                        (header::CACHE_CONTROL, "no-cache"),
-                    ],
-                    include_str!("../static/app.css"),
-                )
-            }),
-        )
-        .route(
-            "/v2/static/app.js",
-            get(|| async {
-                (
-                    [
-                        (header::CONTENT_TYPE, "text/javascript"),
-                        (header::CACHE_CONTROL, "no-cache"),
-                    ],
-                    include_str!("../static/app.js"),
-                )
-            }),
-        )
-        .route(
-            "/v2/static/watchlist-dialog.js",
-            get(|| async {
-                (
-                    [
-                        (header::CONTENT_TYPE, "text/javascript"),
-                        (header::CACHE_CONTROL, "no-cache"),
-                    ],
-                    include_str!("../static/watchlist-dialog.js"),
-                )
-            }),
-        )
-        .route(
-            "/v2/static/browse.js",
-            get(|| async {
-                (
-                    [
-                        (header::CONTENT_TYPE, "text/javascript"),
-                        (header::CACHE_CONTROL, "no-cache"),
-                    ],
-                    include_str!("../static/browse.js"),
-                )
-            }),
-        )
-        .route(
-            "/v2/static/vendor/htmx.min.js",
-            get(|| async {
-                (
-                    [
-                        (header::CONTENT_TYPE, "text/javascript"),
-                        (header::CACHE_CONTROL, "no-cache"),
-                    ],
-                    include_str!("../static/vendor/htmx.min.js"),
-                )
-            }),
-        )
-        .route(
-            "/v2/static/vendor/Sortable.min.js",
-            get(|| async {
-                (
-                    [
-                        (header::CONTENT_TYPE, "text/javascript"),
-                        (header::CACHE_CONTROL, "no-cache"),
-                    ],
-                    include_str!("../static/vendor/Sortable.min.js"),
-                )
-            }),
-        )
+        .route("/v2/static/{*path}", get(assets::serve))
         .fallback(|| async { (StatusCode::NOT_FOUND, "Page not found") })
 }
 
