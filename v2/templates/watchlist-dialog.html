@@ -1,12 +1,14 @@
 <dialog
   id="watchlist-dialog"
   class="dialog"
+  closedby="any"
   aria-labelledby="watchlist-dialog-title"
+  aria-describedby="watchlist-dialog-help{% if form.error.is_some() %} watchlist-form-error{% endif %}"
   data-watchlist-dialog
 >
   <header class="dialog-header">
     <h2 id="watchlist-dialog-title">{{form.title}}</h2>
-    <p class="dialog-help">{{form.help}}</p>
+    <p id="watchlist-dialog-help" class="dialog-help">{{form.help}}</p>
   </header>
   <button type="button" class="dialog-close" data-watchlist-dialog-close aria-label="Close dialog">
     <svg
