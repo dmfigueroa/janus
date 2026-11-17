@@ -115,9 +115,9 @@ Detail pages and reorder fragments share one feature-owned presentation module,
 the page or fragment with no Axum or database access, leaving HTTP extraction, content
 negotiation, failures and response selection in the web adapter. Focused unit tests cover
 title matching, release years and missing dates, poster resolution, custom/release ordering,
-watched runs spanning years, empty results and unwatched-only filtering; HTTP and HTMX
-regressions remain covered by the fixture-backed `cargo test` suite and
-`node --test v2/tests/reorder-browser.cjs`.
+watched runs spanning years, empty results and unwatched-only filtering; HTTP regressions
+remain covered by the fixture-backed `cargo test` suite, and `npm run test:v2:dom` covers the
+HTMX and reorder DOM behavior.
 
 Watchlist read state is split by responsibility. `item_order.rs` owns stored order-mode
 decoding and the ordering SQL shared by reads and reorder; private `storage.rs` decodes rows
@@ -154,8 +154,13 @@ null. Web dialogs validate, announce pending/failed requests, restore focus and 
 list or detail surface through HTMX. See [PARITY.md](PARITY.md) for evidence and outstanding
 acceptance.
 
-Reorder DOM regression: `node --test v2/tests/reorder-browser.cjs` (Node 24.12 or later
-with npm dependencies). Dialog DOM regression: `node --test v2/tests/watchlist-form-browser.cjs`.
+V2 DOM regressions: `npm run test:v2:dom` runs `v2/tests/htmx-browser.cjs` and
+`v2/tests/reorder-browser.cjs` with Node's test runner. The suites use jsdom to exercise real
+HTMX requests and swaps, optimistic keyboard reorder, drop anchors, blocked swaps during drags
+and saves, failed-save reconciliation, and filter/scroll/focus restoration. They need the
+`.tool-versions` Node and root `npm ci`, but no downloaded browser. Every pull request runs the
+same command in the "V2 DOM Tests" job, so a failing DOM regression fails the check.
+Dialog DOM regression: `node --test v2/tests/watchlist-form-browser.cjs`.
 Dialog viewport layout: `node --test v2/tests/dialog-layout-browser.cjs` (requires Chromium;
 set `PLAYWRIGHT_BROWSERS=chromium,webkit` to also cover WebKit).
 Browse card sizing: `node --test v2/tests/browse-browser.cjs`.
