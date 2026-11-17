@@ -88,7 +88,8 @@
   },
   "lint-staged": {
     "v2/**/*.rs": [
-      "cargo fmt --manifest-path v2/Cargo.toml -- --check"
+      "cargo fmt --manifest-path v2/Cargo.toml -- --check",
+      "sh -c 'cargo check --locked --manifest-path v2/Cargo.toml'"
     ],
     "*.tsx": [
       "oxlint --fix --config tools/oxlint/StagedTsx.oxlintrc.json",
