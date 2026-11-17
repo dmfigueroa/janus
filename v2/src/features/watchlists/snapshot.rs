@@ -74,9 +74,6 @@ impl WatchlistItem {
     }
 }
 
-/// SQL equivalent of [`WatchlistItem::is_unwatched`] for stored reads.
-pub(super) const UNWATCHED_ITEM_SQL: &str = "COALESCE(is_watched,0)=0";
-
 /// A consistent watchlist snapshot: summary, ordered items and order token.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WatchlistDetail {
@@ -109,96 +106,101 @@ impl Watchlists {
         }))
     }
 
-    /// Reads every watchlist row without derived statistics.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`DbErr`] when the database read or stored-value decoding fails.
-    pub async fn headers(&self) -> Result<Vec<WatchlistRecord>, DbErr> {
-        storage::headers(&self.0).await
-    }
-
     /// Reads every watchlist summary in one consistent snapshot.
     ///
     /// # Errors
     ///
     /// Returns [`DbErr`] when a database read or stored-value decoding fails.
     pub async fn all_summaries(&self) -> Result<Vec<WatchlistSummary>, DbErr> {
-        let transaction = self.0.begin().await?;
-        let headers = storage::headers(&transaction).await?;
-        let counts = storage::all_counts(&transaction).await?;
-        let mut selections = HashMap::new();
-        for mode in [ItemOrderMode::Release, ItemOrderMode::Custom] {
-            let ids = headers
-                .iter()
-                .filter(|header| header.item_order_mode == mode)
-                .map(|header| header.id)
-                .collect::<Vec<_>>();
-            selections.extend(storage::summary_selections(&transaction, &ids, mode).await?);
-        }
-        transaction.commit().await?;
-        Ok(headers
-            .into_iter()
-            .map(|header| {
-                let id = header.id;
-                let counts = counts.get(&id).copied().unwrap_or(storage::ItemCounts {
-                    total_items: 0,
-                    watched_items: 0,
-                });
-                let selection = selections.remove(&id).map(|selected| {
-                    let storage::SelectedSummary {
-                        next_unwatched,
-                        cover_item,
-                    } = selected;
-                    SummarySelection::new(next_unwatched, Some(&cover_item))
-                });
-                WatchlistSummary {
-                    watchlist: header,
-                    stats: summary::build_stats(
-                        counts.total_items,
-                        counts.watched_items,
-                        selection.unwrap_or_else(|| SummarySelection::new(None, None)),
-                    ),
-                }
+        let (summaries, ()) = self
+            .summaries_for(|headers| {
+                let ids = headers.iter().map(|header| header.id).collect();
+                (ids, ())
             })
-            .collect())
+            .await?;
+        Ok(summaries)
     }
 
-    /// Reads one summary without loading every item.
+    /// Reads the summaries chosen by `select` from one consistent snapshot.
+    ///
+    /// `select` receives every stored watchlist header, applies the caller's
+    /// selection policy and returns the chosen identifiers in result order
+    /// alongside a caller-owned value. Headers, counts and cover selections for
+    /// those identifiers are then read inside one transaction, so a page never
+    /// mixes states from different writes.
     ///
     /// # Errors
     ///
-    /// Returns [`DbErr`] when the database read or stored-value decoding fails.
-    pub(super) async fn summary(&self, id: i64) -> Result<Option<WatchlistSummary>, DbErr> {
+    /// Returns [`DbErr`] when a database read or stored-value decoding fails.
+    pub(super) async fn summaries_for<T, F>(
+        &self,
+        select: F,
+    ) -> Result<(Vec<WatchlistSummary>, T), DbErr>
+    where
+        F: FnOnce(&[WatchlistRecord]) -> (Vec<i64>, T),
+    {
         let transaction = self.0.begin().await?;
-        let summary = summary(&transaction, id).await?;
+        let headers = storage::headers(&transaction).await?;
+        let (ids, selected) = select(&headers);
+        let summaries = hydrate(&transaction, headers, &ids).await?;
         transaction.commit().await?;
-        Ok(summary)
+        Ok((summaries, selected))
     }
 }
 
-async fn summary<C: ConnectionTrait>(
+/// Hydrates the selected watchlists from already read headers, their stored
+/// counts and one cover selection per order mode.
+async fn hydrate<C: ConnectionTrait>(
     database: &C,
-    id: i64,
-) -> Result<Option<WatchlistSummary>, DbErr> {
-    let Some(watchlist) = storage::watchlist(database, id).await? else {
-        return Ok(None);
-    };
-    let mode = watchlist.item_order_mode;
-    let counts = storage::counts(database, id).await?;
-    let next_unwatched =
-        storage::first_item(database, id, mode, storage::ItemFilter::Unwatched).await?;
-    let first_item = if next_unwatched.is_some() {
-        None
-    } else {
-        storage::first_item(database, id, mode, storage::ItemFilter::All).await?
-    };
-    let stats = summary::build_stats(
-        counts.total_items,
-        counts.watched_items,
-        SummarySelection::new(next_unwatched, first_item.as_ref()),
-    );
-    Ok(Some(WatchlistSummary { watchlist, stats }))
+    headers: Vec<WatchlistRecord>,
+    ids: &[i64],
+) -> Result<Vec<WatchlistSummary>, DbErr> {
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut headers_by_id = headers
+        .into_iter()
+        .map(|header| (header.id, header))
+        .collect::<HashMap<_, _>>();
+    let counts = storage::counts_for(database, ids).await?;
+    let mut selections = HashMap::new();
+    for mode in [ItemOrderMode::Release, ItemOrderMode::Custom] {
+        let mode_ids = ids
+            .iter()
+            .filter(|id| {
+                headers_by_id
+                    .get(id)
+                    .is_some_and(|header| header.item_order_mode == mode)
+            })
+            .copied()
+            .collect::<Vec<_>>();
+        selections.extend(storage::summary_selections(database, &mode_ids, mode).await?);
+    }
+    Ok(ids
+        .iter()
+        .filter_map(|id| {
+            let header = headers_by_id.remove(id)?;
+            let counts = counts.get(id).copied().unwrap_or(storage::ItemCounts {
+                total_items: 0,
+                watched_items: 0,
+            });
+            let selection = selections.remove(id).map(|selected| {
+                let storage::SelectedSummary {
+                    next_unwatched,
+                    cover_item,
+                } = selected;
+                SummarySelection::new(next_unwatched, Some(&cover_item))
+            });
+            Some(WatchlistSummary {
+                watchlist: header,
+                stats: summary::build_stats(
+                    counts.total_items,
+                    counts.watched_items,
+                    selection.unwrap_or_else(|| SummarySelection::new(None, None)),
+                ),
+            })
+        })
+        .collect())
 }
 
 fn order_token(id: i64, mode: ItemOrderMode, items: &[WatchlistItem]) -> String {
