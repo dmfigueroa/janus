@@ -91,7 +91,7 @@ pub async fn list(
             "Unable to load this page. Return to /v2/watchlists and try again.",
         ),
     })?;
-    let representation = format.0;
+    let representation = format.representation();
     format
         .respond(&view, async {
             match representation {

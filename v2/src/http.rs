@@ -61,7 +61,15 @@ impl<S: Send + Sync> FromRequestParts<S> for ResponseFormat {
 }
 
 /// Browse defaults to a full page and reserves fragments for HTMX swaps.
-pub struct BrowseFormat(pub ResponseFormat);
+#[derive(Clone, Copy)]
+pub struct BrowseFormat(ResponseFormat);
+
+impl BrowseFormat {
+    /// The representation selected for this request.
+    pub fn representation(self) -> ResponseFormat {
+        self.0
+    }
+}
 
 impl<S: Send + Sync> FromRequestParts<S> for BrowseFormat {
     type Rejection = Infallible;
@@ -108,6 +116,9 @@ fn select_representation(headers: &HeaderMap, default: OrdinaryDefault) -> Respo
 
 impl ResponseFormat {
     /// Evaluate HTML rendering only when requested, preserving the cheaper API path.
+    ///
+    /// # Errors
+    /// Returns the error produced by the HTML renderer. The JSON path never runs it.
     pub async fn respond<T, E>(
         self,
         json: T,
@@ -138,6 +149,9 @@ impl ResponseFormat {
 
 impl BrowseFormat {
     /// Respond while advertising every representation input, including history restoration.
+    ///
+    /// # Errors
+    /// Returns the error produced by the HTML renderer. JSON responses skip rendering.
     pub async fn respond<T, E>(
         self,
         json: T,
@@ -175,7 +189,7 @@ mod tests {
     }
 
     async fn browse_handler(format: BrowseFormat) -> Response {
-        let representation = format.0;
+        let representation = format.representation();
         format
             .respond(&Input { count: 3 }, async move {
                 Ok::<_, StatusCode>(Html(match representation {
@@ -214,7 +228,7 @@ mod tests {
                     .await
                     .unwrap();
                 assert_eq!(response.status(), StatusCode::OK);
-                assert_eq!(response.headers()[header::VARY], API_VARY);
+                assert_eq!(response.headers()[header::VARY], "HX-Request, Accept");
                 let bytes = response.into_body().collect().await.unwrap().to_bytes();
                 assert_eq!(bytes.as_ref(), expected.as_bytes());
             }
@@ -273,7 +287,10 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(response.status(), StatusCode::OK);
-            assert_eq!(response.headers()[header::VARY], BROWSE_VARY);
+            assert_eq!(
+                response.headers()[header::VARY],
+                "HX-Request, HX-History-Restore-Request, Accept"
+            );
             let bytes = response.into_body().collect().await.unwrap().to_bytes();
             assert_eq!(bytes.as_ref(), expected.as_bytes(), "{headers:?}");
         }
