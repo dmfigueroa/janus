@@ -20,8 +20,6 @@ pub mod discovery;
 
 mod browse;
 
-mod contracts;
-
 mod dialog;
 
 pub mod reorder;
