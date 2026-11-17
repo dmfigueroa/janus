@@ -4,6 +4,7 @@ const Database = require("better-sqlite3");
 const { drizzle } = require("drizzle-orm/better-sqlite3");
 const { migrate } = require("drizzle-orm/better-sqlite3/migrator");
 const path = require("node:path");
+const { bulkWatchlists } = require("./bulk-watchlists.cjs");
 const database = new Database(process.argv[2]);
 const customOrder = "ORDER BY custom_rank IS NULL, custom_rank, id";
 const watchlistItemIds = (watchlistId) =>
@@ -86,6 +87,9 @@ const actions = {
     for (let index = 0; index < 60; index += 1) {
       insert.run(`Bulk list ${String(index).padStart(2, "0")}`);
     }
+  },
+  bulk() {
+    bulkWatchlists(database, 30);
   },
   incompatible() {
     database.exec("ALTER TABLE watchlists ADD COLUMN unexpected TEXT");
