@@ -148,7 +148,12 @@ envelopes stay in `mcp.rs`.
 The browse home is separate from MCP discovery. `browse.rs` turns one typed summary snapshot
 into v1-style cards: stored recency ordering, NFC-plus-lowercase name matching, bound
 continuation cursors, lifecycle sections, cover selection, progress, next-item labels and
-paused dates. `snapshot.rs` reads the home summaries in one transaction with grouped counts
+paused dates. A Light DOM `<watchlist-browser>` owns search, continuation, busy state, status
+announcements and request coordination; its HTMX listeners only handle requests initiated
+inside that element. Search and continuation share a replace policy, so a newer query cancels
+an older page request instead of allowing stale results to win. The server-rendered cursor
+still replaces the current result page and remains bound to the normalized query.
+`snapshot.rs` reads the home summaries in one transaction with grouped counts
 and mode-specific ranked selections instead of loading every item or issuing per-list
 queries. `web.rs` chooses the full page or the grid fragment;
 HTMX search and pagination swap only `#watchlist-browse` and push the new URL. A

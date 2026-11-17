@@ -1,72 +1,64 @@
-function setBrowseBusy(busy) {
-  document.getElementById("watchlist-browse")?.setAttribute("aria-busy", String(busy));
+class WatchlistBrowser extends HTMLElement {
+  pendingRequests = new Set();
+
+  connectedCallback() {
+    this.addEventListener("htmx:beforeRequest", this.onBeforeRequest);
+    this.addEventListener("htmx:afterRequest", this.onAfterRequest);
+    this.addEventListener("htmx:afterSwap", this.onAfterSwap);
+    this.addEventListener("htmx:responseError", this.onRequestFailure);
+    this.addEventListener("htmx:sendError", this.onRequestFailure);
+  }
+
+  disconnectedCallback() {
+    this.removeEventListener("htmx:beforeRequest", this.onBeforeRequest);
+    this.removeEventListener("htmx:afterRequest", this.onAfterRequest);
+    this.removeEventListener("htmx:afterSwap", this.onAfterSwap);
+    this.removeEventListener("htmx:responseError", this.onRequestFailure);
+    this.removeEventListener("htmx:sendError", this.onRequestFailure);
+    this.pendingRequests.clear();
+  }
+
+  onBeforeRequest = (event) => {
+    if (!this.owns(event)) return;
+    this.pendingRequests.add(event.detail.xhr);
+    this.browse?.setAttribute("aria-busy", "true");
+    this.setStatus("");
+  };
+
+  onAfterRequest = (event) => {
+    if (!this.owns(event)) return;
+    this.pendingRequests.delete(event.detail.xhr);
+    this.browse?.setAttribute("aria-busy", String(this.pendingRequests.size > 0));
+    if (event.detail?.successful) this.setStatus("");
+  };
+
+  onAfterSwap = (event) => {
+    if (!this.owns(event)) return;
+    if (event.detail.requestConfig.elt.matches("[data-page-link]")) {
+      this.browse?.querySelector(".browse-heading h2")?.focus();
+    }
+  };
+
+  onRequestFailure = (event) => {
+    if (!this.owns(event)) return;
+    this.setStatus("Unable to load watchlists. Please try again.");
+  };
+
+  get browse() {
+    return this.querySelector("#watchlist-browse");
+  }
+
+  owns(event) {
+    const { xhr } = event.detail ?? {};
+    const requestElement = event.detail?.requestConfig?.elt;
+    const elementIsInside = requestElement instanceof Element && this.contains(requestElement);
+    return elementIsInside || this.pendingRequests.has(xhr);
+  }
+
+  setStatus(message) {
+    const status = this.querySelector("#browse-status");
+    if (status) status.textContent = message;
+  }
 }
 
-function setBrowseStatus(message) {
-  const status = document.getElementById("browse-status");
-  if (status) status.textContent = message;
-}
-
-function announceBrowseFailure() {
-  setBrowseStatus("Unable to load watchlists. Please try again.");
-}
-
-function isPageLink(element) {
-  if (!element) return false;
-  if (typeof element.matches !== "function") return false;
-  return element.matches("[data-page-link]");
-}
-
-function focusHeading(id) {
-  const heading = document.getElementById(id);
-  if (heading) heading.focus();
-}
-
-function requestElement(event) {
-  if (!event.detail) return null;
-  if (!event.detail.requestConfig) return null;
-  return event.detail.requestConfig.elt;
-}
-
-function focusPageResults(event) {
-  const element = requestElement(event);
-  if (!isPageLink(element)) return;
-  focusHeading("browse-heading");
-}
-
-function createTile() {
-  return document.querySelector(".watchlist-grid .create-tile");
-}
-
-function siblingCovers(tile) {
-  return [...tile.parentElement.querySelectorAll(".card-cover")];
-}
-
-function coverHeight(cover) {
-  return cover.getBoundingClientRect().height;
-}
-
-function tallestCover(covers) {
-  return Math.max(0, ...covers.map(coverHeight));
-}
-
-function setCreateTileHeight() {
-  const tile = createTile();
-  if (!tile) return;
-  const height = tallestCover(siblingCovers(tile));
-  if (height > 0) tile.style.height = `${height}px`;
-}
-
-document.addEventListener("htmx:responseError", announceBrowseFailure);
-document.addEventListener("htmx:sendError", announceBrowseFailure);
-document.addEventListener("htmx:beforeRequest", () => {
-  setBrowseBusy(true);
-});
-document.addEventListener("htmx:afterSwap", focusPageResults);
-document.addEventListener("htmx:afterRequest", (event) => {
-  setBrowseBusy(false);
-  if (event.detail?.successful) setBrowseStatus("");
-});
-document.addEventListener("htmx:afterSwap", setCreateTileHeight);
-window.addEventListener("resize", setCreateTileHeight);
-setCreateTileHeight();
+customElements.define("watchlist-browser", WatchlistBrowser);
