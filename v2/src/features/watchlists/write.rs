@@ -111,24 +111,21 @@ impl Watchlists {
             let current_mode =
                 ItemOrderMode::from_stored(&row.try_get::<String>("", "item_order_mode")?)?;
             if current_mode == ItemOrderMode::Release {
-                let items = transaction
-                    .query_all_raw(statement(
+                transaction
+                    .execute_raw(statement(
                         &format!(
-                            "SELECT id FROM watchlist_items WHERE watchlist_id=? ORDER BY {}",
+                            "WITH release_order AS (\
+                               SELECT id, ROW_NUMBER() OVER (ORDER BY {}) AS rank \
+                               FROM watchlist_items WHERE watchlist_id=?\
+                             ) \
+                             UPDATE watchlist_items \
+                             SET custom_rank=(SELECT rank FROM release_order WHERE release_order.id=watchlist_items.id) \
+                             WHERE watchlist_id=?",
                             ItemOrderMode::Release.order_sql()
                         ),
-                        vec![changes.watchlist_id.into()],
+                        vec![changes.watchlist_id.into(), changes.watchlist_id.into()],
                     ))
                     .await?;
-                for (rank, item) in items.iter().enumerate() {
-                    let item_id = item.try_get::<i64>("", "id")?;
-                    transaction
-                        .execute_raw(statement(
-                            "UPDATE watchlist_items SET custom_rank=? WHERE id=? AND watchlist_id=?",
-                            vec![((rank + 1) as i64).into(), item_id.into(), changes.watchlist_id.into()],
-                        ))
-                        .await?;
-                }
             }
         }
 
