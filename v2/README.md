@@ -106,4 +106,5 @@ list or detail surface through HTMX. See [PARITY.md](PARITY.md) for evidence and
 acceptance.
 
 Reorder DOM regression: `node --test v2/tests/reorder-browser.cjs` (Node 24.12 or later
-with npm dependencies). Dialog DOM regression: `node --test v2/tests/watchlist-form-browser.cjs`.
+with npm dependencies). Dialog DOM regression: `node --test v2/tests/watchlist-form-browser.cjs`. Browse card sizing:
+`node --test v2/tests/browse-browser.cjs`.

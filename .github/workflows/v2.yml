@@ -57,7 +57,7 @@ jobs:
         working-directory: .
       - run: cargo test --locked
       - name: Browser DOM tests
-        run: node --test tests/watchlist-form-browser.cjs tests/reorder-browser.cjs
+        run: node --test tests/browse-browser.cjs tests/watchlist-form-browser.cjs tests/reorder-browser.cjs
       - uses: Swatinem/rust-cache@v2
         if: github.event_name == 'push'
         with:

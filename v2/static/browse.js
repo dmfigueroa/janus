@@ -34,6 +34,29 @@ function focusPageResults(event) {
   focusHeading("browse-heading");
 }
 
+function createTile() {
+  return document.querySelector(".watchlist-grid .create-tile");
+}
+
+function siblingCards(tile) {
+  return [...tile.parentElement.querySelectorAll(".watchlist-card:not(.create-tile)")];
+}
+
+function cardHeight(card) {
+  return card.getBoundingClientRect().height;
+}
+
+function tallestCard(cards) {
+  return Math.max(0, ...cards.map(cardHeight));
+}
+
+function setCreateTileHeight() {
+  const tile = createTile();
+  if (!tile) return;
+  const height = tallestCard(siblingCards(tile));
+  if (height > 0) tile.style.height = `${height}px`;
+}
+
 document.addEventListener("htmx:responseError", announceBrowseFailure);
 document.addEventListener("htmx:sendError", announceBrowseFailure);
 document.addEventListener("htmx:beforeRequest", () => {
@@ -44,3 +67,6 @@ document.addEventListener("htmx:afterRequest", (event) => {
   setBrowseBusy(false);
   if (event.detail?.successful) setBrowseStatus("");
 });
+document.addEventListener("htmx:afterSwap", setCreateTileHeight);
+window.addEventListener("resize", setCreateTileHeight);
+setCreateTileHeight();
