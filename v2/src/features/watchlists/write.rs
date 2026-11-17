@@ -120,10 +120,15 @@ impl Watchlists {
                              ) \
                              UPDATE watchlist_items \
                              SET custom_rank=(SELECT rank FROM release_order WHERE release_order.id=watchlist_items.id) \
-                             WHERE watchlist_id=?",
+                             WHERE watchlist_id=? \
+                               AND NOT EXISTS (SELECT 1 FROM watchlist_items WHERE watchlist_id=? AND custom_rank IS NOT NULL)",
                             ItemOrderMode::Release.order_sql()
                         ),
-                        vec![changes.watchlist_id.into(), changes.watchlist_id.into()],
+                        vec![
+                            changes.watchlist_id.into(),
+                            changes.watchlist_id.into(),
+                            changes.watchlist_id.into(),
+                        ],
                     ))
                     .await?;
             }
