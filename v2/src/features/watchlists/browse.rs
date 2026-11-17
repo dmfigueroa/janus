@@ -44,7 +44,7 @@ impl BrowseOrder {
 
     fn label(self) -> &'static str {
         match self {
-            Self::Recency => "Watch Now order",
+            Self::Recency => "Default",
             Self::CreatedAt => "Newest first",
             Self::LastWatched => "Recently watched",
             Self::LastAdded => "Recently added",
