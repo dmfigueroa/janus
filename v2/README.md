@@ -159,3 +159,14 @@ with npm dependencies). Dialog DOM regression: `node --test v2/tests/watchlist-f
 Dialog viewport layout: `node --test v2/tests/dialog-layout-browser.cjs` (requires Chromium;
 set `PLAYWRIGHT_BROWSERS=chromium,webkit` to also cover WebKit).
 Browse card sizing: `node --test v2/tests/browse-browser.cjs`.
+Full-page layout regression: `node --test v2/tests/layout-browser.cjs`. The check builds the v2
+debug binary, creates a disposable v1-migrated fixture database, starts its own v2 process on a
+free port and stops it afterwards. It renders `/v2/watchlists` at `390x844` and `1280x800` and
+fails with measured and expected values when footer items leave one row or drift horizontally,
+the grid loses its two mobile or four desktop columns, a card exceeds the 220px cap, or the
+visible "Watchlists" heading regresses. Expected values come from
+`v2/tests/v1-layout-baseline.json`, recorded from the v1 home. To refresh that baseline, start
+`npm run preview:local` in another terminal and run
+`JANUS_LAYOUT_RECORD=1 node --test v2/tests/layout-browser.cjs` (set `JANUS_V1_BASE_URL` for a
+different v1 address). It needs Chromium: install it once with
+`npx playwright-core install chromium` or point `PLAYWRIGHT_CHROMIUM` at an existing executable.

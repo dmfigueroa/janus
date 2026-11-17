@@ -61,7 +61,7 @@ jobs:
       - name: Browser tests
         env:
           PLAYWRIGHT_BROWSERS: chromium,webkit
-        run: node --test tests/browse-browser.cjs tests/watchlist-form-browser.cjs tests/reorder-browser.cjs tests/dialog-layout-browser.cjs
+        run: node --test tests/browse-browser.cjs tests/watchlist-form-browser.cjs tests/reorder-browser.cjs tests/dialog-layout-browser.cjs tests/layout-browser.cjs
       - uses: Swatinem/rust-cache@v2
         if: github.event_name == 'push'
         with:

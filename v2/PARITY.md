@@ -271,3 +271,28 @@ validation/success headers; dialog DOM tests cover opening focus, cancel focus r
 success announcements and pending/error state. `cargo fmt --check`, Clippy
 and all Rust tests pass, and the reorder/dialog browser suites pass locally. No deployed,
 Access-authenticated client, physical-device or owner acceptance is claimed for this slice.
+
+## Issue #330 layout regression evidence
+
+`node --test v2/tests/layout-browser.cjs` builds the v2 debug binary, creates a disposable
+v1-migrated database through the existing `create_v1_fixture.cjs` helper plus extra rotation
+cards, starts its own v2 process on a free port, renders `/v2/watchlists` in headless Chromium
+at `390x844` and `1280x800`, then stops the process and removes the fixture. It needs no
+deployed preview and no manually started server.
+
+Expected geometry is the v1 home measured in this worktree and stored in
+`v2/tests/v1-layout-baseline.json`:
+
+- `390x844`: three footer items on one row at `38.33..118.33`, `155..235` and
+  `271.66..351.66`; two grid columns; 220px card cap; visible "Watchlists" heading.
+- `1280x800`: the same three items on one row at `464..544`, `600..680` and `736..816`;
+  four grid columns; 220px card cap; visible "Watchlists" heading.
+
+The check fails with measured and expected values when footer items stack or drift more than
+1px horizontally, when the column count or the 220px cap changes, or when the heading is hidden
+or retitled. Local negative checks confirmed failures for a column-direction footer, a
+three-column desktop grid, a removed card cap and a hidden heading. Refresh the baseline from a
+running v1 with `JANUS_LAYOUT_RECORD=1 node --test v2/tests/layout-browser.cjs` after
+`npm run preview:local`.
+
+This is emulated Chromium geometry at two viewports, not physical-device or full visual parity.
