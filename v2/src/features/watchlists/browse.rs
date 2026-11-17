@@ -38,6 +38,7 @@ impl std::error::Error for BrowseError {}
 pub struct BrowseSection {
     pub title: Option<&'static str>,
     pub collapsible: bool,
+    pub create_tile: bool,
     pub cards: Vec<BrowseCard>,
 }
 
@@ -161,6 +162,7 @@ fn single_section(cards: Vec<BrowseCard>) -> Vec<BrowseSection> {
         .then_some(BrowseSection {
             title: None,
             collapsible: false,
+            create_tile: true,
             cards,
         })
         .into_iter()
@@ -184,17 +186,18 @@ fn lifecycle_sections(cards: Vec<BrowseCard>) -> Vec<BrowseSection> {
         },
     );
     let groups = [
-        ("Watchlists", false, rotation),
-        ("Completed", true, completed),
-        ("Empty", true, empty),
-        ("Paused", true, paused),
+        ("Watchlists", false, true, rotation),
+        ("Completed", true, false, completed),
+        ("Empty", true, false, empty),
+        ("Paused", true, false, paused),
     ];
     groups
         .into_iter()
-        .filter(|(_, _, cards)| !cards.is_empty())
-        .map(|(title, collapsible, cards)| BrowseSection {
+        .filter(|(_, _, create_tile, cards)| *create_tile || !cards.is_empty())
+        .map(|(title, collapsible, create_tile, cards)| BrowseSection {
             title: Some(title),
             collapsible,
+            create_tile,
             cards,
         })
         .collect()
@@ -490,7 +493,12 @@ mod tests {
         let mut summaries = vec![summary(1, "List", "2020-01-01", None, true, 2, 1)];
         summaries[0].stats.next_unwatched = Some(item(Some("3"), Some(2), "tmdb", "episode"));
         let view = BrowseView::build(&summaries, &filters()).unwrap();
-        let card = &view.sections[0].cards[0];
+        let card = view
+            .sections
+            .iter()
+            .flat_map(|section| &section.cards)
+            .find(|card| card.id == 1)
+            .unwrap();
         assert_eq!(card.next_label.as_deref(), Some("S2:E3 • Episode title"));
         assert_eq!(card.paused_since.as_deref(), Some("January 5, 2021"));
         assert_eq!(card.cover, "https://image.tmdb.org/t/p/w500/poster.jpg");

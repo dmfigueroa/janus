@@ -27,6 +27,7 @@ async fn browser_assets_are_served_locally() {
         "/v2/static/app.css",
         "/v2/static/app.js",
         "/v2/static/browse.js",
+        "/v2/static/watchlist-dialog.js",
         "/v2/static/vendor/htmx.min.js",
         "/v2/static/vendor/Sortable.min.js",
     ] {

@@ -28,7 +28,7 @@ compatibility reconciliation and regeneration of the v1 schema contract through 
 ## Workflow checklist
 
 - [x] Watchlist listing and name search through web/MCP reads.
-- [ ] Watchlist create, edit, delete and merge.
+- [x] Watchlist create and edit; delete and merge remain outstanding.
 - [x] Existing detail reads, text filters, stored release/custom order and release-year/watched grouping.
 - [x] Hidden-item-safe custom reorder.
 - [ ] Order-mode changes.
@@ -50,13 +50,14 @@ compatibility reconciliation and regeneration of the v1 schema contract through 
 
 ## MCP source inventory
 
-The four prerequisite read tools and `reorder_watchlist_items` are implemented; the other
+The four prerequisite read tools, `create_watchlists`, `update_watchlists` and
+`reorder_watchlist_items` are implemented; the other
 tools are unported. Contracts live in src/app/mcp at the source revision above.
 
 - [ ] add_custom_items_to_watchlists
 - [ ] add_media_to_watchlists
 - [ ] create_lineups
-- [ ] create_watchlists
+- [x] create_watchlists
 - [ ] delete_lineups
 - [ ] delete_watchlists
 - [ ] edit_watchlist_items
@@ -79,7 +80,7 @@ tools are unported. Contracts live in src/app/mcp at the source revision above.
 - [ ] set_watchlist_order
 - [ ] skip_watchlists
 - [ ] update_lineups
-- [ ] update_watchlists
+- [x] update_watchlists
 
 ## Issue #253 evidence
 
@@ -237,3 +238,32 @@ The detail header reuses v1's "watched/total Watched" and "complete" progress la
 retained as a v2 addition because v2 has no media search page; it is not presented as v1
 parity. `cargo fmt --check`, Clippy and all Rust tests pass against disposable v1 databases.
 No deployed, browser, physical-device or owner acceptance is claimed for this style pass.
+
+## Issue #257 create/edit evidence
+
+Web and MCP call the same create and update operations. Creation keeps v1's insert defaults:
+omitted order mode stores `release`, pause stays null, `created_at` comes from SQLite and the
+new list joins the back of the rotation through the same millisecond-monotonic expression as
+watched/skipped lists. Updates write only submitted fields and set `updated_at` to
+`CURRENT_TIMESTAMP`, standing in for Drizzle's application-side `updatedAt` hook. Clearing a
+description stores null; creation preserves an explicitly empty description exactly as v1's
+web form does.
+
+The home create tile and mobile button open a native dialog. The tile remains available in
+search results and when the collection is empty. The detail header exposes the edit dialog.
+Both forms support inline validation, pending and error states, focus restoration to the exact
+opening control, dismissal through Cancel, Escape or the backdrop, and a success announcement.
+Server failures keep the dialog open with an inline message. A successful HTMX write raises one
+event that re-reads the current URL and replaces only the grid or detail surface, preserving
+search and pagination; JSON callers receive structured outcomes. MCP `create_watchlists` and
+`update_watchlists` keep input order, isolate invalid or missing entries and return structured
+batch results. Null names, null update order modes and null creation descriptions are rejected
+as in v1's Zod contracts.
+
+Automated coverage: disposable v1-migrated SQLite tests verify validation, creation defaults,
+editable fields, timestamps, schema preservation, ordered MCP batches, independent outcomes,
+and reads through v1's tooling after v2 writes. HTTP tests assert the refresh hooks and
+validation/success headers; dialog DOM tests cover opening focus, cancel focus restoration,
+success announcements and pending/error state. `cargo fmt --check`, Clippy
+and all Rust tests pass, and the reorder/dialog browser suites pass locally. No deployed,
+Access-authenticated client, physical-device or owner acceptance is claimed for this slice.

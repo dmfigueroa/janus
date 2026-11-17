@@ -216,7 +216,7 @@ pub(super) async fn first_item<C: ConnectionTrait>(
         .transpose()
 }
 
-fn record(row: &QueryResult) -> Result<WatchlistRecord, DbErr> {
+pub(super) fn record(row: &QueryResult) -> Result<WatchlistRecord, DbErr> {
     Ok(WatchlistRecord {
         id: row.try_get("", "id")?,
         name: row.try_get("", "name")?,

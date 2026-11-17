@@ -1,0 +1,12 @@
+<dialog
+  id="watchlist-dialog"
+  class="dialog"
+  aria-labelledby="watchlist-dialog-title"
+  data-watchlist-dialog
+>
+  <header class="dialog-header">
+    <h2 id="watchlist-dialog-title">{{form.title}}</h2>
+    <p class="dialog-help">{{form.help}}</p>
+  </header>
+  {% include "watchlist-form.html" %}
+</dialog>

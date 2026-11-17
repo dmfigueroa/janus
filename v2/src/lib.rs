@@ -71,6 +71,18 @@ fn base_router(database_ready: bool) -> Router {
             }),
         )
         .route(
+            "/v2/static/watchlist-dialog.js",
+            get(|| async {
+                (
+                    [
+                        (header::CONTENT_TYPE, "text/javascript"),
+                        (header::CACHE_CONTROL, "no-cache"),
+                    ],
+                    include_str!("../static/watchlist-dialog.js"),
+                )
+            }),
+        )
+        .route(
             "/v2/static/browse.js",
             get(|| async {
                 (
@@ -113,10 +125,13 @@ fn base_router(database_ready: bool) -> Router {
 pub fn database_router(database: sea_orm::DatabaseConnection) -> Router {
     let state = features::watchlists::Watchlists(database);
     Router::new()
-        .route("/v2/watchlists", get(features::watchlists::web::list))
+        .route(
+            "/v2/watchlists",
+            get(features::watchlists::web::list).post(features::watchlists::web::create),
+        )
         .route(
             "/v2/watchlists/{id}",
-            get(features::watchlists::web::detail),
+            get(features::watchlists::web::detail).post(features::watchlists::web::update),
         )
         .route(
             "/v2/watchlists/{id}/reorder",
@@ -127,7 +142,7 @@ pub fn database_router(database: sea_orm::DatabaseConnection) -> Router {
         .nest_service(
             "/v2/mcp",
             StreamableHttpService::new(
-                move || Ok(features::watchlists::mcp::ReadMcp(state.clone())),
+                move || Ok(features::watchlists::mcp::WatchlistMcp(state.clone())),
                 sessions(),
                 StreamableHttpServerConfig::default().with_json_response(true),
             ),

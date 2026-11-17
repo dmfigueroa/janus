@@ -29,7 +29,8 @@
   </details>
   {% else %}
   <div class="watchlist-grid">
-    {% for card in section.cards %} {% include "watchlist-card.html" %} {% endfor %}
+    {% for card in section.cards %} {% include "watchlist-card.html" %} {% endfor %} {% if
+    section.create_tile %} {% include "watchlist-create-tile.html" %} {% endif %}
   </div>
   {% endif %} {% endfor %} {% if let Some(message) = view.empty_message %}
   <div class="empty-state">

@@ -94,6 +94,15 @@ async fn existing_watchlist_renders_ids_order_filters_and_escaped_content_withou
     assert!(html.contains("class=\"timeline\""), "{html}");
     assert!(html.contains("id=\"reorder-recovery\""), "{html}");
     assert!(
+        html.contains("data-watchlist-dialog-open=\"edit\""),
+        "{html}"
+    );
+    assert!(html.contains("hx-post=\"/v2/watchlists/41\""), "{html}");
+    assert!(
+        html.contains("value=\"Café 東京 &#60;collection&#62;\""),
+        "{html}"
+    );
+    assert!(
         html.contains("hx-post=\"/v2/watchlists/41/reorder?query=&amp;unwatched=true\""),
         "{html}"
     );
@@ -172,6 +181,13 @@ async fn watchlist_home_renders_v1_cards_sections_and_local_navigation() {
     assert!(html.contains("role=\"progressbar\""), "{html}");
     assert!(html.contains("aria-label=\"Primary navigation\""), "{html}");
     assert!(!html.contains("Completed (0)"), "{html}");
+    assert!(
+        html.contains("data-watchlist-dialog-open=\"create\""),
+        "{html}"
+    );
+    assert!(html.contains("id=\"watchlist-dialog\""), "{html}");
+    assert!(html.contains("hx-post=\"/v2/watchlists\""), "{html}");
+    assert!(html.contains("Create New List"), "{html}");
 
     let json_response = app
         .clone()
@@ -317,7 +333,7 @@ async fn mcp_discovers_and_reads_existing_watchlist_with_baseline_envelopes_and_
         .await,
     )
     .await;
-    assert_eq!(tools["tools"].as_array().unwrap().len(), 5);
+    assert_eq!(tools["tools"].as_array().unwrap().len(), 7);
     let read=result(rpc(&app,json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_watchlist","arguments":{"watchlistId":41,"pageSize":1}}}),Some(&session)).await).await;
     assert!(read.get("resultType").is_none());
     assert!(read.get("isError").is_none());
@@ -1363,4 +1379,376 @@ async fn json_input_can_request_filtered_html_with_accept_header() {
     assert!(html.contains("?query=nonexistent-title&amp;unwatched=true"));
     assert!(html.contains("No items match these filters."));
     assert!(!html.contains("data-item-id="));
+}
+
+async fn schema_snapshot(database: &sea_orm::DatabaseConnection) -> Vec<String> {
+    use sea_orm::{ConnectionTrait, DbBackend, Statement};
+    database
+        .query_all_raw(Statement::from_string(
+            DbBackend::Sqlite,
+            "SELECT type, name, tbl_name, sql FROM sqlite_master \
+             WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name",
+        ))
+        .await
+        .unwrap()
+        .iter()
+        .map(|row| {
+            format!(
+                "{}|{}|{}|{}",
+                row.try_get::<String>("", "type").unwrap(),
+                row.try_get::<String>("", "name").unwrap(),
+                row.try_get::<String>("", "tbl_name").unwrap(),
+                row.try_get::<Option<String>>("", "sql")
+                    .unwrap()
+                    .unwrap_or_default()
+            )
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn web_create_preserves_validation_defaults_timestamps_and_v1_compatibility() {
+    let fixture = Fixture::v1();
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let schema = schema_snapshot(&database).await;
+    let lists = janus_v2::Watchlists(database.clone());
+    let app = janus_v2::database_router(database);
+
+    let invalid = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"name":"   "}).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(invalid.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        serde_json::from_str::<Value>(&body(invalid).await).unwrap(),
+        json!({"success":false,"code":"validation_error","message":"Name is required"})
+    );
+
+    let null_description = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"name":"From v2","description":null}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(null_description.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        serde_json::from_str::<Value>(&body(null_description).await).unwrap(),
+        json!({"success":false,"code":"validation_error","message":"Invalid description."})
+    );
+
+    let created = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"name":"From v2","description":""}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(created.status(), StatusCode::OK);
+    let created: Value = serde_json::from_str(&body(created).await).unwrap();
+    assert_eq!(created["success"], true);
+    assert_eq!(created["code"], "created");
+    assert_eq!(created["message"], "Watchlist created.");
+    assert_eq!(created["watchlist"]["name"], "From v2");
+    assert_eq!(created["watchlist"]["description"], "");
+    assert_eq!(created["watchlist"]["itemOrderMode"], "release");
+    let id = created["watchlist"]["id"].as_i64().unwrap();
+
+    let detail = lists.detail(id).await.unwrap().unwrap();
+    let record = &detail.watchlist.watchlist;
+    assert_eq!(record.created_at.len(), 19, "{}", record.created_at);
+    assert_eq!(record.created_at[4..5], *"-");
+    assert!(record.updated_at.is_none());
+    assert!(record.paused_at.is_none());
+    let rotation = record.last_watched_at.as_deref().unwrap();
+    assert_eq!(rotation.len(), 23, "{rotation}");
+    assert_eq!(record.item_order_mode, janus_v2::ItemOrderMode::Release);
+
+    let htmx = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists")
+                .header("hx-request", "true")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(
+                    "name=HTMX+created&description=&itemOrderMode=custom",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(htmx.status(), StatusCode::NO_CONTENT);
+    assert!(
+        htmx.headers()["hx-trigger"]
+            .to_str()
+            .unwrap()
+            .contains("watchlist-saved")
+    );
+    assert_eq!(body(htmx).await, "");
+
+    let invalid_html = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists")
+                .header("hx-request", "true")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from("name=+&description=Kept&itemOrderMode=custom"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(invalid_html.status(), StatusCode::OK);
+    let html = body(invalid_html).await;
+    assert!(html.contains("Name is required"), "{html}");
+    assert!(html.contains("Kept</textarea"), "{html}");
+    assert!(!html.contains("<dialog"), "{html}");
+
+    assert_eq!(schema, schema_snapshot(&lists.0).await);
+    change_v1(&fixture, "check-web-created");
+}
+
+#[tokio::test]
+async fn web_update_changes_only_submitted_fields_and_reports_stale_targets() {
+    let fixture = Fixture::v1();
+    let lists = janus_v2::Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    let before = lists.detail(41).await.unwrap().unwrap().watchlist.watchlist;
+    let app = janus_v2::database_router(lists.0.clone());
+
+    let updated = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"name":"Renamed v2","description":"","itemOrderMode":"release"})
+                        .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(updated.status(), StatusCode::OK);
+    assert_eq!(
+        serde_json::from_str::<Value>(&body(updated).await).unwrap(),
+        json!({"success":true,"code":"updated","message":"Watchlist updated.","watchlistId":41})
+    );
+    let after = lists.detail(41).await.unwrap().unwrap().watchlist.watchlist;
+    assert_eq!(after.name, "Renamed v2");
+    assert_eq!(after.description, None);
+    assert_eq!(after.item_order_mode, janus_v2::ItemOrderMode::Release);
+    assert_eq!(after.created_at, before.created_at);
+    let updated_at = after.updated_at.as_deref().unwrap();
+    assert_ne!(Some(updated_at), before.updated_at.as_deref());
+    assert_eq!(updated_at.len(), 19, "{updated_at}");
+    assert_eq!(after.last_watched_at, before.last_watched_at);
+    assert_eq!(after.paused_at, before.paused_at);
+
+    let missing = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/99999")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"name":"Missing"}).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+    assert_eq!(
+        serde_json::from_str::<Value>(&body(missing).await).unwrap(),
+        json!({"success":false,"code":"not_found","message":"Watchlist not found.","watchlistId":99999})
+    );
+
+    let empty = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41")
+                .header("hx-request", "true")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(
+                    "name=Renamed+v2&description=&itemOrderMode=custom",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(empty.status(), StatusCode::NO_CONTENT);
+    assert!(
+        empty.headers()["hx-trigger"]
+            .to_str()
+            .unwrap()
+            .contains("Changes saved successfully")
+    );
+
+    let validation = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41")
+                .header("hx-request", "true")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(
+                    "name=&description=Still+here&itemOrderMode=custom",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(validation.status(), StatusCode::OK);
+    let html = body(validation).await;
+    assert!(html.contains("Name is required"), "{html}");
+    assert!(html.contains("Still here"), "{html}");
+    assert!(html.contains("id=\"watchlist-form\""), "{html}");
+}
+
+#[tokio::test]
+async fn mcp_create_and_update_keep_ordered_independent_batch_outcomes() {
+    let fixture = Fixture::v1();
+    let lists = janus_v2::Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    let app = janus_v2::database_router(lists.0.clone());
+    let initialized = rpc(
+        &app,
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"write-test","version":"1"}}}),
+        None,
+    )
+    .await;
+    let session = initialized.headers()["mcp-session-id"]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let _ = result(initialized).await;
+    let tools = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":2,"method":"tools/list"}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    let tools = tools["tools"].as_array().unwrap();
+    assert_eq!(tools.len(), 7);
+    let create = tools
+        .iter()
+        .find(|tool| tool["name"] == "create_watchlists")
+        .unwrap();
+    assert_eq!(create["annotations"]["readOnlyHint"], false);
+    assert_eq!(create["annotations"]["destructiveHint"], false);
+    assert_eq!(
+        create["inputSchema"]["properties"]["watchlists"]["minItems"],
+        1
+    );
+    assert_eq!(
+        create["outputSchema"]["properties"]["results"]["items"]["required"],
+        json!(["index", "success", "code", "message"])
+    );
+    let update = tools
+        .iter()
+        .find(|tool| tool["name"] == "update_watchlists")
+        .unwrap();
+    assert_eq!(update["annotations"]["readOnlyHint"], false);
+    assert_eq!(update["annotations"]["destructiveHint"], false);
+
+    let created = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"create_watchlists","arguments":{"watchlists":[
+                {"name":"MCP created","description":"Created through MCP","itemOrderMode":"custom"},
+                {"description":"Name is missing"},
+                {"name":""}
+            ]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    let results = created["structuredContent"]["results"].as_array().unwrap();
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0]["index"], 0);
+    assert_eq!(results[0]["success"], true);
+    assert_eq!(results[0]["code"], "created");
+    assert_eq!(results[0]["message"], "Watchlist created.");
+    assert_eq!(results[0]["watchlist"]["name"], "MCP created");
+    assert_eq!(
+        results[0]["watchlist"]["description"],
+        "Created through MCP"
+    );
+    assert_eq!(results[0]["watchlist"]["itemOrderMode"], "custom");
+    assert_eq!(results[1]["index"], 1);
+    assert_eq!(results[1]["success"], false);
+    assert_eq!(results[1]["code"], "validation_error");
+    assert_eq!(results[1]["message"], "Name is required");
+    assert_eq!(results[2]["message"], "Name is required");
+    let created_id = results[0]["watchlist"]["id"].as_i64().unwrap();
+
+    let updated = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"update_watchlists","arguments":{"watchlists":[
+                {"watchlistId":created_id,"description":null,"itemOrderMode":"release"},
+                {"watchlistId":999999,"name":"Missing"},
+                {"watchlistId":created_id}
+            ]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    let results = updated["structuredContent"]["results"].as_array().unwrap();
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0]["index"], 0);
+    assert_eq!(results[0]["success"], true);
+    assert_eq!(results[0]["code"], "updated");
+    assert_eq!(results[0]["message"], "Watchlist updated.");
+    assert_eq!(results[0]["watchlistId"], created_id);
+    assert_eq!(results[1]["index"], 1);
+    assert_eq!(results[1]["success"], false);
+    assert_eq!(results[1]["code"], "not_found");
+    assert_eq!(results[1]["message"], "Watchlist not found.");
+    assert_eq!(results[1]["watchlistId"], 999999);
+    assert_eq!(results[2]["success"], false);
+    assert_eq!(results[2]["code"], "validation_error");
+    assert_eq!(results[2]["message"], "No fields to update.");
+    assert_eq!(results[2]["watchlistId"], created_id);
+
+    let detail = lists.detail(created_id).await.unwrap().unwrap();
+    assert_eq!(detail.watchlist.watchlist.description, None);
+    assert_eq!(
+        detail.watchlist.watchlist.item_order_mode,
+        janus_v2::ItemOrderMode::Release
+    );
+    assert!(detail.watchlist.watchlist.updated_at.is_some());
+    change_v1(&fixture, "check-mcp-created");
 }

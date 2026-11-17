@@ -1,0 +1,88 @@
+<form
+  id="watchlist-form"
+  class="dialog-form"
+  method="post"
+  action="{{form.action}}"
+  hx-post="{{form.action}}"
+  hx-target="#watchlist-form"
+  hx-swap="outerHTML"
+  hx-disabled-elt="find button[type='submit']"
+  hx-indicator="#watchlist-form-pending"
+  aria-describedby="watchlist-form-error"
+>
+  {% if let Some(id) = form.watchlist_id %}
+  <input type="hidden" name="watchlistId" value="{{id}}" />
+  {% endif %}
+  <fieldset class="dialog-fields">
+    <legend class="visually-hidden">{{form.title}}</legend>
+    <div class="form-field">
+      <label for="watchlist-name">Name</label>
+      <input
+        id="watchlist-name"
+        name="name"
+        type="text"
+        value="{{form.name}}"
+        placeholder="e.g., Marvel Cinematic Universe"
+        autocomplete="off"
+        required
+        {%
+        if
+        form.name_invalid()
+        %}aria-invalid="true"
+        {%
+        endif
+        %}
+      />
+    </div>
+    <div class="form-field">
+      <label for="watchlist-description">Description</label>
+      <textarea
+        id="watchlist-description"
+        name="description"
+        placeholder="Optional description..."
+        rows="3"
+      >
+{{form.description}}</textarea
+      >
+    </div>
+    <fieldset class="form-field order-field">
+      <legend>Order</legend>
+      <label>
+        <input
+          type="radio"
+          name="itemOrderMode"
+          value="release"
+          {%
+          if
+          form.release_selected()
+          %}checked{%
+          endif
+          %}
+        />
+        Release order
+      </label>
+      <label>
+        <input
+          type="radio"
+          name="itemOrderMode"
+          value="custom"
+          {%
+          if
+          form.custom_selected()
+          %}checked{%
+          endif
+          %}
+        />
+        Custom order
+      </label>
+    </fieldset>
+  </fieldset>
+  {% if let Some(error) = form.error %}
+  <p id="watchlist-form-error" class="form-error" role="alert">{{error}}</p>
+  {% endif %}
+  <footer class="dialog-footer">
+    <span id="watchlist-form-pending" class="htmx-indicator" role="status">Saving…</span>
+    <button type="button" class="button-secondary" data-watchlist-dialog-close>Cancel</button>
+    <button type="submit" class="button-primary">{{form.submit_label}}</button>
+  </footer>
+</form>

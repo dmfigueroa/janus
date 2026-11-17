@@ -865,3 +865,257 @@ select {
     transform: none;
   }
 }
+
+/* Watchlist create/edit */
+
+.create-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 100%;
+  padding: 0.75rem;
+  border: 2px dashed var(--border);
+  border-radius: 18px;
+  color: var(--fg-muted);
+  text-align: center;
+  text-decoration: none;
+  transition:
+    border-color 150ms var(--ease-out),
+    background-color 150ms var(--ease-out),
+    color 150ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .create-tile:hover {
+    border-color: var(--fg-muted);
+    background: var(--bg-subtle);
+    color: var(--fg-default);
+  }
+}
+
+.create-tile:active {
+  transform: scale(0.98);
+}
+
+.create-tile-art {
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  background: var(--bg-subtle);
+}
+
+.create-tile-title {
+  font-weight: 600;
+}
+
+.create-watchlist-floating {
+  position: fixed;
+  right: 1.5rem;
+  bottom: 6rem;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: var(--shadow-lg);
+  text-decoration: none;
+  transition:
+    transform 120ms ease-out,
+    background-color 150ms ease-out;
+}
+
+@media (min-width: 768px) {
+  .create-watchlist-floating {
+    display: none;
+  }
+}
+
+.watchlist-edit {
+  margin-left: auto;
+  min-height: 44px;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  cursor: pointer;
+}
+
+.dialog {
+  width: min(30rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--bg-surface);
+  color: var(--fg-default);
+  box-shadow: var(--shadow-lg);
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 0.55);
+}
+
+.dialog-header {
+  padding: 1.25rem 1.25rem 0;
+}
+
+.dialog-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.025em;
+}
+
+.dialog-help {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+  color: var(--fg-muted);
+}
+
+.dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.dialog-form[aria-busy="true"] {
+  opacity: 0.8;
+}
+
+.dialog-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.form-field > label,
+.order-field legend {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.form-field input[type="text"],
+.form-field textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-canvas);
+}
+
+.form-field textarea {
+  resize: vertical;
+}
+
+.field-error,
+.form-error {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--danger);
+}
+
+.form-error:empty {
+  display: none;
+}
+
+.order-field {
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.order-field label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  font-weight: 400;
+}
+
+.order-field input[type="radio"] {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--accent);
+}
+
+.dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.dialog-footer .htmx-indicator {
+  margin-right: auto;
+}
+
+.button-primary,
+.button-secondary {
+  min-height: 44px;
+  padding: 0.55rem 1rem;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.button-primary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.button-secondary {
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+
+.button-primary:disabled,
+.button-secondary:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.notification {
+  position: fixed;
+  right: 1rem;
+  bottom: 5.5rem;
+  left: 1rem;
+  z-index: 60;
+  max-width: 28rem;
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+  border-radius: 14px;
+  background: var(--fg-default);
+  color: var(--bg-canvas);
+  box-shadow: var(--shadow-lg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .create-tile,
+  .create-watchlist-floating {
+    transition: none;
+  }
+  .create-tile:active {
+    transform: none;
+  }
+}

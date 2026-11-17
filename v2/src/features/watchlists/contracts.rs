@@ -5,6 +5,17 @@ pub fn output_schema(name: &str) -> serde_json::Map<String, Value> {
     let item = json!({"type":"object","properties":{"id":{"type":"number"},"watchlistId":{"type":"number"},"provider":{"type":"string"},"providerId":{"type":"string"},"mediaType":media,"title":{"type":"string"},"parent":{"type":"object","properties":{"providerId":nullable_string,"title":nullable_string},"required":["providerId","title"]},"episode":nullable_string,"isWatched":{"type":["boolean","null"]}},"required":["id","watchlistId","provider","providerId","mediaType","title","parent","episode","isWatched"]});
     let title = json!({"type":"object","properties":{"provider":{"type":"string"},"providerId":{"type":"string"},"mediaType":media,"title":{"type":"string"},"matchingItemCount":{"type":"number"}},"required":["provider","providerId","mediaType","title","matchingItemCount"]});
     let summary = json!({"type":"object","properties":{"id":{"type":"number"},"name":{"type":"string"},"description":nullable_string,"itemOrderMode":{"type":"string","enum":["release","custom"]},"createdAt":{"type":"string"},"updatedAt":nullable_string,"lastWatchedAt":nullable_string,"lastItemAddedAt":nullable_string,"pausedAt":nullable_string,"stats":{"type":"object","properties":{"totalItems":{"type":"number"},"watchedItems":{"type":"number"},"progress":{"type":"number"},"nextUnwatched":{},"coverImage":nullable_string,"coverMediaType":{"anyOf":[media,{"type":"null"}]}},"required":["totalItems","watchedItems","progress","nextUnwatched","coverImage","coverMediaType"]}},"required":["id","name","description","itemOrderMode","createdAt","updatedAt","lastWatchedAt","lastItemAddedAt","pausedAt","stats"]});
+    if name == "create_watchlists" || name == "update_watchlists" {
+        let batch = json!({"type":"object","properties":{            "index":{"type":"integer","minimum":0},            "success":{"type":"boolean"},            "code":{"type":"string"},            "message":{"type":"string"},            "watchlistId":{"type":"number"},            "watchlist":{"type":"object","properties":{"id":{"type":"number"},"name":{"type":"string"},"description":nullable_string,"itemOrderMode":{"type":"string","enum":["release","custom"]}},"required":["id","name","description","itemOrderMode"]}        },"required":["index","success","code","message"]});
+        return serde_json::Map::from_iter([
+            ("type".into(), json!("object")),
+            (
+                "properties".into(),
+                json!({"results":{"type":"array","items":batch}}),
+            ),
+            ("required".into(), json!(["results"])),
+        ]);
+    }
     if name == "list_watchlists" || name == "search_watchlists" {
         return serde_json::Map::from_iter([
             ("type".into(), json!("object")),
