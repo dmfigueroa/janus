@@ -63,8 +63,6 @@ async fn load_timeline(
 pub struct ListFilters {
     #[serde(default)]
     query: String,
-    order_by: Option<String>,
-    order: Option<String>,
     cursor: Option<String>,
 }
 #[derive(Template)]
@@ -82,12 +80,9 @@ pub async fn list(
     headers: HeaderMap,
     Query(filters): Query<ListFilters>,
 ) -> Result<Response, Failure> {
-    use super::browse::{BrowseDirection, BrowseError, BrowseFilters, BrowseOrder, BrowseView};
-    let order_by = BrowseOrder::parse(filters.order_by.as_deref());
+    use super::browse::{BrowseError, BrowseFilters, BrowseView};
     let filters = BrowseFilters {
         query: filters.query,
-        order_by,
-        direction: BrowseDirection::parse(filters.order.as_deref(), order_by),
         cursor: filters.cursor,
     };
     let summaries = lists.all_summaries().await.map_err(failure)?;

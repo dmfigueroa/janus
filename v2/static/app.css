@@ -116,8 +116,7 @@ select {
 }
 
 .watchlist-search {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
   gap: 0.5rem;
   width: 100%;
@@ -129,7 +128,8 @@ select {
   position: relative;
   display: flex;
   align-items: center;
-  grid-column: 1 / -1;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .search-icon {
@@ -163,120 +163,6 @@ select {
 
 .search-field:has(input:placeholder-shown) .clear-search {
   display: none;
-}
-
-@media (min-width: 640px) {
-  .watchlist-search {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-  }
-
-  .search-field {
-    grid-column: 1;
-  }
-
-  .select-shell {
-    grid-column: 2;
-  }
-
-  #browse-indicator {
-    grid-column: 3;
-  }
-}
-
-.select-shell {
-  position: relative;
-  display: inline-flex;
-  justify-self: start;
-  max-width: 100%;
-}
-
-.select-shell::after {
-  position: absolute;
-  top: 50%;
-  right: 0.9rem;
-  width: 0.45rem;
-  height: 0.45rem;
-  margin-top: -0.35rem;
-  border-right: 2px solid var(--fg-muted);
-  border-bottom: 2px solid var(--fg-muted);
-  transform: rotate(45deg);
-  pointer-events: none;
-  transition: transform 150ms var(--ease-out);
-  content: "";
-}
-
-.select-shell:has(select:open)::after {
-  margin-top: -0.15rem;
-  transform: rotate(-135deg);
-}
-
-.watchlist-search select {
-  min-height: 44px;
-  max-width: 100%;
-  padding: 0.5rem 2rem 0.5rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--bg-surface);
-  font-size: 0.9375rem;
-  appearance: none;
-  cursor: pointer;
-  transition: background-color 150ms var(--ease-out);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .watchlist-search select:hover {
-    background: var(--bg-subtle);
-  }
-}
-
-@supports (appearance: base-select) {
-  .watchlist-search select,
-  .watchlist-search select::picker(select) {
-    appearance: base-select;
-  }
-
-  .watchlist-search select {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding-right: 2rem;
-  }
-
-  .watchlist-search select::picker-icon {
-    display: none;
-  }
-
-  .watchlist-search select::picker(select) {
-    margin-top: 0.25rem;
-    padding: 0.25rem;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: var(--bg-surface);
-    box-shadow: var(--shadow-lg);
-  }
-
-  .watchlist-search option {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    border-radius: 8px;
-  }
-
-  .watchlist-search option:checked {
-    font-weight: 600;
-  }
-
-  .watchlist-search option::checkmark {
-    order: -1;
-    color: var(--accent);
-    content: "✓";
-  }
-
-  .watchlist-search option:hover,
-  .watchlist-search option:focus {
-    background: var(--bg-subtle);
-  }
 }
 
 .watchlist-search button,
@@ -876,7 +762,6 @@ select {
   .pagination a,
   .nav-item,
   .watchlist-browse,
-  .select-shell::after,
   .chevron {
     transition: none;
   }

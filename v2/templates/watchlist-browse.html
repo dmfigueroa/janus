@@ -42,8 +42,8 @@
   {% endif %} {% if let Some(cursor) = view.next_cursor %}
   <nav class="pagination" aria-label="Watchlist pages">
     <a
-      href="/v2/watchlists?query={{view.query|urlencode}}&amp;orderBy={{view.order_param}}&amp;order={{view.direction_param}}&amp;cursor={{cursor|urlencode}}"
-      hx-get="/v2/watchlists?query={{view.query|urlencode}}&amp;orderBy={{view.order_param}}&amp;order={{view.direction_param}}&amp;cursor={{cursor|urlencode}}"
+      href="/v2/watchlists?query={{view.query|urlencode}}&amp;cursor={{cursor|urlencode}}"
+      hx-get="/v2/watchlists?query={{view.query|urlencode}}&amp;cursor={{cursor|urlencode}}"
       hx-target="#watchlist-browse"
       hx-select="#watchlist-browse"
       hx-swap="outerHTML"

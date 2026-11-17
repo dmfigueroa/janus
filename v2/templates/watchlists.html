@@ -15,7 +15,7 @@
       hx-select="#watchlist-browse"
       hx-swap="outerHTML"
       hx-push-url="true"
-      hx-trigger="submit, input changed delay:300ms from:#query, change from:#orderBy"
+      hx-trigger="submit, input changed delay:300ms from:#query"
       hx-sync="this:replace"
       hx-indicator="#browse-indicator"
     >
@@ -59,16 +59,6 @@
           </svg>
         </a>
       </div>
-      <label class="visually-hidden" for="orderBy">Sort watchlists</label>
-      <span class="select-shell">
-        <select id="orderBy" name="orderBy">
-          {% for option in view.order_options %}
-          <option value="{{option.value}}" {% if option.selected %}selected{% endif %}>
-            {{option.label}}
-          </option>
-          {% endfor %}
-        </select>
-      </span>
       <noscript><button type="submit">Search</button></noscript>
       <span id="browse-indicator" class="htmx-indicator" role="status">Loading watchlists…</span>
     </form>

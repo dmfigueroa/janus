@@ -204,7 +204,7 @@ async fn watchlist_home_renders_v1_cards_sections_and_local_navigation() {
 }
 
 #[tokio::test]
-async fn watchlist_home_searches_sorts_pages_and_swaps_only_the_grid() {
+async fn watchlist_home_searches_and_pages_by_v1_recency() {
     let fixture = Fixture::v1();
     change_v1(&fixture, "many");
     let app = janus_v2::database_router(janus_v2::open_database(&fixture.0).await.unwrap());
@@ -251,21 +251,6 @@ async fn watchlist_home_searches_sorts_pages_and_swaps_only_the_grid() {
     assert!(
         restored.contains("aria-label=\"Primary navigation\""),
         "{restored}"
-    );
-
-    let sorted = body(
-        search(
-            "/v2/watchlists?query=Bulk&orderBy=createdAt&order=desc",
-            false,
-        )
-        .await
-        .unwrap(),
-    )
-    .await;
-    assert!(
-        sorted.find("href=\"/v2/watchlists/102\"").unwrap()
-            < sorted.find("href=\"/v2/watchlists/53\"").unwrap(),
-        "{sorted}"
     );
 
     let empty = body(search("/v2/watchlists?query=missing", false).await.unwrap()).await;

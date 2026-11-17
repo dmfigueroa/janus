@@ -12,79 +12,10 @@ use serde::{Deserialize, Serialize};
 const PAGE_SIZE: usize = 50;
 const TMDB_POSTER_PREFIX: &str = "https://image.tmdb.org/t/p/w500/";
 
-/// Summary ordering offered by the watchlist home.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum BrowseOrder {
-    #[default]
-    Recency,
-    CreatedAt,
-    LastWatched,
-    LastAdded,
-}
-
-impl BrowseOrder {
-    /// Reads a stored web parameter, falling back to the v1 home order.
-    pub fn parse(value: Option<&str>) -> Self {
-        match value {
-            Some("createdAt") => Self::CreatedAt,
-            Some("lastWatched") => Self::LastWatched,
-            Some("lastAdded") => Self::LastAdded,
-            _ => Self::Recency,
-        }
-    }
-
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Recency => "recency",
-            Self::CreatedAt => "createdAt",
-            Self::LastWatched => "lastWatched",
-            Self::LastAdded => "lastAdded",
-        }
-    }
-
-    fn label(self) -> &'static str {
-        match self {
-            Self::Recency => "Default",
-            Self::CreatedAt => "Newest first",
-            Self::LastWatched => "Recently watched",
-            Self::LastAdded => "Recently added",
-        }
-    }
-}
-
-/// Sort direction accepted from the web.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum BrowseDirection {
-    #[default]
-    Asc,
-    Desc,
-}
-
-impl BrowseDirection {
-    /// Reads a stored direction, falling back to the ordering's v1 default.
-    pub fn parse(value: Option<&str>, order: BrowseOrder) -> Self {
-        match value {
-            Some("asc") => Self::Asc,
-            Some("desc") => Self::Desc,
-            _ if order == BrowseOrder::Recency => Self::Asc,
-            _ => Self::Desc,
-        }
-    }
-
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Asc => "asc",
-            Self::Desc => "desc",
-        }
-    }
-}
-
 /// Normalized home inputs shared by the full page and search fragment.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct BrowseFilters {
     pub query: String,
-    pub order_by: BrowseOrder,
-    pub direction: BrowseDirection,
     pub cursor: Option<String>,
 }
 
@@ -126,14 +57,6 @@ pub struct BrowseCard {
     pub paused_since: Option<String>,
 }
 
-/// One sort option in the search form.
-#[derive(Debug, Serialize)]
-pub struct BrowseOrderOption {
-    pub value: &'static str,
-    pub label: &'static str,
-    pub selected: bool,
-}
-
 /// A complete home or search result, ready for the template.
 #[derive(Debug, Serialize)]
 pub struct BrowseView {
@@ -142,21 +65,18 @@ pub struct BrowseView {
     pub summary: String,
     pub totals: String,
     pub sections: Vec<BrowseSection>,
-    pub order_options: Vec<BrowseOrderOption>,
-    pub order_param: &'static str,
-    pub direction_param: &'static str,
     pub next_cursor: Option<String>,
     pub empty_message: Option<&'static str>,
     pub is_search: bool,
 }
 
 impl BrowseView {
-    /// Applies ordering, search, grouping and continuation to typed summaries.
+    /// Applies v1 ordering, search, grouping and continuation to typed summaries.
     ///
     /// # Errors
     ///
-    /// Returns [`BrowseError::InvalidCursor`] when a cursor was made for other
-    /// search or ordering inputs.
+    /// Returns [`BrowseError::InvalidCursor`] when a cursor was made for another
+    /// search input.
     pub fn build(
         summaries: &[WatchlistSummary],
         filters: &BrowseFilters,
@@ -164,13 +84,13 @@ impl BrowseView {
         let query = filters.query.trim().to_owned();
         let search = (!query.is_empty()).then(|| folded(&query));
         let mut ordered = summaries.iter().collect::<Vec<_>>();
-        ordered.sort_by(|left, right| compare(left, right, filters));
+        ordered.sort_by(|left, right| compare_recency(left, right));
         if let Some(search) = &search {
             ordered.retain(|summary| folded(&summary.watchlist.name).contains(search));
         }
         let total_matches = ordered.len();
         let offset = match &filters.cursor {
-            Some(cursor) => decode(cursor, search.as_deref(), filters)?,
+            Some(cursor) => decode(cursor, search.as_deref())?,
             None => 0,
         };
         let page_size = if search.is_some() {
@@ -185,7 +105,7 @@ impl BrowseView {
             .map(card)
             .collect::<Vec<_>>();
         let next_cursor = (offset.saturating_add(page_size) < total_matches)
-            .then(|| encode(offset.saturating_add(page_size), &search, filters))
+            .then(|| encode(offset.saturating_add(page_size), &search))
             .transpose()?;
         let sections = if search.is_some() {
             single_section(cards)
@@ -202,9 +122,6 @@ impl BrowseView {
                 "Watchlists"
             },
             sections,
-            order_options: order_options(filters.order_by),
-            order_param: filters.order_by.as_str(),
-            direction_param: filters.direction.as_str(),
             next_cursor,
             empty_message: (total_matches == 0).then_some(if search.is_some() {
                 "No watchlists match your search."
@@ -214,22 +131,6 @@ impl BrowseView {
             is_search: search.is_some(),
         })
     }
-}
-
-fn order_options(selected: BrowseOrder) -> Vec<BrowseOrderOption> {
-    [
-        BrowseOrder::Recency,
-        BrowseOrder::CreatedAt,
-        BrowseOrder::LastWatched,
-        BrowseOrder::LastAdded,
-    ]
-    .into_iter()
-    .map(|order| BrowseOrderOption {
-        value: order.as_str(),
-        label: order.label(),
-        selected: order == selected,
-    })
-    .collect()
 }
 
 fn summary_line(query: &str, matches: usize, total: usize) -> String {
@@ -375,59 +276,6 @@ fn poster(path: &str) -> String {
     }
 }
 
-fn compare(
-    left: &WatchlistSummary,
-    right: &WatchlistSummary,
-    filters: &BrowseFilters,
-) -> std::cmp::Ordering {
-    let descending = filters.direction == BrowseDirection::Desc;
-    let (left_value, right_value) = match filters.order_by {
-        BrowseOrder::Recency => return compare_recency(left, right),
-        BrowseOrder::CreatedAt => (
-            Some(left.watchlist.created_at.as_str()),
-            Some(right.watchlist.created_at.as_str()),
-        ),
-        BrowseOrder::LastWatched => (
-            left.watchlist.last_watched_at.as_deref(),
-            right.watchlist.last_watched_at.as_deref(),
-        ),
-        BrowseOrder::LastAdded => (
-            Some(
-                left.watchlist
-                    .last_item_added_at
-                    .as_deref()
-                    .unwrap_or(&left.watchlist.created_at),
-            ),
-            Some(
-                right
-                    .watchlist
-                    .last_item_added_at
-                    .as_deref()
-                    .unwrap_or(&right.watchlist.created_at),
-            ),
-        ),
-    };
-    let left_missing = left_value.is_none();
-    let right_missing = right_value.is_none();
-    match (descending, left_missing, right_missing) {
-        (true, true, false) => return std::cmp::Ordering::Greater,
-        (true, false, true) => return std::cmp::Ordering::Less,
-        (false, true, false) => return std::cmp::Ordering::Less,
-        (false, false, true) => return std::cmp::Ordering::Greater,
-        _ => {}
-    }
-    let value = left_value
-        .unwrap_or_default()
-        .cmp(right_value.unwrap_or_default());
-    let ordered = if descending { value.reverse() } else { value };
-    let id = if descending {
-        right.watchlist.id.cmp(&left.watchlist.id)
-    } else {
-        left.watchlist.id.cmp(&right.watchlist.id)
-    };
-    ordered.then(id)
-}
-
 fn compare_recency(left: &WatchlistSummary, right: &WatchlistSummary) -> std::cmp::Ordering {
     left.watchlist
         .last_watched_at
@@ -445,39 +293,24 @@ fn compare_recency(left: &WatchlistSummary, right: &WatchlistSummary) -> std::cm
 #[derive(Deserialize, Serialize)]
 struct Cursor {
     offset: usize,
-    order_by: String,
-    order: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     search: Option<String>,
 }
 
-fn decode(
-    cursor: &str,
-    search: Option<&str>,
-    filters: &BrowseFilters,
-) -> Result<usize, BrowseError> {
+fn decode(cursor: &str, search: Option<&str>) -> Result<usize, BrowseError> {
     let bytes = URL_SAFE_NO_PAD
         .decode(cursor)
         .map_err(|_| BrowseError::InvalidCursor)?;
     let cursor: Cursor = serde_json::from_slice(&bytes).map_err(|_| BrowseError::InvalidCursor)?;
-    let matches = cursor.order_by == filters.order_by.as_str()
-        && cursor.order == filters.direction.as_str()
-        && cursor.search.as_deref() == search;
-    if !matches {
+    if cursor.search.as_deref() != search {
         return Err(BrowseError::InvalidCursor);
     }
     Ok(cursor.offset)
 }
 
-fn encode(
-    offset: usize,
-    search: &Option<String>,
-    filters: &BrowseFilters,
-) -> Result<String, BrowseError> {
+fn encode(offset: usize, search: &Option<String>) -> Result<String, BrowseError> {
     let cursor = Cursor {
         offset,
-        order_by: filters.order_by.as_str().to_owned(),
-        order: filters.direction.as_str().to_owned(),
         search: search.clone(),
     };
     serde_json::to_vec(&cursor)
@@ -588,24 +421,6 @@ mod tests {
     }
 
     #[test]
-    fn created_at_descending_puts_the_newest_first() {
-        let summaries = vec![
-            summary(41, "Older", "2020-01-01 12:30:00", None, false, 1, 0),
-            summary(42, "Newer", "2026-11-16 21:33:04", None, false, 1, 0),
-        ];
-        let view = BrowseView::build(
-            &summaries,
-            &BrowseFilters {
-                order_by: BrowseOrder::CreatedAt,
-                direction: BrowseDirection::Desc,
-                ..filters()
-            },
-        )
-        .unwrap();
-        assert_eq!(view.sections[0].cards[0].id, 42);
-    }
-
-    #[test]
     fn search_matches_unicode_names_after_nfc_and_case_folding() {
         let summaries = vec![
             summary(41, "Café 東京", "2020-01-01", None, false, 1, 0),
@@ -615,7 +430,7 @@ mod tests {
             &summaries,
             &BrowseFilters {
                 query: "CAFE\u{301}".into(),
-                ..filters()
+                ..Default::default()
             },
         )
         .unwrap();
@@ -626,7 +441,7 @@ mod tests {
             &summaries,
             &BrowseFilters {
                 query: "ος".into(),
-                ..filters()
+                ..Default::default()
             },
         )
         .unwrap();
@@ -642,7 +457,7 @@ mod tests {
             &summaries,
             &BrowseFilters {
                 query: "list".into(),
-                ..filters()
+                ..Default::default()
             },
         )
         .unwrap();
@@ -653,7 +468,6 @@ mod tests {
             &BrowseFilters {
                 query: "list".into(),
                 cursor: Some(cursor.clone()),
-                ..filters()
             },
         )
         .unwrap();
@@ -665,7 +479,6 @@ mod tests {
                 &BrowseFilters {
                     query: "other".into(),
                     cursor: Some(cursor),
-                    ..filters()
                 },
             )
             .is_err()
