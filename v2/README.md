@@ -47,6 +47,18 @@ measured values alone. If no Chromium build is available, run
 `npx playwright-core install chromium` once (or set `PLAYWRIGHT_CHROMIUM` to an existing
 executable).
 
+### Parity layout rule
+
+Render both v1 and v2 in a browser at `390x844` and `1280x800` before proposing a layout
+option or claiming parity. The supporting evidence is measured geometry or screenshots from
+both rendered pages at both viewports: element boxes, gaps, alignment, distribution and
+scroll behavior, captured before the change is described. Framework props, component source
+and earlier reasoning are not parity evidence; they can describe a rule while missing what
+the page actually renders. No layout option is offered and no parity claim is made until
+both versions have been measured, and when rendered geometry disagrees with source, the
+geometry wins. Record the route, viewports and measurement or screenshot paths in
+[PARITY.md](PARITY.md) as the evidence for the claim.
+
 Tests require root `npm ci` under a supported Node version because their disposable SQLite
 files are created by the actual v1 Drizzle migrator. From the repository root, `npm run test:v2`
 pins `JANUS_TEST_NODE` to the `.tool-versions` Node and appends arguments to `cargo test
