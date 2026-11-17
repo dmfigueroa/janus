@@ -36,8 +36,10 @@ values alone. If no Chromium build is available, run `npx playwright-core instal
 once (or set `PLAYWRIGHT_CHROMIUM` to an existing executable).
 
 Tests require root `npm ci` under a supported Node version because their disposable SQLite
-files are created by the actual v1 Drizzle migrator. Set `JANUS_TEST_NODE` to that Node
-executable when it differs from PATH. Node is a test fixture dependency only.
+files are created by the actual v1 Drizzle migrator. From the repository root, `npm run test:v2`
+pins `JANUS_TEST_NODE` to the `.tool-versions` Node and appends arguments to `cargo test
+--locked`. Set `JANUS_TEST_NODE` yourself to override that choice. Node is a test fixture
+dependency only.
 
 `JANUS_V2_BIND` defaults to `127.0.0.1:3001`. `DATABASE_URL` is a required filesystem path,
 as in v1. Missing files, incompatible schema and unsupported stored values fail startup.

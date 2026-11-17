@@ -36,6 +36,10 @@ _Avoid_: Archived, hidden, snoozed
 The derived state of a watchlist with at least one item and every item watched. It is never stored; adding an unwatched item or unwatching an item un-completes the list automatically, without clearing its pause.
 _Avoid_: Finished, done, watched
 
+**Watchlist dialog**:
+The create/edit watchlist form together with the decisions it carries: field validation, values retained after a rejection, the failure kind, and the outcome a transport later renders. It is independent of the transport that displayed it; web and MCP keep their own externally observable contracts.
+_Avoid_: Create/edit modal
+
 **Watchlist addition**:
 A request to collect media in a watchlist. Adding a TV show or comic volume expands it into individual watchlist items. An addition may succeed without changing the watchlist when its items are already present or no items are available.
 _Avoid_: Import job
