@@ -525,12 +525,20 @@ select {
 
 .bottom-nav-items {
   display: flex;
-  justify-content: space-around;
+  justify-content: center;
+  gap: 0.5rem;
   width: 100%;
   max-width: 28rem;
   height: 4rem;
   margin: 0 auto;
-  padding: 0 1.5rem;
+  padding: 0 0.75rem;
+}
+
+@media (min-width: 480px) {
+  .bottom-nav-items {
+    gap: 1.5rem;
+    padding: 0 1.5rem;
+  }
 }
 
 .nav-item {

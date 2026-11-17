@@ -227,8 +227,8 @@ this change; those gates remain outstanding.
 ## Issue #256 visual parity follow-up
 
 The shared shell now follows v1 measurements more closely. The bottom navigation keeps
-v1's centered 28rem item row, 4rem height, 5rem items, rounded hover surface and 300ms
-ease-out transition. The browse grid keeps v1's two mobile columns, four desktop columns,
+v1's clustered 28rem item row with a fixed gap, 4rem height, 5rem items, rounded
+hover surface and 300ms ease-out transition. The browse grid keeps v1's two mobile columns, four desktop columns,
 220px card cap, 1.125rem card titles and the "1 of 3 watched • 33%" meta separator; the
 "Watchlists" heading is visible again and collapsed sections use v1's 20px chevron.
 
