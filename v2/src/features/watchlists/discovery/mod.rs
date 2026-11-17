@@ -112,6 +112,15 @@ impl Page {
     pub(super) fn size(&self) -> usize {
         self.size
     }
+
+    /// Decodes the continuation offset, rejecting a cursor bound to other
+    /// selection rules.
+    pub(super) fn offset(&self, binding: &CursorBinding) -> Result<usize, DiscoveryError> {
+        match &self.cursor {
+            Some(cursor) => cursor_offset(cursor, binding),
+            None => Ok(0),
+        }
+    }
 }
 
 /// The values a cursor is bound to, private to discovery.
@@ -170,10 +179,7 @@ pub(super) fn paginate<T>(
     page: &Page,
     binding: &CursorBinding,
 ) -> Result<(Vec<T>, Option<String>), DiscoveryError> {
-    let offset = match &page.cursor {
-        Some(cursor) => cursor_offset(cursor, binding)?,
-        None => 0,
-    };
+    let offset = page.offset(binding)?;
     let has_more = values.len().saturating_sub(offset) > page.size;
     let page_values = values
         .into_iter()

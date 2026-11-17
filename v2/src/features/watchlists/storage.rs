@@ -6,7 +6,7 @@ use sea_orm::{ConnectionTrait, DbBackend, DbErr, QueryResult, Statement};
 use std::collections::HashMap;
 
 use super::ItemOrderMode;
-use super::snapshot::{UNWATCHED_ITEM_SQL, WatchlistItem, WatchlistRecord};
+use super::snapshot::{WatchlistItem, WatchlistRecord};
 
 /// Stored item counts read without loading item rows.
 #[derive(Clone, Copy)]
@@ -77,33 +77,26 @@ pub(super) async fn items<C: ConnectionTrait>(
         .collect()
 }
 
-/// Reads stored total and watched counts for one watchlist.
-pub(super) async fn counts<C: ConnectionTrait>(database: &C, id: i64) -> Result<ItemCounts, DbErr> {
-    let row = database
-        .query_one_raw(statement(
-            "SELECT count(*) AS total,\
-             sum(CASE WHEN is_watched THEN 1 ELSE 0 END) AS watched \
-             FROM watchlist_items WHERE watchlist_id=?",
-            vec![id.into()],
-        ))
-        .await?
-        .ok_or_else(|| DbErr::Custom("Missing watchlist item counts".to_owned()))?;
-    Ok(ItemCounts {
-        total_items: row.try_get::<i64>("", "total")? as usize,
-        watched_items: row.try_get::<Option<i64>>("", "watched")?.unwrap_or(0) as usize,
-    })
-}
-
-/// Reads stored total and watched counts for every watchlist that has items.
-pub(super) async fn all_counts<C: ConnectionTrait>(
+/// Reads stored total and watched counts for the given watchlists that have
+/// items.
+pub(super) async fn counts_for<C: ConnectionTrait>(
     database: &C,
+    watchlist_ids: &[i64],
 ) -> Result<HashMap<i64, ItemCounts>, DbErr> {
+    if watchlist_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let placeholders = vec!["?"; watchlist_ids.len()].join(",");
+    let values = watchlist_ids.iter().map(|id| (*id).into()).collect();
     database
         .query_all_raw(statement(
-            "SELECT watchlist_id, count(*) AS total,\
-             sum(CASE WHEN is_watched THEN 1 ELSE 0 END) AS watched \
-             FROM watchlist_items GROUP BY watchlist_id",
-            vec![],
+            &format!(
+                "SELECT watchlist_id, count(*) AS total,\
+                 sum(CASE WHEN is_watched THEN 1 ELSE 0 END) AS watched \
+                 FROM watchlist_items WHERE watchlist_id IN ({placeholders}) \
+                 GROUP BY watchlist_id"
+            ),
+            values,
         ))
         .await?
         .iter()
@@ -131,6 +124,7 @@ pub(super) async fn summary_selections<C: ConnectionTrait>(
     }
     let placeholders = vec!["?"; watchlist_ids.len()].join(",");
     let order = mode.order_sql();
+    // `COALESCE(is_watched,0)=0` must stay equivalent to `WatchlistItem::is_unwatched`.
     let sql = format!(
         "SELECT * FROM (\
            SELECT watchlist_items.*,\
@@ -182,38 +176,6 @@ pub(super) async fn summary_selections<C: ConnectionTrait>(
 struct SelectedItems {
     cover_item: Option<WatchlistItem>,
     next_unwatched: Option<WatchlistItem>,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(super) enum ItemFilter {
-    All,
-    Unwatched,
-}
-
-/// Reads the first item in the watchlist's stored order matching the filter.
-pub(super) async fn first_item<C: ConnectionTrait>(
-    database: &C,
-    id: i64,
-    mode: ItemOrderMode,
-    filter: ItemFilter,
-) -> Result<Option<WatchlistItem>, DbErr> {
-    let predicate = match filter {
-        ItemFilter::All => String::new(),
-        ItemFilter::Unwatched => format!(" AND {UNWATCHED_ITEM_SQL}"),
-    };
-    database
-        .query_one_raw(statement(
-            &format!(
-                "SELECT * FROM watchlist_items WHERE watchlist_id=?{predicate} \
-                 ORDER BY {} LIMIT 1",
-                mode.order_sql()
-            ),
-            vec![id.into()],
-        ))
-        .await?
-        .as_ref()
-        .map(item)
-        .transpose()
 }
 
 fn record(row: &QueryResult) -> Result<WatchlistRecord, DbErr> {

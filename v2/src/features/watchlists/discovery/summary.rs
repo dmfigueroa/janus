@@ -1,7 +1,7 @@
 //! Summary discovery: watchlist ordering, Unicode name search and summary pages.
 
 use super::{
-    CursorBinding, DiscoveryError, DiscoveryOperation, DiscoveryRequest, Page, invalid, paginate,
+    CursorBinding, DiscoveryError, DiscoveryOperation, DiscoveryRequest, Page, encode, invalid,
     trimmed_text,
 };
 use crate::features::watchlists::{WatchlistRecord, WatchlistSummary, Watchlists};
@@ -129,42 +129,49 @@ impl Watchlists {
     }
 
     async fn summary_page(&self, query: SummaryQuery) -> Result<SummaryPage, DiscoveryError> {
-        let mut headers: Vec<WatchlistRecord> =
-            self.headers().await.map_err(DiscoveryError::Database)?;
-        headers.retain(|list| {
-            query
-                .search
-                .as_ref()
-                .is_none_or(|search| folded(&list.name).contains(search))
-        });
-        headers.sort_by(|left, right| {
-            let compared = query
-                .order_by
-                .value(left)
-                .cmp(&query.order_by.value(right))
-                .then_with(|| left.id.cmp(&right.id));
-            if query.order == SortOrder::Desc {
-                compared.reverse()
-            } else {
-                compared
-            }
-        });
         let binding = CursorBinding::Summaries {
             order_by: query.order_by.as_str(),
             order: query.order.as_str(),
             search: query.search.clone(),
         };
-        let (headers, next_cursor) = paginate(headers, &query.page, &binding)?;
-        let mut watchlists = Vec::new();
-        for header in headers {
-            if let Some(summary) = self
-                .summary(header.id)
-                .await
-                .map_err(DiscoveryError::Database)?
-            {
-                watchlists.push(summary);
-            }
-        }
+        let offset = query.page.offset(&binding)?;
+        let page_size = query.page.size();
+        let (watchlists, eligible_count) = self
+            .summaries_for(|headers| {
+                let mut eligible = headers
+                    .iter()
+                    .filter(|list| {
+                        query
+                            .search
+                            .as_ref()
+                            .is_none_or(|search| folded(&list.name).contains(search))
+                    })
+                    .collect::<Vec<_>>();
+                eligible.sort_by(|left, right| {
+                    let compared = query
+                        .order_by
+                        .value(left)
+                        .cmp(&query.order_by.value(right))
+                        .then_with(|| left.id.cmp(&right.id));
+                    if query.order == SortOrder::Desc {
+                        compared.reverse()
+                    } else {
+                        compared
+                    }
+                });
+                let ids = eligible
+                    .iter()
+                    .skip(offset)
+                    .take(page_size)
+                    .map(|list| list.id)
+                    .collect::<Vec<_>>();
+                (ids, eligible.len())
+            })
+            .await
+            .map_err(DiscoveryError::Database)?;
+        let next_cursor = (eligible_count.saturating_sub(offset) > page_size)
+            .then(|| encode(&binding, offset.saturating_add(page_size)))
+            .transpose()?;
         Ok(SummaryPage {
             watchlists,
             next_cursor,
