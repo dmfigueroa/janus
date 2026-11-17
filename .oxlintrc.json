@@ -183,6 +183,12 @@
       }
     },
     {
+      "files": ["v2/static/**"],
+      "rules": {
+        "complexity": "off"
+      }
+    },
+    {
       "files": ["**/*.test.{ts,tsx}"],
       "rules": {
         "complexity": "off",
