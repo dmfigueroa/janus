@@ -16,10 +16,24 @@ cargo test --locked
 cargo build --locked --release
 ```
 
-During `npm run dev` from the repository root, Nitro proxies `/v2` and `/v2/**` to
-`127.0.0.1:3001`, so the v1 dev server can preview the separate v2 process at
-`http://localhost:3000/v2`. This development proxy is not part of the production
-v1 bundle; deployment routing remains the separate Traefik/Coolify service.
+For visual work, `npm run preview:local` seeds a disposable database, builds and starts
+the v2 process, and starts the v1 dev server. It prints both local URLs. During `npm run dev`
+from the repository root, Nitro proxies `/v2` and `/v2/**` to `127.0.0.1:3001`, so the v1 dev
+server can preview the separate v2 process at `http://localhost:3000/v2`. This development
+proxy is not part of the production v1 bundle; deployment routing remains the separate
+Traefik/Coolify service.
+
+Compare the two UIs with Playwright screenshots after `preview:local`:
+
+```sh
+npm run visual:compare -- --route /watchlists
+npm run visual:compare -- --route /watchlists --click "Create New List"
+```
+
+The second command opens the dialog in both versions and writes `-v1.png` and `-v2.png`
+under the system temporary directory. Inspect both images rather than relying on measured
+values alone. If no Chromium build is available, run `npx playwright-core install chromium`
+once (or set `PLAYWRIGHT_CHROMIUM` to an existing executable).
 
 Tests require root `npm ci` under a supported Node version because their disposable SQLite
 files are created by the actual v1 Drizzle migrator. Set `JANUS_TEST_NODE` to that Node

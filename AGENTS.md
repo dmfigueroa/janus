@@ -144,4 +144,6 @@ Before writing new Rust or reviewing Rust changes under `v2/`, load the `rust-be
 
 ## V2 Frontend
 
+- Use relative units and Open Props tokens for spacing, type and sizing. Add fixed units only where the browser requires them, such as hairline borders.
+- Before changing V2 visuals, run `npm run preview:local`, then compare local v1 and v2 screenshots with `npm run visual:compare -- --route /watchlists`. Inspect both images; do not use a Coolify preview as the development loop.
 - Use HTMX for all v2 browser HTTP requests. Declare requests, triggers, targets, and swaps with hx-\* attributes. Drag-and-drop and keyboard handlers may update request values and dispatch custom DOM events consumed by hx-trigger. Do not use htmx.ajax. Frontend requests must consume server-rendered HTML and let HTMX swap it into the page. Backend endpoints must also preserve JSON support for API callers through content negotiation. Do not use fetch or standalone XMLHttpRequest for frontend requests.
