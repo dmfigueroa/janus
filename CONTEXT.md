@@ -40,6 +40,14 @@ _Avoid_: Finished, done, watched
 The create/edit watchlist form together with the decisions it carries: field validation, values retained after a rejection, the failure kind, and the outcome a transport later renders. It is independent of the transport that displayed it; web and MCP keep their own externally observable contracts.
 _Avoid_: Create/edit modal
 
+**MCP page contract**:
+One MCP tool whose result is a paginated envelope: a page of summaries, items, or grouped titles, with an optional cursor. A page contract owns its declaration, the argument fields it accepts, its output schema, and its projection together, so what it advertises, what it accepts, and what it returns cannot drift apart. Compare *MCP batch contract*.
+_Avoid_: Read tool, paginated tool
+
+**MCP contract table**:
+The single per-tool entry that produces a tool's declaration, accepted fields, and output schema. One table per contract shape; the adapter reads it to list tools, check membership, and dispatch calls, and a test reads it to prove the schema and the projection agree.
+_Avoid_: Tool registry, schema map
+
 **Watchlist addition**:
 A request to collect media in a watchlist. Adding a TV show or comic volume expands it into individual watchlist items. An addition may succeed without changing the watchlist when its items are already present or no items are available.
 _Avoid_: Import job
