@@ -1,5 +1,3 @@
-// Bulk summary fixtures cycle through empty, partial and completed lists so
-// summary tests cover all three states in both order modes.
 const states = [
   { items: 0, watched: 0 },
   { items: 2, watched: 1 },

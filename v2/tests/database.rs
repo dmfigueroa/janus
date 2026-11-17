@@ -963,14 +963,8 @@ async fn all_summaries_matches_individual_reads_for_empty_partial_and_completed_
     assert_eq!(completed.stats.cover_image.as_deref(), Some("/poster.jpg"));
 }
 
-/// Statements the home summary read may execute, independent of how many
-/// watchlists exist: one header read, one grouped count read and one ranked
-/// selection read per order mode. A per-watchlist regression pushes the count
-/// past this budget, so the test below fails before that regression ships.
 const HOME_SUMMARY_STATEMENT_BUDGET: usize = 4;
 
-/// Counts the statements one disposable connection executes through sea-orm's
-/// metric hook.
 struct StatementCounter(std::sync::Arc<AtomicUsize>);
 
 impl StatementCounter {
@@ -978,9 +972,6 @@ impl StatementCounter {
         Self(std::sync::Arc::new(AtomicUsize::new(0)))
     }
 
-    /// Installs the hook on a connection. Transactions and router state clone
-    /// the callback, and it runs once per executed statement rather than per
-    /// prepared statement.
     fn install(&self, database: &mut sea_orm::DatabaseConnection) {
         let statements = std::sync::Arc::clone(&self.0);
         database.set_metric_callback(move |_| {
@@ -993,7 +984,6 @@ impl StatementCounter {
     }
 }
 
-/// Runs the home summary read on its own counted connection.
 async fn counted_home_summaries(fixture: &Fixture) -> (usize, Vec<janus_v2::WatchlistSummary>) {
     let mut database = janus_v2::open_database(&fixture.0).await.unwrap();
     let counter = StatementCounter::new();
