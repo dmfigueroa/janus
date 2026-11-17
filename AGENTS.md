@@ -26,6 +26,12 @@
 - Run root `bash tools/pinned-node.sh npm ci` once per checkout before v2 tests and never borrow another checkout's `node_modules`.
 - Run the v2 Rust tests with `npm run test:v2`, which uses the same wrapper and forwards arguments to `cargo test --locked`, so the Node fixtures need no manual `JANUS_TEST_NODE`. Run `cargo test` directly only through the wrapper: `bash tools/pinned-node.sh cargo test --manifest-path v2/Cargo.toml --locked`. If you set `JANUS_TEST_NODE` yourself, point it at the pinned binary from `bash tools/pinned-node.sh node -p process.execPath`, otherwise the fixture tests spawn a different Node ABI.
 
+## Docker Build Context
+
+- Both images build from the repository root as context — `docker build -f Dockerfile .` for v1 and `docker build -f v2/Dockerfile .` for v2; `deploy/compose.yaml` spells the same root context as `context: ..`. They share the single root `.dockerignore`, so a change to either Dockerfile or `.dockerignore` affects both builds.
+- `v2/`, `test/` and `tools/` must stay in the build context: v2 builds from `v2/`, and v1's `tsc` step typechecks every `*.ts`/`*.tsx` file, including `test/` and `tools/`.
+- `v2/target` must stay ignored in `.dockerignore`: v2 copies its `v2/` sources wholesale, so Rust build output left in the context would bloat the build and invalidate it.
+
 ## Git Conventions
 
 Agents should commit and push work frequently without explicit user request, and create branches/PRs instead of working on main. Never push directly to `main`.
