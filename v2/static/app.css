@@ -458,12 +458,7 @@ select {
 }
 
 .cover-placeholder {
-  display: grid;
-  place-items: center;
-  color: rgb(255 255 255 / 0.22);
-  background:
-    radial-gradient(90% 60% at 30% 0%, #334155 0%, transparent 70%),
-    linear-gradient(to bottom right, #1f2937, #0b1220);
+  background: linear-gradient(to bottom right, #1f2937, #111827);
 }
 
 .cover-episode {
