@@ -55,6 +55,7 @@ async function verifyReorder({ failPost, methods, status }) {
     window.eval(fs.readFileSync(path.join(root, "static/vendor/htmx.min.js"), "utf8"));
     window.eval(fs.readFileSync(path.join(root, "static/vendor/Sortable.min.js"), "utf8"));
     window.eval(fs.readFileSync(path.join(root, "static/app.js"), "utf8"));
+    window.eval(fs.readFileSync(path.join(root, "static/watchlist-reorder-groups.js"), "utf8"));
     window.eval(fs.readFileSync(path.join(root, "static/watchlist-reorder.js"), "utf8"));
     await new Promise((resolve) => window.setTimeout(resolve, 20));
     const completed = new Promise((resolve) =>

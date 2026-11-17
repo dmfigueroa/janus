@@ -26,6 +26,7 @@ test("reorder custom element upgrades, rebinds after HTMX swaps and releases det
         </watchlist-reorder>
       </main>`);
     await page.addScriptTag({ path: path.join(root, "static/vendor/Sortable.min.js") });
+    await page.addScriptTag({ path: path.join(root, "static/watchlist-reorder-groups.js") });
     await page.addScriptTag({ path: path.join(root, "static/watchlist-reorder.js") });
 
     const upgrade = await page.evaluate(async () => {

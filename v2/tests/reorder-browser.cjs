@@ -143,6 +143,7 @@ test("collapsed watched groups reject incoming drops while expanded groups accep
   const { window } = dom;
   window.eval(fs.readFileSync(path.join(root, "static/vendor/Sortable.min.js"), "utf8"));
   window.eval(fs.readFileSync(path.join(root, "static/app.js"), "utf8"));
+  window.eval(fs.readFileSync(path.join(root, "static/watchlist-reorder-groups.js"), "utf8"));
   window.eval(fs.readFileSync(path.join(root, "static/watchlist-reorder.js"), "utf8"));
   const timelineElement = window.document.querySelector("watchlist-reorder");
   const group = window.document.querySelector("details");

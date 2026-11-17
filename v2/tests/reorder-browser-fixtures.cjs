@@ -73,6 +73,7 @@ function openReorderPage(markup, respond, { scrollY = 0 } = {}) {
   window.document.addEventListener("reorder", respondToTrigger);
   window.document.addEventListener("reconcile", respondToTrigger);
   window.eval(fs.readFileSync(path.join(root, "static/app.js"), "utf8"));
+  window.eval(fs.readFileSync(path.join(root, "static/watchlist-reorder-groups.js"), "utf8"));
   window.eval(fs.readFileSync(path.join(root, "static/watchlist-reorder.js"), "utf8"));
   return { dom, window, calls, scrolled };
 }

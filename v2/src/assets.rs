@@ -96,6 +96,7 @@ mod tests {
         for url in [
             APP_CSS_URL,
             APP_JS_URL,
+            WATCHLIST_REORDER_GROUPS_JS_URL,
             WATCHLIST_REORDER_JS_URL,
             WATCHLIST_DIALOG_JS_URL,
             VENDOR_HTMX_MIN_JS_URL,
