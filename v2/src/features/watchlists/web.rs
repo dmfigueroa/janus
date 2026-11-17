@@ -6,7 +6,7 @@ use super::dialog::{
 };
 use super::timeline::{TimelineFilters, TimelineView};
 use super::write::UpdateOutcome;
-use crate::http::{BrowseFormat, FormOrJson, ResponseFormat};
+use crate::http::{FormOrJson, Representation, ResponseFormat};
 use askama::Template;
 use axum::{
     Json,
@@ -83,7 +83,7 @@ struct BrowseFragment<'a> {
 }
 pub async fn list(
     State(lists): State<Watchlists>,
-    format: BrowseFormat,
+    format: ResponseFormat,
     Query(filters): Query<ListFilters>,
 ) -> Result<Response, Failure> {
     use super::browse::{BrowseError, BrowseFilters, BrowseView};
@@ -103,8 +103,8 @@ pub async fn list(
     format
         .respond(&view, async {
             match representation {
-                ResponseFormat::Html => BrowseFragment { view: &view }.render(),
-                ResponseFormat::Page | ResponseFormat::Json => ListPage {
+                Representation::Html => BrowseFragment { view: &view }.render(),
+                Representation::Page | Representation::Json => ListPage {
                     view: &view,
                     form: &form,
                 }
@@ -198,7 +198,7 @@ fn form_failure(form: WatchlistForm, status: StatusCode) -> Response {
 
 fn rejection_response(htmx: bool, format: ResponseFormat, rejection: DialogRejection) -> Response {
     let DialogRejection { failure, form } = rejection;
-    if htmx || matches!(format, ResponseFormat::Html) {
+    if htmx || format.representation() == Representation::Html {
         return form_failure(*form, StatusCode::OK);
     }
     let status = match failure {
@@ -241,7 +241,7 @@ pub async fn create(
         Ok(record) => {
             if htmx {
                 saved_response("Watchlist created successfully", "create")
-            } else if matches!(format, ResponseFormat::Html) {
+            } else if format.representation() == Representation::Html {
                 (
                     StatusCode::SEE_OTHER,
                     [(header::LOCATION, "/v2/watchlists")],
@@ -308,7 +308,7 @@ pub async fn update(
         Ok(UpdateOutcome::Updated) => {
             if htmx {
                 Ok(saved_response("Changes saved successfully", "edit"))
-            } else if matches!(format, ResponseFormat::Html) {
+            } else if format.representation() == Representation::Html {
                 Ok((
                     StatusCode::SEE_OTHER,
                     [(header::LOCATION, format!("/v2/watchlists/{id}"))],
