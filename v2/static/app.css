@@ -11,8 +11,9 @@
   --green: #22c55e;
   --danger: #dc2626;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.05);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-card: 0 0.0625rem 0.125rem rgb(0 0 0 / 0.05);
+  --shadow-lg:
+    0 0.625rem 0.9375rem -0.1875rem rgb(0 0 0 / 0.1), 0 0.25rem 0.375rem -0.25rem rgb(0 0 0 / 0.1);
   font-family:
     "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
     "Segoe UI Symbol", "Noto Color Emoji";
@@ -27,8 +28,9 @@
     --fg-default: #fafafa;
     --fg-muted: #a8a4af;
     --border: #28242e;
-    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+    --shadow-card: 0 0.0625rem 0.125rem rgb(0 0 0 / 0.4);
+    --shadow-lg:
+      0 0.625rem 0.9375rem -0.1875rem rgb(0 0 0 / 0.5), 0 0.25rem 0.375rem -0.25rem rgb(0 0 0 / 0.4);
   }
 }
 
@@ -37,7 +39,7 @@
 }
 
 html {
-  scroll-padding-block-end: calc(4rem + env(safe-area-inset-bottom, 0px));
+  scroll-padding-block-end: calc(4rem + env(safe-area-inset-bottom, 0));
 }
 
 body {
@@ -64,8 +66,8 @@ textarea {
 }
 
 :focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 3px;
+  outline: 0.1875rem solid var(--accent);
+  outline-offset: 0.1875rem;
 }
 
 ::selection {
@@ -75,10 +77,10 @@ textarea {
 
 .visually-hidden {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  width: 0.0625rem;
+  height: 0.0625rem;
   padding: 0;
-  margin: -1px;
+  margin: -0.0625rem;
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
@@ -152,10 +154,10 @@ textarea {
 .watchlist-search input[type="search"] {
   width: 100%;
   min-width: 0;
-  min-height: 44px;
+  min-height: 2.75rem;
   padding: 0.5rem 2.75rem 0.5rem 2.5rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 0.0625rem solid var(--border);
+  border-radius: 0.75rem;
   background: var(--bg-surface);
   transition:
     border-color 150ms var(--ease-out),
@@ -175,10 +177,10 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
+  min-height: 2.75rem;
   padding: 0.5rem 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 0.0625rem solid var(--border);
+  border-radius: 0.75rem;
   background: var(--bg-surface);
   color: inherit;
   text-decoration: none;
@@ -209,7 +211,7 @@ textarea {
   min-height: 2rem;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-round);
   background: transparent;
   color: var(--fg-muted);
 }
@@ -276,7 +278,7 @@ textarea {
   align-items: start;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 48rem) {
   .watchlist-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 1.5rem;
@@ -288,7 +290,7 @@ textarea {
   flex-direction: column;
   gap: 0.5rem;
   width: 100%;
-  max-width: 220px;
+  max-width: 13.75rem;
   min-width: 0;
   position: relative;
 }
@@ -298,7 +300,7 @@ textarea {
   display: block;
   aspect-ratio: 2 / 3;
   overflow: hidden;
-  border-radius: 18px;
+  border-radius: 1.125rem;
   background: linear-gradient(to bottom right, #1f2937, #111827);
   box-shadow: var(--shadow-card);
   text-decoration: none;
@@ -349,7 +351,7 @@ textarea {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: blur(24px);
+  filter: blur(1.5rem);
   transform: scale(1.5);
   opacity: 0.8;
 }
@@ -360,8 +362,8 @@ textarea {
   width: 100%;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  border-radius: 12px;
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.5);
+  border-radius: 0.75rem;
+  box-shadow: 0 0.625rem 0.9375rem -0.1875rem rgb(0 0 0 / 0.5);
 }
 
 .cover-shade {
@@ -407,15 +409,15 @@ textarea {
 
 .card-progress {
   width: 100%;
-  height: 4px;
+  height: 0.25rem;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--radius-round);
   background: var(--bg-subtle);
 }
 
 .card-progress-bar {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-round);
   background: var(--accent);
 }
 
@@ -447,7 +449,7 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 44px;
+  min-height: 2.75rem;
   padding: 0.5rem 0;
   list-style: none;
   cursor: pointer;
@@ -493,10 +495,10 @@ textarea {
 .pagination a {
   display: inline-flex;
   align-items: center;
-  min-height: 44px;
+  min-height: 2.75rem;
   padding: 0.5rem 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 0.0625rem solid var(--border);
+  border-radius: 0.75rem;
   text-decoration: none;
   transition:
     transform 120ms ease-out,
@@ -524,12 +526,12 @@ textarea {
   align-items: center;
   justify-content: space-around;
   gap: 0.5rem;
-  min-height: calc(4rem + env(safe-area-inset-bottom, 0px));
-  padding-block-end: env(safe-area-inset-bottom, 0px);
+  min-height: calc(4rem + env(safe-area-inset-bottom, 0));
+  padding-block-end: env(safe-area-inset-bottom, 0);
   padding-inline: max(1.5rem, calc((100% - 25rem) / 2));
-  border-top: 1px solid var(--border);
+  border-top: 0.0625rem solid var(--border);
   background: color-mix(in srgb, var(--bg-canvas) 90%, transparent);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(0.75rem);
 }
 
 .nav-item {
@@ -539,9 +541,9 @@ textarea {
   justify-content: center;
   gap: 0.25rem;
   width: 5rem;
-  min-height: 44px;
+  min-height: 2.75rem;
   padding: 0.5rem 0;
-  border-radius: 16px;
+  border-radius: 1rem;
   color: var(--fg-muted);
   text-decoration: none;
   transition: all 300ms ease-out;
@@ -573,7 +575,7 @@ textarea {
   max-width: 28rem;
   margin: 0 auto;
   padding: 0.75rem 1rem;
-  border-radius: 14px;
+  border-radius: 0.875rem;
   background: var(--danger);
   color: #ffffff;
   box-shadow: var(--shadow-lg);
@@ -587,7 +589,7 @@ textarea {
   padding: 1.5rem 1rem 7rem;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 48rem) {
   .watchlist {
     padding-inline: 2rem;
   }
@@ -638,13 +640,13 @@ textarea {
   height: 0.5rem;
   margin-top: 0.5rem;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--radius-round);
   background: var(--bg-subtle);
 }
 
 .progress-fill {
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-round);
   background: var(--accent);
 }
 
@@ -684,23 +686,20 @@ textarea {
 .item-search input[type="search"] {
   width: 100%;
   min-width: 0;
+  padding-left: 2.5rem;
 }
 
 .watchlist button,
 .watchlist input[type="search"],
 .watchlist select {
-  min-height: 44px;
+  min-height: 2.75rem;
   padding: 0.5rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 0.0625rem solid var(--border);
+  border-radius: 0.75rem;
   background: var(--bg-surface);
   transition:
     transform 120ms ease-out,
     background-color 150ms ease;
-}
-
-.item-search input[type="search"] {
-  padding-left: 2.5rem;
 }
 
 .watchlist button {
@@ -726,7 +725,7 @@ textarea {
   padding: 1rem;
   margin: 0.5rem 0;
   overflow-wrap: anywhere;
-  border: 1px solid var(--border);
+  border: 0.0625rem solid var(--border);
   border-radius: 0.75rem;
 }
 
@@ -738,7 +737,7 @@ textarea {
   overflow-wrap: anywhere;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 48rem) {
   .watchlist h1 {
     font-size: 1.875rem;
   }
@@ -760,8 +759,8 @@ textarea {
   height: 2rem;
   margin: 1.5rem 0 0.5rem;
   padding: 0 1rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  border: 0.0625rem solid var(--border);
+  border-radius: var(--radius-round);
   font-size: 0.75rem;
   font-weight: 700;
   background: var(--bg-canvas);
@@ -794,7 +793,7 @@ textarea {
 .watchlist summary {
   display: list-item;
   align-content: center;
-  min-height: 44px;
+  min-height: 2.75rem;
   padding-inline: 0.75rem;
   cursor: pointer;
 }
@@ -803,22 +802,22 @@ textarea {
   display: inline-block;
   flex-shrink: 0;
   padding: 0.25rem 0.5rem;
-  border-radius: 14px;
+  border-radius: 0.875rem;
   background: var(--bg-subtle);
   font-size: 0.75rem;
   font-weight: 600;
 }
 
 .reorder-handle {
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
   cursor: grab;
   touch-action: none;
 }
 
 .reorder-handle:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 3px;
+  outline: 0.125rem solid currentColor;
+  outline-offset: 0.1875rem;
 }
 
 .sortable-ghost {
@@ -829,7 +828,7 @@ textarea {
   opacity: 0.75;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 30rem) {
   .home {
     padding: 1rem 1rem 7rem;
   }
@@ -877,8 +876,8 @@ textarea {
   gap: 0.75rem;
   min-height: 12rem;
   padding: 0.75rem;
-  border: 2px dashed var(--border);
-  border-radius: 18px;
+  border: 0.125rem dashed var(--border);
+  border-radius: 1.125rem;
   color: var(--fg-muted);
   text-align: center;
   text-decoration: none;
@@ -905,7 +904,7 @@ textarea {
   place-items: center;
   width: 3rem;
   height: 3rem;
-  border-radius: 999px;
+  border-radius: var(--radius-round);
   background: var(--bg-subtle);
 }
 
@@ -922,7 +921,7 @@ textarea {
   place-items: center;
   width: 3.5rem;
   height: 3.5rem;
-  border-radius: 999px;
+  border-radius: var(--radius-round);
   background: var(--accent);
   color: #ffffff;
   box-shadow: var(--shadow-lg);
@@ -932,7 +931,7 @@ textarea {
     background-color 150ms ease-out;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 48rem) {
   .create-watchlist-floating {
     display: none;
   }
@@ -940,10 +939,10 @@ textarea {
 
 .watchlist-edit {
   margin-left: auto;
-  min-height: 44px;
+  min-height: 2.75rem;
   padding: 0.5rem 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 0.0625rem solid var(--border);
+  border-radius: 0.75rem;
   background: var(--bg-surface);
   cursor: pointer;
 }
@@ -1114,6 +1113,7 @@ textarea {
   padding: 0 var(--size-3);
   border-radius: var(--size-2);
   font-size: 0.875rem;
+  font-weight: 500;
   line-height: var(--size-4);
   cursor: pointer;
 }
@@ -1122,7 +1122,6 @@ textarea {
   border: var(--border-size-1) solid var(--accent);
   background: var(--accent);
   color: #ffffff;
-  font-weight: 600;
 }
 
 .button-secondary {
