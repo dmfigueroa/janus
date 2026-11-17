@@ -1,5 +1,9 @@
 # V2 parity baseline
 
+For visual work, [V1-UI-MAP.md](V1-UI-MAP.md) maps each parity-relevant v1 UI area to its v2
+template and stylesheet counterpart. Use it to locate files; use this ledger for baseline
+revision, evidence and outstanding acceptance.
+
 Parity source and running v1 image: `669a385b8efa855adfad93f73b734cc5c9a4e709`
 (verified 2026-11-11 through Coolify deployment history and Docker image inspection).
 The previous source baseline was `b86d920c7faa347a3af04ffda13f163f461e0616`.

@@ -16,7 +16,9 @@ cargo test --locked
 cargo build --locked --release
 ```
 
-For visual work, `npm run preview:local` seeds a disposable database, builds and starts
+For visual work, start from [V1-UI-MAP.md](V1-UI-MAP.md) to find the v1 reference component
+and v2 template/styles for a UI area, then record evidence in [PARITY.md](PARITY.md).
+`npm run preview:local` seeds a disposable database, builds and starts
 the v2 process, and starts the v1 dev server. It prints both local URLs. During `npm run dev`
 from the repository root, Nitro proxies `/v2` and `/v2/**` to `127.0.0.1:3001`, so the v1 dev
 server can preview the separate v2 process at `http://localhost:3000/v2`. This development
