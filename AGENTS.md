@@ -14,7 +14,7 @@
 - v2 setup, checks, tests and module layout: [`v2/README.md`](v2/README.md).
 - Run commands inside the repository devcontainer: start it with `devcontainer up --workspace-folder . --docker-path podman`, then run commands with `devcontainer exec --workspace-folder . --docker-path podman <command>`.
 - The host toolchain is a fallback for when the container cannot start. When using Podman directly, locate the container with `podman ps -a --filter "label=devcontainer.local_folder=$(pwd)"`, confirm it belongs to the current checkout, then run commands with `podman exec --workdir /workspaces/janus <container> <command>`. Never use an unrelated Toolbox or development container.
-- Run root `npm ci` once per checkout before v2 tests and never borrow another checkout's `node_modules`. `npm run test:v2` pins `JANUS_TEST_NODE` to the `.tool-versions` Node and forwards arguments to `cargo test --locked`; the `24.12` engine floor is a minimum, and the pinned version wins.
+- Run root `npm ci` once per checkout before v2 tests and never borrow another checkout's `node_modules`. `npm run test:v2` pins `JANUS_TEST_NODE` to the `.tool-versions` Node and forwards arguments to `cargo test --locked`; `engines` accepts Node `>=24.12 <26` and the pinned version wins. Run host Node commands through `mise exec --` (for example `mise exec -- npm ci`): a bare `node` can be a newer major, which npm now rejects before installing.
 
 ## Git Conventions
 
@@ -110,5 +110,5 @@ Before writing new Rust or reviewing Rust changes under `v2/`, load the `rust-be
 ## V2 Frontend
 
 - Use relative units and Open Props tokens for spacing, type and sizing. Add fixed units only where the browser requires them, such as hairline borders.
-- Before changing V2 visuals, run `npm run preview:local`, then compare local v1 and v2 screenshots with `npm run visual:compare -- --route /watchlists`. Inspect both images; do not use a Coolify preview as the development loop. Render and measure both versions at `390x844` and `1280x800` first: offer no layout option and claim no parity on source reading alone (see [`v2/README.md`](v2/README.md) parity layout rule).
+- Before changing V2 visuals, run `npm run preview:local` and compare local v1 and v2 screenshots with `npm run visual:compare -- --route /watchlists`; inspect both images, and never use a Coolify preview as the development loop. Measure both versions at `390x844` and `1280x800` before offering any layout option or parity claim (see [`v2/README.md`](v2/README.md) parity layout rule).
 - Use HTMX for all v2 browser HTTP requests. Declare requests, triggers, targets, and swaps with hx-\* attributes. Drag-and-drop and keyboard handlers may update request values and dispatch custom DOM events consumed by hx-trigger. Do not use htmx.ajax. Frontend requests must consume server-rendered HTML and let HTMX swap it into the page. Backend endpoints must also preserve JSON support for API callers through content negotiation. Do not use fetch or standalone XMLHttpRequest for frontend requests.
