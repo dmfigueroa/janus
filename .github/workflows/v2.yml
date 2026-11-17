@@ -56,8 +56,12 @@ jobs:
       - run: npm ci
         working-directory: .
       - run: cargo test --locked
-      - name: Browser DOM tests
-        run: node --test tests/browse-browser.cjs tests/watchlist-form-browser.cjs tests/reorder-browser.cjs
+      - name: Install browsers
+        run: npx playwright-core install --with-deps chromium webkit
+      - name: Browser tests
+        env:
+          PLAYWRIGHT_BROWSERS: chromium,webkit
+        run: node --test tests/browse-browser.cjs tests/watchlist-form-browser.cjs tests/reorder-browser.cjs tests/dialog-layout-browser.cjs
       - uses: Swatinem/rust-cache@v2
         if: github.event_name == 'push'
         with:

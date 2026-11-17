@@ -28,12 +28,24 @@ Compare the two UIs with Playwright screenshots after `preview:local`:
 ```sh
 npm run visual:compare -- --route /watchlists
 npm run visual:compare -- --route /watchlists --click "Create New List"
+npm run visual:compare -- --route /watchlists/1 \
+  --scroll 600 \
+  --click-v1 "button=Watchlist actions" \
+  --click-v1 "menuitem=Edit watchlist" \
+  --click-v2 "button=Edit watchlist" \
+  --wait "#watchlist-dialog" \
+  --assert-in-viewport "#watchlist-dialog"
 ```
 
 The second command opens the dialog in both versions and writes `-v1.png` and `-v2.png`
-under the system temporary directory. Inspect both images rather than relying on measured
-values alone. If no Chromium build is available, run `npx playwright-core install chromium`
-once (or set `PLAYWRIGHT_CHROMIUM` to an existing executable).
+under the system temporary directory. Repeat `--click` to run a click sequence in both
+versions, or use `--click-v1` and `--click-v2` for version-specific controls. A
+`role=accessible name` prefix targets a role instead of page text. `--scroll` positions the
+page before clicking, `--wait` holds until a selector is visible, and `--assert-in-viewport`
+fails when the selector leaves the viewport. Inspect both images rather than relying on
+measured values alone. If no Chromium build is available, run
+`npx playwright-core install chromium` once (or set `PLAYWRIGHT_CHROMIUM` to an existing
+executable).
 
 Tests require root `npm ci` under a supported Node version because their disposable SQLite
 files are created by the actual v1 Drizzle migrator. From the repository root, `npm run test:v2`
@@ -123,5 +135,7 @@ list or detail surface through HTMX. See [PARITY.md](PARITY.md) for evidence and
 acceptance.
 
 Reorder DOM regression: `node --test v2/tests/reorder-browser.cjs` (Node 24.12 or later
-with npm dependencies). Dialog DOM regression: `node --test v2/tests/watchlist-form-browser.cjs`. Browse card sizing:
-`node --test v2/tests/browse-browser.cjs`.
+with npm dependencies). Dialog DOM regression: `node --test v2/tests/watchlist-form-browser.cjs`.
+Dialog viewport layout: `node --test v2/tests/dialog-layout-browser.cjs` (requires Chromium;
+set `PLAYWRIGHT_BROWSERS=chromium,webkit` to also cover WebKit).
+Browse card sizing: `node --test v2/tests/browse-browser.cjs`.
