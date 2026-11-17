@@ -36,6 +36,10 @@ RUN find src templates static -type f -exec touch {} + \
 # runner — minimal image with only the binary and the healthcheck's curl.
 # ---------------------------------------------------------------------------
 FROM debian:bookworm-slim
+# Debian package versions move with the base image tag, so pinning them here would
+# break the build whenever bookworm-slim refreshes. The distro ships the security
+# updates, and apt-get upgrade is intentionally not run.
+# hadolint ignore=DL3008
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates curl \
   && rm -rf /var/lib/apt/lists/*

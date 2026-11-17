@@ -90,6 +90,9 @@
     "pre-push": "sh -c 'if [ -d node_modules ]; then npm run format:check; else echo \"skipping format:check: no node_modules, run npm ci\"; fi'"
   },
   "lint-staged": {
+    "{Dockerfile,v2/Dockerfile}": [
+      "bash tools/lint-dockerfiles.sh"
+    ],
     "v2/**/*.rs": [
       "cargo fmt --manifest-path v2/Cargo.toml -- --check",
       "sh -c 'cargo check --locked --manifest-path v2/Cargo.toml'"
