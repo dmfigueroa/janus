@@ -41,11 +41,11 @@ The create/edit watchlist form together with the decisions it carries: field val
 _Avoid_: Create/edit modal
 
 **MCP page contract**:
-One MCP tool whose result is a paginated envelope: a page of summaries, items, or grouped titles, with an optional cursor. A page contract owns its declaration, the argument fields it accepts, its output schema, and its projection together, so what it advertises, what it accepts, and what it returns cannot drift apart. Compare *MCP batch contract*.
+One MCP tool whose result is a paginated envelope: a page of summaries, items, or grouped titles, with an optional cursor. A page contract owns its declaration, the argument fields it accepts, its output schema, and its projection together, so what it advertises, what it accepts, and what it returns cannot drift apart. Compare _MCP batch contract_.
 _Avoid_: Read tool, paginated tool
 
 **MCP batch contract**:
-One MCP tool whose result is an ordered list of per-entry outcomes: create, update, and reorder. Each entry is processed independently, so one failure never aborts the rest; the whole request is rejected only when the entry array itself is malformed. A batch contract owns its declaration, accepted arguments, output schema, and per-entry rules. Compare *MCP page contract*.
+One MCP tool whose result is an ordered list of per-entry outcomes: create, update, and reorder. Each entry is processed independently, so one failure never aborts the rest; the whole request is rejected only when the entry array itself is malformed. A batch contract owns its declaration, accepted arguments, output schema, and per-entry rules. Compare _MCP page contract_.
 _Avoid_: Bulk operation, mutation tool
 
 **MCP contract table**:
