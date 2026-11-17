@@ -13,9 +13,18 @@
 
 ## Running Commands
 
+### Devcontainer (primary path)
+
 - Run commands inside the repository devcontainer: start it with `devcontainer up --workspace-folder . --docker-path podman`, then run commands with `devcontainer exec --workspace-folder . --docker-path podman <command>`.
-- The host toolchain is a fallback for when the container cannot start. When using Podman directly, locate the container with `podman ps -a --filter "label=devcontainer.local_folder=$(pwd)"`, confirm it belongs to the current checkout, then run commands with `podman exec --workdir /workspaces/janus <container> <command>`. Never use an unrelated Toolbox or development container.
-- Run root `npm ci` once per checkout before v2 tests and never borrow another checkout's `node_modules`. `npm run test:v2` pins `JANUS_TEST_NODE` to the `.tool-versions` Node and forwards arguments to `cargo test --locked`; `engines` accepts Node `>=24.12 <26` and the pinned version wins. Run host Node commands through `mise exec --` (for example `mise exec -- npm ci`): a bare `node` can be a newer major, which npm now rejects before installing.
+- When using Podman directly, locate the container with `podman ps -a --filter "label=devcontainer.local_folder=$(pwd)"`, confirm it belongs to the current checkout, then run commands with `podman exec --workdir /workspaces/janus <container> <command>`. Never use an unrelated Toolbox or development container.
+- If the Dev Container CLI is missing or `devcontainer up` fails, use the host path below instead of retrying the container. Do not use a bare host `node`.
+
+### Host toolchain (fallback path)
+
+- Run every host command through `bash tools/pinned-node.sh <command>`, which runs it under the `.tool-versions` Node (`node@24.18.0`) via `mise exec`. For example `bash tools/pinned-node.sh npm ci`. This path needs only `mise`, a C toolchain for `better-sqlite3` and the Rust toolchain; it is verified to work on the agent host.
+- Never run a bare `node` or `npm` on the host: the default shell can resolve a newer major such as `26.2.0`, which is outside `engines` (`>=24.12 <26`) and has no `better-sqlite3` prebuilt binary, so `npm ci` fails on the native-module ABI.
+- Run root `bash tools/pinned-node.sh npm ci` once per checkout before v2 tests and never borrow another checkout's `node_modules`.
+- Run the v2 Rust tests with `npm run test:v2`, which uses the same wrapper and forwards arguments to `cargo test --locked`, so the Node fixtures need no manual `JANUS_TEST_NODE`. Run `cargo test` directly only through the wrapper: `bash tools/pinned-node.sh cargo test --manifest-path v2/Cargo.toml --locked`. If you set `JANUS_TEST_NODE` yourself, point it at the pinned binary from `bash tools/pinned-node.sh node -p process.execPath`, otherwise the fixture tests spawn a different Node ABI.
 
 ## Git Conventions
 
