@@ -13,10 +13,11 @@ WORKDIR /build
 ENV CARGO_PROFILE_RELEASE_STRIP=true
 
 # Build a stub crate first to compile and cache the full dependency graph.
-COPY v2/Cargo.toml v2/Cargo.lock ./
-RUN mkdir -p src \
+COPY v2/Cargo.toml v2/Cargo.lock v2/build.rs ./
+RUN mkdir -p src static \
   && echo 'fn main() {}' > src/main.rs \
   && echo '' > src/lib.rs \
+  && echo '' > static/app.css \
   && cargo build --locked --release \
   && rm -rf src
 

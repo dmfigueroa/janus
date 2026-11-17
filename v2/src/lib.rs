@@ -1,4 +1,6 @@
+mod assets;
 mod database;
+pub use assets::{APP_CSS_URL, APP_CSS_VERSION};
 pub use database::open_database;
 mod features;
 mod http;
@@ -58,18 +60,7 @@ fn base_router(database_ready: bool) -> Router {
                 )
             }),
         )
-        .route(
-            "/v2/static/app.css",
-            get(|| async {
-                (
-                    [
-                        (header::CONTENT_TYPE, "text/css"),
-                        (header::CACHE_CONTROL, "no-cache"),
-                    ],
-                    include_str!("../static/app.css"),
-                )
-            }),
-        )
+        .route("/v2/static/app.css", get(assets::app_css))
         .route(
             "/v2/static/app.js",
             get(|| async {

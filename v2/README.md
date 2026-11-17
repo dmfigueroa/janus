@@ -75,6 +75,10 @@ SQLite busy timeout. V1 alone owns migrations. No schema-sync/migration features
 The existing directory must be mounted, including WAL/SHM sidecars.
 
 - `/v2`: development landing page.
+- `/v2/static/app.css`: the shared layout references this stylesheet through a build-time
+  SHA-256 query, so the URL changes with the stylesheet bytes. The current version is served
+  as immutable; any other version revalidates against its ETag, so an old cached copy cannot
+  pair with new markup.
 - `/v2/watchlists`: v1-style home grid with covers, progress, next item, paused dates,
   lifecycle sections, Unicode name search and continuation pages. Search swaps only the grid
   through HTMX and keeps the URL in sync. Create tile and mobile button open the native dialog.
