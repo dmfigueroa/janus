@@ -458,7 +458,8 @@ mod tests {
         let page = view.render_page().unwrap();
         assert!(page.contains("<!doctype html>"), "{page}");
         assert!(page.contains("<title>Watchlist · Janus</title>"), "{page}");
-        assert!(page.contains("0 of 1 watched · custom order"), "{page}");
+        assert!(page.contains("0/1 Watched"), "{page}");
+        assert!(page.contains("0% Complete"), "{page}");
         assert!(page.contains("value=\"First\""), "{page}");
         assert!(
             page.contains("hx-post=\"/v2/watchlists/1/reorder?query=First&amp;unwatched=true\""),

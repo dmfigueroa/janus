@@ -1,11 +1,13 @@
 use super::Watchlists;
+use super::browse::BrowseView;
 use super::timeline::{TimelineFilters, TimelineView};
 use crate::http::{FormOrJson, ResponseFormat};
 use askama::Template;
 use axum::{
+    Json,
     extract::{Path, Query, State},
-    http::StatusCode,
-    response::{Html, Response},
+    http::{HeaderMap, StatusCode, header},
+    response::{Html, IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
 #[derive(Deserialize)]
@@ -57,6 +59,7 @@ async fn load_timeline(
 }
 
 #[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct ListFilters {
     #[serde(default)]
     query: String,
@@ -64,62 +67,51 @@ pub struct ListFilters {
 }
 #[derive(Template)]
 #[template(path = "watchlists.html")]
-struct ListPage {
-    lists: Vec<ListRow>,
-    query: String,
-    next: String,
+struct ListPage<'a> {
+    view: &'a BrowseView,
 }
-struct ListRow {
-    id: i64,
-    name: String,
-    total: u64,
-    watched: u64,
+#[derive(Template)]
+#[template(path = "watchlist-browse.html")]
+struct BrowseFragment<'a> {
+    view: &'a BrowseView,
 }
 pub async fn list(
     State(lists): State<Watchlists>,
+    headers: HeaderMap,
     Query(filters): Query<ListFilters>,
-) -> Result<Html<String>, Failure> {
-    use super::discovery::{DiscoveryError, DiscoveryOperation, DiscoveryRequest};
-    let query = filters.query.trim();
-    let operation = if query.is_empty() {
-        DiscoveryOperation::List
-    } else {
-        DiscoveryOperation::Search
-    };
-    let page = lists
-        .summaries(
-            operation,
-            DiscoveryRequest {
-                query: (!query.is_empty()).then(|| query.to_owned()),
-                cursor: filters.cursor,
-                ..Default::default()
-            },
-        )
-        .await
-        .map_err(|error| match error {
-            DiscoveryError::InvalidInput(_) => (
-                StatusCode::BAD_REQUEST,
-                "Unable to load this page. Return to /v2/watchlists and try again.",
-            ),
-            DiscoveryError::Database(error) => failure(error),
-        })?;
-    ListPage {
-        lists: page
-            .watchlists
-            .iter()
-            .map(|summary| ListRow {
-                id: summary.watchlist.id,
-                name: summary.watchlist.name.clone(),
-                total: summary.stats.total_items as u64,
-                watched: summary.stats.watched_items as u64,
-            })
-            .collect(),
+) -> Result<Response, Failure> {
+    use super::browse::{BrowseError, BrowseFilters, BrowseView};
+    let filters = BrowseFilters {
         query: filters.query,
-        next: page.next_cursor.unwrap_or_default(),
+        cursor: filters.cursor,
+    };
+    let summaries = lists.all_summaries().await.map_err(failure)?;
+    let view = BrowseView::build(&summaries, &filters).map_err(|error| match error {
+        BrowseError::InvalidCursor => (
+            StatusCode::BAD_REQUEST,
+            "Unable to load this page. Return to /v2/watchlists and try again.",
+        ),
+    })?;
+    let htmx = headers
+        .get("hx-request")
+        .is_some_and(|value| value == "true");
+    let restoring = headers
+        .get("hx-history-restore-request")
+        .is_some_and(|value| value == "true");
+    let json = headers
+        .get(header::ACCEPT)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.contains("application/json"));
+    let page = if htmx && !restoring {
+        BrowseFragment { view: &view }.render()
+    } else if json {
+        return Ok(([(header::VARY, "HX-Request, Accept")], Json(view)).into_response());
+    } else {
+        ListPage { view: &view }.render()
     }
-    .render()
     .map(Html)
-    .map_err(failure)
+    .map_err(failure)?;
+    Ok(([(header::VARY, "HX-Request, Accept")], page).into_response())
 }
 
 #[derive(Deserialize)]

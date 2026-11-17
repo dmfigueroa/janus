@@ -18,6 +18,8 @@ pub mod mcp;
 
 pub mod discovery;
 
+mod browse;
+
 mod contracts;
 
 pub mod reorder;

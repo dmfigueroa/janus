@@ -135,6 +135,132 @@ async fn existing_watchlist_renders_ids_order_filters_and_escaped_content_withou
         "reads must preserve database bytes, schema and migration metadata"
     );
 }
+#[tokio::test]
+async fn watchlist_home_renders_v1_cards_sections_and_local_navigation() {
+    let fixture = Fixture::v1();
+    let app = janus_v2::database_router(janus_v2::open_database(&fixture.0).await.unwrap());
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v2/watchlists")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let html = body(response).await;
+    assert!(
+        html.contains("<h1 class=\"home-title\">My Lists</h1>"),
+        "{html}"
+    );
+    assert!(html.contains("2 watchlists, 3 items"), "{html}");
+    assert!(html.contains("class=\"watchlist-card\""), "{html}");
+    assert!(html.contains("href=\"/v2/watchlists/41\""), "{html}");
+    assert!(html.contains("href=\"/v2/watchlists/42\""), "{html}");
+    assert!(html.contains("1 of 3 watched"), "{html}");
+    assert!(html.contains("class=\"cover-placeholder\""), "{html}");
+    assert!(
+        html.contains("Next: E1 • Opening &#60;script&#62;"),
+        "{html}"
+    );
+    assert!(html.contains("role=\"progressbar\""), "{html}");
+    assert!(html.contains("aria-label=\"Primary navigation\""), "{html}");
+    assert!(!html.contains("Completed (0)"), "{html}");
+
+    let json_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v2/watchlists?query=caf%C3%A9")
+                .header("accept", "application/json")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(json_response.headers()["content-type"], "application/json");
+    let json: serde_json::Value = serde_json::from_str(&body(json_response).await).unwrap();
+    assert_eq!(json["query"], "café");
+    assert_eq!(json["sections"][0]["cards"][0]["id"], 41);
+
+    let detail = body(
+        app.oneshot(
+            Request::builder()
+                .uri("/v2/watchlists/41")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert!(
+        detail.contains("aria-label=\"Primary navigation\""),
+        "{detail}"
+    );
+    assert!(detail.contains("href=\"/v2/watchlists\""), "{detail}");
+}
+
+#[tokio::test]
+async fn watchlist_home_searches_and_pages_by_v1_recency() {
+    let fixture = Fixture::v1();
+    change_v1(&fixture, "many");
+    let app = janus_v2::database_router(janus_v2::open_database(&fixture.0).await.unwrap());
+    let search = |uri: &str, htmx: bool| {
+        let mut request = Request::builder().uri(uri);
+        if htmx {
+            request = request.header("hx-request", "true");
+        }
+        app.clone().oneshot(request.body(Body::empty()).unwrap())
+    };
+
+    let response = search("/v2/watchlists?query=CAFE%CC%81", false)
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let html = body(response).await;
+    assert!(html.contains("Search results"), "{html}");
+    assert!(html.contains("1 of 62 watchlists"), "{html}");
+    assert!(html.contains("href=\"/v2/watchlists/41\""), "{html}");
+    assert!(!html.contains("href=\"/v2/watchlists/42\""), "{html}");
+
+    let fragment = body(search("/v2/watchlists?query=list", true).await.unwrap()).await;
+    assert!(fragment.contains("id=\"watchlist-browse\""), "{fragment}");
+    assert!(!fragment.contains("<html"), "{fragment}");
+    assert!(fragment.contains("Bulk list 00"), "{fragment}");
+    assert!(fragment.contains("Next page"), "{fragment}");
+
+    let restored = body(
+        app.clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/v2/watchlists?query=list")
+                    .header("hx-request", "true")
+                    .header("hx-history-restore-request", "true")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(restored.contains("<!doctype html>"), "{restored}");
+    assert!(restored.contains("id=\"watchlist-search\""), "{restored}");
+    assert!(
+        restored.contains("aria-label=\"Primary navigation\""),
+        "{restored}"
+    );
+
+    let empty = body(search("/v2/watchlists?query=missing", false).await.unwrap()).await;
+    assert!(
+        empty.contains("No watchlists match your search."),
+        "{empty}"
+    );
+    assert!(empty.contains("Clear search"), "{empty}");
+}
+
 async fn rpc(
     app: &axum::Router,
     message: Value,
@@ -423,13 +549,13 @@ async fn reads_refresh_after_v1_writes_without_restarting_or_changing_schema() {
     assert!(
         body(app.clone().oneshot(read()).await.unwrap())
             .await
-            .contains("1 of 3 watched")
+            .contains("1/3 Watched")
     );
     change_v1(&fixture, "mutate");
     assert!(
         body(app.clone().oneshot(read()).await.unwrap())
             .await
-            .contains("2 of 3 watched")
+            .contains("2/3 Watched")
     );
     change_v1(&fixture, "release");
     let released = body(app.oneshot(read()).await.unwrap()).await;
@@ -769,6 +895,42 @@ async fn empty_watchlist_stats_report_zero_progress_and_no_selection() {
     assert!(stats.next_unwatched.is_none());
     assert!(stats.cover_image.is_none());
     assert!(stats.cover_media_type.is_none());
+}
+
+#[tokio::test]
+async fn all_summaries_matches_individual_reads_for_empty_partial_and_completed_lists() {
+    use janus_v2::Watchlists;
+    let fixture = Fixture::v1();
+    let lists = Watchlists(janus_v2::open_database(&fixture.0).await.unwrap());
+    let summaries = lists.all_summaries().await.unwrap();
+    let partial = summaries
+        .iter()
+        .find(|summary| summary.watchlist.id == 41)
+        .unwrap();
+    assert_eq!(partial.stats.total_items, 3);
+    assert_eq!(partial.stats.watched_items, 1);
+    assert_eq!(partial.stats.progress, 33);
+    assert_eq!(partial.stats.next_unwatched.as_ref().unwrap().id, 101);
+    assert!(partial.stats.cover_image.is_none());
+    assert_eq!(partial.stats.cover_media_type.as_deref(), Some("episode"));
+    let empty = summaries
+        .iter()
+        .find(|summary| summary.watchlist.id == 42)
+        .unwrap();
+    assert_eq!(empty.stats.total_items, 0);
+    assert!(empty.stats.next_unwatched.is_none());
+
+    change_v1(&fixture, "watch-all");
+    let completed = lists
+        .all_summaries()
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|summary| summary.watchlist.id == 41)
+        .unwrap();
+    assert_eq!(completed.stats.progress, 100);
+    assert!(completed.stats.next_unwatched.is_none());
+    assert_eq!(completed.stats.cover_image.as_deref(), Some("/poster.jpg"));
 }
 
 #[tokio::test]

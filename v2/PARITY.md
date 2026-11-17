@@ -157,6 +157,33 @@ Unauthenticated external v1/v2 web/MCP requests returned 403; this alone does no
 Access-authenticated or real-client behavior. Physical-device, full PWA, write/reorder and
 owner acceptance gates remain outstanding in their respective slices.
 
+## Issue #256 browse-home evidence
+
+The web home now renders the v1 watchlist grid instead of a bare result list. Cards keep
+cover selection, the watched/total and progress line, progress bar, next-item label and paused
+date. Rotation lists stay in the stored recency order, while completed, empty and paused lists
+stay in their v1 collapsible sections. A shared layout adds the v1 bottom navigation to the
+home and existing detail page.
+
+`browse.rs` owns summary ordering (v1 recency), NFC plus
+lowercase name matching, page cursors bound to the query, section grouping and card
+labels. `snapshot.rs` reads every summary in one transaction using grouped counts and
+mode-specific ranked item selections, reducing the home read from per-watchlist queries to
+four statements. Search and pagination use
+HTMX, swap only `#watchlist-browse`, push the URL, announce pending/failed loads, and keep a
+non-JavaScript link fallback. Empty search results offer a clear action. These web controls are
+the web projection of the MCP discovery contract; v1's home itself only ordered by recency, and
+v1's `list_watchlists`/`search_watchlists` inputs and ordering are unchanged.
+
+Automated coverage: browse unit tests for recency ordering, Unicode matching, bound
+cursors, lifecycle grouping, next-item markers, cover URLs and paused dates; fixture-backed
+HTTP tests for home cards, totals, cover placeholders, escaped labels, navigation, search,
+HTMX fragment-only swaps, continuation links, JSON content negotiation, bulk summary
+consistency and search empty states. `cargo fmt --check`, Clippy and all Rust tests pass with disposable v1 databases.
+No deployed, real-client, physical-device or owner acceptance is claimed for this slice.
+Create, edit, delete, merge, watch/skip/pause and their card menus remain outstanding in their
+own slices.
+
 ## Issue #307 watchlist read-state evidence
 
 Watchlist stored-row decoding and queries are private to `storage.rs`; `summary.rs` owns
@@ -196,3 +223,17 @@ restoration on success. DOM tests do not establish real browser pointer/touch be
 Existing database tests cover bounded locks and schema compatibility. No deployment,
 Access-authenticated client, physical-device or owner acceptance evidence is claimed for
 this change; those gates remain outstanding.
+
+## Issue #256 visual parity follow-up
+
+The shared shell now follows v1 measurements more closely. The bottom navigation keeps
+v1's space-around item row capped at 28rem, 4rem height, 5rem items, rounded
+hover surface and 300ms ease-out transition. The browse grid keeps v1's two mobile columns, four desktop columns,
+220px card cap, 1.125rem card titles and the "1 of 3 watched • 33%" meta separator; the
+"Watchlists" heading is visible again and collapsed sections use v1's 20px chevron.
+
+The detail header reuses v1's "watched/total Watched" and "complete" progress labels, an
+8px progress bar, pill year headings and a sticky filter row. The watchlist search bar is
+retained as a v2 addition because v2 has no media search page; it is not presented as v1
+parity. `cargo fmt --check`, Clippy and all Rust tests pass against disposable v1 databases.
+No deployed, browser, physical-device or owner acceptance is claimed for this style pass.

@@ -26,7 +26,9 @@ SQLite busy timeout. V1 alone owns migrations. No schema-sync/migration features
 The existing directory must be mounted, including WAL/SHM sidecars.
 
 - `/v2`: development landing page.
-- `/v2/watchlists`: paginated watchlist discovery and Unicode name search.
+- `/v2/watchlists`: v1-style home grid with covers, progress, next item, paused dates,
+  lifecycle sections, Unicode name search and continuation pages. Search swaps only the grid
+  through HTMX and keeps the URL in sync.
 - `/v2/watchlists/{id}`: existing items in release/custom order, text filtering, release-year
   grouping, expandable watched runs, stable IDs and nullable metadata.
 - `/v2/watchlists/{id}/reorder`: atomic custom-order moves from web drag or keyboard intents.
@@ -73,6 +75,16 @@ item pages; private discovery code owns page windows, cursor binding and shared 
 validation. Web and MCP build a typed `DiscoveryRequest`, call the typed operation and
 project the typed result themselves. Legacy MCP coercion, unknown-field filtering and JSON
 envelopes stay in `mcp.rs`.
+
+The browse home is separate from MCP discovery. `browse.rs` turns one typed summary snapshot
+into v1-style cards: stored recency ordering, NFC-plus-lowercase name matching, bound
+continuation cursors, lifecycle sections, cover selection, progress, next-item labels and
+paused dates. `snapshot.rs` reads the home summaries in one transaction with grouped counts
+and mode-specific ranked selections instead of loading every item or issuing per-list
+queries. `web.rs` chooses the full page or the grid fragment;
+HTMX search and pagination swap only `#watchlist-browse` and push the new URL. A
+shared layout provides the v1 bottom navigation on the home and detail pages. Create, edit,
+delete and merge controls remain with their own slices.
 
 Reorder writes renumber the complete displayed sequence, keeping ranks contiguous even
 when v1 deletions left gaps. Other future writes must explicitly preserve Drizzle's
