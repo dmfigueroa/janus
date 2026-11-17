@@ -4,32 +4,29 @@
 //! keys a projection promises, and ignores unknown properties so that
 //! forward-compatible additions do not fail the suite.
 
-use super::ToolContract;
+use rmcp::model::Tool;
 use serde_json::Value;
 
-/// Asserts that a projected value satisfies the contract's output schema.
-pub(super) fn assert_output_matches(contract: &ToolContract, value: &Value) {
-    let Some(schema) = contract.tool.output_schema.as_ref() else {
-        panic!("{} declares no output schema", contract.name);
+/// Asserts that a projected value satisfies the tool's output schema.
+pub(super) fn assert_output_matches(name: &str, tool: &Tool, value: &Value) {
+    let Some(schema) = tool.output_schema.as_ref() else {
+        panic!("{name} declares no output schema");
     };
     assert!(
         matches(&Value::Object(schema.as_ref().clone()), value),
-        "{} projection does not satisfy its output schema: {value}",
-        contract.name
+        "{name} projection does not satisfy its output schema: {value}"
     );
 }
 
 /// Asserts that call-time acceptance and the declared input schema agree.
-pub(super) fn assert_accepted_matches_declared(contract: &ToolContract) {
-    let mut declared = contract
-        .tool
+pub(super) fn assert_accepted_matches_declared(name: &str, tool: &Tool, accepted: &[&str]) {
+    let mut declared = tool
         .input_schema
         .get("properties")
         .and_then(Value::as_object)
         .map(|properties| properties.keys().cloned().collect::<Vec<_>>())
         .unwrap_or_default();
-    let mut accepted = contract
-        .accepted
+    let mut accepted = accepted
         .iter()
         .map(|field| (*field).to_owned())
         .collect::<Vec<_>>();
@@ -37,8 +34,7 @@ pub(super) fn assert_accepted_matches_declared(contract: &ToolContract) {
     accepted.sort();
     assert_eq!(
         declared, accepted,
-        "{} accepted fields drifted from its declared input schema",
-        contract.name
+        "{name} accepted fields drifted from its declared input schema"
     );
 }
 

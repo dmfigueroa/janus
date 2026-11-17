@@ -1,12 +1,6 @@
 //! MCP page contracts: tools whose results are paginated envelopes.
-//!
-//! Each contract owns its declaration, accepted argument fields, output schema
-//! and projection together, so what a tool advertises, what it accepts and what
-//! it returns stay one piece of knowledge. Discovery behavior itself lives in
-//! [`crate::features::watchlists::discovery`]; this module maps it to the
-//! legacy MCP shape.
 
-use super::{McpCallError, ToolContract, object_schema, output_schema};
+use super::{McpCallError, object_schema, output_schema};
 use crate::features::watchlists::{
     WatchlistItem, WatchlistRecord, WatchlistStats, WatchlistSummary, Watchlists,
     discovery::{
@@ -33,7 +27,14 @@ const FIND_FIELDS: &[&str] = &[
     "resultView",
 ];
 
-static CONTRACTS: LazyLock<Vec<ToolContract>> = LazyLock::new(build_contracts);
+pub(super) struct Contract {
+    pub(super) name: &'static str,
+    pub(super) tool: Tool,
+    pub(super) accepted: &'static [&'static str],
+    operation: DiscoveryOperation,
+}
+
+static CONTRACTS: LazyLock<Vec<Contract>> = LazyLock::new(build_contracts);
 
 /// Declarations for every page-shaped tool, in protocol listing order.
 pub(super) fn tools() -> Vec<Tool> {
@@ -43,24 +44,20 @@ pub(super) fn tools() -> Vec<Tool> {
         .collect()
 }
 
-/// One page-shaped declaration, cloned only when the protocol asks for it.
 pub(super) fn tool(name: &str) -> Option<Tool> {
     contract(name).map(|contract| contract.tool.clone())
 }
 
-/// The contract that owns this tool, when it is page-shaped.
-pub(super) fn contract(name: &str) -> Option<&'static ToolContract> {
+pub(super) fn contract(name: &str) -> Option<&'static Contract> {
     CONTRACTS.iter().find(|contract| contract.name == name)
 }
 
-/// Runs one page-shaped tool call against the shared discovery operations.
 pub(super) async fn call(
     lists: &Watchlists,
-    contract: &ToolContract,
+    contract: &Contract,
     arguments: Map<String, Value>,
 ) -> Result<Value, McpCallError> {
-    let operation = operation_for(contract.name)
-        .ok_or_else(|| McpCallError::Failure("Unknown watchlist tool.".into()))?;
+    let operation = contract.operation;
     let arguments = normalize(contract, arguments);
     let request = request_from_arguments(&arguments).map_err(McpCallError::Failure)?;
     let discovered = if operation.is_summary() {
@@ -74,16 +71,6 @@ pub(super) async fn call(
     discovered.map_err(|error| McpCallError::Failure(message_for(operation, error)))
 }
 
-fn operation_for(name: &str) -> Option<DiscoveryOperation> {
-    match name {
-        "list_watchlists" => Some(DiscoveryOperation::List),
-        "search_watchlists" => Some(DiscoveryOperation::Search),
-        "get_watchlist" => Some(DiscoveryOperation::Get),
-        "find_watchlist_items" => Some(DiscoveryOperation::Find),
-        _ => None,
-    }
-}
-
 fn message_for(operation: DiscoveryOperation, error: DiscoveryError) -> String {
     match error {
         DiscoveryError::InvalidInput(message) => message,
@@ -94,7 +81,7 @@ fn message_for(operation: DiscoveryOperation, error: DiscoveryError) -> String {
     }
 }
 
-fn build_contracts() -> Vec<ToolContract> {
+fn build_contracts() -> Vec<Contract> {
     let media = json!({"type":"string","enum": MEDIA_TYPES});
     let page = json!({"orderBy":{"type":"string","enum":["createdAt","lastWatched","lastAdded"]},"order":{"type":"string","enum":["asc","desc"]},"pageSize":{"type":"integer","minimum":1,"maximum":100},"cursor":{"type":"string"}});
     let list = page.clone();
@@ -131,6 +118,7 @@ fn build_contracts() -> Vec<ToolContract> {
             json!([]),
             summary_page.clone(),
             LIST_FIELDS,
+            DiscoveryOperation::List,
         ),
         read_contract(
             "search_watchlists",
@@ -139,6 +127,7 @@ fn build_contracts() -> Vec<ToolContract> {
             json!(["query"]),
             summary_page,
             SEARCH_FIELDS,
+            DiscoveryOperation::Search,
         ),
         read_contract(
             "get_watchlist",
@@ -147,6 +136,7 @@ fn build_contracts() -> Vec<ToolContract> {
             json!(["watchlistId"]),
             detail_page,
             GET_FIELDS,
+            DiscoveryOperation::Get,
         ),
         read_contract(
             "find_watchlist_items",
@@ -155,6 +145,7 @@ fn build_contracts() -> Vec<ToolContract> {
             json!(["watchlistId"]),
             item_page,
             FIND_FIELDS,
+            DiscoveryOperation::Find,
         ),
     ]
 }
@@ -166,15 +157,17 @@ fn read_contract(
     required: Value,
     output_schema: Arc<Map<String, Value>>,
     accepted: &'static [&'static str],
-) -> ToolContract {
+    operation: DiscoveryOperation,
+) -> Contract {
     let mut tool = Tool::new(name, title, object_schema(properties, required));
     tool.title = Some(title.into());
     tool.output_schema = Some(output_schema);
     tool.annotations = Some(ToolAnnotations::new().read_only(true).destructive(false));
-    ToolContract {
+    Contract {
         name,
         tool,
         accepted,
+        operation,
     }
 }
 
@@ -191,11 +184,9 @@ fn summary_schema(media: &Value) -> Value {
     json!({"type":"object","properties":{"id":{"type":"number"},"name":{"type":"string"},"description":nullable_string,"itemOrderMode":{"type":"string","enum":["release","custom"]},"createdAt":{"type":"string"},"updatedAt":nullable_string,"lastWatchedAt":nullable_string,"lastItemAddedAt":nullable_string,"pausedAt":nullable_string,"stats":{"type":"object","properties":{"totalItems":{"type":"number"},"watchedItems":{"type":"number"},"progress":{"type":"number"},"nextUnwatched":{},"coverImage":nullable_string,"coverMediaType":{"anyOf":[media,{"type":"null"}]}},"required":["totalItems","watchedItems","progress","nextUnwatched","coverImage","coverMediaType"]}},"required":["id","name","description","itemOrderMode","createdAt","updatedAt","lastWatchedAt","lastItemAddedAt","pausedAt","stats"]})
 }
 
-/// Removes unaccepted fields, then applies the legacy `get_watchlist` coercion.
-///
 /// Only `get_watchlist` coerces its selector: v1's Zod schema used JavaScript
 /// `Number` there. Other selectors and page sizes accept JSON numbers only.
-fn normalize(contract: &ToolContract, arguments: Map<String, Value>) -> Map<String, Value> {
+fn normalize(contract: &Contract, arguments: Map<String, Value>) -> Map<String, Value> {
     let mut arguments = arguments;
     arguments.retain(|key, _| contract.accepted.contains(&key.as_str()));
     if contract.name == "get_watchlist"
@@ -235,11 +226,6 @@ fn coerced_number(value: &Value, in_array: bool) -> Option<f64> {
     }
 }
 
-/// Builds the typed request from normalized MCP arguments.
-///
-/// Unknown fields were already removed and the legacy `get_watchlist` selector
-/// was already coerced. Value types and integral numbers stay adapter concerns;
-/// semantic rules belong to discovery.
 fn request_from_arguments(arguments: &Map<String, Value>) -> Result<DiscoveryRequest, String> {
     let text = |key: &str| -> Result<Option<String>, String> {
         arguments
@@ -315,8 +301,7 @@ fn item_envelope(page: ItemPage) -> Value {
     value
 }
 
-/// Full stored-item projection used by detail stats.
-fn item_json(item: &WatchlistItem) -> Value {
+fn stored_item_json(item: &WatchlistItem) -> Value {
     json!({
         "id": item.id,
         "tmdbId": item.tmdb_id,
@@ -339,7 +324,6 @@ fn item_json(item: &WatchlistItem) -> Value {
     })
 }
 
-/// Reduced item projection returned by regular MCP item views.
 fn item_projection(item: &WatchlistItem) -> Value {
     json!({
         "id": item.id,
@@ -373,7 +357,7 @@ fn stats_json(stats: &WatchlistStats) -> Value {
         "totalItems": stats.total_items,
         "watchedItems": stats.watched_items,
         "progress": stats.progress,
-        "nextUnwatched": stats.next_unwatched.as_ref().map(item_json),
+        "nextUnwatched": stats.next_unwatched.as_ref().map(stored_item_json),
         "coverImage": stats.cover_image,
         "coverMediaType": stats.cover_media_type,
     })
@@ -450,14 +434,19 @@ mod tests {
         }
     }
 
-    fn page_contract(name: &str) -> &'static ToolContract {
+    fn page_contract(name: &str) -> &'static Contract {
         contract(name).unwrap_or_else(|| panic!("{name} is not a page contract"))
+    }
+
+    fn assert_page_output(name: &str, value: &Value) {
+        let contract = page_contract(name);
+        assert_output_matches(contract.name, &contract.tool, value);
     }
 
     #[test]
     fn every_page_contract_accepts_exactly_its_declared_fields() {
         for contract in CONTRACTS.iter() {
-            assert_accepted_matches_declared(contract);
+            assert_accepted_matches_declared(contract.name, &contract.tool, contract.accepted);
         }
     }
 
@@ -467,8 +456,8 @@ mod tests {
             watchlists: vec![summary()],
             next_cursor: Some("cursor".into()),
         });
-        assert_output_matches(page_contract("list_watchlists"), &page);
-        assert_output_matches(page_contract("search_watchlists"), &page);
+        assert_page_output("list_watchlists", &page);
+        assert_page_output("search_watchlists", &page);
     }
 
     #[test]
@@ -479,7 +468,7 @@ mod tests {
             next_cursor: None,
             order_token: Some("token".into()),
         });
-        assert_output_matches(page_contract("get_watchlist"), &page);
+        assert_page_output("get_watchlist", &page);
     }
 
     #[test]
@@ -496,6 +485,6 @@ mod tests {
             next_cursor: None,
             order_token: None,
         });
-        assert_output_matches(page_contract("find_watchlist_items"), &page);
+        assert_page_output("find_watchlist_items", &page);
     }
 }

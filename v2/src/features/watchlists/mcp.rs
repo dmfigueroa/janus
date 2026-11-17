@@ -1,10 +1,4 @@
 //! MCP adapter: tool routing and protocol envelopes.
-//!
-//! The page and batch contract modules own their tool declarations, accepted
-//! arguments, output schemas and projections. This adapter owns only what the
-//! transport and v1's observable protocol require: routing a call to its
-//! contract family, mapping whole-request rejections to JSON-RPC errors, and the
-//! response envelope quirks existing clients see.
 
 use super::Watchlists;
 use rmcp::{ErrorData, RoleServer, ServerHandler, model::*, service::RequestContext};
@@ -20,34 +14,16 @@ mod contract_check;
 #[derive(Clone)]
 pub struct WatchlistMcp(pub Watchlists);
 
-/// One MCP tool's declaration, accepted argument fields and output schema.
-///
-/// The declaration, the fields accepted at call time and the schema describing
-/// the projection are built from one entry so they cannot drift apart.
-pub(super) struct ToolContract {
-    pub(super) name: &'static str,
-    pub(super) tool: Tool,
-    pub(super) accepted: &'static [&'static str],
-}
-
-/// A whole-request outcome the adapter turns into the protocol envelope.
-///
-/// Per-entry failures inside a batch are data in the returned value, never one
-/// of these variants: they must not abort the remaining entries.
 pub(super) enum McpCallError {
-    /// Rejected before dispatch; surfaces as JSON-RPC invalid params.
     InvalidRequest(String),
-    /// Failed at the tool level; surfaces as error content.
     Failure(String),
 }
 
-/// The contract family that owns a tool, for routing.
 enum Route {
-    Paged(&'static ToolContract),
-    Batched(&'static ToolContract),
+    Paged(&'static paged::Contract),
+    Batched(&'static batched::Contract),
 }
 
-/// Builds an object-valued JSON schema, as tool declarations use.
 pub(super) fn object_schema(properties: Value, required: Value) -> Map<String, Value> {
     Map::from_iter([
         ("type".into(), Value::from("object")),
@@ -56,7 +32,6 @@ pub(super) fn object_schema(properties: Value, required: Value) -> Map<String, V
     ])
 }
 
-/// Builds an object-schema output declaration with an optional `required` list.
 pub(super) fn output_schema(properties: Value, required: Option<Value>) -> Arc<Map<String, Value>> {
     let mut schema = Map::from_iter([
         ("type".into(), Value::from("object")),

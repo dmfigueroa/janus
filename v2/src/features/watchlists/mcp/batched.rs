@@ -1,13 +1,6 @@
 //! MCP batch contracts: tools whose results are ordered per-entry outcomes.
-//!
-//! Create, update and reorder each process their entries independently and
-//! answer with one ordered result per entry. That contract — indexing, partial
-//! failure, error codes and reference echoes — is shared here, while each tool
-//! keeps its own declaration, accepted arguments, schema and entry rules.
-//! Whole-request rejections happen before any entry runs and surface as
-//! JSON-RPC invalid params.
 
-use super::{McpCallError, ToolContract, object_schema, output_schema};
+use super::{McpCallError, object_schema, output_schema};
 use crate::features::watchlists::{
     ItemOrderMode, Watchlists,
     reorder::{Reorder, ReorderOutcome},
@@ -20,7 +13,14 @@ use std::sync::{Arc, LazyLock};
 const REORDER_FIELDS: &[&str] = &["reorders"];
 const WRITE_FIELDS: &[&str] = &["watchlists"];
 
-static CONTRACTS: LazyLock<Vec<ToolContract>> = LazyLock::new(build_contracts);
+pub(super) struct Contract {
+    pub(super) name: &'static str,
+    pub(super) tool: Tool,
+    pub(super) accepted: &'static [&'static str],
+    kind: BatchTool,
+}
+
+static CONTRACTS: LazyLock<Vec<Contract>> = LazyLock::new(build_contracts);
 
 /// Declarations for every batch-shaped tool, in protocol listing order.
 pub(super) fn tools() -> Vec<Tool> {
@@ -30,64 +30,34 @@ pub(super) fn tools() -> Vec<Tool> {
         .collect()
 }
 
-/// One batch-shaped declaration, cloned only when the protocol asks for it.
 pub(super) fn tool(name: &str) -> Option<Tool> {
     contract(name).map(|contract| contract.tool.clone())
 }
 
-/// The contract that owns this tool, when it is batch-shaped.
-pub(super) fn contract(name: &str) -> Option<&'static ToolContract> {
+pub(super) fn contract(name: &str) -> Option<&'static Contract> {
     CONTRACTS.iter().find(|contract| contract.name == name)
 }
 
-/// Runs one batch-shaped tool call, one entry at a time.
 pub(super) async fn call(
     lists: &Watchlists,
-    contract: &ToolContract,
+    contract: &Contract,
     arguments: Map<String, Value>,
 ) -> Result<Value, McpCallError> {
     let mut arguments = arguments;
     arguments.retain(|key, _| contract.accepted.contains(&key.as_str()));
-    match contract.name {
-        "create_watchlists" => {
-            let entries = entries(
-                &arguments,
-                "watchlists",
-                "watchlists must be a non-empty array",
-            )?;
-            if !entries.iter().all(create_shape_is_valid) {
-                return Err(McpCallError::InvalidRequest(
-                    "Invalid watchlist input".into(),
-                ));
-            }
-            Ok(run_batch(lists, BatchTool::Create, entries).await)
-        }
-        "update_watchlists" => {
-            let entries = entries(
-                &arguments,
-                "watchlists",
-                "watchlists must be a non-empty array",
-            )?;
-            if !entries.iter().all(update_shape_is_valid) {
-                return Err(McpCallError::InvalidRequest(
-                    "Invalid watchlist input".into(),
-                ));
-            }
-            Ok(run_batch(lists, BatchTool::Update, entries).await)
-        }
-        "reorder_watchlist_items" => {
-            let entries = entries(&arguments, "reorders", "reorders must be a non-empty array")?;
-            if !entries.iter().all(reorder_shape_is_valid) {
-                return Err(McpCallError::InvalidRequest("Invalid reorder input".into()));
-            }
-            Ok(run_batch(lists, BatchTool::Reorder, entries).await)
-        }
-        // `contract` only returns names declared here; routing checks membership first.
-        _ => unreachable!("every batch contract has a call path"),
+    let (key, empty_message) = contract.kind.entries();
+    let entries = entries(&arguments, key, empty_message)?;
+    if !entries
+        .iter()
+        .all(|entry| contract.kind.shape_is_valid(entry))
+    {
+        return Err(McpCallError::InvalidRequest(
+            contract.kind.invalid_message().into(),
+        ));
     }
+    Ok(run_batch(lists, contract.kind, entries).await)
 }
 
-/// The non-empty entry array a batch call requires.
 fn entries<'a>(
     arguments: &'a Map<String, Value>,
     key: &str,
@@ -101,7 +71,6 @@ fn entries<'a>(
         .ok_or_else(|| McpCallError::InvalidRequest(message.into()))
 }
 
-/// One entry's outcome, before the shared renderer adds its position.
 struct BatchEntry {
     success: bool,
     code: &'static str,
@@ -128,14 +97,12 @@ impl BatchEntry {
         }
     }
 
-    /// Adds a field the entry echoes back, such as a watchlist or item ID.
     fn with(mut self, key: &'static str, value: Value) -> Self {
         self.fields.push((key, value));
         self
     }
 }
 
-/// The closed set of batch tools, each with its own per-entry rules.
 #[derive(Clone, Copy)]
 enum BatchTool {
     Create,
@@ -143,16 +110,42 @@ enum BatchTool {
     Reorder,
 }
 
-/// Runs every entry in order and renders the ordered `results` envelope.
+impl BatchTool {
+    fn entries(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Create | Self::Update => ("watchlists", "watchlists must be a non-empty array"),
+            Self::Reorder => ("reorders", "reorders must be a non-empty array"),
+        }
+    }
+
+    fn invalid_message(self) -> &'static str {
+        match self {
+            Self::Create | Self::Update => "Invalid watchlist input",
+            Self::Reorder => "Invalid reorder input",
+        }
+    }
+
+    fn shape_is_valid(self, entry: &Value) -> bool {
+        match self {
+            Self::Create => create_shape_is_valid(entry),
+            Self::Update => update_shape_is_valid(entry),
+            Self::Reorder => reorder_shape_is_valid(entry),
+        }
+    }
+
+    async fn run_entry(self, lists: &Watchlists, entry: Value, index: usize) -> BatchEntry {
+        match self {
+            Self::Create => create_entry(lists, entry, index).await,
+            Self::Update => update_entry(lists, entry, index).await,
+            Self::Reorder => reorder_entry(lists, entry, index).await,
+        }
+    }
+}
+
 async fn run_batch(lists: &Watchlists, tool: BatchTool, entries: &[Value]) -> Value {
     let mut results = Vec::with_capacity(entries.len());
     for (index, entry) in entries.iter().cloned().enumerate() {
-        let outcome = match tool {
-            BatchTool::Create => create_entry(lists, entry, index).await,
-            BatchTool::Update => update_entry(lists, entry, index).await,
-            BatchTool::Reorder => reorder_entry(lists, entry, index).await,
-        };
-        results.push(outcome);
+        results.push(tool.run_entry(lists, entry, index).await);
     }
     render(results)
 }
@@ -262,7 +255,6 @@ async fn reorder_entry(lists: &Watchlists, entry: Value, index: usize) -> BatchE
         .fold(outcome, |entry, (key, value)| entry.with(key, value))
 }
 
-/// Builds the ordered-batch output schema shared by create and update.
 fn write_output_schema() -> Arc<Map<String, Value>> {
     let batch = json!({"type":"object","properties":{"index":{"type":"integer","minimum":0},"success":{"type":"boolean"},"code":{"type":"string"},"message":{"type":"string"},"watchlistId":{"type":"number"},"watchlist":{"type":"object","properties":{"id":{"type":"number"},"name":{"type":"string"},"description":{"type":["string","null"]},"itemOrderMode":{"type":"string","enum":["release","custom"]}},"required":["id","name","description","itemOrderMode"]}},"required":["index","success","code","message"]});
     output_schema(
@@ -271,7 +263,7 @@ fn write_output_schema() -> Arc<Map<String, Value>> {
     )
 }
 
-fn build_contracts() -> Vec<ToolContract> {
+fn build_contracts() -> Vec<Contract> {
     let write_schema = write_output_schema();
 
     let mut reorder = Tool::new(
@@ -322,26 +314,27 @@ fn build_contracts() -> Vec<ToolContract> {
     update.annotations = Some(ToolAnnotations::new().read_only(false).destructive(false));
 
     vec![
-        ToolContract {
+        Contract {
             name: "reorder_watchlist_items",
             tool: reorder,
             accepted: REORDER_FIELDS,
+            kind: BatchTool::Reorder,
         },
-        ToolContract {
+        Contract {
             name: "create_watchlists",
             tool: create,
             accepted: WRITE_FIELDS,
+            kind: BatchTool::Create,
         },
-        ToolContract {
+        Contract {
             name: "update_watchlists",
             tool: update,
             accepted: WRITE_FIELDS,
+            kind: BatchTool::Update,
         },
     ]
 }
 
-/// Rejects entries whose present fields carry the wrong JSON type.
-///
 /// Missing fields are per-entry validation failures, not whole-request ones.
 fn reorder_shape_is_valid(entry: &Value) -> bool {
     entry.is_object()
@@ -493,8 +486,13 @@ mod tests {
         assert_accepted_matches_declared, assert_output_matches,
     };
 
-    fn batch_contract(name: &str) -> &'static ToolContract {
+    fn batch_contract(name: &str) -> &'static Contract {
         contract(name).unwrap_or_else(|| panic!("{name} is not a batch contract"))
+    }
+
+    fn assert_batch_output(name: &str, value: &Value) {
+        let contract = batch_contract(name);
+        assert_output_matches(contract.name, &contract.tool, value);
     }
 
     fn created() -> BatchEntry {
@@ -507,7 +505,7 @@ mod tests {
     #[test]
     fn every_batch_contract_accepts_exactly_its_declared_fields() {
         for contract in CONTRACTS.iter() {
-            assert_accepted_matches_declared(contract);
+            assert_accepted_matches_declared(contract.name, &contract.tool, contract.accepted);
         }
     }
 
@@ -520,8 +518,8 @@ mod tests {
             BatchEntry::failed("validation_error", "Name is required"),
             internal_error(),
         ]);
-        assert_output_matches(batch_contract("create_watchlists"), &rendered);
-        assert_output_matches(batch_contract("update_watchlists"), &rendered);
+        assert_batch_output("create_watchlists", &rendered);
+        assert_batch_output("update_watchlists", &rendered);
     }
 
     #[test]
@@ -533,7 +531,7 @@ mod tests {
                 .with("referenceItemId", json!(3)),
             BatchEntry::failed("not_found", "Watchlist not found."),
         ]);
-        assert_output_matches(batch_contract("reorder_watchlist_items"), &rendered);
+        assert_batch_output("reorder_watchlist_items", &rendered);
     }
 
     #[test]
