@@ -47,6 +47,18 @@ fn base_router(database_ready: bool) -> Router {
             }),
         )
         .route(
+            "/v2/static/vendor/open-props.min.css",
+            get(|| async {
+                (
+                    [
+                        (header::CONTENT_TYPE, "text/css"),
+                        (header::CACHE_CONTROL, "no-cache"),
+                    ],
+                    include_str!("../static/vendor/open-props.min.css"),
+                )
+            }),
+        )
+        .route(
             "/v2/static/app.css",
             get(|| async {
                 (

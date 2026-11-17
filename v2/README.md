@@ -1,6 +1,7 @@
 # Janus v2
 
-One Rust crate serves HTML, local assets and MCP. V2 owns watchlist reads, create/edit,
+One Rust crate serves HTML, local assets and MCP. Dialog and layout values use
+[browser-ready Open Props tokens](https://open-props.style/) served from `static/vendor`. V2 owns watchlist reads, create/edit,
 reordering and their MCP tools; v1 remains the application for the remaining writes.
 Requires Rust 1.94.0 and a native C compiler.
 Production needs no Node runtime or frontend build.

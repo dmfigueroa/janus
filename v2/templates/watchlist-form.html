@@ -40,42 +40,44 @@
         id="watchlist-description"
         name="description"
         placeholder="Optional description..."
-        rows="3"
+        rows="2"
       >
 {{form.description}}</textarea
       >
     </div>
-    <fieldset class="form-field order-field">
-      <legend>Order</legend>
-      <label>
-        <input
-          type="radio"
-          name="itemOrderMode"
-          value="release"
-          {%
-          if
-          form.release_selected()
-          %}checked{%
-          endif
-          %}
-        />
-        Release order
-      </label>
-      <label>
-        <input
-          type="radio"
-          name="itemOrderMode"
-          value="custom"
-          {%
-          if
-          form.custom_selected()
-          %}checked{%
-          endif
-          %}
-        />
-        Custom order
-      </label>
-    </fieldset>
+    <div class="form-field order-field" role="group" aria-labelledby="watchlist-order-label">
+      <span id="watchlist-order-label" class="field-label">Order</span>
+      <div class="order-options">
+        <label>
+          <input
+            type="radio"
+            name="itemOrderMode"
+            value="release"
+            {%
+            if
+            form.release_selected()
+            %}checked{%
+            endif
+            %}
+          />
+          Release order
+        </label>
+        <label>
+          <input
+            type="radio"
+            name="itemOrderMode"
+            value="custom"
+            {%
+            if
+            form.custom_selected()
+            %}checked{%
+            endif
+            %}
+          />
+          Custom order
+        </label>
+      </div>
+    </div>
   </fieldset>
   {% if let Some(error) = form.error %}
   <p id="watchlist-form-error" class="form-error" role="alert">{{error}}</p>

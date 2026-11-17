@@ -30,6 +30,7 @@ async fn browser_assets_are_served_locally() {
         "/v2/static/watchlist-dialog.js",
         "/v2/static/vendor/htmx.min.js",
         "/v2/static/vendor/Sortable.min.js",
+        "/v2/static/vendor/open-props.min.css",
     ] {
         let response = janus_v2::router()
             .oneshot(Request::builder().uri(path).body(Body::empty()).unwrap())

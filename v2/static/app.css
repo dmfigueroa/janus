@@ -57,7 +57,8 @@ a {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
   color: inherit;
 }
@@ -948,14 +949,17 @@ select {
 }
 
 .dialog {
-  width: min(30rem, calc(100vw - 2rem));
+  position: relative;
+  width: min(24rem, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
   padding: 0;
   overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: 18px;
+  border: 0;
+  border-radius: var(--size-2);
   background: var(--bg-surface);
   color: var(--fg-default);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
   box-shadow: var(--shadow-lg);
 }
 
@@ -964,26 +968,51 @@ select {
 }
 
 .dialog-header {
-  padding: 1.25rem 1.25rem 0;
+  padding: var(--size-5) var(--size-5) var(--size-3);
 }
 
 .dialog-header h2 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.125rem;
+  font-weight: 600;
   letter-spacing: -0.025em;
+  line-height: var(--size-6);
 }
 
 .dialog-help {
-  margin: 0.35rem 0 0;
+  margin: var(--size-1) 0 0;
   font-size: 0.875rem;
+  line-height: var(--size-4);
   color: var(--fg-muted);
+}
+
+.dialog-close {
+  position: absolute;
+  top: var(--size-3);
+  right: var(--size-3);
+  display: grid;
+  place-items: center;
+  width: calc(var(--size-7) + var(--size-2) + var(--size-1));
+  height: calc(var(--size-7) + var(--size-2) + var(--size-1));
+  padding: 0;
+  border: 0;
+  border-radius: var(--size-2);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dialog-close:hover {
+    background: var(--bg-subtle);
+    color: var(--fg-default);
+  }
 }
 
 .dialog-form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1rem 1.25rem 1.25rem;
+  padding: var(--size-2) var(--size-5) var(--size-3);
 }
 
 .dialog-form[aria-busy="true"] {
@@ -993,7 +1022,7 @@ select {
 .dialog-fields {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--size-3);
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -1003,27 +1032,32 @@ select {
 .form-field {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: calc(var(--size-2) * 0.75);
   min-width: 0;
 }
 
 .form-field > label,
-.order-field legend {
+.order-field .field-label {
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 500;
+  line-height: var(--size-4);
 }
 
 .form-field input[type="text"],
 .form-field textarea {
   width: 100%;
-  min-height: 44px;
-  padding: 0.55rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  min-height: calc(var(--size-7) + var(--size-2));
+  padding: 0 calc(var(--size-2) + var(--size-1));
+  border: var(--border-size-1) solid var(--border);
+  border-radius: var(--size-2);
   background: var(--bg-canvas);
+  font-size: 0.875rem;
+  line-height: var(--size-4);
 }
 
 .form-field textarea {
+  height: calc(2 * var(--size-4) + var(--size-3) + 2 * var(--border-size-1));
+  padding-block: var(--size-2);
   resize: vertical;
 }
 
@@ -1031,6 +1065,7 @@ select {
 .form-error {
   margin: 0;
   font-size: 0.875rem;
+  line-height: var(--size-4);
   color: var(--danger);
 }
 
@@ -1038,24 +1073,25 @@ select {
   display: none;
 }
 
-.order-field {
-  gap: 0.5rem;
-  margin: 0;
-  padding: 0;
-  border: 0;
+.order-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2);
 }
 
 .order-field label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  min-height: 44px;
-  font-weight: 400;
+  gap: calc(var(--size-2) + var(--size-1) * 0.5);
+  min-height: var(--size-4);
+  font-size: 0.875rem;
+  line-height: var(--size-4);
 }
 
 .order-field input[type="radio"] {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: var(--size-4);
+  height: var(--size-4);
+  margin: 0;
   accent-color: var(--accent);
 }
 
@@ -1063,7 +1099,9 @@ select {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.75rem;
+  gap: var(--size-3);
+  margin-top: var(--size-5);
+  padding-top: var(--size-2);
 }
 
 .dialog-footer .htmx-indicator {
@@ -1072,21 +1110,23 @@ select {
 
 .button-primary,
 .button-secondary {
-  min-height: 44px;
-  padding: 0.55rem 1rem;
-  border-radius: 12px;
+  min-height: calc(var(--size-7) + var(--size-2) + var(--size-1));
+  padding: 0 var(--size-3);
+  border-radius: var(--size-2);
+  font-size: 0.875rem;
+  line-height: var(--size-4);
   cursor: pointer;
 }
 
 .button-primary {
-  border: 1px solid var(--accent);
+  border: var(--border-size-1) solid var(--accent);
   background: var(--accent);
   color: #ffffff;
   font-weight: 600;
 }
 
 .button-secondary {
-  border: 1px solid var(--border);
+  border: var(--border-size-1) solid var(--border);
   background: var(--bg-surface);
 }
 
@@ -1098,14 +1138,14 @@ select {
 
 .notification {
   position: fixed;
-  right: 1rem;
-  bottom: 5.5rem;
-  left: 1rem;
+  right: var(--size-3);
+  bottom: calc(var(--size-12) * 0.55);
+  left: var(--size-3);
   z-index: 60;
   max-width: 28rem;
   margin: 0 auto;
-  padding: 0.75rem 1rem;
-  border-radius: 14px;
+  padding: var(--size-3);
+  border-radius: var(--size-2);
   background: var(--fg-default);
   color: var(--bg-canvas);
   box-shadow: var(--shadow-lg);
