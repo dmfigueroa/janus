@@ -4,6 +4,7 @@
 
 - `ARCHITECTURE.md` is the source of truth for Janus's target file structure, ownership model, and dependency rules.
 - `CONTRIBUTING.md` is the placement guide for new files and incremental migrations.
+- `deploy/README.md` documents deployment topology, production Coolify applications and PR preview URLs. Read it before debugging routing or preview behavior.
 - When adding files, moving modules, or introducing new boundaries, read those docs first and follow them.
 - Apply the target structure to new code and touched areas. Do not do broad drive-by reorganizations unless the user asks for them.
 
@@ -16,6 +17,7 @@
 - Start the selected container if needed, then run commands with `podman exec --workdir /workspaces/janus <container> <command>`.
 - Never use an unrelated Toolbox or development container. Native Node modules such as `better-sqlite3` must run with the same Node.js ABI used when `npm install` compiled them.
 - Host execution is supported only with Node.js 24.12 or later and the native compiler toolchain required by `better-sqlite3`.
+- If the devcontainer command or container is unavailable, run on the host and run `npm ci` in this worktree first. Worktrees do not include `node_modules`; do not symlink dependencies from another checkout.
 
 ## Git Conventions
 
