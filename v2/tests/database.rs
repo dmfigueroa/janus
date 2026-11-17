@@ -549,13 +549,13 @@ async fn reads_refresh_after_v1_writes_without_restarting_or_changing_schema() {
     assert!(
         body(app.clone().oneshot(read()).await.unwrap())
             .await
-            .contains("1 of 3 watched")
+            .contains("1/3 Watched")
     );
     change_v1(&fixture, "mutate");
     assert!(
         body(app.clone().oneshot(read()).await.unwrap())
             .await
-            .contains("2 of 3 watched")
+            .contains("2/3 Watched")
     );
     change_v1(&fixture, "release");
     let released = body(app.oneshot(read()).await.unwrap()).await;

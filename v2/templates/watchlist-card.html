@@ -34,6 +34,7 @@
     <h3 class="card-title" title="{{card.name}}">{{card.name}}</h3>
     <div class="card-meta">
       <span>{{card.watched}} of {{card.total}} watched</span>
+      <span aria-hidden="true">•</span>
       <span class="card-progress-value {% if card.complete %}complete{% endif %}"
         >{{card.progress}}%</span
       >

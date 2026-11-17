@@ -1,23 +1,62 @@
 {% extends "layout.html" %} {% block title %}{{view.name}} · Janus{% endblock %} {% block content %}
 <main class="watchlist">
-  <nav class="breadcrumb"><a href="/v2/watchlists">Janus</a></nav>
-  <header>
-    <h1>{{view.name}}</h1>
-    {% if view.paused %}<span class="badge" role="status">Paused</span>{% endif %}
-    <p>{{view.description}}</p>
-    <p>{{view.watched}} of {{view.total}} watched · {{view.mode}} order</p>
-    <progress value="{{view.progress}}" max="100" aria-label="Watchlist progress">
-      {{view.progress}}%
-    </progress>
+  <header class="watchlist-header">
+    <div class="watchlist-title">
+      <h1>{{view.name}}</h1>
+      {% if view.paused %}<span class="badge" role="status">Paused</span>{% endif %}
+    </div>
+    {% if !view.description.is_empty() %}
+    <p class="watchlist-description">{{view.description}}</p>
+    {% endif %}
+    <div class="watchlist-progress">
+      <div class="watchlist-progress-labels">
+        <span class="watchlist-progress-count">{{view.watched}}/{{view.total}} Watched</span>
+        <span class="watchlist-progress-percent">{{view.progress}}% Complete</span>
+      </div>
+      <div
+        class="progress-track"
+        role="progressbar"
+        aria-label="Watchlist progress"
+        aria-valuenow="{{view.progress}}"
+        aria-valuemin="0"
+        aria-valuemax="100"
+      >
+        <div class="progress-fill" style="width: {{view.progress}}%"></div>
+      </div>
+    </div>
   </header>
-  <form method="get">
-    <label for="query">Search items</label
-    ><input id="query" name="query" value="{{view.query}}" type="search" /><label for="unwatched"
-      >Watched items</label
-    ><select name="unwatched" id="unwatched">
+  <form class="watchlist-toolbar" method="get" role="search">
+    <div class="item-search">
+      <svg
+        class="search-icon"
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        width="16"
+        height="16"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+      >
+        <circle cx="11" cy="11" r="7"></circle>
+        <line x1="16" y1="16" x2="21" y2="21"></line>
+      </svg>
+      <label class="visually-hidden" for="query">Search items</label>
+      <input
+        id="query"
+        name="query"
+        value="{{view.query}}"
+        type="search"
+        placeholder="Search titles..."
+        autocomplete="off"
+      />
+    </div>
+    <label class="visually-hidden" for="unwatched">Watched items</label>
+    <select name="unwatched" id="unwatched">
       <option value="true" {% if view.unwatched %}selected{% endif %}>Collapse watched</option>
-      <option value="false" {% if !view.unwatched %}selected{% endif %}>Show all</option></select
-    ><button>Apply filters</button>
+      <option value="false" {% if !view.unwatched %}selected{% endif %}>Show all</option>
+    </select>
+    <button type="submit">Apply filters</button>
   </form>
   <span
     id="reorder-recovery"

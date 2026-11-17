@@ -223,3 +223,17 @@ restoration on success. DOM tests do not establish real browser pointer/touch be
 Existing database tests cover bounded locks and schema compatibility. No deployment,
 Access-authenticated client, physical-device or owner acceptance evidence is claimed for
 this change; those gates remain outstanding.
+
+## Issue #256 visual parity follow-up
+
+The shared shell now follows v1 measurements more closely. The bottom navigation keeps
+v1's centered 28rem item row, 4rem height, 5rem items, rounded hover surface and 300ms
+ease-out transition. The browse grid keeps v1's two mobile columns, four desktop columns,
+220px card cap, 1.125rem card titles and the "1 of 3 watched • 33%" meta separator; the
+"Watchlists" heading is visible again and collapsed sections use v1's 20px chevron.
+
+The detail header reuses v1's "watched/total Watched" and "complete" progress labels, an
+8px progress bar, pill year headings and a sticky filter row. The watchlist search bar is
+retained as a v2 addition because v2 has no media search page; it is not presented as v1
+parity. `cargo fmt --check`, Clippy and all Rust tests pass against disposable v1 databases.
+No deployed, browser, physical-device or owner acceptance is claimed for this style pass.

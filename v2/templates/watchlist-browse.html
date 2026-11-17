@@ -1,18 +1,6 @@
 <div id="watchlist-browse" class="watchlist-browse" aria-busy="false">
-  <div class="browse-heading{% if !view.is_search %} browse-heading--compact{% endif %}">
-    <h2
-      id="browse-heading"
-      tabindex="-1"
-      {%
-      if
-      !view.is_search
-      %}class="visually-hidden"
-      {%
-      endif
-      %}
-    >
-      {{view.heading}}
-    </h2>
+  <div class="browse-heading">
+    <h2 id="browse-heading" tabindex="-1">{{view.heading}}</h2>
     {% if !view.summary.is_empty() %}
     <p class="browse-summary">{{view.summary}}</p>
     {% endif %}
@@ -22,7 +10,18 @@
   <details class="watchlist-section">
     <summary>
       <h3>{{section.title.unwrap_or_default()}} ({{section.cards.len()}})</h3>
-      <span class="chevron" aria-hidden="true"></span>
+      <svg
+        class="chevron"
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="m6 9 6 6 6-6"></path>
+      </svg>
     </summary>
     <div class="watchlist-grid">
       {% for card in section.cards %} {% include "watchlist-card.html" %} {% endfor %}
