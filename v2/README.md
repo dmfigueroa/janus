@@ -15,6 +15,11 @@ cargo test --locked
 cargo build --locked --release
 ```
 
+During `npm run dev` from the repository root, Nitro proxies `/v2` and `/v2/**` to
+`127.0.0.1:3001`, so the v1 dev server can preview the separate v2 process at
+`http://localhost:3000/v2`. This development proxy is not part of the production
+v1 bundle; deployment routing remains the separate Traefik/Coolify service.
+
 Tests require root `npm ci` under a supported Node version because their disposable SQLite
 files are created by the actual v1 Drizzle migrator. Set `JANUS_TEST_NODE` to that Node
 executable when it differs from PATH. Node is a test fixture dependency only.

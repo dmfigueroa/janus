@@ -7,6 +7,12 @@ import viteTsConfigPaths from "vite-tsconfig-paths";
 import { fileURLToPath, URL } from "url";
 import { nitro } from "nitro/vite";
 
+// Local preview only: the v2 Rust service is deployed separately.
+const v2DevProxy = {
+  "/v2": "http://127.0.0.1:3001",
+  "/v2/**": "http://127.0.0.1:3001",
+};
+
 const config = defineConfig({
   resolve: {
     alias: {
@@ -19,7 +25,7 @@ const config = defineConfig({
   },
   plugins: [
     devtools(),
-    nitro(),
+    nitro({ devProxy: v2DevProxy }),
     viteTsConfigPaths({
       projects: ["./tsconfig.json"],
     }),
