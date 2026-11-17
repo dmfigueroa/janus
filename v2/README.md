@@ -63,9 +63,11 @@ geometry wins. Record the route, viewports and measurement or screenshot paths i
 
 Tests require root `npm ci` under a supported Node version because their disposable SQLite
 files are created by the actual v1 Drizzle migrator. From the repository root, `npm run test:v2`
-pins `JANUS_TEST_NODE` to the `.tool-versions` Node and appends arguments to `cargo test
---locked`. Set `JANUS_TEST_NODE` yourself to override that choice. Node is a test fixture
-dependency only.
+runs `cargo test --locked` under the `.tool-versions` Node (through `tools/pinned-node.sh`), so
+the fixture tests find that Node on `PATH` and need no manual `JANUS_TEST_NODE`; extra arguments
+are appended to the cargo command. Set `JANUS_TEST_NODE` yourself to override that choice, and
+point it at the same Node (`bash tools/pinned-node.sh node -p process.execPath`). Node is a test
+fixture dependency only.
 
 `JANUS_V2_BIND` defaults to `127.0.0.1:3001`. `DATABASE_URL` is a required filesystem path,
 as in v1. Missing files, incompatible schema and unsupported stored values fail startup.
@@ -160,8 +162,9 @@ V2 DOM regressions: `npm run test:v2:dom` runs `v2/tests/htmx-browser.cjs` and
 `v2/tests/reorder-browser.cjs` with Node's test runner. The suites use jsdom to exercise real
 HTMX requests and swaps, optimistic keyboard reorder, drop anchors, blocked swaps during drags
 and saves, failed-save reconciliation, and filter/scroll/focus restoration. They need the
-`.tool-versions` Node and root `npm ci`, but no downloaded browser. Every pull request runs the
-same command in the "V2 DOM Tests" job, so a failing DOM regression fails the check.
+`.tool-versions` Node (`bash tools/pinned-node.sh npm run test:v2:dom` on the host) and root
+`npm ci`, but no downloaded browser. Every pull request runs the same command in the "V2 DOM
+Tests" job, so a failing DOM regression fails the check.
 Dialog DOM regression: `node --test v2/tests/watchlist-form-browser.cjs`.
 Dialog viewport layout: `node --test v2/tests/dialog-layout-browser.cjs` (requires Chromium;
 set `PLAYWRIGHT_BROWSERS=chromium,webkit` to also cover WebKit).
