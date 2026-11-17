@@ -963,6 +963,109 @@ async fn all_summaries_matches_individual_reads_for_empty_partial_and_completed_
     assert_eq!(completed.stats.cover_image.as_deref(), Some("/poster.jpg"));
 }
 
+/// Statements the home summary read may execute, independent of how many
+/// watchlists exist: one header read, one grouped count read and one ranked
+/// selection read per order mode. A per-watchlist regression pushes the count
+/// past this budget, so the test below fails before that regression ships.
+const HOME_SUMMARY_STATEMENT_BUDGET: usize = 4;
+
+/// Counts the statements one disposable connection executes through sea-orm's
+/// metric hook.
+struct StatementCounter(std::sync::Arc<AtomicUsize>);
+
+impl StatementCounter {
+    fn new() -> Self {
+        Self(std::sync::Arc::new(AtomicUsize::new(0)))
+    }
+
+    /// Installs the hook on a connection. Transactions and router state clone
+    /// the callback, and it runs once per executed statement rather than per
+    /// prepared statement.
+    fn install(&self, database: &mut sea_orm::DatabaseConnection) {
+        let statements = std::sync::Arc::clone(&self.0);
+        database.set_metric_callback(move |_| {
+            statements.fetch_add(1, Ordering::Relaxed);
+        });
+    }
+
+    fn count(&self) -> usize {
+        self.0.load(Ordering::Relaxed)
+    }
+}
+
+/// Runs the home summary read on its own counted connection.
+async fn counted_home_summaries(fixture: &Fixture) -> (usize, Vec<janus_v2::WatchlistSummary>) {
+    let mut database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let counter = StatementCounter::new();
+    counter.install(&mut database);
+    let summaries = janus_v2::Watchlists(database)
+        .all_summaries()
+        .await
+        .unwrap();
+    (counter.count(), summaries)
+}
+
+#[tokio::test]
+async fn home_summary_reads_use_a_fixed_statement_budget() {
+    let fixture = Fixture::v1();
+    let (two_watchlists, summaries) = counted_home_summaries(&fixture).await;
+    let partial = summaries
+        .iter()
+        .find(|summary| summary.watchlist.id == 41)
+        .unwrap();
+    assert_eq!(partial.stats.total_items, 3);
+    assert_eq!(partial.stats.watched_items, 1);
+    assert_eq!(partial.stats.progress, 33);
+    let empty = summaries
+        .iter()
+        .find(|summary| summary.watchlist.id == 42)
+        .unwrap();
+    assert_eq!(empty.stats.total_items, 0);
+    assert!(
+        two_watchlists <= HOME_SUMMARY_STATEMENT_BUDGET,
+        "home summary read used {two_watchlists} statements for {} watchlists, budget is {HOME_SUMMARY_STATEMENT_BUDGET}",
+        summaries.len()
+    );
+
+    change_v1(&fixture, "watch-all");
+    let (completed_watchlists, completed) = counted_home_summaries(&fixture).await;
+    let completed_list = completed
+        .iter()
+        .find(|summary| summary.watchlist.id == 41)
+        .unwrap();
+    assert_eq!(completed_list.stats.progress, 100);
+    assert!(completed_list.stats.next_unwatched.is_none());
+    assert_eq!(
+        completed_watchlists, two_watchlists,
+        "completing a watchlist must not change the statement count"
+    );
+
+    let bulk = Fixture::v1();
+    change_v1(&bulk, "bulk");
+    let (bulk_watchlists, bulk_summaries) = counted_home_summaries(&bulk).await;
+    assert_eq!(bulk_summaries.len(), 32);
+    assert!(
+        bulk_summaries
+            .iter()
+            .any(|summary| summary.stats.total_items == 0)
+    );
+    assert!(bulk_summaries.iter().any(|summary| {
+        summary.stats.total_items > summary.stats.watched_items && summary.stats.watched_items > 0
+    }));
+    assert!(bulk_summaries.iter().any(|summary| {
+        summary.stats.total_items > 0 && summary.stats.total_items == summary.stats.watched_items
+    }));
+    assert_eq!(
+        bulk_watchlists, two_watchlists,
+        "the home summary read must not issue more statements as watchlists are added"
+    );
+    assert!(
+        bulk_watchlists <= HOME_SUMMARY_STATEMENT_BUDGET,
+        "home summary read used {bulk_watchlists} statements for {} watchlists, budget is {HOME_SUMMARY_STATEMENT_BUDGET}",
+        bulk_summaries.len()
+    );
+}
+
 #[tokio::test]
 async fn summary_discovery_uses_efficient_counts_and_cover_fallback() {
     use janus_v2::{DiscoveryOperation as Operation, DiscoveryRequest as Request, Watchlists};
