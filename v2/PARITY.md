@@ -35,7 +35,7 @@ compatibility reconciliation and regeneration of the v1 schema contract through 
 - [x] Watchlist create and edit; delete and merge remain outstanding.
 - [x] Existing detail reads, text filters, stored release/custom order and release-year/watched grouping.
 - [x] Hidden-item-safe custom reorder.
-- [ ] Order-mode changes.
+- [x] Order-mode changes: web updates and MCP `update_watchlists` share the metadata write; switching release to custom initializes contiguous custom ranks in release order, and switching back retains ranks while release ordering resumes. The detail read reprojects grouping, filters and reorder availability from the stored mode. Web and MCP integration coverage uses disposable v1-migrated SQLite databases and verifies round trips and persisted ranks; no schema change.
 - [ ] Provider search/details/pagination and additions; TV/comic expansions.
 - [ ] Custom additions, anchored insertion, duplicates and partial outcomes.
 - [ ] Edited metadata, item/parent removal and movement.
