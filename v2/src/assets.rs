@@ -70,7 +70,7 @@ pub async fn serve(
         ),
     ]);
 
-    if not_modified(&headers, &etag) {
+    if crate::http::if_none_match_matches(headers.get(header::IF_NONE_MATCH), &etag) {
         let mut response = Response::new(axum::body::Body::empty());
         *response.status_mut() = StatusCode::NOT_MODIFIED;
         *response.headers_mut() = validators;
@@ -79,21 +79,6 @@ pub async fn serve(
     let mut response = Response::new(axum::body::Body::from(asset.bytes));
     *response.headers_mut() = validators;
     response
-}
-
-fn not_modified(headers: &HeaderMap, etag: &str) -> bool {
-    headers
-        .get(header::IF_NONE_MATCH)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| {
-            value.split(',').map(str::trim).any(|candidate| {
-                candidate == "*"
-                    || candidate == etag
-                    || candidate
-                        .strip_prefix("W/")
-                        .is_some_and(|candidate| candidate == etag)
-            })
-        })
 }
 
 #[cfg(test)]
