@@ -20,14 +20,16 @@ struct SetupMcp;
 impl rmcp::ServerHandler for SetupMcp {}
 
 pub fn router() -> Router {
-    base_router(false).nest_service(
-        "/v2/mcp",
-        StreamableHttpService::new(
-            || Ok(SetupMcp),
-            sessions(),
-            StreamableHttpServerConfig::default().with_json_response(true),
-        ),
-    )
+    base_router(false)
+        .nest_service(
+            "/v2/mcp",
+            StreamableHttpService::new(
+                || Ok(SetupMcp),
+                sessions(),
+                StreamableHttpServerConfig::default().with_json_response(true),
+            ),
+        )
+        .layer(axum::middleware::from_fn(http::revalidate_html))
 }
 
 fn base_router(database_ready: bool) -> Router {
@@ -79,6 +81,7 @@ pub fn database_router(database: sea_orm::DatabaseConnection) -> Router {
             ),
         )
         .layer(axum::middleware::from_fn(mcp_compatibility))
+        .layer(axum::middleware::from_fn(http::revalidate_html))
 }
 
 fn sessions() -> Arc<LocalSessionManager> {

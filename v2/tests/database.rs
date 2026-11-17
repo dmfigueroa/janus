@@ -169,6 +169,8 @@ async fn watchlist_home_renders_v1_cards_sections_and_local_navigation() {
         response.headers()["vary"],
         "HX-Request, HX-History-Restore-Request, Accept"
     );
+    assert_eq!(response.headers()["cache-control"], "no-cache");
+    let etag = response.headers()["etag"].to_str().unwrap().to_string();
     let html = body(response).await;
     assert!(
         html.contains("<h1 class=\"home-title\">My Lists</h1>"),
@@ -194,6 +196,19 @@ async fn watchlist_home_renders_v1_cards_sections_and_local_navigation() {
     assert!(html.contains("id=\"watchlist-dialog\""), "{html}");
     assert!(html.contains("hx-post=\"/v2/watchlists\""), "{html}");
     assert!(html.contains("Create New List"), "{html}");
+
+    let not_modified = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v2/watchlists")
+                .header("if-none-match", &etag)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(not_modified.status(), StatusCode::NOT_MODIFIED);
 
     let json_response = app
         .clone()

@@ -2,7 +2,8 @@
 use axum::{
     Form, Json,
     extract::{FromRequest, FromRequestParts, Request},
-    http::{HeaderMap, Method, header, request::Parts},
+    http::{HeaderMap, HeaderValue, Method, StatusCode, header, request::Parts},
+    middleware::Next,
     response::{Html, IntoResponse, Response},
 };
 use serde::{Serialize, de::DeserializeOwned};
@@ -40,6 +41,68 @@ where
 
 const API_VARY: &str = "HX-Request, Accept";
 const PAGE_VARY: &str = "HX-Request, HX-History-Restore-Request, Accept";
+
+const HTML_CACHE: &str = "no-cache";
+
+pub async fn revalidate_html(request: Request, next: Next) -> Response {
+    let revalidating = matches!(*request.method(), Method::GET | Method::HEAD);
+    let if_none_match = request.headers().get(header::IF_NONE_MATCH).cloned();
+    let response = next.run(request).await;
+    if !revalidating || !is_html(&response) {
+        return response;
+    }
+
+    let (mut parts, body) = response.into_parts();
+    let Ok(bytes) = axum::body::to_bytes(body, usize::MAX).await else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Unable to read HTML response",
+        )
+            .into_response();
+    };
+    let etag = content_etag(&bytes);
+    parts
+        .headers
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static(HTML_CACHE));
+    parts.headers.insert(
+        header::ETAG,
+        HeaderValue::from_str(&etag).expect("a quoted hash is a valid header value"),
+    );
+    parts.headers.remove(header::CONTENT_LENGTH);
+
+    if if_none_match_matches(if_none_match.as_ref(), &etag) {
+        parts.status = StatusCode::NOT_MODIFIED;
+        return Response::from_parts(parts, axum::body::Body::empty());
+    }
+    Response::from_parts(parts, axum::body::Body::from(bytes))
+}
+
+fn is_html(response: &Response) -> bool {
+    response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.starts_with("text/html"))
+}
+
+fn content_etag(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    format!("\"{:x}\"", Sha256::digest(bytes))
+}
+
+pub(crate) fn if_none_match_matches(value: Option<&HeaderValue>, etag: &str) -> bool {
+    value
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| {
+            value.split(',').map(str::trim).any(|candidate| {
+                candidate == "*"
+                    || candidate == etag
+                    || candidate
+                        .strip_prefix("W/")
+                        .is_some_and(|candidate| candidate == etag)
+            })
+        })
+}
 
 /// The representation a handler should return.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

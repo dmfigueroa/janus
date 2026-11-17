@@ -18,64 +18,120 @@ fn embedded_assets_are_versioned_by_their_bytes() {
     }
 }
 
+async fn get(uri: &str) -> axum::response::Response {
+    janus_v2::router()
+        .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+        .await
+        .unwrap()
+}
+
 #[tokio::test]
-async fn asset_cache_headers_agree_with_the_url_version() {
-    for path in ["app.css", "app.js"] {
-        let asset = janus_v2::static_assets()
-            .iter()
-            .find(|asset| asset.path == path)
-            .unwrap();
+async fn every_asset_carries_its_revalidation_contract() {
+    for asset in janus_v2::static_assets() {
         let etag = format!("\"{}\"", asset.version);
-        let versioned = janus_v2::router()
-            .oneshot(
-                Request::builder()
-                    .uri(asset.url)
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(versioned.status(), StatusCode::OK);
+
+        let versioned = get(asset.url).await;
+        assert_eq!(versioned.status(), StatusCode::OK, "{}", asset.path);
+        assert_eq!(
+            versioned.headers()[header::CONTENT_TYPE],
+            asset.content_type,
+            "{}",
+            asset.path
+        );
         assert_eq!(
             versioned.headers()[header::CACHE_CONTROL],
-            "public, max-age=31536000, immutable"
+            "public, max-age=31536000, immutable",
+            "{}",
+            asset.path
         );
-        assert_eq!(versioned.headers()[header::ETAG], etag.as_str());
+        assert_eq!(
+            versioned.headers()[header::ETAG].to_str().unwrap(),
+            etag,
+            "{}",
+            asset.path
+        );
 
-        let revalidated = janus_v2::router()
-            .oneshot(
-                Request::builder()
-                    .uri(format!("/v2/static/{path}?v=1"))
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(revalidated.status(), StatusCode::OK);
-        assert_eq!(revalidated.headers()[header::CACHE_CONTROL], "no-cache");
-        assert_eq!(revalidated.headers()[header::ETAG], etag.as_str());
+        for uri in [
+            format!("/v2/static/{}", asset.path),
+            format!("/v2/static/{}?v=stale", asset.path),
+        ] {
+            let revalidated = get(&uri).await;
+            assert_eq!(revalidated.status(), StatusCode::OK, "{uri}");
+            assert_eq!(
+                revalidated.headers()[header::CACHE_CONTROL],
+                "no-cache",
+                "{uri}"
+            );
+            assert_eq!(
+                revalidated.headers()[header::ETAG].to_str().unwrap(),
+                etag,
+                "{uri}"
+            );
 
-        let not_modified = janus_v2::router()
-            .oneshot(
-                Request::builder()
-                    .uri(asset.url)
-                    .header(header::IF_NONE_MATCH, &etag)
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(not_modified.status(), StatusCode::NOT_MODIFIED);
-        assert!(
-            not_modified
-                .into_body()
-                .collect()
+            let not_modified = janus_v2::router()
+                .oneshot(
+                    Request::builder()
+                        .uri(&uri)
+                        .header(header::IF_NONE_MATCH, &etag)
+                        .body(Body::empty())
+                        .unwrap(),
+                )
                 .await
-                .unwrap()
-                .to_bytes()
-                .is_empty()
-        );
+                .unwrap();
+            assert_eq!(not_modified.status(), StatusCode::NOT_MODIFIED, "{uri}");
+            assert_eq!(
+                not_modified.headers()[header::ETAG].to_str().unwrap(),
+                etag,
+                "{uri}"
+            );
+            assert!(
+                not_modified
+                    .into_body()
+                    .collect()
+                    .await
+                    .unwrap()
+                    .to_bytes()
+                    .is_empty(),
+                "{uri}"
+            );
+        }
     }
+}
+
+#[tokio::test]
+async fn html_pages_revalidate_before_reusing_cached_markup() {
+    let page = get("/v2").await;
+    assert_eq!(page.status(), StatusCode::OK);
+    assert_eq!(page.headers()[header::CACHE_CONTROL], "no-cache");
+    let etag = page.headers()[header::ETAG].to_str().unwrap().to_string();
+
+    let revalidated = janus_v2::router()
+        .oneshot(
+            Request::builder()
+                .uri("/v2")
+                .header(header::IF_NONE_MATCH, &etag)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(revalidated.status(), StatusCode::NOT_MODIFIED);
+    assert_eq!(revalidated.headers()[header::ETAG].to_str().unwrap(), etag);
+    assert!(
+        revalidated
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .is_empty()
+    );
+
+    let liveness = get("/v2/health/live").await;
+    assert!(
+        liveness.headers().get(header::CACHE_CONTROL).is_none(),
+        "non-HTML responses keep their own cache policy"
+    );
 }
 
 #[tokio::test]
@@ -109,24 +165,6 @@ async fn pages_reference_the_content_addressed_assets() {
             body.contains(&format!("{attribute}=\"{url}\"")),
             "{path} missing from {body}"
         );
-    }
-}
-
-#[tokio::test]
-async fn browser_assets_are_served_locally() {
-    for asset in janus_v2::static_assets() {
-        let path = format!("/v2/static/{}", asset.path);
-        let response = janus_v2::router()
-            .oneshot(Request::builder().uri(&path).body(Body::empty()).unwrap())
-            .await
-            .unwrap();
-        assert_eq!(response.status(), StatusCode::OK, "{path}");
-        assert_eq!(
-            response.headers()[header::CONTENT_TYPE],
-            asset.content_type,
-            "{path}"
-        );
-        assert_eq!(response.headers()[header::CACHE_CONTROL], "no-cache");
     }
 }
 
