@@ -67,6 +67,7 @@ Agents should commit and push work frequently without explicit user request, and
 
 - Never infer context or make assumptions about a task when the requirements are unclear. If the ticket, issue, or user request is ambiguous, ask the user for clarification before proceeding.
 - When working on a GitHub issue, always fetch the full issue details first (including parent PRDs and blocking dependencies) to understand the complete scope before planning implementation.
+- When feedback arrives as a screenshot, restate the target element and the intended change before editing, then implement that restatement rather than a larger redesign. Ask when the screenshot does not make the target element or the kind of change clear (styling, layout, interaction). This is a judgement rule for ambiguous feedback, not a gate on UI edits: a request that already names the element and change proceeds without confirmation.
 
 <!-- intent-skills:start -->
 
