@@ -296,3 +296,28 @@ running v1 with `JANUS_LAYOUT_RECORD=1 node --test v2/tests/layout-browser.cjs` 
 `npm run preview:local`.
 
 This is emulated Chromium geometry at two viewports, not physical-device or full visual parity.
+
+## Issue #329 watchlists home check evidence
+
+`npm run test:v2:home` (`node --test v2/tests/watchlists-home-browser.cjs`) reuses the
+disposable v1-migrated fixture database and v2 process from the layout check, renders
+`/v2/watchlists` at `320x568`, `390x844`, `768x1024` and `1280x800`, then removes the process and
+fixture. The check launches only the Chromium executable resolved from the pinned
+`playwright-core` `1.65.1` dependency, so a differently cached Playwright browser does not change
+the result, and it needs neither the in-app browser connection nor a deployed preview.
+
+For every width it asserts the expected grid density (two columns and four rows on phones, four
+columns and two rows on tablet and desktop for the eight-card fixture home), no horizontal
+document, body or card overflow, the absence of any sort control on the home, and the
+"Watchlists" heading. After typing `Layout` it asserts the search-results heading, the same
+density and overflow rules, and that the clear-search control is hidden while the field is empty
+and, once populated, sits inside the search field on its trailing side, vertically centered.
+
+The four-viewport pass is recorded locally. Local negative checks confirmed that a three-column
+mobile grid fails with measured versus expected columns and overflows the 320px viewport at
+`323px`, and that each failing viewport writes a full-page screenshot under
+`v2/tests/artifacts/watchlists-home` (overridable with `JANUS_VISUAL_ARTIFACTS`) while exiting
+non-zero. CI runs the file with the other browser tests and uploads that directory as the
+`v2-browser-failure-screenshots` artifact when the job fails.
+
+This is emulated Chromium geometry at four viewports, not physical-device or full visual parity.

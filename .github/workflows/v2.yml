@@ -61,7 +61,15 @@ jobs:
       - name: Browser tests
         env:
           PLAYWRIGHT_BROWSERS: chromium,webkit
-        run: node --test tests/browse-browser.cjs tests/watchlist-form-browser.cjs tests/reorder-browser.cjs tests/dialog-layout-browser.cjs tests/layout-browser.cjs
+        run: node --test tests/browse-browser.cjs tests/watchlist-form-browser.cjs tests/reorder-browser.cjs tests/dialog-layout-browser.cjs tests/layout-browser.cjs tests/watchlists-home-browser.cjs
+      - name: Upload browser failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-browser-failure-screenshots
+          path: v2/tests/artifacts
+          if-no-files-found: ignore
+          retention-days: 7
       - uses: Swatinem/rust-cache@v2
         if: github.event_name == 'push'
         with:
