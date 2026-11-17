@@ -1,13 +1,12 @@
 use super::Watchlists;
 use super::browse::BrowseView;
 use super::timeline::{TimelineFilters, TimelineView};
-use crate::http::{FormOrJson, ResponseFormat};
+use crate::http::{BrowseFormat, FormOrJson, ResponseFormat};
 use askama::Template;
 use axum::{
-    Json,
     extract::{Path, Query, State},
-    http::{HeaderMap, StatusCode, header},
-    response::{Html, IntoResponse, Response},
+    http::StatusCode,
+    response::{Html, Response},
 };
 use serde::{Deserialize, Serialize};
 #[derive(Deserialize)]
@@ -77,7 +76,7 @@ struct BrowseFragment<'a> {
 }
 pub async fn list(
     State(lists): State<Watchlists>,
-    headers: HeaderMap,
+    format: BrowseFormat,
     Query(filters): Query<ListFilters>,
 ) -> Result<Response, Failure> {
     use super::browse::{BrowseError, BrowseFilters, BrowseView};
@@ -92,26 +91,17 @@ pub async fn list(
             "Unable to load this page. Return to /v2/watchlists and try again.",
         ),
     })?;
-    let htmx = headers
-        .get("hx-request")
-        .is_some_and(|value| value == "true");
-    let restoring = headers
-        .get("hx-history-restore-request")
-        .is_some_and(|value| value == "true");
-    let json = headers
-        .get(header::ACCEPT)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| value.contains("application/json"));
-    let page = if htmx && !restoring {
-        BrowseFragment { view: &view }.render()
-    } else if json {
-        return Ok(([(header::VARY, "HX-Request, Accept")], Json(view)).into_response());
-    } else {
-        ListPage { view: &view }.render()
-    }
-    .map(Html)
-    .map_err(failure)?;
-    Ok(([(header::VARY, "HX-Request, Accept")], page).into_response())
+    let representation = format.representation();
+    format
+        .respond(&view, async {
+            match representation {
+                ResponseFormat::Html => BrowseFragment { view: &view }.render(),
+                ResponseFormat::Page | ResponseFormat::Json => ListPage { view: &view }.render(),
+            }
+            .map(Html)
+            .map_err(failure)
+        })
+        .await
 }
 
 #[derive(Deserialize)]
