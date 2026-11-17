@@ -136,7 +136,7 @@ Use the five default triage labels. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-This is a single-context repository. See `docs/agents/domain.md`.
+This is a single-context repository. `CONTEXT.md` at the root is the domain glossary — the file some skills call `GLOSSARY.md`. See `docs/agents/domain.md`.
 
 ## V2 Rust
 
