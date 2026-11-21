@@ -5,6 +5,11 @@ const { drizzle } = require("drizzle-orm/better-sqlite3");
 const { migrate } = require("drizzle-orm/better-sqlite3/migrator");
 const path = require("node:path");
 const { bulkWatchlists } = require("./bulk-watchlists.cjs");
+const {
+  releaseTieBreaks,
+  addUnrankedInRelease,
+  checkOrderModeV1Read,
+} = require("./order-mode-fixtures.cjs");
 const database = new Database(process.argv[2]);
 const customOrder = "ORDER BY custom_rank IS NULL, custom_rank, id";
 const watchlistItemIds = (watchlistId) =>
@@ -57,6 +62,15 @@ const actions = {
   "release-no-ranks"() {
     database.prepare("UPDATE watchlists SET item_order_mode = 'release' WHERE id = 41").run();
     database.prepare("UPDATE watchlist_items SET custom_rank = NULL WHERE watchlist_id = 41").run();
+  },
+  "release-tie-breaks"() {
+    releaseTieBreaks(database);
+  },
+  "add-unranked-in-release"() {
+    addUnrankedInRelease(database);
+  },
+  "check-order-mode-v1-read"() {
+    checkOrderModeV1Read(database);
   },
   mutate() {
     database.prepare("UPDATE watchlist_items SET is_watched = 1 WHERE id = 101").run();

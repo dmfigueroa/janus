@@ -336,3 +336,30 @@ non-zero. CI runs the file with the other browser tests and uploads that directo
 `v2-browser-failure-screenshots` artifact when the job fails.
 
 This is emulated Chromium geometry at four viewports, not physical-device or full visual parity.
+
+## Issue #258 order-mode evidence
+
+Web updates (`POST /v2/watchlists/{id}`) and MCP `update_watchlists` share `Watchlists::update_watchlist`
+inside one SQLite writer transaction. Switching `release -> custom` initializes contiguous
+`custom_rank` values `1..N` in v1's release order (`release_date IS NULL OR release_date=''` last,
+`release_date ASC`, `id ASC`) only when no saved custom ranks exist; switching `custom -> release`
+preserves existing ranks while release ordering resumes, and returning to `custom` keeps saved ranks
+intact even if unranked items were added in release mode. Mid-write failures roll back both the mode
+change and rank writes atomically, and the SQLite schema remains unchanged.
+
+On `/v2/watchlists/{id}`, `#watchlist-refresh` swaps `.watchlist` and updates `#watchlist-form`
+out-of-band (`hx-select-oob="#watchlist-form"`), reconciling displayed items, active filters,
+release-year versus cross-year watched grouping, `<watchlist-reorder>` / `.reorder-handle`
+availability, and the edit dialog's persisted defaults without stealing focus while closed.
+`WatchlistForm::name_invalid` flags `#watchlist-name` only for name validation errors, leaving
+order-mode, missing-watchlist and internal errors linked through `aria-describedby`.
+
+Automated coverage: disposable v1-migrated SQLite tests verify release tie-breaks (equal dates,
+empty-string and null dates), mixed ranked/unranked preservation, atomic rollback, unchanged schema,
+v1 SQLite reads of stored order modes and ranks, web HTML reconciliation and validation, and MCP
+`update_watchlists` / `get_watchlist` / `reorder_watchlist_items` contracts (invalid modes,
+independent batches, `orderToken` and `nextUnwatched` updates, and `not_custom_mode` rejection).
+Real-HTMX DOM coverage verifies `#watchlist-refresh` OOB dialog updates and focus restoration, and
+local live v1/v2 Chromium verification exercises full round trips across both surfaces sharing one
+disposable database. Deployed, Access-authenticated client, physical-device and owner acceptance
+remain independent gates.
