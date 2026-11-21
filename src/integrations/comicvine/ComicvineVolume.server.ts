@@ -13,11 +13,16 @@ async function getComicVolumeDetailsRequest(id: string, apiKey: string, signal?:
   const url = new URL(`https://comicvine.gamespot.com/api/volume/4050-${encodeURIComponent(id)}/`);
   url.search = new URLSearchParams({ api_key: apiKey, format: "json" }).toString();
 
-  const rawData = await requestProviderJson(url.toString(), {
-    headers: { "User-Agent": "JanusApp/1.0" },
-    signal,
-  });
-  const data = parseProviderData(comicVineVolumeDetailsResponseSchema, rawData);
+  const context = { provider: "comicvine", operation: "get_volume_details" };
+  const rawData = await requestProviderJson(
+    url.toString(),
+    {
+      headers: { "User-Agent": "JanusApp/1.0" },
+      signal,
+    },
+    context,
+  );
+  const data = parseProviderData(comicVineVolumeDetailsResponseSchema, rawData, context);
 
   return { title: data.results.name || "Unknown Title" };
 }

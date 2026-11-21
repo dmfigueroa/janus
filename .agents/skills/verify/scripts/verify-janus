@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "$script_dir/../../../.." && pwd)"
+cli_entry="$script_dir/lib/cli.cjs"
+
+current_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || true)"
+if [ "$current_major" = "24" ]; then
+  exec node "$cli_entry" "$@"
+fi
+
+exec bash "$repo_root/tools/pinned-node.sh" node "$cli_entry" "$@"

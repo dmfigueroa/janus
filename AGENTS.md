@@ -4,19 +4,34 @@
 
 - `ARCHITECTURE.md` is the source of truth for Janus's target file structure, ownership model, and dependency rules.
 - `CONTRIBUTING.md` is the placement guide for new files and incremental migrations.
+- `deploy/README.md` documents deployment topology, production Coolify applications and PR preview URLs. Read it before debugging routing or preview behavior.
+- v1 app routes, feature boundaries, and frontend code style: [`docs/agents/v1-app.md`](docs/agents/v1-app.md).
+- Before exploring `v2/` source for routes, module ownership, or local setup/check/test commands, read [`v2/README.md`](v2/README.md); it is the entry document for v2.
+- Before recording or checking parity and acceptance evidence for v2, read [`v2/PARITY.md`](v2/PARITY.md) for the baseline, existing evidence and outstanding acceptance; [`v2/V1-UI-MAP.md`](v2/V1-UI-MAP.md) locates the v1 counterpart of a UI area.
 - When adding files, moving modules, or introducing new boundaries, read those docs first and follow them.
 - Apply the target structure to new code and touched areas. Do not do broad drive-by reorganizations unless the user asks for them.
 
 ## Running Commands
 
-- Prefer the repository's devcontainer because it provides the supported Node.js version and native build tools.
-- Start or create it with `devcontainer up --workspace-folder . --docker-path podman`.
-- Run project commands with `devcontainer exec --workspace-folder . --docker-path podman <command>`, for example `devcontainer exec --workspace-folder . --docker-path podman pnpm run lint`.
-- When using Podman directly, locate the container with `podman ps -a --filter "label=devcontainer.local_folder=$(pwd)"` and confirm it belongs to the current checkout before using it.
-- Start the selected container if needed, then run commands with `podman exec --workdir /workspaces/janus <container> <command>`.
-- Never use an unrelated Toolbox or development container. Native Node modules such as `better-sqlite3` must run with the same Node.js ABI used when `pnpm install` compiled them.
+### Devcontainer (primary path)
+
+- Run commands inside the repository devcontainer: start it with `devcontainer up --workspace-folder . --docker-path podman`, then run commands with `devcontainer exec --workspace-folder . --docker-path podman <command>` (for example `pnpm run lint`).
+- When using Podman directly, locate the container with `podman ps -a --filter "label=devcontainer.local_folder=$(pwd)"`, confirm it belongs to the current checkout, then run commands with `podman exec --workdir /workspaces/janus <container> <command>`. Never use an unrelated Toolbox or development container.
+- If the Dev Container CLI is missing or `devcontainer up` fails, use the host path below instead of retrying the container. Do not use a bare host `node`.
 - Enable Corepack (`corepack enable`) or install pnpm so the `packageManager` field in `package.json` resolves.
-- Host execution is supported only with Node.js 24.12 or later and the native compiler toolchain required by `better-sqlite3`.
+
+### Host toolchain (fallback path)
+
+- Run every host command through `bash tools/pinned-node.sh <command>`, which runs it under the `.tool-versions` Node (`node@24.18.0`) via `mise exec`. For example `bash tools/pinned-node.sh pnpm install --frozen-lockfile`. This path needs only `mise`, a C toolchain for `better-sqlite3` and the Rust toolchain; it is verified to work on the agent host.
+- Never run a bare `node` or `pnpm` on the host: the default shell can resolve a newer major such as `26.2.0`, which is outside `engines` (`>=24.12 <26`) and has no `better-sqlite3` prebuilt binary, so installs fail on the native-module ABI.
+- Run root `bash tools/pinned-node.sh pnpm install --frozen-lockfile` once per checkout before v2 tests and never borrow another checkout's `node_modules`.
+- Run the v2 Rust tests with `pnpm run test:v2`, which uses the same wrapper and forwards arguments to `cargo test --locked`, so the Node fixtures need no manual `JANUS_TEST_NODE`. Run `cargo test` directly only through the wrapper: `bash tools/pinned-node.sh cargo test --manifest-path v2/Cargo.toml --locked`. If you set `JANUS_TEST_NODE` yourself, point it at the pinned binary from `bash tools/pinned-node.sh node -p process.execPath`, otherwise the fixture tests spawn a different Node ABI.
+
+## Docker Build Context
+
+- Both images build from the repository root as context — `docker build -f Dockerfile .` for v1 and `docker build -f v2/Dockerfile .` for v2; `deploy/compose.yaml` spells the same root context as `context: ..`. They share the single root `.dockerignore`, so a change to either Dockerfile or `.dockerignore` affects both builds.
+- `v2/`, `test/` and `tools/` must stay in the build context: v2 builds from `v2/`, and v1's `tsc` step typechecks every `*.ts`/`*.tsx` file, including `test/` and `tools/`.
+- `v2/target` must stay ignored in `.dockerignore`: v2 copies its `v2/` sources wholesale, so Rust build output left in the context would bloat the build and invalidate it.
 
 ## Git Conventions
 
@@ -51,48 +66,10 @@ Agents should commit and push work frequently without explicit user request, and
 - Never edit `drizzle/*.sql` files directly.
 - Always generate SQL migrations and snapshot updates through the Drizzle CLI from schema changes.
 
-## Route And Feature Boundaries
-
-- Put business code under `src/features/*`, app shell code under `src/app/*`, design-system primitives under `src/ui/*`, and external adapters under `src/integrations/*`.
-- Use shallow feature use-case folders with responsibility-based PascalCase names such as `detail/WatchlistDetail.ts`, `detail/WatchlistDetail.server.ts`, and `detail/WatchlistDetailScreen.tsx`.
-- Prefer current TanStack Start guidance over older local patterns when the two disagree.
-- Keep small route-specific loader logic in the route file. Param parsing, route defaults, redirects, and `notFound` handling usually belong in the route.
-- Do not extract route loaders into wrapper functions unless the extraction adds real value through reuse, deeper domain logic, or a stable shared boundary.
-- Shared route modules must not import `.server` modules directly. Routes are part of the shared module graph, and direct `.server` imports can leak server-only dependencies into the client bundle.
-- Avoid `index.ts` / `index.server.ts` barrels unless they provide a clear, durable navigation benefit.
-- Keep type definitions in the file that creates or derives them. Avoid standalone `types.ts` files that only re-export types from other modules. When a type is consumed across module boundaries, export it from the module that owns the derivation (e.g., the file that imports the DB schema) and import it where needed. Prefer minimal structural types in pure-algorithm modules over importing DB-derived types.
-- Prefer short, domain-based filenames and folders over thin wrapper modules.
-- Do not use `"use server"` or `"use client"` directives. Prefer framework-native boundaries such as `createServerFn`, route/module boundaries, and `.server` files where appropriate.
-- Remove `"use server"` and `"use client"` directives when you encounter them unless there is a documented, current framework requirement that makes one unavoidable.
-- In React components, call TanStack Start server functions through `useServerFn(serverFn)` instead of invoking server functions directly from event handlers, mutations, or query functions.
-- Encapsulate every `useQuery` and `useMutation` call in a feature-owned custom hook. Components should consume the hook's data and actions rather than define query or mutation configuration inline.
-- Keep feature-owned query keys and query options in the feature module, and include every loader/search/filter input that affects returned data in the query key.
-- For `createServerFn` and other TanStack response surfaces, expected user-facing failures must return structured error objects such as `{ success: false, message }` instead of throwing. Reserve throws for framework control flow like `redirect` / `notFound` or truly unexpected defects.
-
 ## Naming
 
 - Write out full words. Avoid abbreviations like `tx` (use `transaction`), `itemToInsertValues` (use `extractItemFields` or `itemAsInsertValues`), `err` (use `error`), `cb` (use `callback`), etc.
 - Parameter and variable names should be readable without domain context. `item` is fine in a watchlist context; `tx` is not.
-
-## Code Style
-
-Keep JSX declarative and rendering-only. Trivial expressions such as string concatenation and one-line ternaries may stay in JSX, but move more complex parsing, transformation, and branching into component logic or a child component. Components over 50 lines must be placed in their own adjacent file.
-
-Prefer declarative and functional code over imperative code.
-
-### Prefer
-
-- Array methods (`map`, `filter`, `reduce`, `find`) over manual loops
-- Computed values over mutation
-- Pure functions over side effects
-- Declarative data transformations over imperative accumulation
-- Module-level constants and functions over class-based state where appropriate
-
-### Avoid
-
-- Manual `for`/`while` loops where array methods would be clearer
-- Mutating state in place
-- Procedural step-by-step logic when a functional pipeline reads better
 
 ## GitHub Interactions
 
@@ -107,6 +84,7 @@ Prefer declarative and functional code over imperative code.
 
 - Never infer context or make assumptions about a task when the requirements are unclear. If the ticket, issue, or user request is ambiguous, ask the user for clarification before proceeding.
 - When working on a GitHub issue, always fetch the full issue details first (including parent PRDs and blocking dependencies) to understand the complete scope before planning implementation.
+- When feedback arrives as a screenshot, restate the target element and the intended change before editing, then implement that restatement rather than a larger redesign. Ask when the screenshot does not make the target element or the kind of change clear (styling, layout, interaction). This is a judgement rule for ambiguous feedback, not a gate on UI edits: a request that already names the element and change proceeds without confirmation.
 
 <!-- intent-skills:start -->
 
@@ -123,8 +101,11 @@ skills:
 - task: "notFound handling, error boundaries, and route error behavior"
   load: "node_modules/@tanstack/router-core/skills/router-core/not-found-and-errors/SKILL.md"
 - task: "createServerFn, server/client execution boundaries, and server-only imports"
-load: "node_modules/@tanstack/start-client-core/skills/start-core/server-functions/SKILL.md"
+  load: "node_modules/@tanstack/start-client-core/skills/start-core/server-functions/SKILL.md"
+
 <!-- intent-skills:end -->
+
+Regenerate the mappings above with `pnpm dlx @tanstack/intent install`. Keep each `load` indented under its own `task` item and keep the blank line before the end marker, otherwise `oxfmt` dedents the final `load` and the mapping stops resolving. `pnpm run check:agents` verifies the block and runs as part of `pnpm run lint`.
 
 ## Agent skills
 
@@ -138,4 +119,16 @@ Use the five default triage labels. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-This is a single-context repository. See `docs/agents/domain.md`.
+This is a single-context repository. `CONTEXT.md` at the root is the domain glossary — the file some skills call `GLOSSARY.md`. See `docs/agents/domain.md`.
+
+## V2 Rust
+
+Before writing new Rust or reviewing Rust changes under `v2/`, load the `rust-best-practices` skill and apply it as the review baseline while implementing. If that skill is unavailable, work from Apollo's upstream handbook at <https://github.com/apollographql/rust-best-practices> instead and say which source you used.
+
+## V2 Frontend
+
+- All first-party V2 browser JavaScript is loaded as ES modules. Enforcement: `pnpm run check:v2-modules` requires every `v2/static/*.js` asset to have a matching `type="module"` script entry in a template.
+- Use relative units and Open Props tokens for spacing, type and sizing. Add fixed units only where the browser requires them, such as hairline borders.
+- Before changing V2 visuals, run `pnpm run preview:local` and compare local v1 and v2 screenshots with `pnpm run visual:compare -- --route /watchlists`; inspect both images, and never use a Coolify preview as the development loop. Measure both versions at `390x844` and `1280x800` before offering any layout option or parity claim (see [`v2/README.md`](v2/README.md) parity layout rule).
+- A new V2 affordance needs a V1 counterpart or an explicit user request. Confirm the counterpart in the [`v2/PARITY.md`](v2/PARITY.md) ledger, which records the parity baseline and outstanding acceptance, using [`v2/V1-UI-MAP.md`](v2/V1-UI-MAP.md) to find the v1 control. In review, treat a control, glyph or interaction that v1 has no counterpart for and the request did not name as a defect to remove rather than a feature to keep. This is a review judgement call, not a lint rule, and it is not a reason to ask before every UI edit.
+- Use HTMX for all v2 browser HTTP requests. Declare requests, triggers, targets, and swaps with hx-\* attributes. Drag-and-drop and keyboard handlers may update request values and dispatch custom DOM events consumed by hx-trigger. Do not use htmx.ajax. Frontend requests must consume server-rendered HTML and let HTMX swap it into the page. Backend endpoints must also preserve JSON support for API callers through content negotiation. Do not use fetch or standalone XMLHttpRequest for frontend requests.

@@ -46,7 +46,7 @@ export function registerEditWatchlistItemsTool(server: McpServer) {
     },
     async ({ edits }) =>
       asMcpContent({
-        results: await executeWriteBatch(edits, editWatchlistItemResult),
+        results: await executeWriteBatch(edits, editWatchlistItemResult, "edit_watchlist_items"),
       }),
   );
 }

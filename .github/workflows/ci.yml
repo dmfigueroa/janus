@@ -78,3 +78,29 @@ jobs:
 
       - name: Build
         run: pnpm run build
+
+  image:
+    name: V1 Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # Builds every stage, so a broken dependency install, compile or COPY
+      # fails here instead of at Coolify deploy time.
+      - name: Build v1 image
+        run: docker build -f Dockerfile -t janus-v1:ci .
+
+  dockerfile-lint:
+    name: Dockerfile Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Lint Dockerfiles
+        run: >-
+          docker run --rm
+          -v "$GITHUB_WORKSPACE:/work" -w /work
+          hadolint/hadolint:v2.12.0
+          hadolint Dockerfile v2/Dockerfile

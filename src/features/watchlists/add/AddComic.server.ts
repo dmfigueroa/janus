@@ -7,6 +7,7 @@ import { getComicVolumeDetails } from "@/integrations/comicvine/ComicvineVolume.
 import type { AddToWatchlistInsertionPosition } from "./Mutation";
 import { persistAddedItems } from "./InsertWatchlistItems.server";
 import { rejectAdd, addedItemsResult, type WatchlistWriteResult } from "./AdditionOutcome";
+import { logMissingProviderConfiguration } from "@/integrations/ProviderLogging.server";
 
 const COMICVINE_UNAVAILABLE_MESSAGE =
   "Comic additions are unavailable because the ComicVine integration is not configured.";
@@ -20,6 +21,7 @@ export async function addComicToWatchlist(
 ): Promise<WatchlistWriteResult> {
   const apiKey = getApiKey();
   if (!apiKey) {
+    logMissingProviderConfiguration("comicvine", "add_comic");
     return rejectAdd(COMICVINE_UNAVAILABLE_MESSAGE, "provider_not_configured");
   }
 

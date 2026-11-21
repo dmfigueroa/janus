@@ -1,3 +1,7 @@
+let latestReorder:
+  | import("@/features/watchlists/detail/useWatchlistReorder").WatchlistReorder
+  | undefined;
+import { flushSync } from "react-dom";
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -74,27 +78,30 @@ vi.mock("@/features/watchlists/components/WatchlistHeader", () => ({
 vi.mock("@/features/watchlists/components/WatchlistTimeline", () => ({
   WatchlistTimeline: ({
     items,
-    onReorder,
+    reorder,
     interactionDisabled,
   }: {
     items: WatchlistItem[];
-    onReorder: (intent: {
-      movedItemId: number;
-      referenceItemId: number;
-      position: "after";
-    }) => void;
+    reorder: import("@/features/watchlists/detail/useWatchlistReorder").WatchlistReorder;
     interactionDisabled: boolean;
-  }) => (
-    <div>
-      <output>{items.map((item) => item.id).join(",")}</output>
-      <button
-        disabled={interactionDisabled}
-        onClick={() => onReorder({ movedItemId: 1, referenceItemId: 2, position: "after" })}
-      >
-        Reorder
-      </button>
-    </div>
-  ),
+  }) => {
+    latestReorder = reorder;
+    return (
+      <div>
+        <output>{items.map((item) => item.id).join(",")}</output>
+        <button
+          disabled={interactionDisabled}
+          onClick={async () => {
+            flushSync(() => reorder.handleDragStart({ active: { id: 1 } } as never));
+            await latestReorder!.prepareDrop({ active: { id: 1 }, over: { id: 2 } } as never);
+            latestReorder!.handleDragEnd();
+          }}
+        >
+          Reorder
+        </button>
+      </div>
+    );
+  },
 }));
 afterEach(() => {
   cleanup();

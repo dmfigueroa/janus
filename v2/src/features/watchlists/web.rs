@@ -1,12 +1,21 @@
-use super::{ItemOrderMode, Watchlists};
+use super::Watchlists;
+use super::browse::BrowseView;
+use super::dialog::{
+    self, DialogFailure, DialogRejection, DialogTarget, WatchlistDialogInput, WatchlistForm,
+    WatchlistMutation,
+};
+use super::timeline::{TimelineFilters, TimelineView};
+use super::write::UpdateOutcome;
+use crate::http::{FormOrJson, Representation, ResponseFormat};
 use askama::Template;
 use axum::{
+    Json,
     extract::{Path, Query, State},
-    http::StatusCode,
-    response::Html,
+    http::{HeaderMap, HeaderName, HeaderValue, StatusCode, header},
+    response::{Html, IntoResponse, Response},
 };
-use serde::Deserialize;
-#[derive(Default, Deserialize)]
+use serde::{Deserialize, Deserializer, Serialize};
+#[derive(Deserialize)]
 pub struct Filters {
     #[serde(default)]
     query: String,
@@ -14,40 +23,12 @@ pub struct Filters {
     unwatched: bool,
 }
 fn default_unwatched() -> bool {
-    true
+    TimelineFilters::default().unwatched
 }
-#[derive(Template)]
-#[template(path = "watchlist.html")]
-struct Page {
-    id: i64,
-    name: String,
-    description: String,
-    mode: String,
-    progress: u64,
-    watched: u64,
-    total: u64,
-    query: String,
-    unwatched: bool,
-    runs: Vec<Run>,
-    paused: bool,
-}
-#[derive(Clone)]
-struct Row {
-    id: i64,
-    title: String,
-    parent: String,
-    episode: String,
-    date: String,
-    year: String,
-    watched: bool,
-    poster: String,
-    media: String,
-}
-struct Run {
-    year: String,
-    heading: bool,
-    hidden: bool,
-    rows: Vec<Row>,
+impl Filters {
+    fn timeline(self) -> TimelineFilters {
+        TimelineFilters::new(self.query, self.unwatched)
+    }
 }
 type Failure = (StatusCode, &'static str);
 fn failure(error: impl std::fmt::Display) -> Failure {
@@ -62,87 +43,28 @@ pub async fn detail(
     Path(id): Path<i64>,
     Query(filters): Query<Filters>,
 ) -> Result<Html<String>, Failure> {
+    load_timeline(&lists, id, filters.timeline())
+        .await?
+        .render_page()
+        .map(Html)
+        .map_err(failure)
+}
+
+async fn load_timeline(
+    lists: &Watchlists,
+    id: i64,
+    filters: TimelineFilters,
+) -> Result<TimelineView, Failure> {
     let detail = lists
         .detail(id)
         .await
         .map_err(failure)?
         .ok_or((StatusCode::NOT_FOUND, "Watchlist not found"))?;
-    let list = &detail.watchlist.watchlist;
-    let stats = &detail.watchlist.stats;
-    let query = filters.query.trim().to_ascii_lowercase();
-    let rows: Vec<Row> = detail
-        .items
-        .iter()
-        .filter(|item| item.matches_text(&query))
-        .map(|item| {
-            let date = item.release_date.clone().unwrap_or_default();
-            Row {
-                id: item.id,
-                title: item.title.clone(),
-                parent: item.parent_title.clone().unwrap_or_default(),
-                episode: item.episode.clone().unwrap_or_default(),
-                year: if date.is_empty() {
-                    "TBA".into()
-                } else {
-                    date.split_once('-')
-                        .map_or(date.as_str(), |(year, _)| year)
-                        .into()
-                },
-                date,
-                watched: item.is_watched == Some(true),
-                poster: poster(item.poster_path.as_deref().unwrap_or("")),
-                media: item.media_type.clone(),
-            }
-        })
-        .collect();
-    let release_mode = list.item_order_mode == ItemOrderMode::Release;
-    let groups: Vec<&[Row]> = rows
-        .chunk_by(|previous, next| {
-            previous.watched == next.watched && (!release_mode || previous.year == next.year)
-        })
-        .collect();
-    let runs = groups
-        .iter()
-        .enumerate()
-        .map(|(index, rows)| Run {
-            year: rows[0].year.clone(),
-            heading: release_mode && (index == 0 || groups[index - 1][0].year != rows[0].year),
-            hidden: filters.unwatched && rows[0].watched,
-            rows: rows.to_vec(),
-        })
-        .collect();
-    Page {
-        id,
-        name: list.name.clone(),
-        description: list.description.clone().unwrap_or_default(),
-        mode: list.item_order_mode.as_str().into(),
-        progress: stats.progress,
-        watched: stats.watched_items as u64,
-        total: stats.total_items as u64,
-        query: filters.query,
-        unwatched: filters.unwatched,
-        runs,
-        paused: list.paused_at.is_some(),
-    }
-    .render()
-    .map(Html)
-    .map_err(failure)
-}
-
-fn poster(path: &str) -> String {
-    if path.is_empty() {
-        String::new()
-    } else if path.starts_with("https://") || path.starts_with("http://") {
-        path.into()
-    } else {
-        format!(
-            "https://image.tmdb.org/t/p/w200/{}",
-            path.trim_start_matches('/')
-        )
-    }
+    Ok(TimelineView::new(&detail, &filters))
 }
 
 #[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct ListFilters {
     #[serde(default)]
     query: String,
@@ -150,62 +72,274 @@ pub struct ListFilters {
 }
 #[derive(Template)]
 #[template(path = "watchlists.html")]
-struct ListPage {
-    lists: Vec<ListRow>,
-    query: String,
-    next: String,
+struct ListPage<'a> {
+    view: &'a BrowseView,
+    form: &'a WatchlistForm,
 }
-struct ListRow {
-    id: i64,
-    name: String,
-    total: u64,
-    watched: u64,
+#[derive(Template)]
+#[template(path = "watchlist-browse.html")]
+struct BrowseFragment<'a> {
+    view: &'a BrowseView,
 }
 pub async fn list(
     State(lists): State<Watchlists>,
+    format: ResponseFormat,
     Query(filters): Query<ListFilters>,
-) -> Result<Html<String>, Failure> {
-    use super::discovery::{DiscoveryError, DiscoveryOperation, DiscoveryRequest};
-    let query = filters.query.trim();
-    let operation = if query.is_empty() {
-        DiscoveryOperation::List
-    } else {
-        DiscoveryOperation::Search
-    };
-    let page = lists
-        .summaries(
-            operation,
-            DiscoveryRequest {
-                query: (!query.is_empty()).then(|| query.to_owned()),
-                cursor: filters.cursor,
-                ..Default::default()
-            },
-        )
-        .await
-        .map_err(|error| match error {
-            DiscoveryError::InvalidInput(_) => (
-                StatusCode::BAD_REQUEST,
-                "Unable to load this page. Return to /v2/watchlists and try again.",
-            ),
-            DiscoveryError::Database(error) => failure(error),
-        })?;
-    ListPage {
-        lists: page
-            .watchlists
-            .iter()
-            .map(|summary| ListRow {
-                id: summary.watchlist.id,
-                name: summary.watchlist.name.clone(),
-                total: summary.stats.total_items as u64,
-                watched: summary.stats.watched_items as u64,
-            })
-            .collect(),
+) -> Result<Response, Failure> {
+    use super::browse::{BrowseError, BrowseFilters, BrowseView};
+    let filters = BrowseFilters {
         query: filters.query,
-        next: page.next_cursor.unwrap_or_default(),
+        cursor: filters.cursor,
+    };
+    let summaries = lists.all_summaries().await.map_err(failure)?;
+    let view = BrowseView::build(&summaries, &filters).map_err(|error| match error {
+        BrowseError::InvalidCursor => (
+            StatusCode::BAD_REQUEST,
+            "Unable to load this page. Return to /v2/watchlists and try again.",
+        ),
+    })?;
+    let representation = format.representation();
+    let form = WatchlistForm::create();
+    format
+        .respond(&view, async {
+            match representation {
+                Representation::Html => BrowseFragment { view: &view }.render(),
+                Representation::Page | Representation::Json => ListPage {
+                    view: &view,
+                    form: &form,
+                }
+                .render(),
+            }
+            .map(Html)
+            .map_err(failure)
+        })
+        .await
+}
+
+const WRITE_VARY: &str = "HX-Request, Accept";
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct WatchlistFields {
+    #[serde(deserialize_with = "nullable_field")]
+    name: Option<Option<String>>,
+    #[serde(deserialize_with = "nullable_field")]
+    description: Option<Option<String>>,
+    #[serde(deserialize_with = "nullable_field")]
+    item_order_mode: Option<Option<String>>,
+}
+
+impl From<WatchlistFields> for WatchlistDialogInput {
+    fn from(fields: WatchlistFields) -> Self {
+        Self {
+            name: fields.name,
+            description: fields.description,
+            item_order_mode: fields.item_order_mode,
+        }
     }
-    .render()
-    .map(Html)
-    .map_err(failure)
+}
+
+fn nullable_field<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Option::<String>::deserialize(deserializer).map(Some)
+}
+
+#[derive(Template)]
+#[template(path = "watchlist-form.html")]
+struct FormFragment<'a> {
+    form: &'a WatchlistForm,
+}
+
+fn htmx_request(headers: &HeaderMap) -> bool {
+    headers
+        .get("hx-request")
+        .is_some_and(|value| value == "true")
+}
+
+fn json_response(status: StatusCode, body: serde_json::Value) -> Response {
+    let mut response = Json(body).into_response();
+    *response.status_mut() = status;
+    response
+        .headers_mut()
+        .insert(header::VARY, HeaderValue::from_static(WRITE_VARY));
+    response
+}
+
+fn saved_response(title: &'static str, mode: &'static str) -> Response {
+    let trigger = serde_json::json!({
+        "watchlist-saved": {"mode": mode, "message": title}
+    })
+    .to_string();
+    let mut response = StatusCode::NO_CONTENT.into_response();
+    response.headers_mut().insert(
+        HeaderName::from_static("hx-trigger"),
+        HeaderValue::from_str(&trigger).unwrap(),
+    );
+    response
+        .headers_mut()
+        .insert(header::VARY, HeaderValue::from_static(WRITE_VARY));
+    response
+}
+
+fn form_failure(form: WatchlistForm, status: StatusCode) -> Response {
+    match (FormFragment { form: &form }).render() {
+        Ok(html) => {
+            let mut response = (status, Html(html)).into_response();
+            response
+                .headers_mut()
+                .insert(header::VARY, HeaderValue::from_static(WRITE_VARY));
+            response
+        }
+        Err(error) => failure(error).into_response(),
+    }
+}
+
+fn rejection_response(htmx: bool, format: ResponseFormat, rejection: DialogRejection) -> Response {
+    let DialogRejection { failure, form } = rejection;
+    if htmx || format.representation() == Representation::Html {
+        return form_failure(*form, StatusCode::OK);
+    }
+    let status = match failure {
+        DialogFailure::Validation(_) => StatusCode::BAD_REQUEST,
+        DialogFailure::NotFound => StatusCode::NOT_FOUND,
+        DialogFailure::Internal => StatusCode::INTERNAL_SERVER_ERROR,
+    };
+    let mut body = serde_json::json!({
+        "success": false,
+        "code": failure.code(),
+        "message": form.error,
+    });
+    if let Some(watchlist_id) = form.watchlist_id {
+        body["watchlistId"] = serde_json::json!(watchlist_id);
+    }
+    json_response(status, body)
+}
+
+pub async fn create(
+    State(lists): State<Watchlists>,
+    format: ResponseFormat,
+    headers: HeaderMap,
+    FormOrJson(fields): FormOrJson<WatchlistFields>,
+) -> Response {
+    let htmx = htmx_request(&headers);
+    let input = WatchlistDialogInput::from(fields);
+    let new_watchlist = match dialog::submit(DialogTarget::Create, &input) {
+        Ok(WatchlistMutation::Create(new_watchlist)) => new_watchlist,
+        Ok(WatchlistMutation::Update(_)) => {
+            eprintln!("Create dialog produced an update mutation");
+            return rejection_response(
+                htmx,
+                format,
+                dialog::rejected(DialogTarget::Create, &input, DialogFailure::Internal),
+            );
+        }
+        Err(rejection) => return rejection_response(htmx, format, rejection),
+    };
+    match lists.create_watchlist(new_watchlist).await {
+        Ok(record) => {
+            if htmx {
+                saved_response("Watchlist created successfully", "create")
+            } else if format.representation() == Representation::Html {
+                (
+                    StatusCode::SEE_OTHER,
+                    [(header::LOCATION, "/v2/watchlists")],
+                )
+                    .into_response()
+            } else {
+                json_response(
+                    StatusCode::OK,
+                    serde_json::json!({
+                        "success": true,
+                        "code": "created",
+                        "message": "Watchlist created.",
+                        "watchlist": {
+                            "id": record.id,
+                            "name": record.name,
+                            "description": record.description,
+                            "itemOrderMode": record.item_order_mode.as_str(),
+                        },
+                    }),
+                )
+            }
+        }
+        Err(error) => {
+            eprintln!("Watchlist create failed: {error}");
+            rejection_response(
+                htmx,
+                format,
+                dialog::rejected(DialogTarget::Create, &input, DialogFailure::Internal),
+            )
+        }
+    }
+}
+
+pub async fn update(
+    State(lists): State<Watchlists>,
+    Path(id): Path<i64>,
+    format: ResponseFormat,
+    headers: HeaderMap,
+    FormOrJson(fields): FormOrJson<WatchlistFields>,
+) -> Result<Response, Failure> {
+    let htmx = htmx_request(&headers);
+    let input = WatchlistDialogInput::from(fields);
+    let Some(record) = lists.record(id).await.map_err(failure)? else {
+        return Ok(rejection_response(
+            htmx,
+            format,
+            DialogRejection::missing(id),
+        ));
+    };
+    let target = DialogTarget::Edit(&record);
+    let changes = match dialog::submit(target, &input) {
+        Ok(WatchlistMutation::Update(changes)) => changes,
+        Ok(WatchlistMutation::Create(_)) => {
+            eprintln!("Update dialog produced a create mutation for watchlist {id}");
+            return Ok(rejection_response(
+                htmx,
+                format,
+                dialog::rejected(target, &input, DialogFailure::Internal),
+            ));
+        }
+        Err(rejection) => return Ok(rejection_response(htmx, format, rejection)),
+    };
+    match lists.update_watchlist(changes).await {
+        Ok(UpdateOutcome::Updated) => {
+            if htmx {
+                Ok(saved_response("Changes saved successfully", "edit"))
+            } else if format.representation() == Representation::Html {
+                Ok((
+                    StatusCode::SEE_OTHER,
+                    [(header::LOCATION, format!("/v2/watchlists/{id}"))],
+                )
+                    .into_response())
+            } else {
+                Ok(json_response(
+                    StatusCode::OK,
+                    serde_json::json!({
+                        "success": true,
+                        "code": "updated",
+                        "message": "Watchlist updated.",
+                        "watchlistId": id,
+                    }),
+                ))
+            }
+        }
+        Ok(UpdateOutcome::NotFound) => Ok(rejection_response(
+            htmx,
+            format,
+            dialog::rejected(target, &input, DialogFailure::NotFound),
+        )),
+        Err(error) => {
+            eprintln!("Watchlist update failed for {id}: {error}");
+            Ok(rejection_response(
+                htmx,
+                format,
+                dialog::rejected(target, &input, DialogFailure::Internal),
+            ))
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -218,23 +352,51 @@ pub struct ReorderRequest {
 pub async fn reorder(
     State(lists): State<Watchlists>,
     Path(id): Path<i64>,
-    axum::Json(request): axum::Json<ReorderRequest>,
-) -> axum::Json<serde_json::Value> {
+    Query(filters): Query<Filters>,
+    format: ResponseFormat,
+    FormOrJson(request): FormOrJson<ReorderRequest>,
+) -> Result<Response, Failure> {
+    let result = reorder_result(&lists, id, request).await;
+    format
+        .respond(&result, async {
+            load_timeline(&lists, id, filters.timeline())
+                .await?
+                .render_fragment(result.message.unwrap_or("Order saved."))
+                .map(Html)
+                .map_err(failure)
+        })
+        .await
+}
+
+#[derive(Serialize)]
+struct ReorderResponse {
+    success: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<&'static str>,
+}
+impl ReorderResponse {
+    fn rejected(code: &'static str, message: &'static str) -> Self {
+        Self {
+            success: false,
+            code: Some(code),
+            message: Some(message),
+        }
+    }
+}
+
+async fn reorder_result(lists: &Watchlists, id: i64, request: ReorderRequest) -> ReorderResponse {
     use super::reorder::{Reorder, ReorderFailure, ReorderOutcome, ReorderPosition};
-    use serde_json::json;
     if request.moved_item_id == request.reference_item_id {
         let failure = ReorderFailure::InvalidReorder;
-        return axum::Json(
-            json!({"success":false,"code":failure.code(),"message":failure.message()}),
-        );
+        return ReorderResponse::rejected(failure.code(), failure.message());
     }
     let position = match request.position.as_str() {
         "before" => ReorderPosition::Before,
         "after" => ReorderPosition::After,
         _ => {
-            return axum::Json(
-                json!({"success":false,"code":"validation_error","message":"Invalid position"}),
-            );
+            return ReorderResponse::rejected("validation_error", "Invalid position");
         }
     };
     let input = Reorder {
@@ -242,14 +404,18 @@ pub async fn reorder(
         reference_item_id: request.reference_item_id,
         position,
     };
-    axum::Json(match lists.reorder(id, input).await {
-        Ok(ReorderOutcome::Reordered) => json!({"success":true}),
+    match lists.reorder(id, input).await {
+        Ok(ReorderOutcome::Reordered) => ReorderResponse {
+            success: true,
+            code: None,
+            message: None,
+        },
         Ok(ReorderOutcome::Rejected(failure)) => {
-            json!({"success":false,"code":failure.code(),"message":failure.message()})
+            ReorderResponse::rejected(failure.code(), failure.message())
         }
         Err(error) => {
             eprintln!("Reorder failed for watchlist {id}: {error}");
-            json!({"success":false,"code":"internal_error","message":"Unable to reorder watchlist items."})
+            ReorderResponse::rejected("internal_error", "Unable to reorder watchlist items.")
         }
-    })
+    }
 }

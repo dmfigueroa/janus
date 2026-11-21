@@ -3,6 +3,9 @@ import { searchBooks } from "@/server/providers/GoogleBooks.server";
 import { searchGames } from "@/server/providers/Rawg.server";
 import { searchMultimedia } from "@/server/providers/Tmdb.server";
 import { API_PAGE_SIZE } from "@/server/Constants";
+import { logMissingProviderConfiguration } from "@/integrations/ProviderLogging.server";
+import { ProviderRequestError } from "@/integrations/ProviderRequest.server";
+import { serializeError, serverLogger } from "@/shared/logging/ServerLog.server";
 import { DEPRECATED_MEDIA_MESSAGE, isDeprecatedMediaType, type UnifiedMedia } from "@/server/Media";
 import {
   EMPTY_MEDIA_SEARCH_MESSAGE,
@@ -22,13 +25,19 @@ type ActiveProviderMediaType = Exclude<SearchableMediaType, "movie" | "tv" | "an
 
 async function searchGameProvider(query: string, page: number) {
   const apiKey = process.env.RAWG_API_KEY;
-  if (!apiKey) throw new Error("RAWG_API_KEY is not configured");
+  if (!apiKey) {
+    logMissingProviderConfiguration("rawg", "search_games");
+    throw new Error("RAWG_API_KEY is not configured");
+  }
   return searchGames(query, apiKey, page);
 }
 
 async function searchComicProvider(query: string, page: number) {
   const apiKey = process.env.COMICVINE_API_KEY;
-  if (!apiKey) throw new Error("COMICVINE_API_KEY is not configured");
+  if (!apiKey) {
+    logMissingProviderConfiguration("comicvine", "search_comics");
+    throw new Error("COMICVINE_API_KEY is not configured");
+  }
   return searchComics(query, apiKey, page);
 }
 
@@ -119,13 +128,23 @@ async function searchProviders(
 ): Promise<MediaSearchOutcome> {
   try {
     return await getMediaSearchPage(query, mediaType, page);
-  } catch {
+  } catch (error) {
+    logUnexpectedProviderFailure(mediaType, error);
     return {
       status: "provider_unavailable",
       page,
       message: PROVIDER_UNAVAILABLE_MESSAGE,
     };
   }
+}
+
+function logUnexpectedProviderFailure(mediaType: SearchableMediaType, error: unknown) {
+  if (error instanceof ProviderRequestError) return;
+  serverLogger("error", "provider.search.failed", {
+    provider: mediaType,
+    outcome: "unexpected_error",
+    error: serializeError(error),
+  });
 }
 
 export async function searchMedia({

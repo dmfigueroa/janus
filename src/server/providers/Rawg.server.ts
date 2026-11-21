@@ -6,7 +6,6 @@ import {
 import { z } from "zod";
 import { API_PAGE_SIZE } from "../Constants";
 import { type UnifiedMedia } from "../Media";
-import { getErrorMessage } from "../Utils";
 
 const RawgGameSchema = z.object({
   id: z.number(),
@@ -71,15 +70,17 @@ async function searchGamesRequest(
     page_size: pageSize.toString(),
   }).toString();
 
-  const rawData = await requestProviderJson(url.toString(), { signal });
-  const data = parseProviderData(RawgResponseSchema, rawData);
+  const context = { provider: "rawg", operation: "search_games" };
+  const rawData = await requestProviderJson(url.toString(), { signal }, context);
+  const data = parseProviderData(RawgResponseSchema, rawData, context);
   return formatGameSearch(data);
 }
 
 async function getGameDetailsRequest(id: string, apiKey: string, signal?: AbortSignal) {
+  const context = { provider: "rawg", operation: "get_game_details" };
   const url = `https://api.rawg.io/api/games/${id}?key=${apiKey}`;
-  const item = await requestProviderJson(url, { signal });
-  return mapGame(parseProviderData(RawgGameSchema, item));
+  const item = await requestProviderJson(url, { signal }, context);
+  return mapGame(parseProviderData(RawgGameSchema, item, context));
 }
 
 export async function searchGames(
@@ -91,8 +92,10 @@ export async function searchGames(
   try {
     return await searchGamesRequest(query, apiKey, page, signal);
   } catch (error) {
-    console.error("RAWG API Error:", getErrorMessage(error));
-    rethrowProviderFailure(error, "RAWG API Error");
+    rethrowProviderFailure(error, "RAWG API Error", {
+      provider: "rawg",
+      operation: "search_games",
+    });
   }
 }
 

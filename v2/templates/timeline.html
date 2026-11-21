@@ -1,0 +1,14 @@
+{% if view.custom %}
+<watchlist-reorder
+  class="timeline"
+  hx-post="/v2/watchlists/{{view.id}}/reorder?query={{view.query|urlencode}}&amp;unwatched={{view.unwatched}}"
+  hx-trigger="reorder"
+  hx-target="this"
+  hx-select=".timeline > *"
+  hx-swap="innerHTML"
+>
+  {% include "timeline-items.html" %}
+</watchlist-reorder>
+{% else %}
+<div class="timeline">{% include "timeline-items.html" %}</div>
+{% endif %}

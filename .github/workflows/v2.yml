@@ -5,6 +5,19 @@ on:
   pull_request:
     branches: [main]
 jobs:
+  dom:
+    name: V2 DOM Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .tool-versions
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run test:v2:dom
+
   format:
     name: Rust Format
     runs-on: ubuntu-latest
@@ -52,11 +65,25 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24.12.0
+          node-version-file: .tool-versions
           cache: pnpm
       - run: pnpm install --frozen-lockfile
         working-directory: .
       - run: cargo test --locked
+      - name: Install browsers
+        run: pnpm exec playwright-core install --with-deps chromium webkit
+      - name: Browser tests
+        env:
+          PLAYWRIGHT_BROWSERS: chromium,webkit
+        run: node --test tests/browse-browser.cjs tests/watchlist-form-browser.cjs tests/dialog-layout-browser.cjs tests/layout-browser.cjs tests/watchlists-home-browser.cjs tests/reorder-lifecycle-browser.cjs
+      - name: Upload browser failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2-browser-failure-screenshots
+          path: v2/tests/artifacts
+          if-no-files-found: ignore
+          retention-days: 7
       - uses: Swatinem/rust-cache@v2
         if: github.event_name == 'push'
         with:
@@ -64,3 +91,11 @@ jobs:
           shared-key: v2-release
       - run: cargo build --locked --release
         if: github.event_name == 'push'
+
+  image:
+    name: Rust Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build v2 image
+        run: docker build -f v2/Dockerfile -t janus-v2:ci .

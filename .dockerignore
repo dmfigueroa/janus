@@ -1,10 +1,45 @@
+# Dependencies
 node_modules
-.git
+
+# Build output / caches
 .output
+.nitro
 .tanstack
-sqlite.db
-.env
-.DS_Store
+.vinxi
+.wrangler
 dist
+dist-ssr
 coverage
 test-results
+v2/target
+
+# VCS & env
+.git
+.gitignore
+.env
+.env.*
+*.local
+.DS_Store
+
+# Local data (mounted at runtime, never baked into the image)
+storage
+*.db
+sqlite.db
+todos.json
+count.txt
+
+# Tooling / CI / docs not needed to compile
+.devcontainer
+.github
+.vscode
+.agents
+docs
+deploy
+*.md
+README.md
+.oxlintrc.json
+.oxfmtrc.json
+opencode.json
+.cta.json
+skills-lock.json
+.tool-versions

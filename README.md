@@ -29,6 +29,7 @@
 
 - [Podman](https://podman.io/)
 - [Dev Container CLI](https://github.com/devcontainers/cli)
+- [mise](https://mise.jdx.dev) for the host fallback only (see [Host Installation](#host-installation))
 
 The recommended development environment is defined by `.devcontainer/devcontainer.json`. It builds
 with Podman and installs the supported Node.js version and native build tools needed by dependencies
@@ -85,13 +86,19 @@ Node modules must be executed with the same Node.js ABI used when `pnpm install`
 
 ### Host Installation
 
-Running directly on the host is also supported with Node.js 24.12 or later, pnpm (via Corepack or a
-global install matching `packageManager` in `package.json`), and the native compiler toolchain
-required by `better-sqlite3`:
+Running directly on the host is supported when the devcontainer cannot start. The repository pins
+Node.js in `.tool-versions`, and a bare host `node` may be a newer major without a
+`better-sqlite3` prebuilt binary, so run installs through the wrapper that pins it (pnpm via
+Corepack or a global install matching `packageManager` in `package.json`):
 
 ```bash
-pnpm install
+bash tools/pinned-node.sh pnpm install --frozen-lockfile
 ```
+
+The wrapper runs the command under the `.tool-versions` Node through
+[mise](https://mise.jdx.dev). It also needs the native compiler toolchain required by
+`better-sqlite3` and the Rust toolchain for the v2 tests. Run `bash tools/pinned-node.sh pnpm run dev`
+the same way.
 
 ### Running Locally
 

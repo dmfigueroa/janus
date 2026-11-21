@@ -1,5 +1,16 @@
 import ky, { isHTTPError, type Options, type RetryOptions } from "ky";
 import { z } from "zod";
+import {
+  getServerLogContext,
+  runWithServerLogContext,
+  serializeError,
+  serverLogger,
+} from "@/shared/logging/ServerLog.server";
+
+export type ProviderRequestContext = {
+  provider: string;
+  operation: string;
+};
 
 export class ProviderRequestError extends Error {
   constructor(
@@ -74,10 +85,27 @@ function throwTransportFailure(error: unknown, options?: Options): never {
 export async function requestProviderJson(
   input: string | URL | Request,
   options?: Options,
+  context?: ProviderRequestContext,
 ): Promise<unknown> {
+  if (getServerLogContext()) return executeProviderRequest(input, options, context);
+
+  // Provider calls made outside an MCP request still get one correlation id
+  // that covers every retry and failure inside this request.
+  return runWithServerLogContext({ requestId: crypto.randomUUID(), transport: "provider" }, () =>
+    executeProviderRequest(input, options, context),
+  );
+}
+
+async function executeProviderRequest(
+  input: string | URL | Request,
+  options: Options | undefined,
+  context: ProviderRequestContext | undefined,
+): Promise<unknown> {
+  const startedAt = performance.now();
   try {
     return await providerTransport(input, options).json();
   } catch (error) {
+    logProviderRequestFailure(error, options, context, startedAt);
     throwTransportFailure(error, options);
   }
 }
@@ -85,10 +113,58 @@ export async function requestProviderJson(
 export function parseProviderData<Schema extends z.ZodTypeAny>(
   schema: Schema,
   data: unknown,
+  context?: ProviderRequestContext,
 ): z.output<Schema> {
   const result = schema.safeParse(data);
-  if (!result.success) throw new ProviderRequestError();
+  if (!result.success) {
+    serverLogger("warn", "provider.response.invalid", {
+      ...context,
+      outcome: "invalid_response",
+      issueCount: result.error.issues.length,
+    });
+    throw new ProviderRequestError();
+  }
   return result.data;
+}
+
+function logProviderRequestFailure(
+  error: unknown,
+  options: Options | undefined,
+  context: ProviderRequestContext | undefined,
+  startedAt: number,
+) {
+  const durationMs = Math.round(performance.now() - startedAt);
+  if (isCancelled(error, options?.signal)) {
+    return logProviderCancellation(context, durationMs);
+  }
+  logProviderFailure(error, context, durationMs);
+}
+
+function logProviderCancellation(context: ProviderRequestContext | undefined, durationMs: number) {
+  serverLogger("debug", "provider.request.cancelled", {
+    ...context,
+    outcome: "cancelled",
+    durationMs,
+  });
+}
+
+function logProviderFailure(
+  error: unknown,
+  context: ProviderRequestContext | undefined,
+  durationMs: number,
+) {
+  const { severity, ...details } = isHTTPError(error)
+    ? { severity: "warn" as const, outcome: "http_error", status: error.response.status }
+    : {
+        severity: "error" as const,
+        outcome: "unexpected_error",
+        error: serializeError(error),
+      };
+  serverLogger(severity, "provider.request.failed", {
+    ...context,
+    ...details,
+    durationMs,
+  });
 }
 
 function getErrorMessage(error: unknown) {
@@ -99,7 +175,16 @@ function getErrorMessage(error: unknown) {
  * Preserve expected provider failures and caller cancellation while wrapping
  * unexpected mapping defects with the provider label.
  */
-export function rethrowProviderFailure(error: unknown, label: string): never {
+export function rethrowProviderFailure(
+  error: unknown,
+  label: string,
+  context?: ProviderRequestContext,
+): never {
   if (error instanceof ProviderRequestError || isAbortError(error)) throw error;
+  serverLogger("error", "provider.operation.failed", {
+    ...context,
+    outcome: "unexpected_error",
+    error: serializeError(error),
+  });
   throw new Error(`${label}: ${getErrorMessage(error)}`);
 }

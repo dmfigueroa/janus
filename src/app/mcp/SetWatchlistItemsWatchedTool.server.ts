@@ -31,7 +31,7 @@ export function registerSetWatchlistItemsWatchedTool(server: McpServer) {
     },
     async ({ updates }) =>
       asMcpContent({
-        results: await executeWriteBatch(updates, setWatchedResult),
+        results: await executeWriteBatch(updates, setWatchedResult, "set_watchlist_items_watched"),
       }),
   );
 }

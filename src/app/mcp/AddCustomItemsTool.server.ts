@@ -53,7 +53,11 @@ export function registerAddCustomItemsToWatchlistsTool(server: McpServer) {
     },
     async ({ items }) =>
       asMcpContent({
-        results: await executeWriteBatch(items, addCustomItemResult),
+        results: await executeWriteBatch(
+          items,
+          addCustomItemResult,
+          "add_custom_items_to_watchlists",
+        ),
       }),
   );
 }

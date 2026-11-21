@@ -7,7 +7,6 @@ import {
 } from "@/integrations/ProviderRequest.server";
 import { API_PAGE_SIZE } from "../Constants";
 import { type UnifiedMedia } from "../Media";
-import { getErrorMessage } from "../Utils";
 import { ANILIST_DETAILS_QUERY, ANILIST_SEARCH_QUERY } from "./AnilistQueries.server";
 
 const AniListMediaSchema = z.object({
@@ -128,21 +127,26 @@ const ANILIST_POST_RETRY_POLICY = {
 async function fetchAniList(
   query: string,
   variables: Record<string, unknown>,
-  signal?: AbortSignal,
+  signal: AbortSignal | undefined,
+  operation: string,
 ) {
-  return requestProviderJson(ANILIST_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
+  return requestProviderJson(
+    ANILIST_URL,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      json: {
+        query,
+        variables,
+      },
+      retry: ANILIST_POST_RETRY_POLICY,
+      signal,
     },
-    json: {
-      query,
-      variables,
-    },
-    retry: ANILIST_POST_RETRY_POLICY,
-    signal,
-  });
+    { provider: "anilist", operation },
+  );
 }
 
 export async function searchAnilistInternal(
@@ -151,6 +155,7 @@ export async function searchAnilistInternal(
   page: number = 1,
   signal?: AbortSignal,
 ): Promise<{ results: UnifiedMedia[]; totalResults: number }> {
+  const context = { provider: "anilist", operation: "search_media" };
   try {
     const rawData = await fetchAniList(
       ANILIST_SEARCH_QUERY,
@@ -161,9 +166,10 @@ export async function searchAnilistInternal(
         perPage: API_PAGE_SIZE,
       },
       signal,
+      context.operation,
     );
 
-    const data = parseProviderData(AniListResponseSchema, rawData);
+    const data = parseProviderData(AniListResponseSchema, rawData, context);
     const results: UnifiedMedia[] = data.data.Page.media.map(mapAniListMedia);
 
     return {
@@ -171,19 +177,23 @@ export async function searchAnilistInternal(
       totalResults: getAniListTotal(data.data.Page.pageInfo.total),
     };
   } catch (error) {
-    console.error("AniList Search Error:", getErrorMessage(error));
-    rethrowProviderFailure(error, "AniList Search Error");
+    rethrowProviderFailure(error, "AniList Search Error", context);
   }
 }
 
 export async function getAnilistDetailsInternal(id: string, signal?: AbortSignal) {
+  const context = { provider: "anilist", operation: "get_details" };
   try {
-    const rawData = await fetchAniList(ANILIST_DETAILS_QUERY, { id: parseInt(id) }, signal);
-    const data = parseProviderData(AniListDetailsResponseSchema, rawData);
+    const rawData = await fetchAniList(
+      ANILIST_DETAILS_QUERY,
+      { id: parseInt(id) },
+      signal,
+      context.operation,
+    );
+    const data = parseProviderData(AniListDetailsResponseSchema, rawData, context);
     return mapAniListDetails(data.data.Media);
   } catch (error) {
-    console.error("AniList Details Error:", getErrorMessage(error));
-    rethrowProviderFailure(error, "AniList Details Error");
+    rethrowProviderFailure(error, "AniList Details Error", context);
   }
 }
 

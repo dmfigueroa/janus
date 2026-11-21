@@ -8,13 +8,22 @@
     "preview": "vite preview",
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",
+    "test:v2": "bash tools/pinned-node.sh cargo test --manifest-path v2/Cargo.toml --locked",
+    "test:v2:dom": "node --test v2/tests/htmx-browser.cjs v2/tests/reorder-browser.cjs",
+    "test:v2:home": "node --test v2/tests/watchlists-home-browser.cjs",
     "test:lint-plugin": "vitest run tools/oxlint/ComponentRendering.test.tsx",
-    "lint": "oxlint .",
+    "lint": "oxlint . && pnpm run lint:css && pnpm run check:agents && pnpm run check:v2-modules",
+    "check:agents": "node tools/check-agent-skill-mappings.mjs",
+    "check:v2-modules": "node tools/check-v2-module-boundaries.mjs",
     "format": "oxfmt . --write",
     "format:check": "oxfmt . --check",
     "typecheck": "tsc --noEmit",
-    "prepare": "simple-git-hooks",
-    "migrate": "pnpm dlx tsx --env-file=.env src/db/Migrate.ts"
+    "prepare": "node tools/install-git-hooks.cjs",
+    "migrate": "pnpm dlx tsx --env-file=.env src/db/Migrate.ts",
+    "seed": "pnpm dlx tsx --env-file=.env src/db/Seed.ts",
+    "lint:css": "stylelint \"v2/static/*.css\"",
+    "preview:local": "bash tools/preview-local.sh",
+    "visual:compare": "node tools/visual-compare.cjs"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.1",
@@ -32,7 +41,10 @@
     "@tanstack/react-router-devtools": "^1.132.0",
     "@tanstack/react-router-ssr-query": "^1.131.7",
     "@tanstack/react-start": "^1.167.5",
+    "@tanstack/react-virtual": "^3.14.26",
+    "@tanstack/router-core": "^1.171.39",
     "@tanstack/router-plugin": "^1.132.0",
+    "@tanstack/start-client-core": "^1.170.39",
     "@types/dompurify": "^3.0.5",
     "better-sqlite3": "^12.6.0",
     "date-fns": "^4.1.0",
@@ -43,6 +55,7 @@
     "next-themes": "^0.4.6",
     "nitro": "npm:nitro-nightly@latest",
     "p-limit": "^7.3.0",
+    "pino": "^9.14.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-hook-form": "^7.85.0",
@@ -66,8 +79,10 @@
     "lint-staged": "^16.2.7",
     "oxfmt": "^0.24.0",
     "oxlint": "^1.39.0",
+    "playwright-core": "1.65.1",
     "readdirp": "^5.0.0",
     "simple-git-hooks": "^2.13.1",
+    "stylelint": "^18.0.0",
     "typescript": "^5.7.2",
     "vite": "^7.1.7",
     "vite-plugin-pwa": "^1.2.0",
@@ -76,9 +91,17 @@
     "workbox-window": "^7.4.1"
   },
   "simple-git-hooks": {
-    "pre-commit": "pnpm exec lint-staged --concurrent 1"
+    "pre-commit": "pnpm exec lint-staged --concurrent 1",
+    "pre-push": "sh -c 'if [ -d node_modules ]; then pnpm run format:check; else echo \"skipping format:check: no node_modules, run pnpm install\"; fi'"
   },
   "lint-staged": {
+    "{Dockerfile,v2/Dockerfile}": [
+      "bash tools/lint-dockerfiles.sh"
+    ],
+    "v2/**/*.rs": [
+      "cargo fmt --manifest-path v2/Cargo.toml -- --check",
+      "sh -c 'cargo check --locked --manifest-path v2/Cargo.toml'"
+    ],
     "*.tsx": [
       "oxlint --fix --config tools/oxlint/StagedTsx.oxlintrc.json",
       "oxfmt --write"
@@ -90,12 +113,18 @@
     "*.{json,css,html,md}": [
       "oxfmt --write"
     ],
+    "AGENTS.md": [
+      "node tools/check-agent-skill-mappings.mjs"
+    ],
     "*.{js,ts,jsx,tsx,mjs,cjs}": [
       "vitest related --run --passWithNoTests"
+    ],
+    "*.css": [
+      "stylelint --fix"
     ]
   },
   "engines": {
-    "node": ">=24.12.0"
+    "node": ">=24.12.0 <26"
   },
   "packageManager": "pnpm@10.34.9",
   "pnpm": {

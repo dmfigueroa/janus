@@ -81,14 +81,15 @@ impl Watchlists {
         else {
             return Ok(ReorderOutcome::Rejected(ReorderFailure::NotFound));
         };
-        if row.try_get::<String>("", "item_order_mode")? != "custom" {
+        let mode = ItemOrderMode::from_stored(&row.try_get::<String>("", "item_order_mode")?)?;
+        if mode != ItemOrderMode::Custom {
             return Ok(ReorderOutcome::Rejected(ReorderFailure::NotCustomMode));
         }
         let mut item_ids = transaction
             .query_all_raw(statement(
                 &format!(
                     "SELECT id FROM watchlist_items WHERE watchlist_id=? ORDER BY {}",
-                    ItemOrderMode::Custom.order_sql()
+                    mode.order_sql()
                 ),
                 vec![id.into()],
             ))

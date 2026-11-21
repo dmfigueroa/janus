@@ -1,0 +1,89 @@
+{
+  "reference": "v1 watchlist home rendered in headless Chromium",
+  "route": "/watchlists",
+  "recordedAt": "2026-11-17",
+  "viewports": {
+    "390x844": {
+      "footer": {
+        "items": [
+          {
+            "label": "Watch Now",
+            "left": 38.33,
+            "right": 118.33,
+            "top": 781,
+            "bottom": 843,
+            "width": 80,
+            "height": 62
+          },
+          {
+            "label": "My Lists",
+            "left": 155,
+            "right": 235,
+            "top": 781,
+            "bottom": 843,
+            "width": 80,
+            "height": 62
+          },
+          {
+            "label": "Search",
+            "left": 271.66,
+            "right": 351.66,
+            "top": 781,
+            "bottom": 843,
+            "width": 80,
+            "height": 62
+          }
+        ]
+      },
+      "grid": {
+        "columns": 2,
+        "cardWidthCap": 220
+      },
+      "heading": {
+        "text": "Watchlists",
+        "visible": true
+      }
+    },
+    "1280x800": {
+      "footer": {
+        "items": [
+          {
+            "label": "Watch Now",
+            "left": 464,
+            "right": 544,
+            "top": 737,
+            "bottom": 799,
+            "width": 80,
+            "height": 62
+          },
+          {
+            "label": "My Lists",
+            "left": 600,
+            "right": 680,
+            "top": 737,
+            "bottom": 799,
+            "width": 80,
+            "height": 62
+          },
+          {
+            "label": "Search",
+            "left": 736,
+            "right": 816,
+            "top": 737,
+            "bottom": 799,
+            "width": 80,
+            "height": 62
+          }
+        ]
+      },
+      "grid": {
+        "columns": 4,
+        "cardWidthCap": 220
+      },
+      "heading": {
+        "text": "Watchlists",
+        "visible": true
+      }
+    }
+  }
+}

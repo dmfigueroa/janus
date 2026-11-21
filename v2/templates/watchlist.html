@@ -1,71 +1,90 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>{{name}} · Janus</title>
-    <link rel="stylesheet" href="/v2/static/app.css" />
-    <script defer src="/v2/static/vendor/Sortable.min.js"></script>
-    <script defer src="/v2/static/app.js"></script>
-  </head>
-  <body>
-    <main class="watchlist">
-      <nav><a href="/v2/watchlists">Janus</a></nav>
-      <header>
-        <h1>{{name}}</h1>
-        {% if paused %}<span class="badge" role="status">Paused</span>{% endif %}
-        <p>{{description}}</p>
-        <p>{{watched}} of {{total}} watched · {{mode}} order</p>
-        <progress value="{{progress}}" max="100" aria-label="Watchlist progress">
-          {{progress}}%
-        </progress>
-      </header>
-      <form method="get">
-        <label for="query">Search items</label
-        ><input id="query" name="query" value="{{query}}" type="search" /><label for="unwatched"
-          >Watched items</label
-        ><select name="unwatched" id="unwatched">
-          <option value="true" {% if unwatched %}selected{% endif %}>Collapse watched</option>
-          <option value="false" {% if !unwatched %}selected{% endif %}>Show all</option></select
-        ><button>Apply filters</button>
-      </form>
-      <p id="reorder-status" role="status" aria-live="polite"></p>
-      <div class="timeline" data-reorder-url="/v2/watchlists/{{id}}/reorder" data-mode="{{mode}}">
-        {% for run in runs %}{% if run.heading %}
-        <h2>{{run.year}}</h2>
-        {% endif %}{% if run.hidden %}
-        <details class="watched-run">
-          <summary>{{run.rows.len()}} watched items</summary>
-          {% endif %} {% for row in run.rows %}
-          <article data-item-id="{{row.id}}">
-            {% if mode == "custom" %}<button
-              type="button"
-              class="reorder-handle"
-              aria-label="Move {{row.title}}. Use Alt and arrow keys to reorder"
-            >
-              ↕</button
-            >{% endif %} {% if !row.poster.is_empty() %}<img
-              class="poster {{row.media}}"
-              src="{{row.poster}}"
-              alt=""
-              loading="lazy"
-              referrerpolicy="no-referrer"
-            />{% else %}
-            <div class="poster placeholder" aria-hidden="true">{{row.media}}</div>
-            {% endif %}
-            <div class="item-content">
-              <h3>{{row.title}}</h3>
-              <p>{{row.parent}} {{row.episode}}</p>
-              <p>{{row.date}}</p>
-            </div>
-            <span>{% if row.watched %}Watched{% else %}Unwatched{% endif %}</span>
-          </article>
-          {% endfor %}{% if run.hidden %}
-        </details>
-        {% endif %}{% else %}
-        <p role="status">No items match these filters.</p>
-        {% endfor %}
+{% extends "layout.html" %} {% block title %}{{view.name}} · Janus{% endblock %} {% block content %}
+<main class="watchlist">
+  <header class="watchlist-header">
+    <div class="watchlist-title">
+      <h1>{{view.name}}</h1>
+      {% if view.paused %}<span class="badge" role="status">Paused</span>{% endif %}
+      <button
+        type="button"
+        class="watchlist-edit"
+        data-watchlist-dialog-open="edit"
+        data-watchlist-dialog-trigger="header"
+        aria-label="Edit watchlist"
+      >
+        Edit
+      </button>
+    </div>
+    {% if !view.description.is_empty() %}
+    <p class="watchlist-description">{{view.description}}</p>
+    {% endif %}
+    <div class="watchlist-progress">
+      <div class="watchlist-progress-labels">
+        <span class="watchlist-progress-count">{{view.watched}}/{{view.total}} Watched</span>
+        <span class="watchlist-progress-percent">{{view.progress}}% Complete</span>
       </div>
-    </main>
-  </body>
-</html>
+      <div
+        class="progress-track"
+        role="progressbar"
+        aria-label="Watchlist progress"
+        aria-valuenow="{{view.progress}}"
+        aria-valuemin="0"
+        aria-valuemax="100"
+      >
+        <div class="progress-fill" style="width: {{view.progress}}%"></div>
+      </div>
+    </div>
+  </header>
+  <form class="watchlist-toolbar" method="get" role="search">
+    <div class="item-search">
+      <svg
+        class="search-icon"
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        width="16"
+        height="16"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+      >
+        <circle cx="11" cy="11" r="7"></circle>
+        <line x1="16" y1="16" x2="21" y2="21"></line>
+      </svg>
+      <label class="visually-hidden" for="query">Search items</label>
+      <input
+        id="query"
+        name="query"
+        value="{{view.query}}"
+        type="search"
+        placeholder="Search titles..."
+        autocomplete="off"
+      />
+    </div>
+    <label class="visually-hidden" for="unwatched">Watched items</label>
+    <select name="unwatched" id="unwatched">
+      <option value="true" {% if view.unwatched %}selected{% endif %}>Collapse watched</option>
+      <option value="false" {% if !view.unwatched %}selected{% endif %}>Show all</option>
+    </select>
+    <button type="submit">Apply filters</button>
+  </form>
+  <span
+    id="reorder-recovery"
+    hidden
+    hx-get=""
+    hx-trigger="reconcile"
+    hx-target=".timeline"
+    hx-select=".timeline > *"
+    hx-swap="innerHTML"
+  ></span>
+  {% include "timeline.html" %}
+</main>
+<span
+  id="watchlist-refresh"
+  hidden
+  hx-get=""
+  hx-trigger="watchlist-saved from:body"
+  hx-target=".watchlist"
+  hx-select=".watchlist"
+  hx-swap="outerHTML"
+></span>
+{% include "watchlist-dialog.html" %} {% endblock %}

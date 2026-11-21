@@ -3,52 +3,22 @@ const assert = require("node:assert/strict");
 const { JSDOM } = require("jsdom");
 const fs = require("node:fs");
 const path = require("node:path");
+const {
+  page,
+  timeline,
+  openReorderPage,
+  installReorderModules,
+} = require("./reorder-browser-fixtures.cjs");
 const root = path.resolve(__dirname, "..");
-
-function timeline(itemIds) {
-  const rows = itemIds
-    .map(
-      (id) =>
-        `<article data-item-id="${id}"><button class="reorder-handle">Move ${id}</button></article>`,
-    )
-    .join("");
-  return `<div class="timeline" data-reorder-url="/reorder" data-mode="custom">${rows}</div>`;
-}
-
-function page(itemIds) {
-  return `<p id="reorder-status" role="status"></p><form><input id="query" value="first" /></form>${timeline(itemIds)}`;
-}
-
-function setScrollPosition(window, scrollY) {
-  if (!scrollY) return;
-  Object.defineProperty(window, "scrollY", { value: scrollY, configurable: true });
-}
-
-function openReorderPage(markup, respond, { scrollY = 0 } = {}) {
-  const dom = new JSDOM(markup, {
-    url: "https://janus.example/v2/watchlists/41?query=first",
-    runScripts: "outside-only",
-  });
-  const { window } = dom;
-  const scrolled = [];
-  window.scrollTo = ({ top }) => scrolled.push(top);
-  setScrollPosition(window, scrollY);
-  window.HTMLElement.prototype.getClientRects = () => [1];
-  window.eval(fs.readFileSync(path.join(root, "static/vendor/Sortable.min.js"), "utf8"));
-  const calls = [];
-  window.fetch = async (url, options) => {
-    calls.push({ url, options });
-    return respond(url, options);
-  };
-  window.eval(fs.readFileSync(path.join(root, "static/app.js"), "utf8"));
-  return { dom, window, calls, scrolled };
-}
 
 test("keyboard reorder saves intent and restores authoritative order and focus after failure", async () => {
   const markup = page([1, 2]);
   const { dom, window, calls } = openReorderPage(markup, (_, options) =>
     options
-      ? { ok: true, json: async () => ({ success: false, message: "Stale anchor" }) }
+      ? {
+          ok: true,
+          text: async () => markup.replace('role="status"></p>', 'role="status">Stale anchor</p>'),
+        }
       : { ok: true, text: async () => markup },
   );
   const button = window.document.querySelector("button");
@@ -58,16 +28,19 @@ test("keyboard reorder saves intent and restores authoritative order and focus a
   );
   assert.equal(window.document.querySelector("article").dataset.itemId, "2");
   assert.equal(window.document.getElementById("reorder-status").textContent, "Saving order…");
-  const swap = new window.Event("htmx:beforeSwap", { cancelable: true });
+  const swap = new window.CustomEvent("htmx:beforeSwap", {
+    detail: { target: window.document.querySelector("watchlist-reorder") },
+    cancelable: true,
+  });
   window.document.dispatchEvent(swap);
   assert.equal(swap.defaultPrevented, true, "fragment swaps wait for the save and reconcile");
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.deepEqual(JSON.parse(calls[0].options.body), {
-    movedItemId: 1,
-    referenceItemId: 2,
+    movedItemId: "1",
+    referenceItemId: "2",
     position: "after",
   });
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 1);
   assert.equal(window.document.querySelector("article").dataset.itemId, "1");
   assert.equal(window.document.activeElement.closest("article").dataset.itemId, "1");
   assert.match(window.document.getElementById("reorder-status").textContent, /Stale anchor/);
@@ -79,11 +52,18 @@ test("drops submit the visible anchor and preserve filters, scroll and focus on 
     page([1, 2]),
     (_, options) =>
       options
-        ? { ok: true, json: async () => ({ success: true }) }
+        ? {
+            ok: true,
+            text: async () =>
+              timeline([2, 1]).replace(
+                "</watchlist-reorder>",
+                '<p id="reorder-status">Order saved.</p></watchlist-reorder>',
+              ),
+          }
         : { ok: true, text: async () => timeline([2, 1]) },
     { scrollY: 420 },
   );
-  const timelineElement = window.document.querySelector(".timeline");
+  const timelineElement = window.document.querySelector("watchlist-reorder");
   const sortable = window.Sortable.get(timelineElement);
   const first = timelineElement.querySelector('[data-item-id="1"]');
   const second = timelineElement.querySelector('[data-item-id="2"]');
@@ -101,12 +81,12 @@ test("drops submit the visible anchor and preserve filters, scroll and focus on 
   );
   await new Promise((resolve) => setTimeout(resolve, 20));
   assert.deepEqual(JSON.parse(calls[0].options.body), {
-    movedItemId: 2,
-    referenceItemId: 1,
+    movedItemId: "2",
+    referenceItemId: "1",
     position: "before",
   });
-  assert.equal(calls.length, 2);
-  assert.equal(calls[1].url, window.location.href);
+  assert.equal(calls.length, 1);
+  assert.equal(new URL(calls[0].url, window.location.href).search, window.location.search);
   assert.equal(window.document.getElementById("query").value, "first");
   assert.equal(window.document.getElementById("reorder-status").textContent, "Order saved.");
   assert.deepEqual(scrolled, [420]);
@@ -115,9 +95,7 @@ test("drops submit the visible anchor and preserve filters, scroll and focus on 
 });
 
 test("failed reconciliation requests a refresh instead of implying a saved order", async () => {
-  const { dom, window } = openReorderPage(page([1, 2]), (_, options) =>
-    options ? { ok: true, json: async () => ({ success: true }) } : { ok: false },
-  );
+  const { dom, window } = openReorderPage(page([1, 2]), () => ({ ok: false }));
   const button = window.document.querySelector("button");
   button.dispatchEvent(
     new window.KeyboardEvent("keydown", { key: "ArrowDown", altKey: true, bubbles: true }),
@@ -135,10 +113,13 @@ test("active drags block fragment swaps and swaps do not duplicate initializatio
   const { dom, window } = openReorderPage(page([1, 2]), () => {
     throw new Error("No request expected");
   });
-  const timelineElement = window.document.querySelector(".timeline");
+  const timelineElement = window.document.querySelector("watchlist-reorder");
   const sortable = window.Sortable.get(timelineElement);
   sortable.options.onStart();
-  const duringDrag = new window.Event("htmx:beforeSwap", { cancelable: true });
+  const duringDrag = new window.CustomEvent("htmx:beforeSwap", {
+    detail: { target: timelineElement },
+    cancelable: true,
+  });
   window.document.dispatchEvent(duringDrag);
   assert.equal(duringDrag.defaultPrevented, true);
   sortable.options.onEnd({
@@ -148,7 +129,10 @@ test("active drags block fragment swaps and swaps do not duplicate initializatio
     oldIndex: 0,
     newIndex: 0,
   });
-  const afterDrag = new window.Event("htmx:beforeSwap", { cancelable: true });
+  const afterDrag = new window.CustomEvent("htmx:beforeSwap", {
+    detail: { target: timelineElement },
+    cancelable: true,
+  });
   window.document.dispatchEvent(afterDrag);
   assert.equal(afterDrag.defaultPrevented, false);
   window.document.dispatchEvent(new window.Event("htmx:load"));
@@ -158,13 +142,14 @@ test("active drags block fragment swaps and swaps do not duplicate initializatio
 
 test("collapsed watched groups reject incoming drops while expanded groups accept them", () => {
   const dom = new JSDOM(
-    '<p id="reorder-status"></p><div class="timeline" data-reorder-url="/reorder" data-mode="custom"><article data-item-id="1"></article><details><summary>Watched</summary><article data-item-id="2"></article></details><article data-item-id="3"></article></div>',
+    '<watchlist-reorder class="timeline"><p id="reorder-status"></p><article data-item-id="1"></article><details><summary>Watched</summary><article data-item-id="2"></article></details><article data-item-id="3"></article></watchlist-reorder>',
     { url: "https://janus.example/v2/watchlists/41", runScripts: "outside-only" },
   );
   const { window } = dom;
   window.eval(fs.readFileSync(path.join(root, "static/vendor/Sortable.min.js"), "utf8"));
   window.eval(fs.readFileSync(path.join(root, "static/app.js"), "utf8"));
-  const timelineElement = window.document.querySelector(".timeline");
+  installReorderModules(window);
+  const timelineElement = window.document.querySelector("watchlist-reorder");
   const group = window.document.querySelector("details");
   const source = window.Sortable.get(timelineElement);
   const destination = window.Sortable.get(group);

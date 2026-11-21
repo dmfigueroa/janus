@@ -41,7 +41,7 @@ export function registerMoveWatchlistParentsTool(server: McpServer) {
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     },
     async ({ moves }) => {
-      const results = await executeWriteBatch(moves, moveParentResult);
+      const results = await executeWriteBatch(moves, moveParentResult, "move_watchlist_parents");
       return asMcpContent({ results });
     },
   );

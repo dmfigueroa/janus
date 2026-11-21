@@ -1,19 +1,17 @@
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import { Box, Flex, Text } from "@chakra-ui/react";
+import { Flex, Text } from "@chakra-ui/react";
 import { DndContext, DragOverlay, closestCenter } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { WatchlistItem } from "@/db/Schema";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
-import type { ReorderIntent } from "@/features/watchlists/detail/Reorder";
+import type { WatchlistReorder } from "@/features/watchlists/detail/useWatchlistReorder";
 import { useIntersectionObserver } from "@/hooks/useIntersectionObserver";
-import { useMemo } from "react";
-import { DragOverlayTimelineRow } from "./ReorderableTimelineRow";
-import { WatchlistTimelineGroupSection } from "./WatchlistTimelineGroup";
-import { useWatchlistTimelineReorder } from "./useWatchlistTimelineReorder";
+import { useCallback, useMemo, useState } from "react";
+import { DragOverlayTimelineRow } from "./DragOverlayTimelineRow";
+import { WatchlistTimelineVirtualList } from "./WatchlistTimelineVirtualList";
+
 import { WatchlistTimelineEndcap } from "./WatchlistTimelineEndcap";
-import {
-  buildWatchlistTimelineGroups,
-  type WatchlistTimelineGroup,
-} from "./WatchlistTimeline.model";
+import { buildWatchlistTimelineBlocks } from "./WatchlistTimeline.model";
 
 interface WatchlistTimelineProps {
   items: WatchlistItem[];
@@ -22,30 +20,105 @@ interface WatchlistTimelineProps {
   hasMore?: boolean;
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
-  canReorder?: boolean;
+  reorder?: WatchlistReorder;
   interactionDisabled?: boolean;
-  onReorder?: (intent: ReorderIntent) => Promise<boolean> | void;
 }
 
-export function WatchlistTimeline(props: WatchlistTimelineProps) {
-  const { items, itemOrderMode, onLoadMore, onReorder } = props;
-  const reorder = useWatchlistTimelineReorder({
-    items,
-    itemOrderMode,
-    canReorder: Boolean(props.canReorder),
-    onReorder,
-  });
-  const groups = useMemo(
-    () => buildWatchlistTimelineGroups(reorder.displayedItems, itemOrderMode),
-    [reorder.displayedItems, itemOrderMode],
+export function WatchlistTimeline({
+  items,
+  itemOrderMode,
+  unwatchedOnly,
+  onLoadMore,
+  hasMore,
+  isLoadingMore,
+  interactionDisabled,
+  reorder: providedReorder,
+}: WatchlistTimelineProps) {
+  const reorder = providedReorder ?? readOnlyReorder(items);
+  const displayedItems = reorder.displayedItems;
+  const { expandedRunKeys, toggleRun } = useExpandedWatchedRuns();
+  const blocks = useMemo(
+    () =>
+      buildWatchlistTimelineBlocks({
+        items: displayedItems,
+        itemOrderMode,
+        unwatchedOnly,
+        expandedRunKeys,
+      }),
+    [displayedItems, itemOrderMode, unwatchedOnly, expandedRunKeys],
   );
+  const sortableItemIds = useMemo(() => displayedItems.map((item) => item.id), [displayedItems]);
   const { ref } = useIntersectionObserver({
-    onIntersect: getLoadMoreHandler(Boolean(props.interactionDisabled), onLoadMore),
-    enabled: isLoadMoreEnabled(props),
+    onIntersect: getLoadMoreHandler(Boolean(interactionDisabled), onLoadMore),
+    enabled: isLoadMoreEnabled({ onLoadMore, hasMore, isLoadingMore, interactionDisabled }),
     rootMargin: "100px",
   });
 
-  return <WatchlistTimelineContent props={props} reorder={reorder} groups={groups} ref={ref} />;
+  if (items.length === 0) return <EmptyWatchlistState />;
+
+  return (
+    <DndContext
+      sensors={reorder.sensors}
+      collisionDetection={closestCenter}
+      modifiers={[restrictToVerticalAxis]}
+      onDragStart={reorder.handleDragStart}
+      onDragCancel={reorder.handleDragCancel}
+      onDragEnd={reorder.handleDragEnd}
+      cancelDrop={reorder.prepareDrop}
+    >
+      {/* Saving updates the cache asynchronously. The default drop animation measures
+          the old row position and can fly back there before the new order renders. */}
+      <DragOverlay dropAnimation={null}>
+        <TimelineDragOverlayItem item={reorder.activeItem} itemOrderMode={itemOrderMode} />
+      </DragOverlay>
+
+      <SortableContext items={sortableItemIds} strategy={verticalListSortingStrategy}>
+        <WatchlistTimelineVirtualList
+          blocks={blocks}
+          itemOrderMode={itemOrderMode}
+          showHandleSlot={itemOrderMode === "custom"}
+          showHandle={resolveShowHandle(itemOrderMode, reorder.reorderEnabled)}
+          interactionDisabled={Boolean(interactionDisabled)}
+          onToggleRun={toggleRun}
+        />
+      </SortableContext>
+      <WatchlistTimelineEndcap hasMore={hasMore} sentinelRef={ref} />
+    </DndContext>
+  );
+}
+
+function TimelineDragOverlayItem({
+  item,
+  itemOrderMode,
+}: {
+  item: WatchlistItem | null;
+  itemOrderMode: WatchlistItemOrderMode;
+}) {
+  if (!item) return null;
+  return <DragOverlayTimelineRow item={item} itemOrderMode={itemOrderMode} />;
+}
+
+function resolveShowHandle(itemOrderMode: WatchlistItemOrderMode, reorderEnabled: boolean) {
+  return itemOrderMode === "custom" && reorderEnabled;
+}
+
+function useExpandedWatchedRuns() {
+  const [expandedRunKeys, setExpandedRunKeys] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleRun = useCallback((runKey: string) => {
+    setExpandedRunKeys((current) => toggleSetKey(current, runKey));
+  }, []);
+
+  return { expandedRunKeys, toggleRun };
+}
+
+function toggleSetKey(current: ReadonlySet<string>, key: string) {
+  const next = new Set(current);
+  if (next.has(key)) {
+    next.delete(key);
+  } else {
+    next.add(key);
+  }
+  return next;
 }
 
 const getLoadMoreHandler = (interactionDisabled: boolean, onLoadMore: (() => void) | undefined) =>
@@ -68,86 +141,6 @@ function isLoadMoreEnabled({
 const isTimelineInteractionReady = (isLoadingMore?: boolean, interactionDisabled?: boolean) =>
   !isLoadingMore && !interactionDisabled;
 
-function WatchlistTimelineContent({
-  props,
-  reorder,
-  groups,
-  ref,
-}: {
-  props: WatchlistTimelineProps;
-  reorder: ReturnType<typeof useWatchlistTimelineReorder>;
-  groups: WatchlistTimelineGroup[];
-  ref: ReturnType<typeof useIntersectionObserver>["ref"];
-}) {
-  if (props.items.length === 0) return <EmptyWatchlistState />;
-  const showHandleSlot = props.itemOrderMode === "custom";
-
-  return (
-    <DndContext
-      sensors={reorder.sensors}
-      collisionDetection={closestCenter}
-      modifiers={[restrictToVerticalAxis]}
-      onDragStart={reorder.handleDragStart}
-      onDragCancel={reorder.handleDragCancel}
-      onDragEnd={reorder.handleDragEnd}
-      cancelDrop={reorder.prepareDrop}
-    >
-      {/* Saving updates the cache asynchronously. The default drop animation measures
-          the old row position and can fly back there before the new order renders. */}
-      <DragOverlay dropAnimation={null}>
-        {reorder.activeItem ? (
-          <DragOverlayTimelineRow item={reorder.activeItem} itemOrderMode={props.itemOrderMode} />
-        ) : null}
-      </DragOverlay>
-
-      <Box position="relative" pl={{ base: 6, md: 0 }} overflowAnchor="none">
-        <ReleaseTimelineDecorations itemOrderMode={props.itemOrderMode} />
-        <Box>
-          <TimelineGroups
-            groups={groups}
-            props={props}
-            reorderEnabled={reorder.reorderEnabled}
-            showHandleSlot={showHandleSlot}
-          />
-        </Box>
-        <WatchlistTimelineEndcap hasMore={props.hasMore} sentinelRef={ref} />
-      </Box>
-    </DndContext>
-  );
-}
-
-function TimelineGroups({
-  groups,
-  props,
-  reorderEnabled,
-  showHandleSlot,
-}: {
-  groups: WatchlistTimelineGroup[];
-  props: WatchlistTimelineProps;
-  reorderEnabled: boolean;
-  showHandleSlot: boolean;
-}) {
-  const groupProps = groups.map((group) => ({
-    key: group.year,
-    group,
-    unwatchedOnly: props.unwatchedOnly,
-    itemOrderMode: props.itemOrderMode,
-    interactionDisabled: Boolean(props.interactionDisabled),
-    reorderEnabled,
-    showHandleSlot,
-  }));
-  return groupProps.map(TimelineGroup);
-}
-
-function TimelineGroup({
-  key,
-  ...props
-}: React.ComponentProps<typeof WatchlistTimelineGroupSection> & {
-  key: string;
-}) {
-  return <WatchlistTimelineGroupSection key={key} {...props} />;
-}
-
 function EmptyWatchlistState() {
   return (
     <Flex
@@ -165,31 +158,15 @@ function EmptyWatchlistState() {
   );
 }
 
-function ReleaseTimelineDecorations({ itemOrderMode }: { itemOrderMode: WatchlistItemOrderMode }) {
-  if (itemOrderMode !== "release") {
-    return null;
-  }
-
-  return (
-    <>
-      <Box
-        position="absolute"
-        bottom={12}
-        left="26px"
-        top={6}
-        w="2px"
-        bg="border.default"
-        display={{ base: "block", md: "none" }}
-      />
-      <Box
-        position="absolute"
-        bottom={12}
-        left={8}
-        top={0}
-        w="2px"
-        bg="border.default"
-        display={{ base: "none", md: "block" }}
-      />
-    </>
-  );
+function readOnlyReorder(items: WatchlistItem[]) {
+  return {
+    displayedItems: items,
+    activeItem: null,
+    reorderEnabled: false,
+    sensors: undefined,
+    handleDragStart: undefined,
+    handleDragCancel: undefined,
+    handleDragEnd: undefined,
+    prepareDrop: undefined,
+  };
 }

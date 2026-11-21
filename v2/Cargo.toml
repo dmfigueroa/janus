@@ -19,6 +19,9 @@ sea-orm = { version = "=2.0.4", default-features = false, features = [
 ] }
 rmcp = { version = "=3.9.0", features = ["transport-streamable-http-server"] }
 
+[build-dependencies]
+sha2 = "0.10"
+
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"

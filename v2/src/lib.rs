@@ -1,6 +1,9 @@
+mod assets;
 mod database;
+pub use assets::{EmbeddedAsset, asset_url, static_assets};
 pub use database::open_database;
 mod features;
+mod http;
 
 use axum::{
     Router,
@@ -17,14 +20,16 @@ struct SetupMcp;
 impl rmcp::ServerHandler for SetupMcp {}
 
 pub fn router() -> Router {
-    base_router(false).nest_service(
-        "/v2/mcp",
-        StreamableHttpService::new(
-            || Ok(SetupMcp),
-            sessions(),
-            StreamableHttpServerConfig::default().with_json_response(true),
-        ),
-    )
+    base_router(false)
+        .nest_service(
+            "/v2/mcp",
+            StreamableHttpService::new(
+                || Ok(SetupMcp),
+                sessions(),
+                StreamableHttpServerConfig::default().with_json_response(true),
+            ),
+        )
+        .layer(axum::middleware::from_fn(http::revalidate_html))
 }
 
 fn base_router(database_ready: bool) -> Router {
@@ -45,42 +50,7 @@ fn base_router(database_ready: bool) -> Router {
                 }
             }),
         )
-        .route(
-            "/v2/static/app.css",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "text/css")],
-                    include_str!("../static/app.css"),
-                )
-            }),
-        )
-        .route(
-            "/v2/static/app.js",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "text/javascript")],
-                    include_str!("../static/app.js"),
-                )
-            }),
-        )
-        .route(
-            "/v2/static/vendor/htmx.min.js",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "text/javascript")],
-                    include_str!("../static/vendor/htmx.min.js"),
-                )
-            }),
-        )
-        .route(
-            "/v2/static/vendor/Sortable.min.js",
-            get(|| async {
-                (
-                    [(header::CONTENT_TYPE, "text/javascript")],
-                    include_str!("../static/vendor/Sortable.min.js"),
-                )
-            }),
-        )
+        .route("/v2/static/{*path}", get(assets::serve))
         .fallback(|| async { (StatusCode::NOT_FOUND, "Page not found") })
 }
 
@@ -88,10 +58,13 @@ fn base_router(database_ready: bool) -> Router {
 pub fn database_router(database: sea_orm::DatabaseConnection) -> Router {
     let state = features::watchlists::Watchlists(database);
     Router::new()
-        .route("/v2/watchlists", get(features::watchlists::web::list))
+        .route(
+            "/v2/watchlists",
+            get(features::watchlists::web::list).post(features::watchlists::web::create),
+        )
         .route(
             "/v2/watchlists/{id}",
-            get(features::watchlists::web::detail),
+            get(features::watchlists::web::detail).post(features::watchlists::web::update),
         )
         .route(
             "/v2/watchlists/{id}/reorder",
@@ -102,12 +75,13 @@ pub fn database_router(database: sea_orm::DatabaseConnection) -> Router {
         .nest_service(
             "/v2/mcp",
             StreamableHttpService::new(
-                move || Ok(features::watchlists::mcp::ReadMcp(state.clone())),
+                move || Ok(features::watchlists::mcp::WatchlistMcp(state.clone())),
                 sessions(),
                 StreamableHttpServerConfig::default().with_json_response(true),
             ),
         )
         .layer(axum::middleware::from_fn(mcp_compatibility))
+        .layer(axum::middleware::from_fn(http::revalidate_html))
 }
 
 fn sessions() -> Arc<LocalSessionManager> {
@@ -182,5 +156,8 @@ async fn legacy_json_response(response: axum::response::Response) -> axum::respo
 pub use features::watchlists::{
     ItemOrderMode, WatchlistDetail, WatchlistItem, WatchlistRecord, WatchlistStats,
     WatchlistSummary, Watchlists,
-    discovery::{DiscoveryError, DiscoveryOperation, DiscoveryRequest, SummaryPage},
+    discovery::{
+        DiscoveryError, DiscoveryOperation, DiscoveryRequest, GroupedTitle, ItemPage, ItemResults,
+        SummaryPage,
+    },
 };
