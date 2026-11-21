@@ -11,10 +11,11 @@
 
 - Prefer the repository's devcontainer because it provides the supported Node.js version and native build tools.
 - Start or create it with `devcontainer up --workspace-folder . --docker-path podman`.
-- Run project commands with `devcontainer exec --workspace-folder . --docker-path podman <command>`, for example `devcontainer exec --workspace-folder . --docker-path podman npm run lint`.
+- Run project commands with `devcontainer exec --workspace-folder . --docker-path podman <command>`, for example `devcontainer exec --workspace-folder . --docker-path podman pnpm run lint`.
 - When using Podman directly, locate the container with `podman ps -a --filter "label=devcontainer.local_folder=$(pwd)"` and confirm it belongs to the current checkout before using it.
 - Start the selected container if needed, then run commands with `podman exec --workdir /workspaces/janus <container> <command>`.
-- Never use an unrelated Toolbox or development container. Native Node modules such as `better-sqlite3` must run with the same Node.js ABI used when `npm install` compiled them.
+- Never use an unrelated Toolbox or development container. Native Node modules such as `better-sqlite3` must run with the same Node.js ABI used when `pnpm install` compiled them.
+- Enable Corepack (`corepack enable`) or install pnpm so the `packageManager` field in `package.json` resolves.
 - Host execution is supported only with Node.js 24.12 or later and the native compiler toolchain required by `better-sqlite3`.
 
 ## Git Conventions

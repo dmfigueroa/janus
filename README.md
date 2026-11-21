@@ -52,7 +52,7 @@ such as `better-sqlite3`.
 3. Install dependencies inside the devcontainer:
 
    ```bash
-   devcontainer exec --workspace-folder . --docker-path podman npm install
+   devcontainer exec --workspace-folder . --docker-path podman pnpm install
    ```
 
 4. Create `.env` in the repository root. `TMDB_API_KEY` is needed for TMDB search; the other provider
@@ -76,20 +76,21 @@ JANUS_CONTAINER="$(podman ps -a \
   --filter "label=devcontainer.local_folder=$(pwd)" \
   --format '{{.Names}}')"
 podman start "$JANUS_CONTAINER"
-podman exec --workdir /workspaces/janus "$JANUS_CONTAINER" npm test
+podman exec --workdir /workspaces/janus "$JANUS_CONTAINER" pnpm test
 ```
 
 Run `podman ps -a --filter "label=devcontainer.local_folder=$(pwd)"` to confirm that the selected
 container belongs to this checkout. Do not use an unrelated Toolbox or development container: native
-Node modules must be executed with the same Node.js ABI used when `npm install` compiled them.
+Node modules must be executed with the same Node.js ABI used when `pnpm install` compiled them.
 
 ### Host Installation
 
-Running directly on the host is also supported with Node.js 24.12 or later and the native compiler
-toolchain required by `better-sqlite3`:
+Running directly on the host is also supported with Node.js 24.12 or later, pnpm (via Corepack or a
+global install matching `packageManager` in `package.json`), and the native compiler toolchain
+required by `better-sqlite3`:
 
 ```bash
-npm install
+pnpm install
 ```
 
 ### Running Locally
@@ -97,7 +98,7 @@ npm install
 Start the development server:
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 Visit `http://localhost:3000` to see the app.
@@ -109,7 +110,7 @@ Janus uses Drizzle ORM with SQLite. The database file is created locally.
 - **View Database UI**:
 
   ```bash
-  npm run db:studio
+  pnpm run db:studio
   ```
 
   This opens Drizzle Studio, allowing you to visually manage your SQLite data.
@@ -117,13 +118,13 @@ Janus uses Drizzle ORM with SQLite. The database file is created locally.
 - **Lint & Format**:
 
   ```bash
-  npm run lint
-  npm run format
+  pnpm run lint
+  pnpm run format
   ```
 
 - **Run Tests**:
   ```bash
-  npm run test
+  pnpm run test
   ```
 
 ## 🚀 Deployment
@@ -131,13 +132,13 @@ Janus uses Drizzle ORM with SQLite. The database file is created locally.
 To build the application for production:
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 This will compile the application. You can preview the production build locally using:
 
 ```bash
-npm run preview
+pnpm run preview
 ```
 
 The Dockerfile under `.devcontainer/` is for development only; it is not a production deployment

@@ -14,9 +14,9 @@ cargo test --locked
 cargo build --locked --release
 ```
 
-Tests require root `npm ci` under a supported Node version because their disposable SQLite
-files are created by the actual v1 Drizzle migrator. Set `JANUS_TEST_NODE` to that Node
-executable when it differs from PATH. Node is a test fixture dependency only.
+Tests require root `pnpm install --frozen-lockfile` under a supported Node version because their
+disposable SQLite files are created by the actual v1 Drizzle migrator. Set `JANUS_TEST_NODE` to
+that Node executable when it differs from PATH. Node is a test fixture dependency only.
 
 `JANUS_V2_BIND` defaults to `127.0.0.1:3001`. `DATABASE_URL` is a required filesystem path,
 as in v1. Missing files, incompatible schema and unsupported stored values fail startup.
@@ -55,4 +55,4 @@ the shared web/MCP operation; other writes belong to following slices. See
 [PARITY.md](PARITY.md) for evidence and outstanding acceptance.
 
 Reorder DOM regression: `node --test v2/tests/reorder-browser.cjs` (Node 24.12 or later
-with npm dependencies).
+with pnpm dependencies).
