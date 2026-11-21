@@ -71,6 +71,7 @@ jobs:
         working-directory: .
       - run: cargo test --locked
       - name: Install browsers
+        working-directory: .
         run: pnpm exec playwright-core install --with-deps chromium webkit
       - name: Browser tests
         env:
