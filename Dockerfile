@@ -1,30 +1,35 @@
 FROM node:24.18.0-bookworm AS base
+RUN corepack enable
 
 # Install dependencies only when needed
 FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-# npm ci installs the Linux native oxc bindings from package-lock.json.
-RUN npm pkg delete scripts.prepare \
-  && npm ci
+COPY package.json pnpm-lock.yaml ./
+# Hoist so the copied node_modules tree matches the runner layout (no broken pnpm symlinks).
+RUN printf 'node-linker=hoisted\n' > .npmrc \
+  && pnpm pkg delete scripts.prepare \
+  && pnpm install --frozen-lockfile
 
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/.npmrc ./
 COPY . .
 ENV NITRO_PRESET=node-server
-RUN npm run build
-# Compile migration script using esbuild (bundled with vite, or npx)
-RUN npx esbuild src/db/Migrate.ts --bundle --platform=node --format=esm --outfile=.output/server/migrate.mjs --external:better-sqlite3 --external:drizzle-orm
+RUN pnpm run build
+# Compile migration script using esbuild
+RUN pnpm exec esbuild src/db/Migrate.ts --bundle --platform=node --format=esm --outfile=.output/server/migrate.mjs --external:better-sqlite3 --external:drizzle-orm
 
 # Production image, copy all the files and run next
 FROM base AS prod-deps
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY package.json pnpm-lock.yaml ./
 # Install production dependencies only
 # We use the full image (base) to ensure we have build tools for better-sqlite3
-RUN npm pkg delete scripts.prepare && npm ci --omit=dev
+RUN printf 'node-linker=hoisted\n' > .npmrc \
+  && pnpm pkg delete scripts.prepare \
+  && pnpm install --frozen-lockfile --prod
 
 FROM node:24.18.0-bookworm-slim AS runner
 WORKDIR /app
