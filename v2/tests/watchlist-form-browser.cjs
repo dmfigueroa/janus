@@ -42,40 +42,37 @@ function openPage() {
     };
   }
   window.eval(fs.readFileSync(path.join(root, "static/watchlist-dialog.js"), "utf8"));
-  return { dom, window };
+  const click = (element) =>
+    element.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+  const emit = (type, detail) =>
+    window.document.dispatchEvent(new window.CustomEvent(type, { bubbles: true, detail }));
+  return { dom, window, click, emit };
 }
 
 test("create dialog opens with focus on the name and restores the trigger on cancel", () => {
-  const { dom, window } = openPage();
+  const { dom, window, click } = openPage();
   const opener = window.document.getElementById("opener");
   opener.focus();
-  opener.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+  click(opener);
   const dialog = window.document.getElementById("watchlist-dialog");
   assert.equal(dialog.open, true);
   assert.equal(window.document.activeElement.id, "watchlist-name");
 
-  window.document
-    .querySelector("[data-watchlist-dialog-close]")
-    .dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+  click(window.document.querySelector("[data-watchlist-dialog-close]"));
   assert.equal(dialog.open, false);
   assert.equal(window.document.activeElement.id, "opener");
   dom.window.close();
 });
 
 test("saving closes the dialog and announces the v1 success message", () => {
-  const { dom, window } = openPage();
+  const { dom, window, click, emit } = openPage();
   const opener = window.document.getElementById("opener");
   opener.focus();
-  opener.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+  click(opener);
   window.document.getElementById("watchlist-name").value = "Created locally";
   window.document.getElementById("watchlist-dialog").setAttribute("aria-busy", "true");
 
-  window.document.dispatchEvent(
-    new window.CustomEvent("watchlist-saved", {
-      bubbles: true,
-      detail: { mode: "create", message: "Watchlist created successfully" },
-    }),
-  );
+  emit("watchlist-saved", { mode: "create", message: "Watchlist created successfully" });
   assert.equal(window.document.getElementById("watchlist-dialog").open, false);
   const notification = window.document.getElementById("notification");
   assert.equal(notification.hasAttribute("hidden"), false);
@@ -85,36 +82,21 @@ test("saving closes the dialog and announces the v1 success message", () => {
 });
 
 test("dialog requests expose pending state and focus replaced validation forms", () => {
-  const { dom, window } = openPage();
+  const { dom, window, click, emit } = openPage();
   const opener = window.document.getElementById("opener");
   opener.focus();
-  opener.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+  click(opener);
   const form = window.document.getElementById("watchlist-form");
-  window.document.dispatchEvent(
-    new window.CustomEvent("htmx:beforeRequest", {
-      bubbles: true,
-      detail: { elt: form },
-    }),
-  );
+  emit("htmx:beforeRequest", { elt: form });
   const dialog = window.document.getElementById("watchlist-dialog");
   assert.equal(dialog.getAttribute("aria-busy"), "true");
-  window.document.dispatchEvent(
-    new window.CustomEvent("htmx:afterRequest", {
-      bubbles: true,
-      detail: { elt: form, successful: false },
-    }),
-  );
+  emit("htmx:afterRequest", { elt: form, successful: false });
   assert.equal(dialog.hasAttribute("aria-busy"), false);
 
   const replacement = form.cloneNode(true);
   replacement.querySelector("#watchlist-form-error").textContent = "Name is required";
   form.replaceWith(replacement);
-  window.document.dispatchEvent(
-    new window.CustomEvent("htmx:afterSwap", {
-      bubbles: true,
-      detail: { target: replacement },
-    }),
-  );
+  emit("htmx:afterSwap", { target: replacement });
   assert.equal(window.document.activeElement.id, "watchlist-name");
   assert.equal(
     window.document.getElementById("watchlist-form-error").textContent,
@@ -123,53 +105,46 @@ test("dialog requests expose pending state and focus replaced validation forms",
   dom.window.close();
 });
 
-test("pending dialogs ignore close controls and cancel requests", () => {
-  const { dom, window } = openPage();
+test("out-of-band form swaps do not steal focus while the dialog is closed", () => {
+  const { dom, window, emit } = openPage();
   const opener = window.document.getElementById("opener");
   opener.focus();
-  opener.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+  const form = window.document.getElementById("watchlist-form");
+  const replacement = form.cloneNode(true);
+  form.replaceWith(replacement);
+  emit("htmx:afterSwap", { target: replacement });
+  assert.equal(window.document.activeElement.id, "opener");
+  dom.window.close();
+});
+
+test("pending dialogs ignore close controls and cancel requests", () => {
+  const { dom, window, click, emit } = openPage();
+  const opener = window.document.getElementById("opener");
+  opener.focus();
+  click(opener);
   const dialog = window.document.getElementById("watchlist-dialog");
   const form = window.document.getElementById("watchlist-form");
 
-  window.document.dispatchEvent(
-    new window.CustomEvent("htmx:beforeRequest", {
-      bubbles: true,
-      detail: { elt: form },
-    }),
-  );
+  emit("htmx:beforeRequest", { elt: form });
   const cancel = new window.Event("cancel", { bubbles: true, cancelable: true });
   dialog.dispatchEvent(cancel);
   assert.equal(cancel.defaultPrevented, true);
-  window.document
-    .querySelector("[data-watchlist-dialog-close]")
-    .dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+  click(window.document.querySelector("[data-watchlist-dialog-close]"));
   assert.equal(dialog.open, true);
 
-  window.document.dispatchEvent(
-    new window.CustomEvent("htmx:afterRequest", {
-      bubbles: true,
-      detail: { elt: form, successful: false },
-    }),
-  );
-  window.document
-    .querySelector("[data-watchlist-dialog-close]")
-    .dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+  emit("htmx:afterRequest", { elt: form, successful: false });
+  click(window.document.querySelector("[data-watchlist-dialog-close]"));
   assert.equal(dialog.open, false);
   dom.window.close();
 });
 
 test("light dismiss waits for a press and release outside the dialog", () => {
-  const { dom, window } = openPage();
+  const { dom, window, click } = openPage();
   const opener = window.document.getElementById("opener");
   opener.focus();
-  opener.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+  click(opener);
   const dialog = window.document.getElementById("watchlist-dialog");
-  dialog.getBoundingClientRect = () => ({
-    left: 100,
-    right: 300,
-    top: 100,
-    bottom: 400,
-  });
+  dialog.getBoundingClientRect = () => ({ left: 100, right: 300, top: 100, bottom: 400 });
   const pointer = (type, clientX, clientY) =>
     new window.PointerEvent(type, { bubbles: true, clientX, clientY });
 
@@ -185,22 +160,12 @@ test("light dismiss waits for a press and release outside the dialog", () => {
 });
 
 test("refreshed results return focus to the control that opened the dialog", () => {
-  const { dom, window } = openPage();
+  const { dom, window, click, emit } = openPage();
   const floating = window.document.getElementById("floating");
   floating.focus();
-  floating.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
-  window.document.dispatchEvent(
-    new window.CustomEvent("watchlist-saved", {
-      bubbles: true,
-      detail: { mode: "create", message: "Watchlist created successfully" },
-    }),
-  );
-  window.document.dispatchEvent(
-    new window.CustomEvent("htmx:afterSettle", {
-      bubbles: true,
-      detail: { target: { id: "watchlist-browse" } },
-    }),
-  );
+  click(floating);
+  emit("watchlist-saved", { mode: "create", message: "Watchlist created successfully" });
+  emit("htmx:afterSettle", { target: { id: "watchlist-browse" } });
   assert.equal(window.document.activeElement.id, "floating");
   dom.window.close();
 });
