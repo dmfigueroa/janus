@@ -82,7 +82,7 @@ class WatchlistDialog {
 
   onSwap = (event) => {
     const target = event.detail?.target;
-    if (!target) return;
+    if (!target || !this.dialog.open) return;
     const replacesForm = target.id === "watchlist-form";
     if (replacesForm || this.dialog.contains(target)) this.focusName();
   };

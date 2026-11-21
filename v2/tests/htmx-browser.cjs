@@ -93,3 +93,95 @@ test("real HTMX uses hx-get to recover from a failed save", () =>
     methods: ["POST", "GET"],
     status: "Current order restored. Check the order before trying again.",
   }));
+
+function detailPageHtml(mode) {
+  const modes = {
+    release: {
+      timelineHtml: '<div class="timeline"><h2>2020</h2><article data-item-id="1"></article></div>',
+      releaseChecked: "checked",
+      customChecked: "",
+    },
+    custom: {
+      timelineHtml: timeline([1, 2]),
+      releaseChecked: "",
+      customChecked: "checked",
+    },
+  };
+  const { timelineHtml, releaseChecked, customChecked } = modes[mode];
+  return `<main class="watchlist">
+      <button type="button" data-watchlist-dialog-open="edit" data-watchlist-dialog-trigger="header">Edit</button>
+      ${timelineHtml}
+    </main>
+    <span id="watchlist-refresh" hidden hx-get="" hx-trigger="watchlist-saved from:body" hx-target=".watchlist" hx-select=".watchlist" hx-select-oob="#watchlist-form" hx-swap="outerHTML"></span>
+    <p id="notification" role="status" hidden></p>
+    <dialog id="watchlist-dialog">
+      <form id="watchlist-form">
+        <input id="watchlist-name" name="name" value="MCU" />
+        <input type="radio" name="itemOrderMode" value="release" ${releaseChecked} />
+        <input type="radio" name="itemOrderMode" value="custom" ${customChecked} />
+      </form>
+    </dialog>`;
+}
+
+function patchDialogEnvironment(window) {
+  window.CSS = { escape: (value) => value };
+  const evaluate = window.XPathExpression.prototype.evaluate;
+  window.XPathExpression.prototype.evaluate = function (context, type, result) {
+    return evaluate.call(this, context, type ?? 0, result);
+  };
+  const prototype = window.HTMLDialogElement.prototype;
+  prototype.showModal = function showModal() {
+    this.open = true;
+    this.setAttribute("open", "");
+  };
+  prototype.close = function close() {
+    this.open = false;
+    this.removeAttribute("open");
+    this.dispatchEvent(new window.Event("close"));
+  };
+}
+
+test("real HTMX detail refresh updates timeline and edit dialog defaults via OOB swap", async () => {
+  const http = require("node:http");
+  const server = http.createServer((_, response) => {
+    response.writeHead(200, { "Content-Type": "text/html" });
+    response.end(detailPageHtml("custom"));
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const dom = new JSDOM(detailPageHtml("release"), {
+    url: `http://127.0.0.1:${server.address().port}/v2/watchlists/41?unwatched=false`,
+    runScripts: "outside-only",
+  });
+  try {
+    const { window } = dom;
+    patchDialogEnvironment(window);
+    window.eval(fs.readFileSync(path.join(root, "static/vendor/htmx.min.js"), "utf8"));
+    window.eval(fs.readFileSync(path.join(root, "static/watchlist-dialog.js"), "utf8"));
+    await new Promise((resolve) => window.setTimeout(resolve, 20));
+    const trigger = window.document.querySelector('[data-watchlist-dialog-open="edit"]');
+    trigger.focus();
+    trigger.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+    const settled = new Promise((resolve) =>
+      window.document.addEventListener("htmx:afterSettle", resolve, { once: true }),
+    );
+    window.document.body.dispatchEvent(
+      new window.CustomEvent("watchlist-saved", {
+        bubbles: true,
+        detail: { mode: "edit", message: "Changes saved successfully" },
+      }),
+    );
+    await settled;
+    await new Promise((resolve) => window.setTimeout(resolve, 20));
+    assert.ok(window.document.querySelector("watchlist-reorder"));
+    assert.equal(window.document.getElementById("watchlist-dialog").open, false);
+    assert.equal(window.document.activeElement.getAttribute("data-watchlist-dialog-open"), "edit");
+    window.document.activeElement.dispatchEvent(
+      new window.MouseEvent("click", { bubbles: true, cancelable: true }),
+    );
+    assert.equal(window.document.querySelector('input[value="custom"]').checked, true);
+    assert.equal(window.document.querySelector('input[value="release"]').checked, false);
+  } finally {
+    dom.window.close();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

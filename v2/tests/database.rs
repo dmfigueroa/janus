@@ -2214,3 +2214,542 @@ async fn mcp_update_watchlists_preserves_custom_ranks_across_order_modes() {
         vec![(102, Some(1)), (101, Some(2)), (103, None)]
     );
 }
+
+#[tokio::test]
+async fn order_mode_transitions_preserve_tie_breaks_mixed_ranks_rollback_and_v1_reads() {
+    let fixture = Fixture::v1();
+    change_v1(&fixture, "release-tie-breaks");
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let schema_before = schema_snapshot(&database).await;
+    let lists = janus_v2::Watchlists(database.clone());
+    let app = janus_v2::database_router(database.clone());
+
+    let initial = lists.detail(41).await.unwrap().unwrap();
+    assert_eq!(
+        initial.watchlist.watchlist.item_order_mode,
+        janus_v2::ItemOrderMode::Release
+    );
+    assert_eq!(
+        initial.items.iter().map(|item| item.id).collect::<Vec<_>>(),
+        vec![101, 104, 102, 106, 103, 105]
+    );
+
+    let to_custom = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"itemOrderMode":"custom"}).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_custom.status(), StatusCode::OK);
+
+    let custom = lists.detail(41).await.unwrap().unwrap();
+    assert_eq!(
+        custom
+            .items
+            .iter()
+            .map(|item| (item.id, item.custom_rank))
+            .collect::<Vec<_>>(),
+        vec![
+            (101, Some(1)),
+            (104, Some(2)),
+            (102, Some(3)),
+            (106, Some(4)),
+            (103, Some(5)),
+            (105, Some(6)),
+        ]
+    );
+
+    let reorder = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41/reorder")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"movedItemId":105,"referenceItemId":101,"position":"before"})
+                        .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(reorder.status(), StatusCode::OK);
+
+    let to_release = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"itemOrderMode":"release"}).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_release.status(), StatusCode::OK);
+
+    change_v1(&fixture, "add-unranked-in-release");
+    let release_with_new = lists.detail(41).await.unwrap().unwrap();
+    assert_eq!(
+        release_with_new
+            .items
+            .iter()
+            .map(|item| item.id)
+            .collect::<Vec<_>>(),
+        vec![107, 101, 104, 102, 106, 103, 105]
+    );
+
+    let back_to_custom = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"itemOrderMode":"custom"}).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(back_to_custom.status(), StatusCode::OK);
+
+    let mixed_custom = lists.detail(41).await.unwrap().unwrap();
+    assert_eq!(
+        mixed_custom
+            .items
+            .iter()
+            .map(|item| (item.id, item.custom_rank))
+            .collect::<Vec<_>>(),
+        vec![
+            (105, Some(1)),
+            (101, Some(2)),
+            (104, Some(3)),
+            (102, Some(4)),
+            (106, Some(5)),
+            (103, Some(6)),
+            (107, None),
+        ]
+    );
+    assert_eq!(schema_before, schema_snapshot(&database).await);
+    change_v1(&fixture, "check-order-mode-v1-read");
+
+    let rollback_fixture = Fixture::v1();
+    change_v1(&rollback_fixture, "release-no-ranks");
+    change_v1(&rollback_fixture, "reject-rank");
+    let rollback_database = janus_v2::open_database(&rollback_fixture.0).await.unwrap();
+    let rollback_lists = janus_v2::Watchlists(rollback_database.clone());
+    let rollback_app = janus_v2::database_router(rollback_database);
+    let before_rollback = rollback_lists.detail(41).await.unwrap().unwrap();
+
+    let failed_switch = rollback_app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"itemOrderMode":"custom"}).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(failed_switch.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(
+        serde_json::from_str::<Value>(&body(failed_switch).await).unwrap()["code"],
+        "internal_error"
+    );
+    assert_eq!(
+        rollback_lists.detail(41).await.unwrap().unwrap(),
+        before_rollback
+    );
+}
+
+#[tokio::test]
+async fn web_order_mode_changes_reconcile_filters_grouping_reorder_and_validation() {
+    let fixture = Fixture::v1();
+    change_v1(&fixture, "release-tie-breaks");
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let app = janus_v2::database_router(database);
+
+    let invalid_json = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"itemOrderMode":"alphabetical"}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(invalid_json.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        serde_json::from_str::<Value>(&body(invalid_json).await).unwrap(),
+        json!({
+            "success": false,
+            "code": "validation_error",
+            "message": "Invalid order mode.",
+            "watchlistId": 41
+        })
+    );
+
+    let invalid_htmx = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41")
+                .header("hx-request", "true")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from("name=Keep+Name&itemOrderMode=alphabetical"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(invalid_htmx.status(), StatusCode::OK);
+    let invalid_html = body(invalid_htmx).await;
+    assert!(
+        invalid_html.contains("Invalid order mode."),
+        "{invalid_html}"
+    );
+    assert!(
+        !invalid_html.contains("aria-invalid=\"true\""),
+        "{invalid_html}"
+    );
+
+    let release_page = body(
+        app.clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/v2/watchlists/41?query=A%20Show&unwatched=true")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(release_page.contains("hx-select-oob=\"#watchlist-form\""));
+    assert!(release_page.contains("value=\"A Show\""));
+    assert!(release_page.contains("<h2>2020</h2>"));
+    assert!(release_page.contains("<h2>2021</h2>"));
+    assert_eq!(
+        release_page
+            .matches("<details class=\"watched-run\">")
+            .count(),
+        2
+    );
+    assert!(release_page.contains("<div class=\"timeline\">"));
+    assert!(!release_page.contains("<watchlist-reorder"));
+    assert!(!release_page.contains("reorder-handle"));
+
+    let blocked_reorder = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41/reorder")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"movedItemId":104,"referenceItemId":101,"position":"before"})
+                        .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&body(blocked_reorder).await).unwrap()["code"],
+        "not_custom_mode"
+    );
+
+    let to_custom = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41")
+                .header("hx-request", "true")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from("name=Caf%C3%A9&itemOrderMode=custom"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_custom.status(), StatusCode::NO_CONTENT);
+
+    let custom_page = body(
+        app.clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/v2/watchlists/41?query=A%20Show&unwatched=true")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(custom_page.contains("value=\"A Show\""));
+    assert!(!custom_page.contains("<h2>2020</h2>"));
+    assert!(!custom_page.contains("<h2>2021</h2>"));
+    assert_eq!(
+        custom_page
+            .matches("<details class=\"watched-run\">")
+            .count(),
+        1
+    );
+    assert!(custom_page.contains("2 watched items"));
+    assert!(custom_page.contains("<watchlist-reorder"));
+    assert!(custom_page.contains("reorder-handle"));
+    assert!(custom_page.contains("value=\"custom\""));
+    assert!(
+        custom_page.find("data-item-id=\"101\"").unwrap()
+            < custom_page.find("data-item-id=\"104\"").unwrap()
+    );
+
+    let reorder = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41/reorder")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"movedItemId":104,"referenceItemId":101,"position":"before"})
+                        .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&body(reorder).await).unwrap()["success"],
+        true
+    );
+
+    let reordered_page = body(
+        app.clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/v2/watchlists/41?query=A%20Show&unwatched=false")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap(),
+    )
+    .await;
+    assert!(
+        reordered_page.find("data-item-id=\"104\"").unwrap()
+            < reordered_page.find("data-item-id=\"101\"").unwrap()
+    );
+    assert!(!reordered_page.contains("<details class=\"watched-run\">"));
+
+    let back_to_release = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"itemOrderMode":"release"}).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(back_to_release.status(), StatusCode::OK);
+
+    let restored_release_page = body(
+        app.oneshot(
+            Request::builder()
+                .uri("/v2/watchlists/41?query=A%20Show&unwatched=false")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap(),
+    )
+    .await;
+    assert!(restored_release_page.contains("<h2>2020</h2>"));
+    assert!(restored_release_page.contains("<div class=\"timeline\">"));
+    assert!(!restored_release_page.contains("<watchlist-reorder"));
+    assert!(
+        restored_release_page.find("data-item-id=\"101\"").unwrap()
+            < restored_release_page.find("data-item-id=\"104\"").unwrap()
+    );
+}
+
+#[tokio::test]
+async fn mcp_order_mode_contracts_validate_inputs_preserve_batches_and_sync_reads() {
+    let fixture = Fixture::v1();
+    change_v1(&fixture, "release-tie-breaks");
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let app = janus_v2::database_router(database);
+    let initialized = rpc(
+        &app,
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"order-mode-contract","version":"1"}}}),
+        None,
+    )
+    .await;
+    let session = initialized.headers()["mcp-session-id"]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let _ = result(initialized).await;
+
+    for invalid_mode in [json!("sideways"), Value::Null] {
+        let malformed = rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"update_watchlists","arguments":{"watchlists":[{"watchlistId":41,"itemOrderMode":invalid_mode}]}}}),
+            Some(&session),
+        )
+        .await;
+        let payload: Value = serde_json::from_str(&body(malformed).await).unwrap();
+        assert_eq!(payload["error"]["code"], -32602, "{payload}");
+    }
+
+    let before_get = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_watchlist","arguments":{"watchlistId":41}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    let release_token = before_get["structuredContent"]["orderToken"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert_eq!(
+        before_get["structuredContent"]["watchlist"]["itemOrderMode"],
+        "release"
+    );
+
+    let batch = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"update_watchlists","arguments":{"watchlists":[
+                {"watchlistId":41,"itemOrderMode":"custom"},
+                {"watchlistId":999999,"itemOrderMode":"custom"},
+                {"watchlistId":41}
+            ]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    let results = batch["structuredContent"]["results"].as_array().unwrap();
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0]["code"], "updated");
+    assert_eq!(results[1]["code"], "not_found");
+    assert_eq!(results[1]["watchlistId"], 999999);
+    assert_eq!(results[2]["code"], "validation_error");
+    assert_eq!(results[2]["message"], "No fields to update.");
+
+    let after_custom_get = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_watchlist","arguments":{"watchlistId":41}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        after_custom_get["structuredContent"]["watchlist"]["itemOrderMode"],
+        "custom"
+    );
+    assert_ne!(
+        after_custom_get["structuredContent"]["orderToken"]
+            .as_str()
+            .unwrap(),
+        release_token
+    );
+
+    let reorder_in_custom = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"reorder_watchlist_items","arguments":{"reorders":[{"watchlistId":41,"movedItemId":105,"referenceItemId":101,"position":"before"}]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        reorder_in_custom["structuredContent"]["results"][0]["code"],
+        "reordered"
+    );
+
+    let custom_after_reorder = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"get_watchlist","arguments":{"watchlistId":41}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        custom_after_reorder["structuredContent"]["watchlist"]["stats"]["nextUnwatched"]["id"],
+        105
+    );
+
+    let switch_release = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"update_watchlists","arguments":{"watchlists":[{"watchlistId":41,"itemOrderMode":"release"}]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        switch_release["structuredContent"]["results"][0]["code"],
+        "updated"
+    );
+
+    let after_release_get = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"get_watchlist","arguments":{"watchlistId":41}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        after_release_get["structuredContent"]["watchlist"]["stats"]["nextUnwatched"]["id"],
+        101
+    );
+    assert_eq!(
+        after_release_get["structuredContent"]["orderToken"]
+            .as_str()
+            .unwrap(),
+        release_token
+    );
+
+    let reorder_in_release = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"reorder_watchlist_items","arguments":{"reorders":[{"watchlistId":41,"movedItemId":105,"referenceItemId":101,"position":"before"}]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        reorder_in_release["structuredContent"]["results"][0]["code"],
+        "not_custom_mode"
+    );
+}

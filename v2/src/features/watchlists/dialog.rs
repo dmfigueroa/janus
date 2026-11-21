@@ -40,7 +40,7 @@ impl WatchlistForm {
     }
 
     pub fn name_invalid(&self) -> bool {
-        self.error.is_some()
+        self.error.as_deref() == Some("Name is required")
     }
 
     pub fn release_selected(&self) -> bool {
@@ -483,5 +483,31 @@ mod tests {
             rejection.form.error.as_deref(),
             Some("Watchlist not found.")
         );
+        assert!(!rejection.form.name_invalid());
+    }
+
+    #[test]
+    fn name_invalid_only_flags_name_validation_errors() {
+        let record = record();
+        let blank_name = submit(
+            DialogTarget::Edit(&record),
+            &input(Some(Some("   ")), None, None),
+        )
+        .unwrap_err();
+        assert!(blank_name.form.name_invalid());
+
+        let bad_mode = submit(
+            DialogTarget::Edit(&record),
+            &input(Some(Some("Valid")), None, Some(Some("shuffled"))),
+        )
+        .unwrap_err();
+        assert!(!bad_mode.form.name_invalid());
+
+        let internal = rejected(
+            DialogTarget::Edit(&record),
+            &input(Some(Some("Valid")), None, Some(Some("custom"))),
+            DialogFailure::Internal,
+        );
+        assert!(!internal.form.name_invalid());
     }
 }
