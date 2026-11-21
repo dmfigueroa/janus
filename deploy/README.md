@@ -57,7 +57,7 @@ resources when previews are enabled:
 
 The v2 preview runs the separate Rust application, not a V1 route. A V1 404 on `/v2`
 means the v2 preview is missing, unhealthy or not routed; debug the v2 container rather
-than the V1 router. The local `npm run dev` proxy is a convenience only and is not evidence
+than the V1 router. The local `pnpm run dev` proxy is a convenience only and is not evidence
 about a Coolify preview.
 
 Inspect the preview resources, then the v2 image and container:
@@ -100,6 +100,6 @@ Behavior:
 Local run against a disposable database:
 
 ```bash
-SEED_ON_STARTUP=true DATABASE_URL=/tmp/janus-preview.sqlite npm run migrate
-SEED_ON_STARTUP=true DATABASE_URL=/tmp/janus-preview.sqlite npm run seed
+SEED_ON_STARTUP=true DATABASE_URL=/tmp/janus-preview.sqlite pnpm run migrate
+SEED_ON_STARTUP=true DATABASE_URL=/tmp/janus-preview.sqlite pnpm run seed
 ```

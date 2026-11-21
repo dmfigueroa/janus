@@ -32,7 +32,7 @@ impl Fixture {
             .unwrap();
         assert!(
             status.success(),
-            "v1 fixture creation requires installed npm dependencies and the supported Node ABI"
+            "v1 fixture creation requires installed pnpm dependencies and the supported Node ABI"
         );
         fixture
     }

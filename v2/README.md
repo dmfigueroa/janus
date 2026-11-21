@@ -18,8 +18,8 @@ cargo build --locked --release
 
 For visual work, start from [V1-UI-MAP.md](V1-UI-MAP.md) to find the v1 reference component
 and v2 template/styles for a UI area, then record evidence in [PARITY.md](PARITY.md).
-`npm run preview:local` seeds a disposable database, builds and starts
-the v2 process, and starts the v1 dev server. It prints both local URLs. During `npm run dev`
+`pnpm run preview:local` seeds a disposable database, builds and starts
+the v2 process, and starts the v1 dev server. It prints both local URLs. During `pnpm run dev`
 from the repository root, Nitro proxies `/v2` and `/v2/**` to `127.0.0.1:3001`, so the v1 dev
 server can preview the separate v2 process at `http://localhost:3000/v2`. This development
 proxy is not part of the production v1 bundle; deployment routing remains the separate
@@ -28,9 +28,9 @@ Traefik/Coolify service.
 Compare the two UIs with Playwright screenshots after `preview:local`:
 
 ```sh
-npm run visual:compare -- --route /watchlists
-npm run visual:compare -- --route /watchlists --click "Create New List"
-npm run visual:compare -- --route /watchlists/1 \
+pnpm run visual:compare -- --route /watchlists
+pnpm run visual:compare -- --route /watchlists --click "Create New List"
+pnpm run visual:compare -- --route /watchlists/1 \
   --scroll 600 \
   --click-v1 "button=Watchlist actions" \
   --click-v1 "menuitem=Edit watchlist" \
@@ -46,7 +46,7 @@ versions, or use `--click-v1` and `--click-v2` for version-specific controls. A
 page before clicking, `--wait` holds until a selector is visible, and `--assert-in-viewport`
 fails when the selector leaves the viewport. Inspect both images rather than relying on
 measured values alone. If no Chromium build is available, run
-`npx playwright-core install chromium` once (or set `PLAYWRIGHT_CHROMIUM` to an existing
+`pnpm exec playwright-core install chromium` once (or set `PLAYWRIGHT_CHROMIUM` to an existing
 executable).
 
 ### Parity layout rule
@@ -61,8 +61,8 @@ both versions have been measured, and when rendered geometry disagrees with sour
 geometry wins. Record the route, viewports and measurement or screenshot paths in
 [PARITY.md](PARITY.md) as the evidence for the claim.
 
-Tests require root `npm ci` under a supported Node version because their disposable SQLite
-files are created by the actual v1 Drizzle migrator. From the repository root, `npm run test:v2`
+Tests require root `pnpm install --frozen-lockfile` under a supported Node version because their disposable SQLite
+files are created by the actual v1 Drizzle migrator. From the repository root, `pnpm run test:v2`
 runs `cargo test --locked` under the `.tool-versions` Node (through `tools/pinned-node.sh`), so
 the fixture tests find that Node on `PATH` and need no manual `JANUS_TEST_NODE`; extra arguments
 are appended to the cargo command. Set `JANUS_TEST_NODE` yourself to override that choice, and
@@ -120,7 +120,7 @@ the page or fragment with no Axum or database access, leaving HTTP extraction, c
 negotiation, failures and response selection in the web adapter. Focused unit tests cover
 title matching, release years and missing dates, poster resolution, custom/release ordering,
 watched runs spanning years, empty results and unwatched-only filtering; HTTP regressions
-remain covered by the fixture-backed `cargo test` suite, and `npm run test:v2:dom` covers the
+remain covered by the fixture-backed `cargo test` suite, and `pnpm run test:v2:dom` covers the
 HTMX and reorder DOM behavior.
 
 Custom-order detail pages render their timeline as a Light DOM `<watchlist-reorder>` element.
@@ -169,12 +169,12 @@ dialog and form styles are scoped to the native dialog. Web dialogs validate, an
 pending/failed requests, restore focus and refresh their list or detail surface through HTMX.
 See [PARITY.md](PARITY.md) for evidence and outstanding acceptance.
 
-V2 DOM regressions: `npm run test:v2:dom` runs `v2/tests/htmx-browser.cjs` and
+V2 DOM regressions: `pnpm run test:v2:dom` runs `v2/tests/htmx-browser.cjs` and
 `v2/tests/reorder-browser.cjs` with Node's test runner. The suites use jsdom to exercise real
 HTMX requests and swaps, optimistic keyboard reorder, drop anchors, blocked swaps during drags
 and saves, failed-save reconciliation, and filter/scroll/focus restoration. They need the
-`.tool-versions` Node (`bash tools/pinned-node.sh npm run test:v2:dom` on the host) and root
-`npm ci`, but no downloaded browser. Every pull request runs the same command in the "V2 DOM
+`.tool-versions` Node (`bash tools/pinned-node.sh pnpm run test:v2:dom` on the host) and root
+`pnpm install --frozen-lockfile`, but no downloaded browser. Every pull request runs the same command in the "V2 DOM
 Tests" job, so a failing DOM regression fails the check.
 Dialog DOM regression: `node --test v2/tests/watchlist-form-browser.cjs`.
 Dialog viewport layout: `node --test v2/tests/dialog-layout-browser.cjs` (requires Chromium;
@@ -187,13 +187,13 @@ fails with measured and expected values when footer items leave one row or drift
 the grid loses its two mobile or four desktop columns, a card exceeds the 220px cap, or the
 visible "Watchlists" heading regresses. Expected values come from
 `v2/tests/v1-layout-baseline.json`, recorded from the v1 home. To refresh that baseline, start
-`npm run preview:local` in another terminal and run
+`pnpm run preview:local` in another terminal and run
 `JANUS_LAYOUT_RECORD=1 node --test v2/tests/layout-browser.cjs` (set `JANUS_V1_BASE_URL` for a
 different v1 address). It needs Chromium: install it once with
-`npx playwright-core install chromium` or point `PLAYWRIGHT_CHROMIUM` at an existing executable.
+`pnpm exec playwright-core install chromium` or point `PLAYWRIGHT_CHROMIUM` at an existing executable.
 
 Watchlists home layout: `node --test v2/tests/watchlists-home-browser.cjs` (also
-`npm run test:v2:home`). It boots the same disposable fixture database and v2
+`pnpm run test:v2:home`). It boots the same disposable fixture database and v2
 process, then renders `/v2/watchlists` at `320x568`, `390x844`, `768x1024` and `1280x800`. It
 fails with measured and expected values when the grid density per width (two phone columns and
 four tablet/desktop columns, with the expected rows), horizontal overflow, a sort control, the
@@ -202,5 +202,5 @@ field regresses. Failed viewports write full-page screenshots to
 `v2/tests/artifacts/watchlists-home` (override the directory with `JANUS_VISUAL_ARTIFACTS`), and
 CI uploads them as artifacts. The check launches only the Chromium build pinned by the
 checked-in `playwright-core` version, so install exactly that build once with
-`npx playwright-core install chromium`; it does not use whichever cached Playwright browser or
+`pnpm exec playwright-core install chromium`; it does not use whichever cached Playwright browser or
 in-app browser connection is available.

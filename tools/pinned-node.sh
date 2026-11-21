@@ -8,7 +8,7 @@
 # in AGENTS.md.
 #
 # Usage: bash tools/pinned-node.sh <command> [arguments...]
-# Example: bash tools/pinned-node.sh npm ci
+# Example: bash tools/pinned-node.sh pnpm install --frozen-lockfile
 
 set -euo pipefail
 

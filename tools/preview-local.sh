@@ -5,7 +5,7 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
 if [ ! -d node_modules/drizzle-orm ] || [ ! -d node_modules/.bin ]; then
-  printf 'Root dependencies are missing. Run npm ci from %s.\n' "$root" >&2
+  printf 'Root dependencies are missing. Run pnpm install from %s.\n' "$root" >&2
   exit 1
 fi
 
@@ -39,8 +39,8 @@ wait_for_url() {
   return 1
 }
 
-DATABASE_URL="$database" SEED_ON_STARTUP=true npx -y tsx src/db/Migrate.ts
-DATABASE_URL="$database" SEED_ON_STARTUP=true npx -y tsx src/db/Seed.ts
+DATABASE_URL="$database" SEED_ON_STARTUP=true pnpm dlx tsx src/db/Migrate.ts
+DATABASE_URL="$database" SEED_ON_STARTUP=true pnpm dlx tsx src/db/Seed.ts
 
 (cd v2 && cargo build --locked --release)
 (
@@ -49,7 +49,7 @@ DATABASE_URL="$database" SEED_ON_STARTUP=true npx -y tsx src/db/Seed.ts
 ) &
 v2_pid=$!
 
-DATABASE_URL="$database" npm run dev &
+DATABASE_URL="$database" pnpm run dev &
 v1_pid=$!
 
 wait_for_url "v2" "http://127.0.0.1:3001/v2/health/live" "$v2_pid"

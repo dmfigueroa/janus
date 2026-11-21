@@ -2,18 +2,20 @@
 
 # Node 24 with the native toolchain needed to install the better-sqlite3 addon.
 FROM node:24.18.0-bookworm AS base
+RUN corepack enable
 
 # ---------------------------------------------------------------------------
 # deps — install the full dependency tree once. This layer is keyed only on the
-# manifests, so it stays cached until package.json / package-lock.json change.
+# manifests, so it stays cached until package.json / pnpm-lock.yaml change.
 # ---------------------------------------------------------------------------
 FROM base AS deps
 WORKDIR /app
-COPY package.json package-lock.json ./
-# npm ci installs the Linux native oxc & better-sqlite3 bindings from the lock.
-RUN --mount=type=cache,target=/root/.npm \
-  npm pkg delete scripts.prepare \
-  && npm ci --no-audit --no-fund
+COPY package.json pnpm-lock.yaml ./
+# Keep the default isolated linker for the build graph. Hoisting here can flatten
+# mismatched TanStack copies and break Nitro's SSR bundle imports.
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+  pnpm pkg delete scripts.prepare \
+  && pnpm install --frozen-lockfile
 
 # ---------------------------------------------------------------------------
 # builder — build the Nitro node-server output plus standalone migration/seed
@@ -24,10 +26,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NITRO_PRESET=node-server
-RUN npm run build
-# Compile migration and seed scripts using esbuild (bundled with vite).
-RUN npx esbuild src/db/Migrate.ts --bundle --platform=node --format=esm --outfile=.output/server/migrate.mjs --external:better-sqlite3 --external:drizzle-orm \
-  && npx esbuild src/db/Seed.ts --bundle --platform=node --format=esm --outfile=.output/server/seed.mjs --external:better-sqlite3 --external:drizzle-orm
+RUN pnpm run build
+# Compile migration and seed scripts using esbuild.
+RUN pnpm exec esbuild src/db/Migrate.ts --bundle --platform=node --format=esm --outfile=.output/server/migrate.mjs --external:better-sqlite3 --external:drizzle-orm \
+  && pnpm exec esbuild src/db/Seed.ts --bundle --platform=node --format=esm --outfile=.output/server/seed.mjs --external:better-sqlite3 --external:drizzle-orm
 
 # ---------------------------------------------------------------------------
 # prod-deps — install only the runtime packages the bundled server and the
@@ -36,12 +38,17 @@ RUN npx esbuild src/db/Migrate.ts --bundle --platform=node --format=esm --outfil
 # ---------------------------------------------------------------------------
 FROM base AS prod-deps
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY package.json pnpm-lock.yaml ./
 # Rebuild a minimal manifest pinned to the exact versions in the lockfile, then
 # install just those two packages (and their transitive dependencies).
-RUN --mount=type=cache,target=/root/.npm \
-  node -e "const l=require('./package-lock.json').packages; const p={name:'janus-runtime',private:true,type:'module',dependencies:{'better-sqlite3':l['node_modules/better-sqlite3'].version,'drizzle-orm':l['node_modules/drizzle-orm'].version}}; require('fs').writeFileSync('package.json',JSON.stringify(p,null,2))" \
-  && npm install --omit=dev --no-audit --no-fund
+# Hoist only this stage so the runner can COPY a flat node_modules tree.
+# Keep packageManager + onlyBuiltDependencies so Corepack stays on pnpm 10 and
+# better-sqlite3's native install script is allowed (pnpm blocks builds by default).
+RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
+  printf 'node-linker=hoisted\n' > .npmrc \
+  && node -e "const fs=require('fs'); const lock=fs.readFileSync('pnpm-lock.yaml','utf8'); const ver=(name)=>{ const m=lock.match(new RegExp('^  '+name+'@([^:\\\\s]+):','m')); if(!m) throw new Error('missing '+name+' in pnpm-lock.yaml'); return m[1]; }; const root=JSON.parse(fs.readFileSync('package.json','utf8')); fs.writeFileSync('package.json', JSON.stringify({name:'janus-runtime',private:true,type:'module',packageManager:root.packageManager,dependencies:{'better-sqlite3':ver('better-sqlite3'),'drizzle-orm':ver('drizzle-orm')},pnpm:{onlyBuiltDependencies:['better-sqlite3']}}, null, 2));" \
+  && rm -f pnpm-lock.yaml \
+  && pnpm install --prod
 
 # ---------------------------------------------------------------------------
 # runner — slim image with only the compiled output, migrations, and minimal

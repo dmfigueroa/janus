@@ -15,16 +15,17 @@
 
 ### Devcontainer (primary path)
 
-- Run commands inside the repository devcontainer: start it with `devcontainer up --workspace-folder . --docker-path podman`, then run commands with `devcontainer exec --workspace-folder . --docker-path podman <command>`.
+- Run commands inside the repository devcontainer: start it with `devcontainer up --workspace-folder . --docker-path podman`, then run commands with `devcontainer exec --workspace-folder . --docker-path podman <command>` (for example `pnpm run lint`).
 - When using Podman directly, locate the container with `podman ps -a --filter "label=devcontainer.local_folder=$(pwd)"`, confirm it belongs to the current checkout, then run commands with `podman exec --workdir /workspaces/janus <container> <command>`. Never use an unrelated Toolbox or development container.
 - If the Dev Container CLI is missing or `devcontainer up` fails, use the host path below instead of retrying the container. Do not use a bare host `node`.
+- Enable Corepack (`corepack enable`) or install pnpm so the `packageManager` field in `package.json` resolves.
 
 ### Host toolchain (fallback path)
 
-- Run every host command through `bash tools/pinned-node.sh <command>`, which runs it under the `.tool-versions` Node (`node@24.18.0`) via `mise exec`. For example `bash tools/pinned-node.sh npm ci`. This path needs only `mise`, a C toolchain for `better-sqlite3` and the Rust toolchain; it is verified to work on the agent host.
-- Never run a bare `node` or `npm` on the host: the default shell can resolve a newer major such as `26.2.0`, which is outside `engines` (`>=24.12 <26`) and has no `better-sqlite3` prebuilt binary, so `npm ci` fails on the native-module ABI.
-- Run root `bash tools/pinned-node.sh npm ci` once per checkout before v2 tests and never borrow another checkout's `node_modules`.
-- Run the v2 Rust tests with `npm run test:v2`, which uses the same wrapper and forwards arguments to `cargo test --locked`, so the Node fixtures need no manual `JANUS_TEST_NODE`. Run `cargo test` directly only through the wrapper: `bash tools/pinned-node.sh cargo test --manifest-path v2/Cargo.toml --locked`. If you set `JANUS_TEST_NODE` yourself, point it at the pinned binary from `bash tools/pinned-node.sh node -p process.execPath`, otherwise the fixture tests spawn a different Node ABI.
+- Run every host command through `bash tools/pinned-node.sh <command>`, which runs it under the `.tool-versions` Node (`node@24.18.0`) via `mise exec`. For example `bash tools/pinned-node.sh pnpm install --frozen-lockfile`. This path needs only `mise`, a C toolchain for `better-sqlite3` and the Rust toolchain; it is verified to work on the agent host.
+- Never run a bare `node` or `pnpm` on the host: the default shell can resolve a newer major such as `26.2.0`, which is outside `engines` (`>=24.12 <26`) and has no `better-sqlite3` prebuilt binary, so installs fail on the native-module ABI.
+- Run root `bash tools/pinned-node.sh pnpm install --frozen-lockfile` once per checkout before v2 tests and never borrow another checkout's `node_modules`.
+- Run the v2 Rust tests with `pnpm run test:v2`, which uses the same wrapper and forwards arguments to `cargo test --locked`, so the Node fixtures need no manual `JANUS_TEST_NODE`. Run `cargo test` directly only through the wrapper: `bash tools/pinned-node.sh cargo test --manifest-path v2/Cargo.toml --locked`. If you set `JANUS_TEST_NODE` yourself, point it at the pinned binary from `bash tools/pinned-node.sh node -p process.execPath`, otherwise the fixture tests spawn a different Node ABI.
 
 ## Docker Build Context
 
@@ -104,7 +105,7 @@ skills:
 
 <!-- intent-skills:end -->
 
-Regenerate the mappings above with `npx @tanstack/intent install`. Keep each `load` indented under its own `task` item and keep the blank line before the end marker, otherwise `oxfmt` dedents the final `load` and the mapping stops resolving. `npm run check:agents` verifies the block and runs as part of `npm run lint`.
+Regenerate the mappings above with `pnpm dlx @tanstack/intent install`. Keep each `load` indented under its own `task` item and keep the blank line before the end marker, otherwise `oxfmt` dedents the final `load` and the mapping stops resolving. `pnpm run check:agents` verifies the block and runs as part of `pnpm run lint`.
 
 ## Agent skills
 
@@ -126,8 +127,8 @@ Before writing new Rust or reviewing Rust changes under `v2/`, load the `rust-be
 
 ## V2 Frontend
 
-- All first-party V2 browser JavaScript is loaded as ES modules. Enforcement: `npm run check:v2-modules` requires every `v2/static/*.js` asset to have a matching `type="module"` script entry in a template.
+- All first-party V2 browser JavaScript is loaded as ES modules. Enforcement: `pnpm run check:v2-modules` requires every `v2/static/*.js` asset to have a matching `type="module"` script entry in a template.
 - Use relative units and Open Props tokens for spacing, type and sizing. Add fixed units only where the browser requires them, such as hairline borders.
-- Before changing V2 visuals, run `npm run preview:local` and compare local v1 and v2 screenshots with `npm run visual:compare -- --route /watchlists`; inspect both images, and never use a Coolify preview as the development loop. Measure both versions at `390x844` and `1280x800` before offering any layout option or parity claim (see [`v2/README.md`](v2/README.md) parity layout rule).
+- Before changing V2 visuals, run `pnpm run preview:local` and compare local v1 and v2 screenshots with `pnpm run visual:compare -- --route /watchlists`; inspect both images, and never use a Coolify preview as the development loop. Measure both versions at `390x844` and `1280x800` before offering any layout option or parity claim (see [`v2/README.md`](v2/README.md) parity layout rule).
 - A new V2 affordance needs a V1 counterpart or an explicit user request. Confirm the counterpart in the [`v2/PARITY.md`](v2/PARITY.md) ledger, which records the parity baseline and outstanding acceptance, using [`v2/V1-UI-MAP.md`](v2/V1-UI-MAP.md) to find the v1 control. In review, treat a control, glyph or interaction that v1 has no counterpart for and the request did not name as a defect to remove rather than a feature to keep. This is a review judgement call, not a lint rule, and it is not a reason to ask before every UI edit.
 - Use HTMX for all v2 browser HTTP requests. Declare requests, triggers, targets, and swaps with hx-\* attributes. Drag-and-drop and keyboard handlers may update request values and dispatch custom DOM events consumed by hx-trigger. Do not use htmx.ajax. Frontend requests must consume server-rendered HTML and let HTMX swap it into the page. Backend endpoints must also preserve JSON support for API callers through content negotiation. Do not use fetch or standalone XMLHttpRequest for frontend requests.

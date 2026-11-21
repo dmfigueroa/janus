@@ -21,7 +21,7 @@ function assertDependenciesInstalled() {
   const tsxBinary = path.join(repoRoot, "node_modules", ".bin", "tsx");
   if (!fs.existsSync(drizzleDirectory) || !fs.existsSync(tsxBinary)) {
     throw new Error(
-      `Root dependencies are missing. Run "bash tools/pinned-node.sh npm ci" from ${repoRoot}.`,
+      `Root dependencies are missing. Run "bash tools/pinned-node.sh pnpm install --frozen-lockfile" from ${repoRoot}.`,
     );
   }
 }

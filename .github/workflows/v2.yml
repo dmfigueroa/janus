@@ -10,12 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .tool-versions
-          cache: npm
-      - run: npm ci
-      - run: npm run test:v2:dom
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run test:v2:dom
 
   format:
     name: Rust Format
@@ -61,15 +62,17 @@ jobs:
         with:
           workspaces: "v2 -> target"
           shared-key: v2-debug
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version-file: .tool-versions
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
         working-directory: .
       - run: cargo test --locked
       - name: Install browsers
-        run: npx playwright-core install --with-deps chromium webkit
+        working-directory: .
+        run: pnpm exec playwright-core install --with-deps chromium webkit
       - name: Browser tests
         env:
           PLAYWRIGHT_BROWSERS: chromium,webkit

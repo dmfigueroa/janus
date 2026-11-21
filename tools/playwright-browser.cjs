@@ -47,7 +47,7 @@ function pinnedChromiumExecutable() {
     const { version } = require("playwright-core/package.json");
     throw new Error(
       `Chromium ${executable} for playwright-core ${version} is not installed. ` +
-        "Run `npx playwright-core install chromium` from the repository root.",
+        "Run `pnpm exec playwright-core install chromium` from the repository root.",
     );
   }
   return executable;

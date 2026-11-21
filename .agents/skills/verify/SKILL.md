@@ -23,7 +23,7 @@ Each verification run is isolated by `--run-id <id>`:
 
 ## Launch
 
-Prerequisite: root dependencies must be installed once per checkout (`bash tools/pinned-node.sh npm ci` on the host, or `npm ci` inside the devcontainer). Playwright Chromium must exist in `~/.cache/ms-playwright` or `PLAYWRIGHT_CHROMIUM` (install once with `bash tools/pinned-node.sh npx playwright-core install chromium`).
+Prerequisite: root dependencies must be installed once per checkout (`bash tools/pinned-node.sh pnpm install --frozen-lockfile` on the host, or `pnpm install --frozen-lockfile` inside the devcontainer). Playwright Chromium must exist in `~/.cache/ms-playwright` or `PLAYWRIGHT_CHROMIUM` (install once with `bash tools/pinned-node.sh pnpm exec playwright-core install chromium`).
 
 Start an isolated v1 + v2 stack from an empty disposable directory (runs `src/db/Migrate.ts`, runs `src/db/Seed.ts` with `SEED_ON_STARTUP=true`, builds `v2/target/debug/janus-v2` with `cargo build --locked`, starts both servers detached, and waits for full readiness):
 
@@ -36,7 +36,7 @@ Optional flags:
 - `--v1-only` or `--v2-only`: launch only one server when proving a single-surface change.
 - `--no-build`: reuse an existing `v2/target/debug/janus-v2` binary when Rust sources have not changed.
 - `--empty-db`: run migrations without seeding the four demo watchlists.
-- `--v1-port <port>` / `--v2-port <port>`: pin ports explicitly (for example `3000` and `3001` if you also want `npm run visual:compare`).
+- `--v1-port <port>` / `--v2-port <port>`: pin ports explicitly (for example `3000` and `3001` if you also want `pnpm run visual:compare`).
 - `--evidence-dir <path>`: override the default `/tmp/janus-verify-evidence/<run-id>` output directory.
 
 **Readiness contract:** `launch` does not return when a TCP socket opens. It waits until:
@@ -122,7 +122,7 @@ Supported step `op` values:
 
 If any step fails, `drive` saves `failure.png`, `failure.aria.txt`, and `<evidence-name>.failure.json` in `<evidenceDir>/<feature>/` and exits `1`.
 
-For v1/v2 visual parity checks (which require both viewports `390x844` and `1280x800`), launch with `--v1-port 3000 --v2-port 3001` and run `bash tools/pinned-node.sh npm run visual:compare -- --route /watchlists --viewport 390x844` and `--viewport 1280x800`, or run `drive` against both `--target v1` and `--target v2` at both viewports.
+For v1/v2 visual parity checks (which require both viewports `390x844` and `1280x800`), launch with `--v1-port 3000 --v2-port 3001` and run `bash tools/pinned-node.sh pnpm run visual:compare -- --route /watchlists --viewport 390x844` and `--viewport 1280x800`, or run `drive` against both `--target v1` and `--target v2` at both viewports.
 
 ### HTTP / JSON / MCP calls (`http`)
 
