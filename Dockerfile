@@ -11,10 +11,10 @@ RUN corepack enable
 FROM base AS deps
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
-# Hoist so the copied node_modules tree matches the runner layout (no broken pnpm symlinks).
+# Keep the default isolated linker for the build graph. Hoisting here can flatten
+# mismatched TanStack copies and break Nitro's SSR bundle imports.
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
-  printf 'node-linker=hoisted\n' > .npmrc \
-  && pnpm pkg delete scripts.prepare \
+  pnpm pkg delete scripts.prepare \
   && pnpm install --frozen-lockfile
 
 # ---------------------------------------------------------------------------
@@ -24,7 +24,6 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/.npmrc ./
 COPY . .
 ENV NITRO_PRESET=node-server
 RUN pnpm run build
@@ -42,6 +41,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 # Rebuild a minimal manifest pinned to the exact versions in the lockfile, then
 # install just those two packages (and their transitive dependencies).
+# Hoist only this stage so the runner can COPY a flat node_modules tree.
 # Keep packageManager + onlyBuiltDependencies so Corepack stays on pnpm 10 and
 # better-sqlite3's native install script is allowed (pnpm blocks builds by default).
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
