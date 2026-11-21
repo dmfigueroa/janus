@@ -42,9 +42,11 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 # Rebuild a minimal manifest pinned to the exact versions in the lockfile, then
 # install just those two packages (and their transitive dependencies).
+# Keep packageManager + onlyBuiltDependencies so Corepack stays on pnpm 10 and
+# better-sqlite3's native install script is allowed (pnpm blocks builds by default).
 RUN --mount=type=cache,id=pnpm-store,target=/root/.local/share/pnpm/store \
   printf 'node-linker=hoisted\n' > .npmrc \
-  && node -e "const fs=require('fs'); const lock=fs.readFileSync('pnpm-lock.yaml','utf8'); const ver=(name)=>{ const m=lock.match(new RegExp('^  '+name+'@([^:\\\\s]+):','m')); if(!m) throw new Error('missing '+name+' in pnpm-lock.yaml'); return m[1]; }; fs.writeFileSync('package.json', JSON.stringify({name:'janus-runtime',private:true,type:'module',dependencies:{'better-sqlite3':ver('better-sqlite3'),'drizzle-orm':ver('drizzle-orm')}}, null, 2));" \
+  && node -e "const fs=require('fs'); const lock=fs.readFileSync('pnpm-lock.yaml','utf8'); const ver=(name)=>{ const m=lock.match(new RegExp('^  '+name+'@([^:\\\\s]+):','m')); if(!m) throw new Error('missing '+name+' in pnpm-lock.yaml'); return m[1]; }; const root=JSON.parse(fs.readFileSync('package.json','utf8')); fs.writeFileSync('package.json', JSON.stringify({name:'janus-runtime',private:true,type:'module',packageManager:root.packageManager,dependencies:{'better-sqlite3':ver('better-sqlite3'),'drizzle-orm':ver('drizzle-orm')},pnpm:{onlyBuiltDependencies:['better-sqlite3']}}, null, 2));" \
   && rm -f pnpm-lock.yaml \
   && pnpm install --prod
 
