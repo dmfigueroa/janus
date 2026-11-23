@@ -431,20 +431,20 @@ pub async fn add_custom_item(
         year,
         insertion_position,
     );
-    let addition = match add_custom::parse_addition(
-        Some(id),
-        fields.title.as_deref(),
-        fields.media_type.as_deref().or(Some("movie")),
-        fields.year.as_deref(),
-        None,
-        None,
-        None,
-        fields
+    let addition = match add_custom::parse_addition(add_custom::CustomItemInput {
+        watchlist_id: Some(id),
+        title: fields.title.as_deref(),
+        media_type: fields.media_type.as_deref().or(Some("movie")),
+        year: fields.year.as_deref(),
+        release_date: None,
+        parent_title: None,
+        episode: None,
+        insertion_position: fields
             .insertion_position
             .as_deref()
             .filter(|value| !value.is_empty()),
-        fields.reference_item_id,
-    ) {
+        reference_item_id: fields.reference_item_id,
+    }) {
         Ok(addition) => addition,
         Err(failure) => {
             return Ok(custom_item_rejection(

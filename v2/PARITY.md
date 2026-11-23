@@ -348,7 +348,8 @@ intact even if unranked items were added in release mode. Mid-write failures rol
 change and rank writes atomically, and the SQLite schema remains unchanged.
 
 On `/v2/watchlists/{id}`, `#watchlist-refresh` swaps `.watchlist` and updates `#watchlist-form`
-out-of-band (`hx-select-oob="#watchlist-form"`), reconciling displayed items, active filters,
+and `#custom-item-form` out-of-band (`hx-select-oob="#watchlist-form,#custom-item-form"`),
+reconciling displayed items, active filters, custom-item insertion controls,
 release-year versus cross-year watched grouping, `<watchlist-reorder>` / `.reorder-handle`
 availability, and the edit dialog's persisted defaults without stealing focus while closed.
 `WatchlistForm::name_invalid` flags `#watchlist-name` only for name validation errors, leaving

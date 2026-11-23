@@ -86,6 +86,19 @@ pub struct CustomItemAddition {
     pub reference_item_id: Option<i64>,
 }
 
+#[derive(Debug)]
+pub struct CustomItemInput<'a> {
+    pub watchlist_id: Option<i64>,
+    pub title: Option<&'a str>,
+    pub media_type: Option<&'a str>,
+    pub year: Option<&'a str>,
+    pub release_date: Option<&'a str>,
+    pub parent_title: Option<&'a str>,
+    pub episode: Option<&'a str>,
+    pub insertion_position: Option<&'a str>,
+    pub reference_item_id: Option<i64>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AddCustomFailure {
     NotFound,
@@ -183,6 +196,38 @@ impl CustomItemForm {
         self.error.as_deref() == Some("Title is required.")
     }
 
+    pub fn movie_selected(&self) -> bool {
+        self.media_type == "movie"
+    }
+
+    pub fn tv_selected(&self) -> bool {
+        self.media_type == "tv"
+    }
+
+    pub fn book_selected(&self) -> bool {
+        self.media_type == "book"
+    }
+
+    pub fn game_selected(&self) -> bool {
+        self.media_type == "game"
+    }
+
+    pub fn comic_selected(&self) -> bool {
+        self.media_type == "comic"
+    }
+
+    pub fn insertion_placeholder_selected(&self) -> bool {
+        self.insertion_position.is_empty()
+    }
+
+    pub fn insertion_beginning_selected(&self) -> bool {
+        self.insertion_position == "beginning"
+    }
+
+    pub fn insertion_end_selected(&self) -> bool {
+        self.insertion_position == "end"
+    }
+
     pub fn with_error(mut self, error: impl Into<String>) -> Self {
         self.error = Some(error.into());
         self
@@ -255,40 +300,33 @@ fn is_leap_year(year: u32) -> bool {
     year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400))
 }
 
-pub fn parse_addition(
-    watchlist_id: Option<i64>,
-    title: Option<&str>,
-    media_type: Option<&str>,
-    year: Option<&str>,
-    release_date: Option<&str>,
-    parent_title: Option<&str>,
-    episode: Option<&str>,
-    insertion_position: Option<&str>,
-    reference_item_id: Option<i64>,
-) -> Result<CustomItemAddition, AddCustomFailure> {
-    let watchlist_id = watchlist_id
+pub fn parse_addition(input: CustomItemInput<'_>) -> Result<CustomItemAddition, AddCustomFailure> {
+    let watchlist_id = input
+        .watchlist_id
         .filter(|id| *id > 0)
         .ok_or_else(|| AddCustomFailure::Validation("Required".into()))?;
-    let title = title
+    let title = input
+        .title
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .ok_or_else(|| AddCustomFailure::Validation("Title is required.".into()))?
         .to_owned();
-    let media_type = media_type
+    let media_type = input
+        .media_type
         .and_then(CustomMediaType::parse)
         .ok_or_else(|| AddCustomFailure::Validation("Invalid media type.".into()))?;
-    let year = optional_release_date(year)?;
-    let release_date = optional_release_date(release_date)?;
-    let parent_title = optional_trimmed(parent_title);
-    let episode = optional_trimmed(episode);
+    let year = optional_release_date(input.year)?;
+    let release_date = optional_release_date(input.release_date)?;
+    let parent_title = optional_trimmed(input.parent_title);
+    let episode = optional_trimmed(input.episode);
     let insertion_position =
-        match insertion_position {
+        match input.insertion_position {
             None => None,
             Some(value) => Some(InsertionPosition::parse(value).ok_or_else(|| {
                 AddCustomFailure::Validation("Invalid insertion position.".into())
             })?),
         };
-    validate_anchor_fields(insertion_position, reference_item_id)?;
+    validate_anchor_fields(insertion_position, input.reference_item_id)?;
     validate_episode_fields(media_type, parent_title.as_deref(), episode.as_deref())?;
     Ok(CustomItemAddition {
         watchlist_id,
@@ -299,7 +337,7 @@ pub fn parse_addition(
         parent_title,
         episode,
         insertion_position,
-        reference_item_id,
+        reference_item_id: input.reference_item_id,
     })
 }
 
@@ -691,17 +729,17 @@ mod tests {
 
     #[test]
     fn episode_fields_are_required() {
-        let error = parse_addition(
-            Some(1),
-            Some("First"),
-            Some("episode"),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
+        let error = parse_addition(CustomItemInput {
+            watchlist_id: Some(1),
+            title: Some("First"),
+            media_type: Some("episode"),
+            year: None,
+            release_date: None,
+            parent_title: None,
+            episode: None,
+            insertion_position: None,
+            reference_item_id: None,
+        })
         .unwrap_err();
         assert_eq!(error.code(), "validation_error");
     }

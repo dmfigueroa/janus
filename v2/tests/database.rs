@@ -2450,7 +2450,7 @@ async fn web_order_mode_changes_reconcile_filters_grouping_reorder_and_validatio
             .unwrap(),
     )
     .await;
-    assert!(release_page.contains("hx-select-oob=\"#watchlist-form\""));
+    assert!(release_page.contains("hx-select-oob=\"#watchlist-form,#custom-item-form\""));
     assert!(release_page.contains("value=\"A Show\""));
     assert!(release_page.contains("<h2>2020</h2>"));
     assert!(release_page.contains("<h2>2021</h2>"));

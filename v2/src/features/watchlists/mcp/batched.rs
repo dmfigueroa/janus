@@ -365,17 +365,17 @@ fn parse_custom_item(
             ));
         }
     };
-    add_custom::parse_addition(
+    add_custom::parse_addition(add_custom::CustomItemInput {
         watchlist_id,
-        string_field("title")?,
-        string_field("mediaType")?,
-        string_field("year")?,
-        string_field("releaseDate")?,
-        string_field("parentTitle")?,
-        string_field("episode")?,
-        string_field("insertionPosition")?,
+        title: string_field("title")?,
+        media_type: string_field("mediaType")?,
+        year: string_field("year")?,
+        release_date: string_field("releaseDate")?,
+        parent_title: string_field("parentTitle")?,
+        episode: string_field("episode")?,
+        insertion_position: string_field("insertionPosition")?,
         reference_item_id,
-    )
+    })
 }
 
 fn custom_item_shape_is_valid(entry: &Value) -> bool {

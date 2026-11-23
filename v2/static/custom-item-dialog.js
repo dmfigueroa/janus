@@ -116,10 +116,21 @@ class CustomItemDialog {
   }
 
   resetForm() {
-    this.dialog.querySelector("#custom-item-form")?.reset();
-    const error = this.dialog.querySelector("#custom-item-form-error");
+    const form = this.dialog.querySelector("#custom-item-form");
+    if (!form) return;
+    const title = form.querySelector("#custom-item-title");
+    if (title instanceof HTMLInputElement) {
+      title.value = "";
+      title.removeAttribute("aria-invalid");
+    }
+    const mediaType = form.querySelector("#custom-item-type");
+    if (mediaType instanceof HTMLSelectElement) mediaType.value = "movie";
+    const year = form.querySelector("#custom-item-year");
+    if (year instanceof HTMLInputElement) year.value = "";
+    const insertion = form.querySelector("#custom-item-insertion");
+    if (insertion instanceof HTMLSelectElement) insertion.value = "";
+    const error = form.querySelector("#custom-item-form-error");
     if (error) error.textContent = "";
-    this.dialog.querySelector("#custom-item-title")?.removeAttribute("aria-invalid");
   }
 
   focusTitle() {

@@ -42,19 +42,13 @@
     <div class="form-field">
       <label for="custom-item-type">Type</label>
       <select id="custom-item-type" name="mediaType">
-        <option value="movie" {% if custom_form.media_type="" ="movie" %}selected{% endif %}>
+        <option value="movie" {% if custom_form.movie_selected() %}selected{% endif %}>
           Movie
         </option>
-        <option value="tv" {% if custom_form.media_type="" ="tv" %}selected{% endif %}>
-          TV Show
-        </option>
-        <option value="book" {% if custom_form.media_type="" ="book" %}selected{% endif %}>
-          Book
-        </option>
-        <option value="game" {% if custom_form.media_type="" ="game" %}selected{% endif %}>
-          Game
-        </option>
-        <option value="comic" {% if custom_form.media_type="" ="comic" %}selected{% endif %}>
+        <option value="tv" {% if custom_form.tv_selected() %}selected{% endif %}>TV Show</option>
+        <option value="book" {% if custom_form.book_selected() %}selected{% endif %}>Book</option>
+        <option value="game" {% if custom_form.game_selected() %}selected{% endif %}>Game</option>
+        <option value="comic" {% if custom_form.comic_selected() %}selected{% endif %}>
           Comic
         </option>
       </select>
@@ -78,7 +72,7 @@
           value=""
           {%
           if
-          custom_form.insertion_position.is_empty()
+          custom_form.insertion_placeholder_selected()
           %}selected{%
           endif
           %}
@@ -90,15 +84,14 @@
           value="beginning"
           {%
           if
-          custom_form.insertion_position=""
-          ="beginning"
+          custom_form.insertion_beginning_selected()
           %}selected{%
           endif
           %}
         >
           Beginning
         </option>
-        <option value="end" {% if custom_form.insertion_position="" ="end" %}selected{% endif %}>
+        <option value="end" {% if custom_form.insertion_end_selected() %}selected{% endif %}>
           End
         </option>
       </select>

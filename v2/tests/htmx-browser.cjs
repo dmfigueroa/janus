@@ -112,7 +112,7 @@ function detailPageHtml(mode) {
       <button type="button" data-watchlist-dialog-open="edit" data-watchlist-dialog-trigger="header">Edit</button>
       ${timelineHtml}
     </main>
-    <span id="watchlist-refresh" hidden hx-get="" hx-trigger="watchlist-saved from:body" hx-target=".watchlist" hx-select=".watchlist" hx-select-oob="#watchlist-form" hx-swap="outerHTML"></span>
+    <span id="watchlist-refresh" hidden hx-get="" hx-trigger="watchlist-saved from:body" hx-target=".watchlist" hx-select=".watchlist" hx-select-oob="#watchlist-form,#custom-item-form" hx-swap="outerHTML"></span>
     <p id="notification" role="status" hidden></p>
     <dialog id="watchlist-dialog">
       <form id="watchlist-form">
