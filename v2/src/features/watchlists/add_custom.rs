@@ -252,54 +252,6 @@ fn statement(sql: &str, values: Vec<Value>) -> Statement {
     Statement::from_sql_and_values(DbBackend::Sqlite, sql, values)
 }
 
-pub fn validate_release_date(value: &str) -> Result<(), &'static str> {
-    if value.len() == 4 {
-        return if value.chars().all(|character| character.is_ascii_digit()) {
-            Ok(())
-        } else {
-            Err("Release date must be YYYY or YYYY-MM-DD.")
-        };
-    }
-    if value.len() != 10 {
-        return Err("Release date must be YYYY or YYYY-MM-DD.");
-    }
-    let bytes = value.as_bytes();
-    if bytes[4] != b'-' || bytes[7] != b'-' {
-        return Err("Release date must be YYYY-MM-DD.");
-    }
-    let year: u32 = value[0..4]
-        .parse()
-        .map_err(|_| "Release date must be YYYY-MM-DD.")?;
-    let month: u32 = value[5..7]
-        .parse()
-        .map_err(|_| "Release date must be YYYY-MM-DD.")?;
-    let day: u32 = value[8..10]
-        .parse()
-        .map_err(|_| "Release date must be YYYY-MM-DD.")?;
-    if !valid_calendar_date(year, month, day) {
-        return Err("Release date must be a valid calendar date.");
-    }
-    Ok(())
-}
-
-fn valid_calendar_date(year: u32, month: u32, day: u32) -> bool {
-    if !(1..=12).contains(&month) || day == 0 {
-        return false;
-    }
-    let max_day = match month {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-        4 | 6 | 9 | 11 => 30,
-        2 if is_leap_year(year) => 29,
-        2 => 28,
-        _ => return false,
-    };
-    day <= max_day
-}
-
-fn is_leap_year(year: u32) -> bool {
-    year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400))
-}
-
 pub fn parse_addition(input: CustomItemInput<'_>) -> Result<CustomItemAddition, AddCustomFailure> {
     let watchlist_id = input
         .watchlist_id
@@ -352,7 +304,7 @@ fn optional_release_date(value: Option<&str>) -> Result<Option<String>, AddCusto
     match value.map(str::trim).filter(|value| !value.is_empty()) {
         None => Ok(None),
         Some(value) => {
-            validate_release_date(value)
+            super::release_date::validate(value)
                 .map_err(|message| AddCustomFailure::Validation(message.into()))?;
             Ok(Some(value.to_owned()))
         }
@@ -712,14 +664,6 @@ fn splice_index(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn release_date_accepts_year_and_calendar_dates() {
-        assert!(validate_release_date("2025").is_ok());
-        assert!(validate_release_date("2025-02-03").is_ok());
-        assert!(validate_release_date("20x5").is_err());
-        assert!(validate_release_date("2025-02-29").is_err());
-    }
 
     #[test]
     fn parent_id_encodes_like_v1() {

@@ -26,6 +26,8 @@ pub mod reorder;
 
 pub mod add_custom;
 
+mod release_date;
+
 mod timeline;
 
 mod write;
