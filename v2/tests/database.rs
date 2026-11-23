@@ -2806,10 +2806,7 @@ async fn custom_item_additions_persist_through_web_and_mcp_with_destination_rule
         "{:?}",
         detail.items
     );
-    assert_eq!(
-        detail.watchlist.watchlist.last_item_added_at.is_some(),
-        true
-    );
+    assert!(detail.watchlist.watchlist.last_item_added_at.is_some());
 
     let unsupported = app
         .clone()
