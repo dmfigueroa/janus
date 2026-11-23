@@ -1,3 +1,15 @@
+const DIALOG_ID = "custom-item-dialog";
+const FORM_ID = "custom-item-form";
+const FORM_SELECTOR = `#${FORM_ID}`;
+const TITLE_SELECTOR = "#custom-item-title";
+const TYPE_SELECTOR = "#custom-item-type";
+const YEAR_SELECTOR = "#custom-item-year";
+const INSERTION_SELECTOR = "#custom-item-insertion";
+const ERROR_SELECTOR = "#custom-item-form-error";
+const OPEN_SELECTOR = "[data-custom-item-dialog-open]";
+const CLOSE_SELECTOR = "[data-custom-item-dialog-close]";
+const DEFAULT_MEDIA_TYPE = "movie";
+
 class CustomItemDialog {
   pendingRequests = new Set();
   returnFocus = null;
@@ -39,12 +51,12 @@ class CustomItemDialog {
   onClick = (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
-    if (target.closest("[data-custom-item-dialog-open]")) {
+    if (target.closest(OPEN_SELECTOR)) {
       event.preventDefault();
-      this.open(target.closest("[data-custom-item-dialog-open]"));
+      this.open(target.closest(OPEN_SELECTOR));
       return;
     }
-    if (target.closest("[data-custom-item-dialog-close]")) {
+    if (target.closest(CLOSE_SELECTOR)) {
       event.preventDefault();
       this.close();
     }
@@ -76,7 +88,7 @@ class CustomItemDialog {
   onSwap = (event) => {
     const target = event.detail?.target;
     if (!target || !this.dialog.open) return;
-    if (target.id === "custom-item-form" || this.dialog.contains(target)) {
+    if (target.id === FORM_ID || this.dialog.contains(target)) {
       this.focusTitle();
     }
   };
@@ -116,36 +128,36 @@ class CustomItemDialog {
   }
 
   resetForm() {
-    const form = this.dialog.querySelector("#custom-item-form");
+    const form = this.dialog.querySelector(FORM_SELECTOR);
     if (!form) return;
-    const title = form.querySelector("#custom-item-title");
+    const title = form.querySelector(TITLE_SELECTOR);
     if (title instanceof HTMLInputElement) {
       title.value = "";
       title.removeAttribute("aria-invalid");
     }
-    const mediaType = form.querySelector("#custom-item-type");
-    if (mediaType instanceof HTMLSelectElement) mediaType.value = "movie";
-    const year = form.querySelector("#custom-item-year");
+    const mediaType = form.querySelector(TYPE_SELECTOR);
+    if (mediaType instanceof HTMLSelectElement) mediaType.value = DEFAULT_MEDIA_TYPE;
+    const year = form.querySelector(YEAR_SELECTOR);
     if (year instanceof HTMLInputElement) year.value = "";
-    const insertion = form.querySelector("#custom-item-insertion");
+    const insertion = form.querySelector(INSERTION_SELECTOR);
     if (insertion instanceof HTMLSelectElement) insertion.value = "";
-    const error = form.querySelector("#custom-item-form-error");
+    const error = form.querySelector(ERROR_SELECTOR);
     if (error) error.textContent = "";
   }
 
   focusTitle() {
-    this.dialog.querySelector("#custom-item-title")?.focus();
+    this.dialog.querySelector(TITLE_SELECTOR)?.focus();
   }
 
   formFromRequest(event) {
     const element = event.detail?.elt || event.detail?.requestConfig?.elt;
-    return element instanceof Element ? element.closest("#custom-item-form") : null;
+    return element instanceof Element ? element.closest(FORM_SELECTOR) : null;
   }
 
   setBusy(busy) {
     if (busy) this.dialog.setAttribute("aria-busy", "true");
     else this.dialog.removeAttribute("aria-busy");
-    this.dialog.querySelectorAll("[data-custom-item-dialog-close]").forEach((control) => {
+    this.dialog.querySelectorAll(CLOSE_SELECTOR).forEach((control) => {
       control.disabled = busy;
     });
   }
@@ -176,5 +188,5 @@ class CustomItemDialog {
   }
 }
 
-const customItemDialogElement = document.getElementById("custom-item-dialog");
+const customItemDialogElement = document.getElementById(DIALOG_ID);
 if (customItemDialogElement) new CustomItemDialog(customItemDialogElement).connect();
