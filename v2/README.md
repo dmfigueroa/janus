@@ -96,8 +96,11 @@ The existing directory must be mounted, including WAL/SHM sidecars.
 - `POST /v2/watchlists/{id}`: shared metadata update with v1's timestamp and empty-description
   semantics.
 - `/v2/watchlists/{id}/reorder`: atomic custom-order moves from web drag or keyboard intents.
+- `POST /v2/watchlists/{id}/custom-items`: add a manually described item with destination and
+  insertion choices; the detail dialog reconciles contents and summary after success.
 - `/v2/mcp`: `list_watchlists`, `search_watchlists`, `get_watchlist`, `find_watchlist_items`,
-  `create_watchlists`, `update_watchlists`, `reorder_watchlist_items`.
+  `create_watchlists`, `update_watchlists`, `reorder_watchlist_items`,
+  `add_custom_items_to_watchlists`.
 - `/v2/health/live`: HTTP liveness.
 - `/v2/health/ready`: compatibility-validated application readiness.
 

@@ -4,6 +4,7 @@
 //! the page and fragment markup shared by web responses. It has no Axum or
 //! database dependency, so behavior is exercised directly from snapshots.
 
+use super::add_custom::CustomItemForm;
 use super::dialog::WatchlistForm;
 use super::{ItemOrderMode, WatchlistDetail, WatchlistItem};
 use askama::Template;
@@ -54,6 +55,7 @@ pub struct TimelineView {
     runs: Vec<Run>,
     paused: bool,
     form: WatchlistForm,
+    custom_form: CustomItemForm,
 }
 
 impl TimelineView {
@@ -85,6 +87,10 @@ impl TimelineView {
             ),
             paused: list.paused_at.is_some(),
             form: WatchlistForm::edit(list),
+            custom_form: CustomItemForm::for_watchlist(
+                list.id,
+                list.item_order_mode == ItemOrderMode::Custom,
+            ),
         }
     }
 
@@ -97,6 +103,7 @@ impl TimelineView {
         Page {
             view: self,
             form: &self.form,
+            custom_form: &self.custom_form,
             message: "",
         }
         .render()
@@ -196,6 +203,7 @@ fn runs(rows: &[Row], release_mode: bool, unwatched: bool) -> Vec<Run> {
 struct Page<'a> {
     view: &'a TimelineView,
     form: &'a WatchlistForm,
+    custom_form: &'a CustomItemForm,
     message: &'a str,
 }
 

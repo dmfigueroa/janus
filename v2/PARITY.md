@@ -37,7 +37,7 @@ compatibility reconciliation and regeneration of the v1 schema contract through 
 - [x] Hidden-item-safe custom reorder.
 - [x] Order-mode changes: web updates and MCP `update_watchlists` share the metadata write; switching release to custom initializes contiguous custom ranks in release order, and switching back retains ranks while release ordering resumes. The detail read reprojects grouping, filters and reorder availability from the stored mode. Web and MCP integration coverage uses disposable v1-migrated SQLite databases and verifies round trips and persisted ranks; no schema change.
 - [ ] Provider search/details/pagination and additions; TV/comic expansions.
-- [ ] Custom additions, anchored insertion, duplicates and partial outcomes.
+- [x] Custom additions, anchored insertion, duplicates and partial outcomes. Web detail dialog and MCP `add_custom_items_to_watchlists` share one feature op. Coverage uses disposable v1-migrated SQLite for release and custom destinations, beginning insertion with contiguous ranks, TV rejection, episode parent ids, batch isolation, and schema-preserving writes.
 - [ ] Edited metadata, item/parent removal and movement.
 - [ ] Watch, quiet watch, unwatch, idempotence and rotation recency.
 - [ ] Watch Now, skip, pause, derived completion and empty watchlists.
@@ -58,7 +58,7 @@ The four prerequisite read tools, `create_watchlists`, `update_watchlists` and
 `reorder_watchlist_items` are implemented; the other
 tools are unported. Contracts live in src/app/mcp at the source revision above.
 
-- [ ] add_custom_items_to_watchlists
+- [x] add_custom_items_to_watchlists
 - [ ] add_media_to_watchlists
 - [ ] create_lineups
 - [x] create_watchlists

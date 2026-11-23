@@ -13,6 +13,15 @@
       >
         Edit
       </button>
+      <button
+        type="button"
+        class="watchlist-edit"
+        data-custom-item-dialog-open
+        data-custom-item-dialog-trigger="header"
+        aria-label="Add custom item"
+      >
+        Add custom item
+      </button>
     </div>
     {% if !view.description.is_empty() %}
     <p class="watchlist-description">{{view.description}}</p>
@@ -88,4 +97,4 @@
   hx-select-oob="#watchlist-form"
   hx-swap="outerHTML"
 ></span>
-{% include "watchlist-dialog.html" %} {% endblock %}
+{% include "watchlist-dialog.html" %} {% include "custom-item-dialog.html" %} {% endblock %}

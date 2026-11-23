@@ -18,6 +18,7 @@ sea-orm = { version = "=2.0.4", default-features = false, features = [
   "runtime-tokio-rustls",
 ] }
 rmcp = { version = "=3.9.0", features = ["transport-streamable-http-server"] }
+uuid = { version = "1.29.3", features = ["v4"] }
 
 [build-dependencies]
 sha2 = "0.10"

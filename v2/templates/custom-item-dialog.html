@@ -1,0 +1,36 @@
+<dialog
+  id="custom-item-dialog"
+  class="dialog"
+  closedby="any"
+  aria-labelledby="custom-item-dialog-title"
+  aria-describedby="custom-item-dialog-help{% if custom_form.error.is_some() %} custom-item-form-error{% endif %}"
+  data-custom-item-dialog
+>
+  <header class="dialog-header">
+    <h2 id="custom-item-dialog-title">Add custom item</h2>
+    <p id="custom-item-dialog-help" class="dialog-help">
+      Add an item that couldn't be found in the search results.
+    </p>
+  </header>
+  <button
+    type="button"
+    class="dialog-close"
+    data-custom-item-dialog-close
+    aria-label="Close dialog"
+  >
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+    >
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+    </svg>
+  </button>
+  {% include "custom-item-form.html" %}
+</dialog>

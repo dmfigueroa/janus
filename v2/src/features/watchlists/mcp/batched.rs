@@ -3,6 +3,7 @@
 use super::{McpCallError, object_schema, output_schema};
 use crate::features::watchlists::{
     ItemOrderMode, Watchlists,
+    add_custom::{self, AddCustomOutcome, CustomMediaType},
     reorder::{Reorder, ReorderOutcome},
     write::{NewWatchlist, UpdateOutcome, WatchlistChanges},
 };
@@ -12,6 +13,7 @@ use std::sync::{Arc, LazyLock};
 
 const REORDER_FIELDS: &[&str] = &["reorders"];
 const WRITE_FIELDS: &[&str] = &["watchlists"];
+const CUSTOM_ITEM_FIELDS: &[&str] = &["items"];
 
 pub(super) struct Contract {
     pub(super) name: &'static str,
@@ -108,6 +110,7 @@ enum BatchTool {
     Create,
     Update,
     Reorder,
+    AddCustom,
 }
 
 impl BatchTool {
@@ -115,6 +118,7 @@ impl BatchTool {
         match self {
             Self::Create | Self::Update => ("watchlists", "watchlists must be a non-empty array"),
             Self::Reorder => ("reorders", "reorders must be a non-empty array"),
+            Self::AddCustom => ("items", "items must be a non-empty array"),
         }
     }
 
@@ -122,6 +126,7 @@ impl BatchTool {
         match self {
             Self::Create | Self::Update => "Invalid watchlist input",
             Self::Reorder => "Invalid reorder input",
+            Self::AddCustom => "Invalid custom item input",
         }
     }
 
@@ -130,6 +135,7 @@ impl BatchTool {
             Self::Create => create_shape_is_valid(entry),
             Self::Update => update_shape_is_valid(entry),
             Self::Reorder => reorder_shape_is_valid(entry),
+            Self::AddCustom => custom_item_shape_is_valid(entry),
         }
     }
 
@@ -138,6 +144,7 @@ impl BatchTool {
             Self::Create => create_entry(lists, entry, index).await,
             Self::Update => update_entry(lists, entry, index).await,
             Self::Reorder => reorder_entry(lists, entry, index).await,
+            Self::AddCustom => add_custom_entry(lists, entry, index).await,
         }
     }
 }
@@ -255,6 +262,160 @@ async fn reorder_entry(lists: &Watchlists, entry: Value, index: usize) -> BatchE
         .fold(outcome, |entry, (key, value)| entry.with(key, value))
 }
 
+async fn add_custom_entry(lists: &Watchlists, entry: Value, index: usize) -> BatchEntry {
+    let watchlist_id = entry.get("watchlistId").and_then(Value::as_i64);
+    let media_type = entry
+        .get("mediaType")
+        .and_then(Value::as_str)
+        .and_then(CustomMediaType::parse);
+    let addition = match parse_custom_item(&entry) {
+        Ok(addition) => addition,
+        Err(failure) => {
+            let mut result = BatchEntry::failed(failure.code(), failure.message().to_owned());
+            if let Some(watchlist_id) = watchlist_id {
+                result = result.with("watchlistId", json!(watchlist_id));
+            }
+            if let Some(media_type) = media_type {
+                result = result.with("mediaType", json!(media_type.as_str()));
+            }
+            return result.with("affectedCount", json!(0));
+        }
+    };
+    let media_type = addition.media_type;
+    let watchlist_id = addition.watchlist_id;
+    match lists.add_custom_item(addition).await {
+        Ok(outcome) => custom_item_result(outcome, watchlist_id, media_type),
+        Err(error) => {
+            eprintln!(
+                "MCP add_custom_items failed for watchlist {watchlist_id}, batch entry {index}: {error}"
+            );
+            BatchEntry::failed(
+                "internal_error",
+                "The operation failed unexpectedly. Verify its state before retrying.",
+            )
+            .with("watchlistId", json!(watchlist_id))
+            .with("mediaType", json!(media_type.as_str()))
+        }
+    }
+}
+
+fn custom_item_result(
+    outcome: AddCustomOutcome,
+    watchlist_id: i64,
+    media_type: CustomMediaType,
+) -> BatchEntry {
+    let (success, code, message, affected_count) = match &outcome {
+        AddCustomOutcome::Added { affected_count } => {
+            (true, "added", outcome.message().to_owned(), *affected_count)
+        }
+        AddCustomOutcome::Duplicate { affected_count } => (
+            true,
+            "duplicate",
+            outcome.message().to_owned(),
+            *affected_count,
+        ),
+        AddCustomOutcome::Rejected(failure) => {
+            (false, failure.code(), failure.message().to_owned(), 0)
+        }
+    };
+    let entry = if success {
+        BatchEntry::done(code, message)
+    } else {
+        BatchEntry::failed(code, message)
+    };
+    entry
+        .with("watchlistId", json!(watchlist_id))
+        .with("mediaType", json!(media_type.as_str()))
+        .with("affectedCount", json!(affected_count))
+}
+
+fn parse_custom_item(
+    entry: &Value,
+) -> Result<add_custom::CustomItemAddition, add_custom::AddCustomFailure> {
+    let object = entry.as_object().ok_or_else(|| {
+        add_custom::AddCustomFailure::Validation(format!(
+            "Expected object, received {}",
+            type_name(entry)
+        ))
+    })?;
+    let string_field = |key: &str| -> Result<Option<&str>, add_custom::AddCustomFailure> {
+        match object.get(key) {
+            None | Some(Value::Null) => Ok(None),
+            Some(Value::String(value)) => Ok(Some(value.as_str())),
+            Some(value) => Err(add_custom::AddCustomFailure::Validation(expected_string(
+                value,
+            ))),
+        }
+    };
+    let watchlist_id = match object.get("watchlistId") {
+        None | Some(Value::Null) => None,
+        Some(Value::Number(number)) => number.as_i64(),
+        Some(_) => {
+            return Err(add_custom::AddCustomFailure::Validation(
+                "Expected integer, received number".into(),
+            ));
+        }
+    };
+    let reference_item_id = match object.get("referenceItemId") {
+        None | Some(Value::Null) => None,
+        Some(Value::Number(number)) => number.as_i64(),
+        Some(_) => {
+            return Err(add_custom::AddCustomFailure::Validation(
+                "Expected integer, received number".into(),
+            ));
+        }
+    };
+    add_custom::parse_addition(
+        watchlist_id,
+        string_field("title")?,
+        string_field("mediaType")?,
+        string_field("year")?,
+        string_field("releaseDate")?,
+        string_field("parentTitle")?,
+        string_field("episode")?,
+        string_field("insertionPosition")?,
+        reference_item_id,
+    )
+}
+
+fn custom_item_shape_is_valid(entry: &Value) -> bool {
+    let Some(object) = entry.as_object() else {
+        return false;
+    };
+    for key in [
+        "title",
+        "mediaType",
+        "year",
+        "releaseDate",
+        "parentTitle",
+        "episode",
+        "insertionPosition",
+    ] {
+        if object
+            .get(key)
+            .is_some_and(|value| !value.is_string() && !value.is_null())
+        {
+            return false;
+        }
+    }
+    for key in ["watchlistId", "referenceItemId"] {
+        if object
+            .get(key)
+            .is_some_and(|value| !value.is_number() && !value.is_null())
+        {
+            return false;
+        }
+    }
+    object
+        .get("mediaType")
+        .and_then(Value::as_str)
+        .is_none_or(|value| CustomMediaType::parse(value).is_some())
+        && object
+            .get("insertionPosition")
+            .and_then(Value::as_str)
+            .is_none_or(|value| add_custom::InsertionPosition::parse(value).is_some())
+}
+
 fn write_output_schema() -> Arc<Map<String, Value>> {
     let batch = json!({"type":"object","properties":{"index":{"type":"integer","minimum":0},"success":{"type":"boolean"},"code":{"type":"string"},"message":{"type":"string"},"watchlistId":{"type":"number"},"watchlist":{"type":"object","properties":{"id":{"type":"number"},"name":{"type":"string"},"description":{"type":["string","null"]},"itemOrderMode":{"type":"string","enum":["release","custom"]}},"required":["id","name","description","itemOrderMode"]}},"required":["index","success","code","message"]});
     output_schema(
@@ -313,7 +474,54 @@ fn build_contracts() -> Vec<Contract> {
     update.output_schema = Some(write_schema);
     update.annotations = Some(ToolAnnotations::new().read_only(false).destructive(false));
 
+    let mut add_custom = Tool::new(
+        "add_custom_items_to_watchlists",
+        "Add custom watchlist items without a provider source",
+        object_schema(
+            json!({"items":{"type":"array","minItems":1,"items":{"type":"object","properties":{
+                "watchlistId":{"type":"number"},
+                "title":{"type":"string"},
+                "mediaType":{"type":"string","enum":["movie","tv","episode","book","game","comic"]},
+                "year":{"type":"string"},
+                "releaseDate":{"type":"string"},
+                "parentTitle":{"type":"string"},
+                "episode":{"type":"string"},
+                "insertionPosition":{"type":"string","enum":["beginning","end","before","after"]},
+                "referenceItemId":{"type":"integer","exclusiveMinimum":0}
+            }}}}),
+            json!(["items"]),
+        ),
+    );
+    add_custom.title = Some("Add custom watchlist items without a provider source".into());
+    add_custom.description = Some(
+        "Add one or more manually described items (movie, episode, TV, book, game, or comic) to watchlists without a provider ID. Janus stores supplied metadata directly and does not fetch canonical metadata. Custom episodes require a series title and episode label. Custom TV items are rejected because TV shows must come from TMDB so Janus can expand them into episodes. Custom-ordered destinations require an explicit insertion position. Each requested addition is processed independently and returns an ordered result.".into(),
+    );
+    add_custom.output_schema = Some(output_schema(
+        json!({"results":{"type":"array","items":{"type":"object","properties":{
+            "index":{"type":"integer","minimum":0},
+            "success":{"type":"boolean"},
+            "code":{"type":"string"},
+            "message":{"type":"string"},
+            "watchlistId":{"type":"number"},
+            "mediaType":{"type":"string","enum":["movie","tv","episode","book","game","comic"]},
+            "affectedCount":{"type":"integer","minimum":0}
+        },"required":["index","success","code","message"]}}}),
+        Some(json!(["results"])),
+    ));
+    add_custom.annotations = Some(
+        ToolAnnotations::new()
+            .read_only(false)
+            .destructive(false)
+            .idempotent(false),
+    );
+
     vec![
+        Contract {
+            name: "add_custom_items_to_watchlists",
+            tool: add_custom,
+            accepted: CUSTOM_ITEM_FIELDS,
+            kind: BatchTool::AddCustom,
+        },
         Contract {
             name: "reorder_watchlist_items",
             tool: reorder,
@@ -532,6 +740,24 @@ mod tests {
             BatchEntry::failed("not_found", "Watchlist not found."),
         ]);
         assert_batch_output("reorder_watchlist_items", &rendered);
+    }
+
+    #[test]
+    fn custom_item_results_satisfy_the_custom_item_schema() {
+        let rendered = render(vec![
+            BatchEntry::done("added", "Added to watchlist")
+                .with("watchlistId", json!(1))
+                .with("mediaType", json!("movie"))
+                .with("affectedCount", json!(1)),
+            BatchEntry::failed(
+                "unsupported",
+                "TV shows must come from TMDB so Janus can expand them into episodes.",
+            )
+            .with("watchlistId", json!(1))
+            .with("mediaType", json!("tv"))
+            .with("affectedCount", json!(0)),
+        ]);
+        assert_batch_output("add_custom_items_to_watchlists", &rendered);
     }
 
     #[test]

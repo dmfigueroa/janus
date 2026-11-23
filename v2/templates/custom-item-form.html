@@ -1,0 +1,112 @@
+<form
+  id="custom-item-form"
+  class="dialog-form"
+  method="post"
+  action="{{custom_form.action}}"
+  hx-post="{{custom_form.action}}"
+  hx-target="#custom-item-form"
+  hx-swap="outerHTML"
+  hx-disabled-elt="find button[type='submit']"
+  {%
+  if
+  custom_form.error.is_some()
+  %}aria-describedby="custom-item-form-error"
+  {%
+  endif
+  %}
+>
+  {% if let Some(error) = custom_form.error %}
+  <p id="custom-item-form-error" class="form-error" role="alert">{{error}}</p>
+  {% endif %}
+  <fieldset class="dialog-fields">
+    <legend class="visually-hidden">Add custom item</legend>
+    <div class="form-field">
+      <label for="custom-item-title">Title</label>
+      <input
+        id="custom-item-title"
+        name="title"
+        type="text"
+        required
+        value="{{custom_form.title}}"
+        placeholder="e.g. My Favorite obscure movie"
+        autocomplete="off"
+        {%
+        if
+        custom_form.title_invalid()
+        %}aria-invalid="true"
+        {%
+        endif
+        %}
+      />
+    </div>
+    <div class="form-field">
+      <label for="custom-item-type">Type</label>
+      <select id="custom-item-type" name="mediaType">
+        <option value="movie" {% if custom_form.media_type="" ="movie" %}selected{% endif %}>
+          Movie
+        </option>
+        <option value="tv" {% if custom_form.media_type="" ="tv" %}selected{% endif %}>
+          TV Show
+        </option>
+        <option value="book" {% if custom_form.media_type="" ="book" %}selected{% endif %}>
+          Book
+        </option>
+        <option value="game" {% if custom_form.media_type="" ="game" %}selected{% endif %}>
+          Game
+        </option>
+        <option value="comic" {% if custom_form.media_type="" ="comic" %}selected{% endif %}>
+          Comic
+        </option>
+      </select>
+    </div>
+    <div class="form-field">
+      <label for="custom-item-year">Year (Optional)</label>
+      <input
+        id="custom-item-year"
+        name="year"
+        type="text"
+        value="{{custom_form.year}}"
+        placeholder="YYYY"
+        autocomplete="off"
+      />
+    </div>
+    {% if custom_form.custom_order %}
+    <div class="form-field">
+      <label for="custom-item-insertion">Insert at</label>
+      <select id="custom-item-insertion" name="insertionPosition" required>
+        <option
+          value=""
+          {%
+          if
+          custom_form.insertion_position.is_empty()
+          %}selected{%
+          endif
+          %}
+          disabled
+        >
+          Choose position
+        </option>
+        <option
+          value="beginning"
+          {%
+          if
+          custom_form.insertion_position=""
+          ="beginning"
+          %}selected{%
+          endif
+          %}
+        >
+          Beginning
+        </option>
+        <option value="end" {% if custom_form.insertion_position="" ="end" %}selected{% endif %}>
+          End
+        </option>
+      </select>
+    </div>
+    {% endif %}
+  </fieldset>
+  <div class="dialog-footer">
+    <button type="button" class="button-secondary" data-custom-item-dialog-close>Cancel</button>
+    <button type="submit" class="button-primary">Create item</button>
+  </div>
+</form>

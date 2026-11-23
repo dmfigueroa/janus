@@ -1,4 +1,5 @@
 use super::Watchlists;
+use super::add_custom::{self, AddCustomOutcome, CustomItemForm};
 use super::browse::BrowseView;
 use super::dialog::{
     self, DialogFailure, DialogRejection, DialogTarget, WatchlistDialogInput, WatchlistForm,
@@ -150,6 +151,12 @@ where
 #[template(path = "watchlist-form.html")]
 struct FormFragment<'a> {
     form: &'a WatchlistForm,
+}
+
+#[derive(Template)]
+#[template(path = "custom-item-form.html")]
+struct CustomItemFormFragment<'a> {
+    custom_form: &'a CustomItemForm,
 }
 
 fn htmx_request(headers: &HeaderMap) -> bool {
@@ -384,6 +391,146 @@ impl ReorderResponse {
             message: Some(message),
         }
     }
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomItemFields {
+    #[serde(default)]
+    title: Option<String>,
+    #[serde(default)]
+    media_type: Option<String>,
+    #[serde(default)]
+    year: Option<String>,
+    #[serde(default)]
+    insertion_position: Option<String>,
+    #[serde(default)]
+    reference_item_id: Option<i64>,
+}
+
+pub async fn add_custom_item(
+    State(lists): State<Watchlists>,
+    Path(id): Path<i64>,
+    format: ResponseFormat,
+    headers: HeaderMap,
+    FormOrJson(fields): FormOrJson<CustomItemFields>,
+) -> Result<Response, Failure> {
+    let htmx = htmx_request(&headers);
+    let title = fields.title.as_deref().unwrap_or_default();
+    let media_type = fields.media_type.as_deref().unwrap_or("movie");
+    let year = fields.year.as_deref().unwrap_or_default();
+    let insertion_position = fields.insertion_position.as_deref().unwrap_or_default();
+    let custom_order = lists
+        .record(id)
+        .await
+        .map_err(failure)?
+        .is_some_and(|record| record.item_order_mode == super::ItemOrderMode::Custom);
+    let retained = CustomItemForm::for_watchlist(id, custom_order).retain(
+        title,
+        media_type,
+        year,
+        insertion_position,
+    );
+    let addition = match add_custom::parse_addition(
+        Some(id),
+        fields.title.as_deref(),
+        fields.media_type.as_deref().or(Some("movie")),
+        fields.year.as_deref(),
+        None,
+        None,
+        None,
+        fields
+            .insertion_position
+            .as_deref()
+            .filter(|value| !value.is_empty()),
+        fields.reference_item_id,
+    ) {
+        Ok(addition) => addition,
+        Err(failure) => {
+            return Ok(custom_item_rejection(
+                htmx,
+                format,
+                retained.with_error(failure.message().to_owned()),
+                failure.code(),
+            ));
+        }
+    };
+    match lists.add_custom_item(addition).await {
+        Ok(outcome @ (AddCustomOutcome::Added { .. } | AddCustomOutcome::Duplicate { .. })) => {
+            if htmx {
+                Ok(saved_response("Added to watchlist", "custom-item"))
+            } else if format.representation() == Representation::Html {
+                Ok((
+                    StatusCode::SEE_OTHER,
+                    [(header::LOCATION, format!("/v2/watchlists/{id}"))],
+                )
+                    .into_response())
+            } else {
+                Ok(json_response(
+                    StatusCode::OK,
+                    serde_json::json!({
+                        "success": true,
+                        "code": outcome.code(),
+                        "message": outcome.message(),
+                        "watchlistId": id,
+                        "affectedCount": outcome.affected_count(),
+                    }),
+                ))
+            }
+        }
+        Ok(AddCustomOutcome::Rejected(failure)) => Ok(custom_item_rejection(
+            htmx,
+            format,
+            retained.with_error(failure.message().to_owned()),
+            failure.code(),
+        )),
+        Err(error) => {
+            eprintln!("Custom item add failed for watchlist {id}: {error}");
+            Ok(custom_item_rejection(
+                htmx,
+                format,
+                retained.with_error("Unable to add custom item. Please try again."),
+                "internal_error",
+            ))
+        }
+    }
+}
+
+fn custom_item_rejection(
+    htmx: bool,
+    format: ResponseFormat,
+    form: CustomItemForm,
+    code: &'static str,
+) -> Response {
+    if htmx || format.representation() == Representation::Html {
+        return match (CustomItemFormFragment { custom_form: &form }).render() {
+            Ok(html) => {
+                let mut response = (StatusCode::OK, Html(html)).into_response();
+                response
+                    .headers_mut()
+                    .insert(header::VARY, HeaderValue::from_static(WRITE_VARY));
+                response
+            }
+            Err(error) => failure(error).into_response(),
+        };
+    }
+    let status = match code {
+        "not_found" => StatusCode::NOT_FOUND,
+        "validation_error" | "insertion_choice_required" | "not_custom_mode" | "unsupported" => {
+            StatusCode::BAD_REQUEST
+        }
+        _ => StatusCode::INTERNAL_SERVER_ERROR,
+    };
+    json_response(
+        status,
+        serde_json::json!({
+            "success": false,
+            "code": code,
+            "message": form.error,
+            "watchlistId": form.action.rsplit('/').nth(1).and_then(|value| value.parse::<i64>().ok()),
+            "affectedCount": 0,
+        }),
+    )
 }
 
 async fn reorder_result(lists: &Watchlists, id: i64, request: ReorderRequest) -> ReorderResponse {

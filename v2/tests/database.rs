@@ -105,6 +105,12 @@ async fn existing_watchlist_renders_ids_order_filters_and_escaped_content_withou
         html.contains("data-watchlist-dialog-open=\"edit\""),
         "{html}"
     );
+    assert!(html.contains("data-custom-item-dialog-open"), "{html}");
+    assert!(html.contains("id=\"custom-item-dialog\""), "{html}");
+    assert!(
+        html.contains("hx-post=\"/v2/watchlists/41/custom-items\""),
+        "{html}"
+    );
     assert!(html.contains("hx-post=\"/v2/watchlists/41\""), "{html}");
     assert!(
         html.contains("value=\"Café 東京 &#60;collection&#62;\""),
@@ -356,7 +362,7 @@ async fn mcp_discovers_and_reads_existing_watchlist_with_baseline_envelopes_and_
         .await,
     )
     .await;
-    assert_eq!(tools["tools"].as_array().unwrap().len(), 7);
+    assert_eq!(tools["tools"].as_array().unwrap().len(), 8);
     let read=result(rpc(&app,json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_watchlist","arguments":{"watchlistId":41,"pageSize":1}}}),Some(&session)).await).await;
     assert!(read.get("resultType").is_none());
     assert!(read.get("isError").is_none());
@@ -2029,7 +2035,13 @@ async fn mcp_create_and_update_keep_ordered_independent_batch_outcomes() {
     )
     .await;
     let tools = tools["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 7);
+    assert_eq!(tools.len(), 8);
+    assert!(
+        tools
+            .iter()
+            .any(|tool| tool["name"] == "add_custom_items_to_watchlists"),
+        "{tools:?}"
+    );
     let create = tools
         .iter()
         .find(|tool| tool["name"] == "create_watchlists")
@@ -2752,4 +2764,231 @@ async fn mcp_order_mode_contracts_validate_inputs_preserve_batches_and_sync_read
         reorder_in_release["structuredContent"]["results"][0]["code"],
         "not_custom_mode"
     );
+}
+
+#[tokio::test]
+async fn custom_item_additions_persist_through_web_and_mcp_with_destination_rules() {
+    let fixture = Fixture::v1();
+    let before = std::fs::read(&fixture.0).unwrap();
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let lists = janus_v2::Watchlists(database.clone());
+    let app = janus_v2::database_router(database);
+
+    let web = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41/custom-items")
+                .header("content-type", "application/json")
+                .header("accept", "application/json")
+                .body(Body::from(
+                    json!({"title":"Local Screening","mediaType":"movie","year":"2025","insertionPosition":"end"}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let web_status = web.status();
+    let web_text = body(web).await;
+    assert_eq!(web_status, StatusCode::OK, "{web_text}");
+    let web_body: Value = serde_json::from_str(&web_text).unwrap();
+    assert_eq!(web_body["success"], true);
+    assert_eq!(web_body["code"], "added");
+    assert_eq!(web_body["affectedCount"], 1);
+
+    let detail = lists.detail(41).await.unwrap().unwrap();
+    assert!(
+        detail
+            .items
+            .iter()
+            .any(|item| item.title == "Local Screening" && item.source == "custom"),
+        "{:?}",
+        detail.items
+    );
+    assert_eq!(
+        detail.watchlist.watchlist.last_item_added_at.is_some(),
+        true
+    );
+
+    let unsupported = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41/custom-items")
+                .header("content-type", "application/json")
+                .header("accept", "application/json")
+                .body(Body::from(
+                    json!({"title":"Local Series","mediaType":"tv","year":"2025"}).to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(unsupported.status(), StatusCode::BAD_REQUEST);
+    let unsupported_body: Value = serde_json::from_str(&body(unsupported).await).unwrap();
+    assert_eq!(unsupported_body["code"], "unsupported");
+
+    let response = rpc(
+        &app,
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"custom-item-test","version":"1"}}}),
+        None,
+    )
+    .await;
+    let session = response.headers()["mcp-session-id"]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let _ = result(response).await;
+    let _ = rpc(
+        &app,
+        json!({"jsonrpc":"2.0","method":"notifications/initialized"}),
+        Some(&session),
+    )
+    .await;
+
+    let batch = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"add_custom_items_to_watchlists","arguments":{"items":[
+                {"watchlistId":41,"title":"Hand Book","mediaType":"book","insertionPosition":"end"},
+                {"watchlistId":41,"title":"Needs Choice","mediaType":"movie"},
+                {"watchlistId":41,"title":"Bad TV","mediaType":"tv","insertionPosition":"end"},
+                {"watchlistId":999999,"title":"Missing","mediaType":"movie","insertionPosition":"end"},
+                {"watchlistId":41,"mediaType":"episode","title":"First","parentTitle":"A B","episode":"S01E01","insertionPosition":"end"}
+            ]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    let results = batch["structuredContent"]["results"].as_array().unwrap();
+    assert_eq!(results.len(), 5);
+    assert_eq!(results[0]["index"], 0);
+    assert_eq!(results[0]["success"], true);
+    assert_eq!(results[0]["code"], "added");
+    assert_eq!(results[0]["affectedCount"], 1);
+    assert_eq!(results[1]["index"], 1);
+    assert_eq!(results[1]["success"], false);
+    assert_eq!(results[1]["code"], "insertion_choice_required");
+    assert_eq!(results[2]["code"], "unsupported");
+    assert_eq!(results[3]["code"], "not_found");
+    assert_eq!(results[4]["code"], "added");
+    assert_eq!(results[4]["mediaType"], "episode");
+
+    let after = lists.detail(41).await.unwrap().unwrap();
+    let episode = after
+        .items
+        .iter()
+        .find(|item| item.media_type == "episode" && item.title == "First")
+        .unwrap();
+    assert_eq!(episode.parent_id.as_deref(), Some("custom:a%20b"));
+    assert_eq!(episode.parent_title.as_deref(), Some("A B"));
+    assert_eq!(episode.episode.as_deref(), Some("S01E01"));
+
+    let created = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"create_watchlists","arguments":{"watchlists":[{"name":"Priority","itemOrderMode":"custom"}]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    let custom_id = created["structuredContent"]["results"][0]["watchlist"]["id"]
+        .as_i64()
+        .unwrap();
+
+    let missing_choice = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"add_custom_items_to_watchlists","arguments":{"items":[{"watchlistId":custom_id,"title":"Missing Choice","mediaType":"movie"}]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        missing_choice["structuredContent"]["results"][0]["code"],
+        "insertion_choice_required"
+    );
+
+    let beginning = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"add_custom_items_to_watchlists","arguments":{"items":[
+                {"watchlistId":custom_id,"title":"Existing First","mediaType":"movie","insertionPosition":"end"},
+                {"watchlistId":custom_id,"title":"Urgent Pick","mediaType":"movie","year":"2025","insertionPosition":"beginning"}
+            ]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        beginning["structuredContent"]["results"][0]["code"],
+        "added"
+    );
+    assert_eq!(
+        beginning["structuredContent"]["results"][1]["code"],
+        "added"
+    );
+    let custom_detail = lists.detail(custom_id).await.unwrap().unwrap();
+    assert_eq!(
+        custom_detail
+            .items
+            .iter()
+            .map(|item| item.title.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Urgent Pick", "Existing First"]
+    );
+    assert_eq!(
+        custom_detail
+            .items
+            .iter()
+            .map(|item| item.custom_rank)
+            .collect::<Vec<_>>(),
+        vec![Some(1), Some(2)]
+    );
+
+    let release_created = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"create_watchlists","arguments":{"watchlists":[{"name":"Release Dest","itemOrderMode":"release"}]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    let release_id = release_created["structuredContent"]["results"][0]["watchlist"]["id"]
+        .as_i64()
+        .unwrap();
+    let seeded = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"add_custom_items_to_watchlists","arguments":{"items":[{"watchlistId":release_id,"title":"Anchor","mediaType":"movie"}]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(seeded["structuredContent"]["results"][0]["code"], "added");
+    let release_detail = lists.detail(release_id).await.unwrap().unwrap();
+    let anchor_id = release_detail.items[0].id;
+    let anchored = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"add_custom_items_to_watchlists","arguments":{"items":[{"watchlistId":release_id,"title":"Anchored Pick","mediaType":"movie","insertionPosition":"before","referenceItemId":anchor_id}]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        anchored["structuredContent"]["results"][0]["code"],
+        "not_custom_mode"
+    );
+
+    assert_ne!(std::fs::read(&fixture.0).unwrap(), before);
 }

@@ -24,6 +24,8 @@ mod dialog;
 
 pub mod reorder;
 
+pub mod add_custom;
+
 mod timeline;
 
 mod write;

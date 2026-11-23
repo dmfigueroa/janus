@@ -1112,6 +1112,7 @@ watchlist-reorder[aria-busy="true"] {
   }
 
   .form-field input[type="text"],
+  .form-field select,
   .form-field textarea {
     width: 100%;
     min-height: calc(var(--size-7) + var(--size-2));
