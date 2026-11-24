@@ -74,7 +74,7 @@ Exit code `0` means the instance is healthy and safe to drive; exit code `1` pri
 
 ## Drive
 
-Read [`features/README.md`](features/README.md) first, then follow the matching feature file. All browser, HTTP, and read-only DB actions run through `.agents/skills/verify/scripts/verify-janus`.
+Follow the matching feature file under `features/`. All browser, HTTP, and read-only DB actions run through `.agents/skills/verify/scripts/verify-janus`.
 
 ### Browser actions (`drive`)
 
@@ -177,14 +177,18 @@ What `cleanup` does:
 | Helper                                       | Purpose                                                                                                                                                                          |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `.agents/skills/verify/scripts/verify-janus` | Executable wrapper that runs under Node 24 directly (devcontainer) or via `tools/pinned-node.sh` (host) and dispatches `launch`, `doctor`, `drive`, `http`, `db`, and `cleanup`. |
-| `.agents/skills/verify/scripts/lib/*.cjs`    | Modular implementation (`paths.cjs`, `lifecycle.cjs`, `doctor.cjs`, `locators.cjs`, `drive.cjs`, `inspect.cjs`, `cli.cjs`).                                                      |
+| `.agents/skills/verify/scripts/lib/*.cjs`    | Modular implementation (`paths.cjs`, `process.cjs`, `lifecycle.cjs`, `doctor.cjs`, `locators.cjs`, `steps.cjs`, `drive.cjs`, `inspect.cjs`, `cli.cjs`).                          |
 
 ## Feature map
 
-Start at [`features/README.md`](features/README.md) for baseline preconditions and proof rules, then use the mapped feature files:
+Use the mapped feature files directly (each starts from a clean baseline run unless its preconditions say otherwise):
 
-- [Browse and search watchlists](features/watchlists-browse-and-search.md)
-- [Create and edit a watchlist](features/create-and-edit-watchlist.md)
-- [Watchlist timeline and progress](features/watchlist-timeline-and-progress.md)
-- [Custom-order item reordering](features/custom-order-reorder.md)
-- [Watch Now and custom lineups](features/watch-now-and-lineups.md)
+- [Browse and search watchlists](features/watchlists-browse-and-search.md) — v1 and v2 home grids, totals, v2 HTMX Unicode search, clear search, and opening a detail page.
+- [Create and edit a watchlist](features/create-and-edit-watchlist.md) — desktop tile, mobile floating button, v2 native dialog, validation/cancel, metadata/order edit, and cross-surface persistence.
+- [Watchlist timeline and progress](features/watchlist-timeline-and-progress.md) — v1 and v2 detail timelines, title search, watched-run disclosures, unwatched filters, and v1 watched-state toggling with DB and v2 verification.
+- [Custom-order item reordering](features/custom-order-reorder.md) — custom-order keyboard reordering on v2 with HTMX updates, live status announcements, reload persistence, and SQLite rank verification.
+- [Watch Now and custom lineups](features/watch-now-and-lineups.md) — v1 Watch Now landing screen, Manage Lineups, creating a custom lineup, and SQLite verification.
+
+### Feature entry contract
+
+When adding or updating a feature file under `features/`, start with an H1 title and one paragraph describing the user-visible behavior, followed by exactly four H2 sections in order: `Sub-features`, `How to get to it (user POV)`, `Driving it with verify-janus` (starting with `Preconditions:`), and `Gotchas`. Name only user paths, stable handles, required state, exact commands, and observable proof.

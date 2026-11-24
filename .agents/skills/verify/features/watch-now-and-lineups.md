@@ -49,9 +49,9 @@ Preconditions:
   `Weekend Binge` appears in `Manage Lineups` and as a linked section heading on `Watch Now`.
 - **Confirm lineup persistence in SQLite.** Run:
   ```bash
-  .agents/skills/verify/scripts/verify-janus db --run-id lineups --save watch-now-and-lineups/db-lineups.json "SELECT id, name, enabled FROM custom_lineups ORDER BY id"
+  .agents/skills/verify/scripts/verify-janus db --run-id lineups --save watch-now-and-lineups/db-lineups.json "SELECT id, name, kind, enabled FROM lineups WHERE kind = 'custom' ORDER BY id"
   ```
-  Returns a row with `name: "Weekend Binge"` and `enabled: 1`.
+  Returns a row with `name: "Weekend Binge"`, `kind: "custom"`, and `enabled: 1`.
 
 ## Gotchas
 

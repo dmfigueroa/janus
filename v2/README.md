@@ -22,8 +22,8 @@ and v2 template/styles for a UI area, then record evidence in [PARITY.md](PARITY
 the v2 process, and starts the v1 dev server. It prints both local URLs. During `pnpm run dev`
 from the repository root, Nitro proxies `/v2` and `/v2/**` to `127.0.0.1:3001`, so the v1 dev
 server can preview the separate v2 process at `http://localhost:3000/v2`. This development
-proxy is not part of the production v1 bundle; deployment routing remains the separate
-Traefik/Coolify service.
+proxy is not part of the production v1 bundle; deployment routing is handled by the reverse proxy
+in front of the separate v2 service.
 
 Compare the two UIs with Playwright screenshots after `preview:local`:
 
@@ -71,7 +71,7 @@ fixture dependency only.
 
 `JANUS_V2_BIND` defaults to `127.0.0.1:3001`. `DATABASE_URL` is a required filesystem path,
 as in v1. Missing files, incompatible schema and unsupported stored values fail startup.
-The connection supports reorder writes, never creates a file, and leaves journal mode unchanged.
+The connection supports create, update and reorder writes, never creates a file, and leaves journal mode unchanged.
 The pool has at most two connections, a five-second connect/acquire timeout and two-second
 SQLite busy timeout. V1 alone owns migrations. No schema-sync/migration features are enabled.
 The existing directory must be mounted, including WAL/SHM sidecars.
@@ -157,8 +157,8 @@ still replaces the current result page and remains bound to the normalized query
 and mode-specific ranked selections instead of loading every item or issuing per-list
 queries. `web.rs` chooses the full page or the grid fragment;
 HTMX search and pagination swap only `#watchlist-browse` and push the new URL. A
-shared layout provides the v1 bottom navigation on the home and detail pages. Create, edit,
-delete and merge controls remain with their own slices.
+shared layout provides the v1 bottom navigation on the home and detail pages. Delete and
+merge controls remain with their own slices.
 
 Reorder writes renumber the complete displayed sequence, keeping ranks contiguous even
 when v1 deletions left gaps. Watchlist creation writes v1's pause and rotation defaults;
@@ -180,12 +180,13 @@ Dialog DOM regression: `node --test v2/tests/watchlist-form-browser.cjs`.
 Dialog viewport layout: `node --test v2/tests/dialog-layout-browser.cjs` (requires Chromium;
 set `PLAYWRIGHT_BROWSERS=chromium,webkit` to also cover WebKit).
 Browse card sizing: `node --test v2/tests/browse-browser.cjs`.
+Reorder custom-element lifecycle: `node --test v2/tests/reorder-lifecycle-browser.cjs` (Chromium/WebKit).
 Full-page layout regression: `node --test v2/tests/layout-browser.cjs`. The check builds the v2
 debug binary, creates a disposable v1-migrated fixture database, starts its own v2 process on a
 free port and stops it afterwards. It renders `/v2/watchlists` at `390x844` and `1280x800` and
 fails with measured and expected values when footer items leave one row or drift horizontally,
 the grid loses its two mobile or four desktop columns, a card exceeds the 220px cap, or the
-visible "Watchlists" heading regresses. Expected values come from
+visible `Watchlists` section `<h2>` (under `<h1>My Lists</h1>`) regresses. Expected values come from
 `v2/tests/v1-layout-baseline.json`, recorded from the v1 home. To refresh that baseline, start
 `pnpm run preview:local` in another terminal and run
 `JANUS_LAYOUT_RECORD=1 node --test v2/tests/layout-browser.cjs` (set `JANUS_V1_BASE_URL` for a
@@ -204,3 +205,7 @@ CI uploads them as artifacts. The check launches only the Chromium build pinned 
 checked-in `playwright-core` version, so install exactly that build once with
 `pnpm exec playwright-core install chromium`; it does not use whichever cached Playwright browser or
 in-app browser connection is available.
+
+For isolated end-to-end verification across both v1 and v2 against a disposable SQLite database
+with saved transcripts, ARIA snapshots, and screenshots, use the `verify` skill
+(`.agents/skills/verify/SKILL.md`).

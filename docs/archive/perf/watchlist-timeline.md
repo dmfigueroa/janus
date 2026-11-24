@@ -1,5 +1,7 @@
 # Watchlist timeline performance (v1)
 
+> **Archived historical record (2026-11-13, issue #294 / PR #304).** Kept for the recorded before/after benchmark methodology and revisit triggers. Note that `playwright-core` is now a devDependency in `package.json`, though `tools/bench/MeasureTimeline.mjs` still imports `playwright`.
+
 Decision record and reproduction notes for
 [#294](https://github.com/dmfigueroa/janus/issues/294):
 profile large v1 watchlist timelines and virtualize only when measurements justify it.
