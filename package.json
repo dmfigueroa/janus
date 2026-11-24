@@ -13,7 +13,7 @@
     "test:v2:home": "node --test v2/tests/watchlists-home-browser.cjs",
     "test:lint-plugin": "vitest run tools/oxlint/ComponentRendering.test.tsx",
     "lint": "oxlint . && pnpm run lint:css && pnpm run check:agents && pnpm run check:v2-modules",
-    "check:agents": "node tools/check-agent-skill-mappings.mjs",
+    "check:agents": "node tools/check-agent-skill-mappings.mjs ARCHITECTURE.md",
     "check:v2-modules": "node tools/check-v2-module-boundaries.mjs",
     "format": "oxfmt . --write",
     "format:check": "oxfmt . --check",
@@ -113,8 +113,8 @@
     "*.{json,css,html,md}": [
       "oxfmt --write"
     ],
-    "AGENTS.md": [
-      "node tools/check-agent-skill-mappings.mjs"
+    "ARCHITECTURE.md": [
+      "node tools/check-agent-skill-mappings.mjs ARCHITECTURE.md"
     ],
     "*.{js,ts,jsx,tsx,mjs,cjs}": [
       "vitest related --run --passWithNoTests"

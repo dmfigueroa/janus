@@ -1,101 +1,36 @@
-# Transition deployment
+# Deployment
 
-## Verified live state (2026-11-11, issue #253)
+Janus runs as two container images built from the repository root:
 
-V1 remains the application for writes and existing MCP clients. Coolify currently deploys
-two Dockerfile applications on ryumi through its existing build/publish/deploy pipeline:
+- **v1 (`Dockerfile`):** TanStack Start / Node.js application on port `3000`. Owns SQLite schema migrations (`drizzle/`), unported writes, and `/mcp`.
+- **v2 (`v2/Dockerfile`):** Rust application on port `3001`, mounted under the `/v2` path prefix. Serves ported watchlist web routes (`/v2/watchlists`), `/v2/mcp`, `/v2/health/live`, and `/v2/health/ready`.
 
-- V1 `h8gsos0k40kk8s8oo8o4ko0w`, source main, port 3000, revision
-  `669a385b8efa855adfad93f73b734cc5c9a4e709`, host `https://janus.dmfigueroa.com`.
-- V2 `5whktbve62r1oj2m3dp0efet`, `v2/Dockerfile`, port 3001, testing prefix `/v2`.
-  The read slice is tested from PR #278; its source branch is restored to main after
-  verification, while the tested image remains running pending the normal merge/deployment.
+## Coexistence & Routing
 
-Docker inspection confirmed both applications mount the **same existing** volume,
-`h8gsos0k40kk8s8oo8o4ko0w-DB`, at `/app/storage`. The file is
-`/app/storage/sqlite.db`; directory permissions are 755 root:root, file permissions
-644 root:root. Both images currently run as root. No chmod/chown, data initialization,
-volume replacement or schema migration ownership change was performed.
+Both containers mount the same SQLite storage directory at `/app/storage` (database file `/app/storage/sqlite.db`) so SQLite WAL/SHM sidecar files remain accessible to both processes:
 
-V2 opens the existing SQLite file read-only. `/v2/health/live` is process liveness;
-`/v2/health/ready` reports startup compatibility validation. The running service uses
-its existing liveness healthcheck, while independent readiness is verified directly.
+- **V1 owns migrations:** On startup, v1 runs `.output/server/migrate.mjs`, optionally runs `.output/server/seed.mjs` (no-op unless `SEED_ON_STARTUP=true`), and starts the Node server.
+- **V2 validates compatibility without migrating:** V2 opens the existing SQLite file read-write (`create_if_missing(false)`, `read_only(false)` in `v2/src/database/mod.rs`) and fails startup if the file is missing or its schema/stored values do not match `v2/src/database/v1-schema.json`.
+- **Health checks:** `/v2/health/live` checks process liveness; `/v2/health/ready` reports startup schema and compatibility validation.
+- **Reverse proxy routing:** Route `/v2` and `/v2/*` (preserving the `/v2` prefix) to the v2 container on port `3001`, and all other paths to v1 on port `3000`. A v1 `404` on `/v2` indicates the reverse proxy is not routing `/v2` to the v2 container (the local `pnpm run dev` proxy is development-only).
+- **Authentication:** Janus expects an external authentication proxy (such as Cloudflare Access) in front of both web and MCP endpoints rather than managing application user accounts. See [`../docs/mcp.md`](../docs/mcp.md) for Managed OAuth setup.
 
-Local destructive/lock/round-trip tests run only on disposable v1-migrated databases.
-Deployed checks use reads only. See `../v2/PARITY.md` for exact revision, data comparison,
-schema/migration hashes, journal-mode and local-versus-deployed evidence.
-Unauthenticated public requests to v1, v2 web and v2 MCP returned 403. An actual
-Access-authenticated client flow remains unverified; internal container-network reads
-are not evidence of that flow. Existing client destinations were not changed.
+`deploy/compose.yaml` provides a transition Docker Compose stack running both services against a shared database volume. Mount the full database directory and configure external volumes so a missing volume fails rather than silently initializing an empty database.
 
-## Prepared same-application Compose configuration (#252)
+## Demo & Preview Seeding
 
-`compose.yaml` describes separate v1/v2 services in the same Coolify application, with
-independent Dockerfile builds and the existing external database volume. **That topology
-is not active**: live Coolify uses the two applications described above. This discrepancy
-with the parent spec remains explicit; issue #253 does not claim that topology migration.
+`src/db/Seed.ts` seeds demo watchlists and items into an empty database. It is compiled to `.output/server/seed.mjs` in the v1 image and runs at container startup between `migrate.mjs` and `index.mjs`. It is a no-op unless `SEED_ON_STARTUP=true`.
 
-The external volume declaration must fail when the volume is absent; it must never create
-a replacement. Mount the entire directory, including SQLite sidecar files. V1 retains its
-startup command and exclusive ownership of schema migrations.
+To enable seeding in a preview or demo environment:
 
-If activating Compose later, inspect the current application/routing/mount configuration
-again, retain v1 hostname/port mapping and provider configuration, and preserve the `/v2`
-prefix when routing it to port 3001. Verify Access on both testing surfaces and keep
-existing MCP clients on v1. Use the existing Coolify-managed build server and separate
-deployment server; no separate GitHub Actions image-publishing pipeline is introduced.
-
-No final traffic cutover, v1 retirement or schema ownership transfer is included.
-
-## PR previews
-
-Coolify creates one preview per Coolify application. A Janus PR therefore has two preview
-resources when previews are enabled:
-
-- V1: `https://dev-janus-<pr>.dmfigueroa.com`
-- V2: `https://dev-janus-<pr>.dmfigueroa.com/v2`
-
-The v2 preview runs the separate Rust application, not a V1 route. A V1 404 on `/v2`
-means the v2 preview is missing, unhealthy or not routed; debug the v2 container rather
-than the V1 router. The local `pnpm run dev` proxy is a convenience only and is not evidence
-about a Coolify preview.
-
-Inspect the preview resources, then the v2 image and container:
-
-```bash
-docker exec coolify-db psql -U coolify -d coolify -Atc \
-  "select pull_request_id, fqdn, status from application_previews where pull_request_id=<pr> order by id"
-ssh ryumi "docker ps -a --filter name=-pr-<pr> --format '{{.Names}} {{.Status}} {{.Image}}'"
-ssh ryumi "docker exec <v2-container> ls -l /usr/local/bin/janus-v2"
-```
-
-The v2 binary is roughly 10 MB; a few hundred KB means the Docker build emitted the stub
-crate, and `v2/Dockerfile` must force the copied sources newer than the stub artifacts.
-Finish with public checks for `/v2`, `/v2/watchlists` and a detail page.
-
-## Preview environment seeding
-
-`src/db/Seed.ts` seeds demo watchlists and items into an empty database. It is compiled
-to `.output/server/seed.mjs` in the image and runs after migrations at container start,
-between `migrate.mjs` and `index.mjs`. It only writes when `SEED_ON_STARTUP=true`, so the
-production app — which never sets that variable — is unaffected.
-
-Enabling it on a Coolify preview deployment:
-
-1. Set `SEED_ON_STARTUP=true` on the preview deployment's environment.
-2. Point the preview at a **disposable** database. Do not mount the shared production volume
-   `h8gsos0k40kk8s8oo8o4ko0w-DB`: seeding (and ordinary app writes) on that volume would
-   modify production data. Give the preview its own empty volume.
+1. Set `SEED_ON_STARTUP=true` in the v1 container environment.
+2. Mount a **disposable** database volume — never point a seeded or preview instance at a production database.
 
 Behavior:
 
-- Idempotent: skips seeding when the `watchlists` table already has rows, so preview restarts
-  do not duplicate data.
-- Seeds only `watchlists` and `watchlist_items`. The five system lineups are created lazily by
-  `LineupConfiguration.server.ts` on first read; system lineup membership is derived from each
-  watchlist's next-unwatched media type, so no `lineup_watchlists` rows are required.
-- Demo watchlists: Marvel Cinematic Universe, Star Wars, Anime & Manga (release order), and
-  Reading List (custom order). Poster paths are left empty so previews do not depend on TMDB.
+- **Idempotent:** Skips seeding whenever the `watchlists` table already contains rows, so container restarts do not duplicate data.
+- **Scope:** Seeds `watchlists` and `watchlist_items` only. The five system lineups are created lazily by `src/features/lineups/manage/LineupConfiguration.server.ts` on first read.
+- **Demo data:** Seeds four watchlists — Marvel Cinematic Universe, Star Wars, Anime & Manga (release order), and Reading List (custom order) — with empty poster paths so no external provider API keys are required.
 
 Local run against a disposable database:
 

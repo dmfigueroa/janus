@@ -98,7 +98,7 @@ export function checkSkillMappings(markdown, rootDirectory) {
 }
 
 function main() {
-  const agentFile = process.argv[2] ?? "AGENTS.md";
+  const agentFile = process.argv[2] ?? "ARCHITECTURE.md";
   const agentFilePath = resolve(process.cwd(), agentFile);
   const { mappings, errors } = checkSkillMappings(
     readFileSync(agentFilePath, "utf8"),
