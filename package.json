@@ -9,7 +9,7 @@
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",
     "test:v2": "bash tools/pinned-node.sh cargo test --manifest-path v2/Cargo.toml --locked",
-    "test:v2:dom": "node --test v2/tests/htmx-browser.cjs v2/tests/reorder-browser.cjs",
+    "test:v2:dom": "node --test v2/tests/htmx-browser.cjs v2/tests/reorder-browser.cjs v2/tests/item-edit-browser.cjs",
     "test:v2:home": "node --test v2/tests/watchlists-home-browser.cjs",
     "test:lint-plugin": "vitest run tools/oxlint/ComponentRendering.test.tsx",
     "lint": "oxlint . && pnpm run lint:css && pnpm run check:agents && pnpm run check:v2-modules",

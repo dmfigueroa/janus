@@ -13,11 +13,13 @@
     <script type="importmap">
       {
         "imports": {
-          "@janus/watchlist-reorder-groups": "{{ crate::assets::WATCHLIST_REORDER_GROUPS_JS_URL|safe }}"
+          "@janus/watchlist-reorder-groups": "{{ crate::assets::WATCHLIST_REORDER_GROUPS_JS_URL|safe }}",
+          "@janus/item-edit-fields": "{{ crate::assets::ITEM_EDIT_FIELDS_JS_URL|safe }}"
         }
       }
     </script>
     <script type="module" src="{{ crate::assets::WATCHLIST_REORDER_JS_URL }}"></script>
+    <script type="module" src="{{ crate::assets::ITEM_EDIT_DIALOG_JS_URL }}"></script>
     {% block scripts %}{% endblock %}
   </head>
   <body>

@@ -26,7 +26,48 @@
       <p>{{row.parent}} {{row.episode}}</p>
       <p>{{row.date}}</p>
     </div>
-    <span>{% if row.watched %}Watched{% else %}Unwatched{% endif %}</span>
+    <div class="item-controls">
+      <div class="item-actions" data-item-actions="{{row.id}}">
+        <button
+          type="button"
+          class="item-actions-trigger"
+          data-item-actions-trigger="{{row.id}}"
+          aria-label="More actions for {{row.title}}"
+          aria-haspopup="true"
+          aria-expanded="false"
+          aria-controls="item-actions-menu-{{row.id}}"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="1"></circle>
+            <circle cx="19" cy="12" r="1"></circle>
+            <circle cx="5" cy="12" r="1"></circle>
+          </svg>
+        </button>
+        <div id="item-actions-menu-{{row.id}}" class="item-actions-menu" hidden>
+          <button
+            type="button"
+            class="item-action-button"
+            data-item-edit-open="{{row.id}}"
+            hx-get="/v2/watchlists/{{view.id}}/items/{{row.id}}/edit"
+            hx-target="#item-edit-form"
+            hx-swap="outerHTML"
+          >
+            Edit
+          </button>
+        </div>
+      </div>
+      <span class="item-status">{% if row.watched %}Watched{% else %}Unwatched{% endif %}</span>
+    </div>
   </article>
   {% endfor %}{% if run.collapsed %}
 </details>

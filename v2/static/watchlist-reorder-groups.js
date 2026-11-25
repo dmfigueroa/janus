@@ -19,10 +19,10 @@ export class WatchlistReorderGroups {
         touchStartThreshold: 5,
         onMove: () => !watchlist.busy,
         onStart: () => {
-          watchlist.dragging = true;
+          watchlist.setDragging(true);
         },
         onEnd: (event) => {
-          watchlist.dragging = false;
+          watchlist.setDragging(false);
           if (watchlist.busy || watchlist.unchanged(event)) return;
           watchlist.saveDrop(event.item);
         },

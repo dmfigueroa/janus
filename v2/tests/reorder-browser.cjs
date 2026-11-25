@@ -110,12 +110,21 @@ test("failed reconciliation requests a refresh instead of implying a saved order
 });
 
 test("active drags block fragment swaps and swaps do not duplicate initialization", () => {
-  const { dom, window } = openReorderPage(page([1, 2]), () => {
+  const markup = page([1, 2]).replace(
+    "</article>",
+    '<button type="button" data-item-actions-trigger="1" aria-expanded="true">...</button><div class="item-actions-menu"></div></article>',
+  );
+  const { dom, window } = openReorderPage(markup, () => {
     throw new Error("No request expected");
   });
   const timelineElement = window.document.querySelector("watchlist-reorder");
   const sortable = window.Sortable.get(timelineElement);
+  const actionTrigger = timelineElement.querySelector('[data-item-actions-trigger="1"]');
+  const actionMenu = timelineElement.querySelector(".item-actions-menu");
   sortable.options.onStart();
+  assert.equal(actionTrigger.disabled, true);
+  assert.equal(actionTrigger.getAttribute("aria-expanded"), "false");
+  assert.equal(actionMenu.hidden, true);
   const duringDrag = new window.CustomEvent("htmx:beforeSwap", {
     detail: { target: timelineElement },
     cancelable: true,
@@ -129,6 +138,7 @@ test("active drags block fragment swaps and swaps do not duplicate initializatio
     oldIndex: 0,
     newIndex: 0,
   });
+  assert.equal(actionTrigger.disabled, false);
   const afterDrag = new window.CustomEvent("htmx:beforeSwap", {
     detail: { target: timelineElement },
     cancelable: true,

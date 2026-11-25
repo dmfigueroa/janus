@@ -36,6 +36,7 @@ For each later v1 commit, inspect `git diff <baseline>..<new revision> -- src pu
 - [ ] Provider search/details/pagination and additions; TV/comic expansions.
 - [ ] Custom additions, anchored insertion, duplicates, and partial outcomes (including `#289` release-mode anchor rejection).
 - [ ] Edited metadata, item/parent removal, and movement.
+  - [x] Watchlist item metadata editing (`#260`): shared domain primitives (`ItemTitle`, `ReleaseDate`, `PosterPath`, `FieldPatch`, `WatchlistItemChanges`) and atomic `UPDATE watchlist_items ... WHERE id = ? AND watchlist_id = ? RETURNING id` write serving both content-negotiated web endpoints (`GET /v2/watchlists/{id}/items/{item_id}/edit`, `POST /v2/watchlists/{id}/items/{item_id}`) and MCP `edit_watchlist_items`; v1-matching row action trigger (`More actions for <title>` → `Edit`, `44x44` on both v1 and v2), native modal `<dialog id="item-edit-dialog">` with live `no-referrer` poster preview, `YYYY`/`YYYY-MM-DD` date entry and clear, `aria-busy` locking, draft retention on failure, detail reconciliation via `HX-Trigger`, and focus restoration (with `#query` fallback when filtered out). Measured against live v1 and v2 on `/watchlists/1` (`/v2/watchlists/1`) at `390x844` (v1 dialog `358x498`, v2 dialog `356x442`) and `1280x800` (v1 dialog `512x422`, v2 dialog `384x442`), screenshots in `/tmp/janus-issue260-evidence/`. Item/parent removal (`#265`) and movement (`#266`) remain outstanding.
 - [ ] Watch, quiet watch, unwatch, idempotence, and rotation recency.
 - [ ] Watch Now, skip, pause, derived completion, and empty watchlists.
 - [ ] Automatic/custom lineups, membership, enablement, and ordering.
@@ -51,7 +52,7 @@ For each later v1 commit, inspect `git diff <baseline>..<new revision> -- src pu
 
 ## MCP source inventory
 
-7 of 27 tools are implemented in v2 (`v2/src/features/watchlists/mcp/`); the remaining 20 are unported. Reference contracts live in `src/app/mcp/`.
+8 of 27 tools are implemented in v2 (`v2/src/features/watchlists/mcp/`); the remaining 19 are unported. Reference contracts live in `src/app/mcp/`.
 
 - [ ] `add_custom_items_to_watchlists`
 - [ ] `add_media_to_watchlists`
@@ -59,7 +60,7 @@ For each later v1 commit, inspect `git diff <baseline>..<new revision> -- src pu
 - [x] `create_watchlists`
 - [ ] `delete_lineups`
 - [ ] `delete_watchlists`
-- [ ] `edit_watchlist_items`
+- [x] `edit_watchlist_items`
 - [x] `find_watchlist_items`
 - [ ] `get_lineup`
 - [x] `get_watchlist`
@@ -103,9 +104,9 @@ Sources: `vite.config.ts`, `src/lib/PwaRegistration.ts`, `src/components/PwaUpda
 
 ## Current verification & coverage summary
 
-- **Rust & disposable-SQLite integration (`pnpm run test:v2`):** validates fail-closed startup, schema/byte/WAL preservation, bounded locks, reads after v1 writes, v1 reads after v2 writes, Unicode name matching, bound cursors, order-token SHA-256 parity, create/update defaults & timestamps, release↔custom order-mode transitions (tie-breaks, mixed ranked/unranked preservation, atomic rollback, `orderToken`/`nextUnwatched` updates, and `not_custom_mode` rejection), gapped-rank full renumbering, mid-write rollback, and MCP page/batch contract parity.
+- **Rust & disposable-SQLite integration (`pnpm run test:v2`):** validates fail-closed startup, schema/byte/WAL preservation, bounded locks, reads after v1 writes, v1 reads after v2 writes, Unicode name matching, bound cursors, order-token SHA-256 parity, create/update defaults & timestamps, release↔custom order-mode transitions (tie-breaks, mixed ranked/unranked preservation, atomic rollback, `orderToken`/`nextUnwatched` updates, and `not_custom_mode` rejection), gapped-rank full renumbering, mid-write rollback, item metadata tri-state merge patch/boundary parsing/atomic writes/content negotiation (`HX-Trigger`, `303` PRG, `Vary: HX-Request, Accept`)/v1↔v2 round trips, and MCP page/batch contract parity (including `edit_watchlist_items`).
 - **DOM & headless browser suites (`.github/workflows/v2.yml`):**
-  - `pnpm run test:v2:dom`: jsdom HTMX swaps, `#watchlist-refresh` OOB edit-dialog reconciliation, optimistic keyboard reorder, drop anchors, swap suppression during drags/saves, failed-save reconciliation, and filter/scroll/focus restoration.
+  - `pnpm run test:v2:dom`: jsdom HTMX swaps, `#watchlist-refresh` OOB edit-dialog reconciliation, optimistic keyboard reorder, drop anchors, swap suppression and row action trigger disabling during drags/saves, failed-save reconciliation, item action menu and `#item-edit-dialog` modal/live `no-referrer` poster preview/date clear/`aria-busy`/draft preservation/focus restoration (including filtered-out fallback), and filter/scroll/focus restoration.
   - `v2/tests/watchlist-form-browser.cjs` & `dialog-layout-browser.cjs`: dialog opening/cancel focus restoration, validation, pending/error states, and Chromium/WebKit viewport containment.
   - `v2/tests/browse-browser.cjs`, `layout-browser.cjs` (against `v2/tests/v1-layout-baseline.json` at `390x844` and `1280x800`), `watchlists-home-browser.cjs` (`320x568`, `390x844`, `768x1024`, `1280x800`), and `reorder-lifecycle-browser.cjs` (`<watchlist-reorder>` upgrade, inner-fragment swap, stale-listener cleanup).
 - **Explicit non-v1 additions:** the watchlist search bar on `/v2/watchlists` is a v2 addition (no v1 home equivalent) and is not claimed as v1 parity.
