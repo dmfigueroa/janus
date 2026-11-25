@@ -3,12 +3,15 @@ import {
   closeAllItemMenus,
   expandedWatchedItemIds,
   focusInitialItemField,
+  handleItemFieldInput,
+  handleMenuEscape,
   pointerOutsideDialog,
+  requestElement,
   restoreItemFocus,
   setDialogBusy,
-  syncClearDateButton,
+  showFormError,
+  showItemNotification,
   syncDialogDescribedBy,
-  syncPosterPreview,
   toggleItemMenu,
 } from "@janus/item-edit-fields";
 
@@ -19,46 +22,45 @@ class ItemEditDialog {
   returnFocus = null;
   pendingFocus = null;
   openingItem = false;
+  activeOpenRequest = null;
   pressedOutside = false;
   notificationTimeout = 0;
 
   constructor(dialog) {
     this.dialog = dialog;
+    this.documentEvents = [
+      ["click", this.onClick],
+      ["keydown", this.onKeydown],
+      ["input", this.onInput],
+      ["watchlist-item-saved", this.onSaved],
+      ["htmx:beforeRequest", this.onRequest],
+      ["htmx:beforeSwap", this.onBeforeSwap],
+      ["htmx:afterRequest", this.onRequestDone],
+      ["htmx:afterSwap", this.onSwap],
+      ["htmx:afterSettle", this.onRefreshSettled],
+      ["htmx:responseError", this.onTransportError],
+      ["htmx:sendError", this.onTransportError],
+      ["htmx:abort", this.onAbort],
+    ];
+    this.dialogEvents = [
+      ["cancel", this.onCancel],
+      ["close", this.restoreFocus],
+      ["pointerdown", this.onPointerDown],
+      ["pointerup", this.onPointerUp],
+    ];
   }
 
   connect() {
-    document.addEventListener("click", this.onClick);
-    document.addEventListener("keydown", this.onKeydown);
-    document.addEventListener("input", this.onInput);
-    document.addEventListener("watchlist-item-saved", this.onSaved);
-    document.addEventListener("htmx:beforeRequest", this.onRequest);
-    document.addEventListener("htmx:afterRequest", this.onRequestDone);
-    document.addEventListener("htmx:afterSwap", this.onSwap);
-    document.addEventListener("htmx:afterSettle", this.onRefreshSettled);
-    document.addEventListener("htmx:responseError", this.onTransportError);
-    document.addEventListener("htmx:sendError", this.onTransportError);
-    this.dialog.addEventListener("cancel", this.onCancel);
-    this.dialog.addEventListener("close", this.restoreFocus);
-    this.dialog.addEventListener("pointerdown", this.onPointerDown);
-    this.dialog.addEventListener("pointerup", this.onPointerUp);
+    this.documentEvents.forEach(([type, listener]) => document.addEventListener(type, listener));
+    this.dialogEvents.forEach(([type, listener]) => this.dialog.addEventListener(type, listener));
     window.addEventListener("pagehide", this.disconnect, { once: true });
   }
 
   disconnect = () => {
-    document.removeEventListener("click", this.onClick);
-    document.removeEventListener("keydown", this.onKeydown);
-    document.removeEventListener("input", this.onInput);
-    document.removeEventListener("watchlist-item-saved", this.onSaved);
-    document.removeEventListener("htmx:beforeRequest", this.onRequest);
-    document.removeEventListener("htmx:afterRequest", this.onRequestDone);
-    document.removeEventListener("htmx:afterSwap", this.onSwap);
-    document.removeEventListener("htmx:afterSettle", this.onRefreshSettled);
-    document.removeEventListener("htmx:responseError", this.onTransportError);
-    document.removeEventListener("htmx:sendError", this.onTransportError);
-    this.dialog.removeEventListener("cancel", this.onCancel);
-    this.dialog.removeEventListener("close", this.restoreFocus);
-    this.dialog.removeEventListener("pointerdown", this.onPointerDown);
-    this.dialog.removeEventListener("pointerup", this.onPointerUp);
+    this.documentEvents.forEach(([type, listener]) => document.removeEventListener(type, listener));
+    this.dialogEvents.forEach(([type, listener]) =>
+      this.dialog.removeEventListener(type, listener),
+    );
     window.clearTimeout(this.notificationTimeout);
     window.removeEventListener("pagehide", this.disconnect);
     this.pendingRequests.clear();
@@ -69,17 +71,20 @@ class ItemEditDialog {
     if (!(target instanceof Element)) return;
     const menuTrigger = target.closest("[data-item-actions-trigger]");
     if (menuTrigger) {
-      if (menuTrigger.disabled) return;
-      event.preventDefault();
-      toggleItemMenu(menuTrigger);
+      if (!menuTrigger.disabled) {
+        event.preventDefault();
+        toggleItemMenu(menuTrigger);
+      }
       return;
     }
     const editOpener = target.closest("[data-item-edit-open]");
     if (editOpener) {
-      const container = editOpener.closest("[data-item-actions]");
-      this.returnFocus = container?.querySelector("[data-item-actions-trigger]") || null;
+      this.returnFocus =
+        editOpener.closest("[data-item-actions]")?.querySelector("[data-item-actions-trigger]") ||
+        null;
       closeAllItemMenus();
       this.openingItem = true;
+      this.activeOpenRequest = null;
       return;
     }
     if (target.closest("[data-clear-release-date]")) {
@@ -95,20 +100,9 @@ class ItemEditDialog {
     if (!target.closest(".item-actions-menu")) closeAllItemMenus();
   };
 
-  onKeydown = (event) => {
-    if (event.key !== "Escape" || this.dialog.open) return;
-    const openTrigger = document.querySelector('[data-item-actions-trigger][aria-expanded="true"]');
-    if (!openTrigger) return;
-    closeAllItemMenus();
-    openTrigger.focus();
-  };
+  onKeydown = (event) => handleMenuEscape(this.dialog, event);
 
-  onInput = (event) => {
-    const target = event.target;
-    if (!(target instanceof Element) || !this.dialog.contains(target)) return;
-    if (target.id === "item-edit-poster") syncPosterPreview(this.dialog, target.value);
-    if (target.id === "item-edit-release-date") syncClearDateButton(this.dialog, target.value);
-  };
+  onInput = (event) => handleItemFieldInput(this.dialog, event);
 
   onSaved = (event) => {
     const detail = event.detail;
@@ -117,14 +111,31 @@ class ItemEditDialog {
       expanded: expandedWatchedItemIds(),
     };
     this.close(true);
-    this.showNotification(detail?.message || "Changes saved successfully");
+    this.notificationTimeout = showItemNotification(
+      detail?.message || "Changes saved successfully",
+      this.notificationTimeout,
+    );
   };
 
   onRequest = (event) => {
+    const opener = this.openerFromRequest(event);
+    if (opener) {
+      this.activeOpenRequest = event.detail?.xhr || opener;
+      return;
+    }
     const form = this.formFromRequest(event);
     if (!form) return;
     this.pendingRequests.add(event.detail?.xhr || form);
     setDialogBusy(this.dialog, true);
+  };
+
+  onBeforeSwap = (event) => {
+    const opener = this.openerFromRequest(event);
+    if (!opener) return;
+    const token = event.detail?.xhr || opener;
+    if (this.openingItem && (!this.activeOpenRequest || this.activeOpenRequest === token)) return;
+    if (event.detail) event.detail.shouldSwap = false;
+    event.preventDefault();
   };
 
   onRequestDone = (event) => {
@@ -134,17 +145,26 @@ class ItemEditDialog {
     setDialogBusy(this.dialog, this.pendingRequests.size > 0);
   };
 
-  onTransportError = (event) => {
-    const element = event.detail?.elt || event.detail?.requestConfig?.elt;
-    if (element instanceof Element && element.closest("[data-item-edit-open]")) {
+  onAbort = (event) => {
+    const opener = this.openerFromRequest(event);
+    if (opener && this.activeOpenRequest === (event.detail?.xhr || opener)) {
       this.openingItem = false;
+      this.activeOpenRequest = null;
+    }
+  };
+
+  onTransportError = (event) => {
+    const opener = this.openerFromRequest(event);
+    if (opener) {
+      const token = event.detail?.xhr || opener;
+      if (!this.activeOpenRequest || this.activeOpenRequest === token) {
+        this.openingItem = false;
+        this.activeOpenRequest = null;
+      }
       return;
     }
     const form = this.formFromRequest(event);
-    if (!form || !this.dialog.open) return;
-    const error = form.querySelector("#item-edit-form-error");
-    if (error) error.textContent = GENERIC_SAVE_ERROR;
-    syncDialogDescribedBy(this.dialog);
+    if (form && this.dialog.open) showFormError(this.dialog, form, GENERIC_SAVE_ERROR);
   };
 
   onSwap = (event) => {
@@ -153,6 +173,7 @@ class ItemEditDialog {
     if (target.id !== "item-edit-form" && !this.dialog.contains(target)) return;
     if (this.openingItem && !this.dialog.open) {
       this.openingItem = false;
+      this.activeOpenRequest = null;
       this.dialog.showModal();
     }
     if (!this.dialog.open) return;
@@ -172,8 +193,9 @@ class ItemEditDialog {
   };
 
   onPointerDown = (event) => {
-    if ("closedBy" in HTMLDialogElement.prototype) return;
-    this.pressedOutside = pointerOutsideDialog(this.dialog, event);
+    if (!("closedBy" in HTMLDialogElement.prototype)) {
+      this.pressedOutside = pointerOutsideDialog(this.dialog, event);
+    }
   };
 
   onPointerUp = (event) => {
@@ -189,29 +211,14 @@ class ItemEditDialog {
   };
 
   close(force = false) {
-    if (!this.dialog.open || (!force && this.isBusy())) return;
-    this.dialog.close();
+    if (this.dialog.open && (force || !this.isBusy())) this.dialog.close();
   }
 
-  formFromRequest(event) {
-    const element = event.detail?.elt || event.detail?.requestConfig?.elt;
-    return element instanceof Element ? element.closest("#item-edit-form") : null;
-  }
+  openerFromRequest = (event) => requestElement(event)?.closest("[data-item-edit-open]") || null;
 
-  isBusy() {
-    return this.dialog.getAttribute("aria-busy") === "true";
-  }
+  formFromRequest = (event) => requestElement(event)?.closest("#item-edit-form") || null;
 
-  showNotification(message) {
-    const notification = document.getElementById("notification");
-    if (!notification) return;
-    notification.textContent = message;
-    notification.removeAttribute("hidden");
-    window.clearTimeout(this.notificationTimeout);
-    this.notificationTimeout = window.setTimeout(() => {
-      notification.setAttribute("hidden", "");
-    }, 4000);
-  }
+  isBusy = () => this.dialog.getAttribute("aria-busy") === "true";
 }
 
 const itemEditDialogElement = document.getElementById("item-edit-dialog");

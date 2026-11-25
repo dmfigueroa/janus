@@ -60,7 +60,10 @@
             data-item-edit-open="{{row.id}}"
             hx-get="/v2/watchlists/{{view.id}}/items/{{row.id}}/edit"
             hx-target="#item-edit-form"
+            hx-select="#item-edit-form"
             hx-swap="outerHTML"
+            hx-sync="#item-edit-dialog:replace"
+            hx-vals="unset"
           >
             Edit
           </button>

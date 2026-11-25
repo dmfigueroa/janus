@@ -121,3 +121,40 @@ export function pointerOutsideDialog(dialog, event) {
     event.clientY > bounds.bottom
   );
 }
+
+export function requestElement(event) {
+  const element = event.detail?.elt || event.detail?.requestConfig?.elt;
+  return element instanceof Element ? element : null;
+}
+
+export function showItemNotification(message, previousTimeout) {
+  const notification = document.getElementById("notification");
+  if (!notification) return 0;
+  notification.textContent = message;
+  notification.removeAttribute("hidden");
+  window.clearTimeout(previousTimeout);
+  return window.setTimeout(() => {
+    notification.setAttribute("hidden", "");
+  }, 4000);
+}
+
+export function handleItemFieldInput(dialog, event) {
+  const target = event.target;
+  if (!(target instanceof Element) || !dialog.contains(target)) return;
+  if (target.id === "item-edit-poster") syncPosterPreview(dialog, target.value);
+  if (target.id === "item-edit-release-date") syncClearDateButton(dialog, target.value);
+}
+
+export function handleMenuEscape(dialog, event) {
+  if (event.key !== "Escape" || dialog.open) return;
+  const openTrigger = document.querySelector('[data-item-actions-trigger][aria-expanded="true"]');
+  if (!openTrigger) return;
+  closeAllItemMenus();
+  openTrigger.focus();
+}
+
+export function showFormError(dialog, form, message) {
+  const error = form.querySelector("#item-edit-form-error");
+  if (error) error.textContent = message;
+  syncDialogDescribedBy(dialog);
+}
