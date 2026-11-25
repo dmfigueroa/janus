@@ -356,7 +356,7 @@ async fn mcp_discovers_and_reads_existing_watchlist_with_baseline_envelopes_and_
         .await,
     )
     .await;
-    assert_eq!(tools["tools"].as_array().unwrap().len(), 7);
+    assert_eq!(tools["tools"].as_array().unwrap().len(), 8);
     let read=result(rpc(&app,json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_watchlist","arguments":{"watchlistId":41,"pageSize":1}}}),Some(&session)).await).await;
     assert!(read.get("resultType").is_none());
     assert!(read.get("isError").is_none());
@@ -2029,7 +2029,7 @@ async fn mcp_create_and_update_keep_ordered_independent_batch_outcomes() {
     )
     .await;
     let tools = tools["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 7);
+    assert_eq!(tools.len(), 8);
     let create = tools
         .iter()
         .find(|tool| tool["name"] == "create_watchlists")
@@ -2751,5 +2751,581 @@ async fn mcp_order_mode_contracts_validate_inputs_preserve_batches_and_sync_read
     assert_eq!(
         reorder_in_release["structuredContent"]["results"][0]["code"],
         "not_custom_mode"
+    );
+}
+
+#[tokio::test]
+async fn web_edit_item_negotiates_htmx_html_json_validates_and_preserves_unmodified_columns() {
+    let fixture = Fixture::v1();
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let schema_before = schema_snapshot(&database).await;
+    let lists = janus_v2::Watchlists(database.clone());
+    let app = janus_v2::database_router(database.clone());
+
+    let before_detail = lists.detail(41).await.unwrap().unwrap();
+    let before_item_101 = before_detail
+        .items
+        .iter()
+        .find(|item| item.id == 101)
+        .unwrap()
+        .clone();
+
+    let edit_form = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v2/watchlists/41/items/102/edit")
+                .header("hx-request", "true")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(edit_form.status(), StatusCode::OK);
+    assert_eq!(edit_form.headers()["vary"], "HX-Request, Accept");
+    let form_html = body(edit_form).await;
+    assert!(form_html.contains("id=\"item-edit-form\""), "{form_html}");
+    assert!(form_html.contains("value=\"Second\""), "{form_html}");
+    assert!(form_html.contains("value=\"2020-02-02\""), "{form_html}");
+    assert!(form_html.contains("value=\"/poster.jpg\""), "{form_html}");
+    assert!(
+        form_html.contains("src=\"https://image.tmdb.org/t/p/w500/poster.jpg\""),
+        "{form_html}"
+    );
+    assert!(
+        form_html.contains("referrerpolicy=\"no-referrer\""),
+        "{form_html}"
+    );
+
+    let edit_form_json = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v2/watchlists/41/items/102/edit")
+                .header("accept", "application/json")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(edit_form_json.status(), StatusCode::OK);
+    assert_eq!(edit_form_json.headers()["vary"], "HX-Request, Accept");
+    assert_eq!(
+        serde_json::from_str::<Value>(&body(edit_form_json).await).unwrap(),
+        json!({
+            "watchlistId": 41,
+            "watchlistItemId": 102,
+            "title": "Second",
+            "releaseDate": "2020-02-02",
+            "posterPath": "/poster.jpg"
+        })
+    );
+
+    let missing_form = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v2/watchlists/42/items/101/edit")
+                .header("accept", "application/json")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(missing_form.status(), StatusCode::NOT_FOUND);
+    assert_eq!(
+        serde_json::from_str::<Value>(&body(missing_form).await).unwrap()["code"],
+        "not_found"
+    );
+
+    let invalid_htmx = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41/items/101")
+                .header("hx-request", "true")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(
+                    "title=Draft+Title&releaseDate=2025-02-29&posterPath=http%3A%2F%2Finvalid.example%2Fp.jpg",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(invalid_htmx.status(), StatusCode::OK);
+    assert_eq!(invalid_htmx.headers()["vary"], "HX-Request, Accept");
+    let invalid_html = body(invalid_htmx).await;
+    assert!(
+        invalid_html.contains("Release date must be a valid calendar date."),
+        "{invalid_html}"
+    );
+    assert!(
+        invalid_html.contains("value=\"Draft Title\""),
+        "{invalid_html}"
+    );
+    assert!(
+        invalid_html.contains("value=\"2025-02-29\""),
+        "{invalid_html}"
+    );
+    assert!(
+        invalid_html.contains("value=\"http://invalid.example/p.jpg\""),
+        "{invalid_html}"
+    );
+    assert!(
+        !invalid_html.contains("src=\"http://invalid.example/p.jpg\""),
+        "{invalid_html}"
+    );
+
+    let invalid_json_empty_string = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41/items/101")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"releaseDate": ""}).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(invalid_json_empty_string.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        invalid_json_empty_string.headers()["vary"],
+        "HX-Request, Accept"
+    );
+    assert_eq!(
+        serde_json::from_str::<Value>(&body(invalid_json_empty_string).await).unwrap()["code"],
+        "validation_error"
+    );
+
+    let htmx_saved = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41/items/101")
+                .header("hx-request", "true")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(
+                    "title=++Trimmed+From+V2++&releaseDate=2025&posterPath=https%3A%2F%2Fimages.example.com%2Fv2-edited.jpg",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(htmx_saved.status(), StatusCode::NO_CONTENT);
+    assert_eq!(htmx_saved.headers()["vary"], "HX-Request, Accept");
+    let trigger: Value =
+        serde_json::from_str(htmx_saved.headers()["hx-trigger"].to_str().unwrap()).unwrap();
+    assert_eq!(trigger["watchlist-item-saved"]["watchlistId"], 41);
+    assert_eq!(trigger["watchlist-item-saved"]["watchlistItemId"], 101);
+
+    let prg_clear = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41/items/102")
+                .header("accept", "text/html")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from("title=Second&releaseDate=&posterPath="))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(prg_clear.status(), StatusCode::SEE_OTHER);
+    assert_eq!(prg_clear.headers()["location"], "/v2/watchlists/41");
+    assert_eq!(prg_clear.headers()["vary"], "HX-Request, Accept");
+
+    let json_partial = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41/items/103")
+                .header("content-type", "application/json")
+                .body(Body::from(json!({"title": "  Renamed Book  "}).to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(json_partial.status(), StatusCode::OK);
+    assert_eq!(json_partial.headers()["vary"], "HX-Request, Accept");
+    assert_eq!(
+        serde_json::from_str::<Value>(&body(json_partial).await).unwrap(),
+        json!({
+            "success": true,
+            "code": "edited",
+            "message": "Watchlist item edited.",
+            "watchlistId": 41,
+            "watchlistItemId": 103
+        })
+    );
+
+    let after_detail = lists.detail(41).await.unwrap().unwrap();
+    assert_eq!(
+        after_detail.watchlist.watchlist.updated_at,
+        before_detail.watchlist.watchlist.updated_at
+    );
+    assert_eq!(
+        after_detail.watchlist.watchlist.last_watched_at,
+        before_detail.watchlist.watchlist.last_watched_at
+    );
+    let after_item_101 = after_detail
+        .items
+        .iter()
+        .find(|item| item.id == 101)
+        .unwrap();
+    assert_eq!(after_item_101.title, "Trimmed From V2");
+    assert_eq!(after_item_101.release_date.as_deref(), Some("2025"));
+    assert_eq!(
+        after_item_101.poster_path.as_deref(),
+        Some("https://images.example.com/v2-edited.jpg")
+    );
+    assert_eq!(after_item_101.tmdb_id, before_item_101.tmdb_id);
+    assert_eq!(after_item_101.source, before_item_101.source);
+    assert_eq!(after_item_101.media_type, before_item_101.media_type);
+    assert_eq!(after_item_101.custom_rank, before_item_101.custom_rank);
+    assert_eq!(after_item_101.is_watched, before_item_101.is_watched);
+    assert_eq!(after_item_101.added_at, before_item_101.added_at);
+    assert_eq!(
+        after_detail
+            .watchlist
+            .stats
+            .next_unwatched
+            .as_ref()
+            .unwrap()
+            .title,
+        "Trimmed From V2"
+    );
+    assert_eq!(
+        after_detail.watchlist.stats.cover_image.as_deref(),
+        Some("https://images.example.com/v2-edited.jpg")
+    );
+    let after_item_103 = after_detail
+        .items
+        .iter()
+        .find(|item| item.id == 103)
+        .unwrap();
+    assert_eq!(after_item_103.title, "Renamed Book");
+    assert_eq!(
+        after_item_103.poster_path.as_deref(),
+        Some("https://images.example/poster.jpg")
+    );
+
+    let summaries = lists.all_summaries().await.unwrap();
+    let summary_41 = summaries
+        .iter()
+        .find(|summary| summary.watchlist.id == 41)
+        .unwrap();
+    assert_eq!(
+        summary_41.stats.next_unwatched.as_ref().unwrap().title,
+        "Trimmed From V2"
+    );
+    assert_eq!(
+        summary_41.stats.cover_image.as_deref(),
+        Some("https://images.example.com/v2-edited.jpg")
+    );
+
+    assert_eq!(schema_before, schema_snapshot(&database).await);
+    change_v1(&fixture, "check-v2-edited-items");
+
+    change_v1(&fixture, "reject-item-title");
+    let db_error = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41/items/101")
+                .header("hx-request", "true")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from("title=Will+Abort&releaseDate=2026"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(db_error.status(), StatusCode::OK);
+    let db_error_html = body(db_error).await;
+    assert!(
+        db_error_html.contains("Failed to save changes. Please try again."),
+        "{db_error_html}"
+    );
+    assert!(
+        db_error_html.contains("value=\"Will Abort\""),
+        "{db_error_html}"
+    );
+    assert!(db_error_html.contains("value=\"2026\""), "{db_error_html}");
+}
+
+#[tokio::test]
+async fn release_order_edit_updates_order_token_next_unwatched_cover_and_v1_round_trip() {
+    let fixture = Fixture::v1();
+    change_v1(&fixture, "release");
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let lists = janus_v2::Watchlists(database.clone());
+    let app = janus_v2::database_router(database);
+
+    let before = lists.detail(41).await.unwrap().unwrap();
+    assert_eq!(
+        before.items.iter().map(|item| item.id).collect::<Vec<_>>(),
+        vec![101, 102, 103]
+    );
+    assert_eq!(
+        before.watchlist.stats.next_unwatched.as_ref().unwrap().id,
+        101
+    );
+    let token_before = before.order_token.clone();
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/41/items/103")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({
+                        "releaseDate": "2018-05-01",
+                        "posterPath": "/earliest-cover.jpg"
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let after = lists.detail(41).await.unwrap().unwrap();
+    assert_eq!(
+        after.items.iter().map(|item| item.id).collect::<Vec<_>>(),
+        vec![103, 101, 102]
+    );
+    assert_ne!(after.order_token, token_before);
+    assert_eq!(
+        after.watchlist.stats.next_unwatched.as_ref().unwrap().id,
+        103
+    );
+    assert_eq!(
+        after.watchlist.stats.cover_image.as_deref(),
+        Some("/earliest-cover.jpg")
+    );
+
+    change_v1(&fixture, "v1-edit-item");
+    let after_v1 = lists.detail(41).await.unwrap().unwrap();
+    assert_eq!(after_v1.items[0].id, 103);
+    assert_eq!(after_v1.items[0].title, "Edited From V1");
+    assert_eq!(
+        after_v1.items[0].release_date.as_deref(),
+        Some("2019-06-15")
+    );
+    assert_eq!(
+        after_v1.items[0].poster_path.as_deref(),
+        Some("/from-v1.jpg")
+    );
+}
+
+#[tokio::test]
+async fn mcp_edit_watchlist_items_preserves_schema_annotations_rejection_and_batch_isolation() {
+    let fixture = Fixture::v1();
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let lists = janus_v2::Watchlists(database.clone());
+    let app = janus_v2::database_router(database);
+
+    let initialized = rpc(
+        &app,
+        json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"edit-item-mcp","version":"1"}}}),
+        None,
+    )
+    .await;
+    let session = initialized.headers()["mcp-session-id"]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let _ = result(initialized).await;
+
+    let listed = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":2,"method":"tools/list"}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    let edit_tool = listed["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["name"] == "edit_watchlist_items")
+        .unwrap();
+    assert_eq!(edit_tool["annotations"]["readOnlyHint"], false);
+    assert_eq!(edit_tool["annotations"]["destructiveHint"], false);
+    assert_eq!(edit_tool["annotations"]["idempotentHint"], false);
+    assert!(
+        edit_tool["description"]
+            .as_str()
+            .unwrap()
+            .contains("title, release date, and poster image")
+    );
+    assert_eq!(
+        edit_tool["inputSchema"]["properties"]["edits"]["items"]["properties"]["posterImage"]["type"],
+        json!(["string", "null"])
+    );
+    assert_eq!(
+        edit_tool["outputSchema"]["properties"]["results"]["items"]["required"],
+        json!(["index", "success", "code", "message"])
+    );
+
+    for malformed in [
+        json!({"edits": []}),
+        json!({"edits": [{"watchlistId": 41, "watchlistItemId": 101, "title": null}]}),
+        json!({"edits": [{"watchlistId": "41", "watchlistItemId": 101, "title": "Bad"}]}),
+        json!({"edits": [{"watchlistId": 41, "watchlistItemId": 101, "posterImage": 123}]}),
+    ] {
+        let rejected = rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"edit_watchlist_items","arguments":malformed}}),
+            Some(&session),
+        )
+        .await;
+        let payload: Value = serde_json::from_str(&body(rejected).await).unwrap();
+        assert_eq!(payload["error"]["code"], -32602, "{payload}");
+    }
+
+    let batch = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"edit_watchlist_items","arguments":{"edits":[
+                {
+                    "watchlistId": 41,
+                    "watchlistItemId": 101,
+                    "title": "  Edited via MCP  ",
+                    "releaseDate": "2025-02-03",
+                    "posterImage": "https://images.example.com/edited.jpg"
+                },
+                {
+                    "watchlistId": 41,
+                    "watchlistItemId": 999999,
+                    "title": "Missing",
+                    "releaseDate": null,
+                    "posterImage": null
+                },
+                {
+                    "watchlistId": 41,
+                    "watchlistItemId": 101,
+                    "title": "   "
+                },
+                {
+                    "watchlistId": 41,
+                    "watchlistItemId": 101,
+                    "posterImage": "http://insecure.example.com/poster.jpg"
+                },
+                {
+                    "watchlistId": 41,
+                    "watchlistItemId": 101,
+                    "releaseDate": ""
+                },
+                {
+                    "watchlistId": 41,
+                    "watchlistItemId": 101,
+                    "posterImage": ""
+                },
+                {
+                    "watchlistId": 41,
+                    "watchlistItemId": 101
+                },
+                {
+                    "watchlistId": 41,
+                    "watchlistItemId": 102,
+                    "releaseDate": null,
+                    "posterImage": null
+                }
+            ]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    assert!(batch.get("isError").is_none());
+    let results = batch["structuredContent"]["results"].as_array().unwrap();
+    assert_eq!(results.len(), 8);
+    assert_eq!(
+        results[0],
+        json!({
+            "index": 0,
+            "success": true,
+            "code": "edited",
+            "message": "Watchlist item edited.",
+            "watchlistId": 41,
+            "watchlistItemId": 101
+        })
+    );
+    assert_eq!(
+        results[1],
+        json!({
+            "index": 1,
+            "success": false,
+            "code": "not_found",
+            "message": "Watchlist item not found.",
+            "watchlistId": 41,
+            "watchlistItemId": 999999
+        })
+    );
+    assert_eq!(results[2]["code"], "validation_error");
+    assert_eq!(results[2]["message"], "Title is required.");
+    assert_eq!(results[3]["code"], "validation_error");
+    assert_eq!(
+        results[3]["message"],
+        "Poster image must be an HTTPS URL or a provider path beginning with /."
+    );
+    assert_eq!(results[4]["code"], "validation_error");
+    assert_eq!(
+        results[4]["message"],
+        "Release date must be YYYY or YYYY-MM-DD."
+    );
+    assert_eq!(results[5]["code"], "validation_error");
+    assert_eq!(
+        results[5]["message"],
+        "Poster image must be an HTTPS URL or a provider path beginning with /."
+    );
+    assert_eq!(results[6]["code"], "validation_error");
+    assert_eq!(results[6]["message"], "No fields to update.");
+    assert_eq!(results[7]["code"], "edited");
+    assert_eq!(results[7]["watchlistItemId"], 102);
+
+    let persisted_101 = lists.item(41, 101).await.unwrap().unwrap();
+    assert_eq!(persisted_101.title, "Edited via MCP");
+    assert_eq!(persisted_101.release_date.as_deref(), Some("2025-02-03"));
+    assert_eq!(
+        persisted_101.poster_path.as_deref(),
+        Some("https://images.example.com/edited.jpg")
+    );
+    let persisted_102 = lists.item(41, 102).await.unwrap().unwrap();
+    assert_eq!(persisted_102.title, "Second");
+    assert_eq!(persisted_102.release_date, None);
+    assert_eq!(persisted_102.poster_path, None);
+
+    change_v1(&fixture, "reject-item-title");
+    let isolated_error = result(
+        rpc(
+            &app,
+            json!({"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"edit_watchlist_items","arguments":{"edits":[
+                {"watchlistId": 41, "watchlistItemId": 101, "title": "Aborted"},
+                {"watchlistId": 41, "watchlistItemId": 103, "title": "Survives"}
+            ]}}}),
+            Some(&session),
+        )
+        .await,
+    )
+    .await;
+    let isolated_results = isolated_error["structuredContent"]["results"]
+        .as_array()
+        .unwrap();
+    assert_eq!(isolated_results[0]["code"], "internal_error");
+    assert_eq!(isolated_results[1]["code"], "edited");
+    assert_eq!(
+        lists.item(41, 103).await.unwrap().unwrap().title,
+        "Survives"
     );
 }
