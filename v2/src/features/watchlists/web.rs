@@ -4,7 +4,10 @@ use super::dialog::{
     self, DialogFailure, DialogRejection, DialogTarget, WatchlistDialogInput, WatchlistForm,
     WatchlistMutation,
 };
-use super::item_dialog::{self, ItemEditFailure, ItemEditForm, ItemEditInput, ItemEditRejection};
+use super::item_dialog::{
+    self, ItemEditEncoding, ItemEditFailure, ItemEditForm, ItemEditInput, ItemEditRejection,
+    RawField,
+};
 use super::timeline::{TimelineFilters, TimelineView};
 use super::write::UpdateOutcome;
 use crate::http::{FormOrJson, Representation, ResponseFormat};
@@ -424,12 +427,22 @@ async fn reorder_result(lists: &Watchlists, id: i64, request: ReorderRequest) ->
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ItemEditFields {
-    #[serde(deserialize_with = "nullable_field")]
-    title: Option<Option<String>>,
-    #[serde(deserialize_with = "nullable_field")]
-    release_date: Option<Option<String>>,
-    #[serde(deserialize_with = "nullable_field")]
-    poster_path: Option<Option<String>>,
+    #[serde(deserialize_with = "raw_field")]
+    title: RawField,
+    #[serde(deserialize_with = "raw_field")]
+    release_date: RawField,
+    #[serde(deserialize_with = "raw_field")]
+    poster_path: RawField,
+}
+
+fn raw_field<'de, D>(deserializer: D) -> Result<RawField, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(match Option::<String>::deserialize(deserializer)? {
+        None => RawField::Null,
+        Some(value) => RawField::Value(value),
+    })
 }
 
 #[derive(Template)]
@@ -562,7 +575,11 @@ pub async fn edit_item(
         title: fields.title,
         release_date: fields.release_date,
         poster_path: fields.poster_path,
-        empty_clears: !is_json_content_type(&headers),
+        encoding: if is_json_content_type(&headers) {
+            ItemEditEncoding::Json
+        } else {
+            ItemEditEncoding::Form
+        },
     };
     let Some(item) = lists.item(watchlist_id, item_id).await.map_err(failure)? else {
         return Ok(item_rejection_response(

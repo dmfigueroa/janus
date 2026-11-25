@@ -1,11 +1,8 @@
-//! Watchlist item metadata edit dialog: validation, draft retention and outcomes.
-
 use super::WatchlistItem;
 use super::write::{
     FieldPatch, ItemMetadataError, ItemTitle, PosterPath, ReleaseDate, WatchlistItemChanges,
 };
 
-/// Identifies which form field failed validation for `aria-invalid` targeting.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ItemInvalidField {
     Title,
@@ -13,7 +10,20 @@ pub enum ItemInvalidField {
     PosterPath,
 }
 
-/// Display values for the item metadata edit dialog form.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum RawField {
+    #[default]
+    Omitted,
+    Null,
+    Value(String),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ItemEditEncoding {
+    Form,
+    Json,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItemEditForm {
     pub watchlist_id: i64,
@@ -78,20 +88,14 @@ impl ItemEditForm {
     }
 }
 
-/// Raw tri-state item edit values submitted via HTML form or JSON.
-///
-/// An absent field is `None`; a present field is `Some`, and `Some(None)` means
-/// JSON `null`. When `empty_clears` is true (HTML form encoding), `Some(Some(""))`
-/// clears optional fields.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItemEditInput {
-    pub title: Option<Option<String>>,
-    pub release_date: Option<Option<String>>,
-    pub poster_path: Option<Option<String>>,
-    pub empty_clears: bool,
+    pub title: RawField,
+    pub release_date: RawField,
+    pub poster_path: RawField,
+    pub encoding: ItemEditEncoding,
 }
 
-/// Why an item edit submission was rejected.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ItemEditFailure {
     Validation(&'static str, Option<ItemInvalidField>),
@@ -124,7 +128,6 @@ impl ItemEditFailure {
     }
 }
 
-/// A rejected item edit together with the draft-retaining form to re-render.
 #[derive(Debug)]
 pub struct ItemEditRejection {
     pub failure: ItemEditFailure,
@@ -140,11 +143,6 @@ impl ItemEditRejection {
     }
 }
 
-/// Validates an item edit submission against its stored item.
-///
-/// # Errors
-/// Returns an [`ItemEditRejection`] retaining every submitted draft value so the
-/// dialog can re-render without discarding user edits.
 pub fn submit(
     item: &WatchlistItem,
     input: &ItemEditInput,
@@ -152,8 +150,6 @@ pub fn submit(
     parse_changes(item, input).map_err(|failure| rejected(item, input, failure))
 }
 
-/// Builds a rejection for a failure discovered after validation, such as a
-/// concurrent deletion or database error.
 pub fn rejected(
     item: &WatchlistItem,
     input: &ItemEditInput,
@@ -169,33 +165,37 @@ fn parse_changes(
     item: &WatchlistItem,
     input: &ItemEditInput,
 ) -> Result<WatchlistItemChanges, ItemEditFailure> {
-    let title = match input.title.as_ref() {
-        None => None,
-        Some(None) => {
+    let title = match &input.title {
+        RawField::Omitted => None,
+        RawField::Null => {
             return Err(ItemEditFailure::Validation(
                 ItemMetadataError::TitleRequired.message(),
                 Some(ItemInvalidField::Title),
             ));
         }
-        Some(Some(raw)) => Some(ItemTitle::parse(raw).map_err(|error| {
+        RawField::Value(raw) => Some(ItemTitle::parse(raw).map_err(|error| {
             ItemEditFailure::Validation(error.message(), Some(ItemInvalidField::Title))
         })?),
     };
 
-    let release_date = match input.release_date.as_ref() {
-        None => FieldPatch::Keep,
-        Some(None) => FieldPatch::Clear,
-        Some(Some(raw)) if input.empty_clears && raw.is_empty() => FieldPatch::Clear,
-        Some(Some(raw)) => FieldPatch::Replace(ReleaseDate::parse(raw).map_err(|error| {
+    let release_date = match &input.release_date {
+        RawField::Omitted => FieldPatch::Keep,
+        RawField::Null => FieldPatch::Clear,
+        RawField::Value(raw) if input.encoding == ItemEditEncoding::Form && raw.is_empty() => {
+            FieldPatch::Clear
+        }
+        RawField::Value(raw) => FieldPatch::Replace(ReleaseDate::parse(raw).map_err(|error| {
             ItemEditFailure::Validation(error.message(), Some(ItemInvalidField::ReleaseDate))
         })?),
     };
 
-    let poster_path = match input.poster_path.as_ref() {
-        None => FieldPatch::Keep,
-        Some(None) => FieldPatch::Clear,
-        Some(Some(raw)) if input.empty_clears && raw.is_empty() => FieldPatch::Clear,
-        Some(Some(raw)) => FieldPatch::Replace(PosterPath::parse(raw).map_err(|error| {
+    let poster_path = match &input.poster_path {
+        RawField::Omitted => FieldPatch::Keep,
+        RawField::Null => FieldPatch::Clear,
+        RawField::Value(raw) if input.encoding == ItemEditEncoding::Form && raw.is_empty() => {
+            FieldPatch::Clear
+        }
+        RawField::Value(raw) => FieldPatch::Replace(PosterPath::parse(raw).map_err(|error| {
             ItemEditFailure::Validation(error.message(), Some(ItemInvalidField::PosterPath))
         })?),
     };
@@ -234,11 +234,11 @@ fn retained_form(
     }
 }
 
-fn retained_value(submitted: &Option<Option<String>>, stored: &str) -> String {
+fn retained_value(submitted: &RawField, stored: &str) -> String {
     match submitted {
-        None => stored.to_owned(),
-        Some(None) => String::new(),
-        Some(Some(value)) => value.clone(),
+        RawField::Omitted => stored.to_owned(),
+        RawField::Null => String::new(),
+        RawField::Value(value) => value.clone(),
     }
 }
 
@@ -275,19 +275,8 @@ mod tests {
         }
     }
 
-    fn form_input(
-        title: Option<Option<&str>>,
-        release_date: Option<Option<&str>>,
-        poster_path: Option<Option<&str>>,
-        empty_clears: bool,
-    ) -> ItemEditInput {
-        let owned = |value: Option<&str>| value.map(str::to_owned);
-        ItemEditInput {
-            title: title.map(owned),
-            release_date: release_date.map(owned),
-            poster_path: poster_path.map(owned),
-            empty_clears,
-        }
+    fn value(text: &str) -> RawField {
+        RawField::Value(text.to_owned())
     }
 
     #[test]
@@ -322,12 +311,12 @@ mod tests {
         let item = sample_item();
         let changes = submit(
             &item,
-            &form_input(
-                Some(Some("  Trimmed  ")),
-                Some(Some("")),
-                Some(Some("")),
-                true,
-            ),
+            &ItemEditInput {
+                title: value("  Trimmed  "),
+                release_date: value(""),
+                poster_path: value(""),
+                encoding: ItemEditEncoding::Form,
+            },
         )
         .unwrap();
         assert_eq!(changes.watchlist_id(), 41);
@@ -337,7 +326,16 @@ mod tests {
     #[test]
     fn json_encoding_rejects_empty_string_optional_fields_and_clears_on_null() {
         let item = sample_item();
-        let empty_date = submit(&item, &form_input(None, Some(Some("")), None, false)).unwrap_err();
+        let empty_date = submit(
+            &item,
+            &ItemEditInput {
+                title: RawField::Omitted,
+                release_date: value(""),
+                poster_path: RawField::Omitted,
+                encoding: ItemEditEncoding::Json,
+            },
+        )
+        .unwrap_err();
         assert_eq!(
             empty_date.failure,
             ItemEditFailure::Validation(
@@ -347,8 +345,16 @@ mod tests {
         );
         assert!(empty_date.form.release_date_invalid());
 
-        let empty_poster =
-            submit(&item, &form_input(None, None, Some(Some("")), false)).unwrap_err();
+        let empty_poster = submit(
+            &item,
+            &ItemEditInput {
+                title: RawField::Omitted,
+                release_date: RawField::Omitted,
+                poster_path: value(""),
+                encoding: ItemEditEncoding::Json,
+            },
+        )
+        .unwrap_err();
         assert_eq!(
             empty_poster.failure,
             ItemEditFailure::Validation(
@@ -358,7 +364,18 @@ mod tests {
         );
         assert!(empty_poster.form.poster_invalid());
 
-        assert!(submit(&item, &form_input(None, Some(None), Some(None), false)).is_ok());
+        assert!(
+            submit(
+                &item,
+                &ItemEditInput {
+                    title: RawField::Omitted,
+                    release_date: RawField::Null,
+                    poster_path: RawField::Null,
+                    encoding: ItemEditEncoding::Json,
+                },
+            )
+            .is_ok()
+        );
     }
 
     #[test]
@@ -366,12 +383,12 @@ mod tests {
         let item = sample_item();
         let rejection = submit(
             &item,
-            &form_input(
-                Some(Some("Draft title")),
-                Some(Some("2025")),
-                Some(Some("http://images.example.com/poster.jpg")),
-                true,
-            ),
+            &ItemEditInput {
+                title: value("Draft title"),
+                release_date: value("2025"),
+                poster_path: value("http://images.example.com/poster.jpg"),
+                encoding: ItemEditEncoding::Form,
+            },
         )
         .unwrap_err();
         assert_eq!(rejection.failure.code(), "validation_error");
@@ -389,13 +406,31 @@ mod tests {
     #[test]
     fn rejects_empty_patch_and_blank_or_null_title() {
         let item = sample_item();
-        let empty = submit(&item, &form_input(None, None, None, false)).unwrap_err();
+        let empty = submit(
+            &item,
+            &ItemEditInput {
+                title: RawField::Omitted,
+                release_date: RawField::Omitted,
+                poster_path: RawField::Omitted,
+                encoding: ItemEditEncoding::Json,
+            },
+        )
+        .unwrap_err();
         assert_eq!(
             empty.failure,
             ItemEditFailure::Validation("No fields to update.", None)
         );
 
-        let blank = submit(&item, &form_input(Some(Some("   ")), None, None, true)).unwrap_err();
+        let blank = submit(
+            &item,
+            &ItemEditInput {
+                title: value("   "),
+                release_date: RawField::Omitted,
+                poster_path: RawField::Omitted,
+                encoding: ItemEditEncoding::Form,
+            },
+        )
+        .unwrap_err();
         assert_eq!(
             blank.failure,
             ItemEditFailure::Validation("Title is required.", Some(ItemInvalidField::Title))
@@ -403,7 +438,16 @@ mod tests {
         assert_eq!(blank.form.title, "   ");
         assert!(blank.form.title_invalid());
 
-        let null_title = submit(&item, &form_input(Some(None), None, None, false)).unwrap_err();
+        let null_title = submit(
+            &item,
+            &ItemEditInput {
+                title: RawField::Null,
+                release_date: RawField::Omitted,
+                poster_path: RawField::Omitted,
+                encoding: ItemEditEncoding::Json,
+            },
+        )
+        .unwrap_err();
         assert_eq!(
             null_title.failure,
             ItemEditFailure::Validation("Title is required.", Some(ItemInvalidField::Title))
@@ -416,12 +460,12 @@ mod tests {
         let item = sample_item();
         let rejection = rejected(
             &item,
-            &form_input(
-                Some(Some("Edited")),
-                Some(None),
-                Some(Some("/replacement.jpg")),
-                true,
-            ),
+            &ItemEditInput {
+                title: value("Edited"),
+                release_date: RawField::Null,
+                poster_path: value("/replacement.jpg"),
+                encoding: ItemEditEncoding::Form,
+            },
             ItemEditFailure::Internal,
         );
         assert_eq!(rejection.failure.code(), "internal_error");

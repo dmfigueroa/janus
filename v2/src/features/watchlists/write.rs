@@ -33,7 +33,6 @@ pub enum UpdateOutcome {
     NotFound,
 }
 
-/// JSON Merge Patch tri-state for an optional watchlist item metadata column.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FieldPatch<T> {
     Keep,
@@ -47,7 +46,6 @@ impl<T> FieldPatch<T> {
     }
 }
 
-/// Domain validation errors shared by web and MCP item metadata editing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ItemMetadataError {
     TitleRequired,
@@ -81,15 +79,10 @@ impl std::fmt::Display for ItemMetadataError {
 
 impl std::error::Error for ItemMetadataError {}
 
-/// A validated, trimmed, non-empty watchlist item title.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ItemTitle(String);
 
 impl ItemTitle {
-    /// Parses a title by trimming leading and trailing whitespace and rejecting blank values.
-    ///
-    /// # Errors
-    /// Returns [`ItemMetadataError::TitleRequired`] when the trimmed title is empty.
     pub fn parse(value: &str) -> Result<Self, ItemMetadataError> {
         let trimmed = value.trim();
         if trimmed.is_empty() {
@@ -103,16 +96,10 @@ impl ItemTitle {
     }
 }
 
-/// A validated ISO 8601 reduced-precision year (`YYYY`) or civil date (`YYYY-MM-DD`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReleaseDate(String);
 
 impl ReleaseDate {
-    /// Parses `YYYY` or a valid Gregorian `YYYY-MM-DD` date without trimming.
-    ///
-    /// # Errors
-    /// Returns [`ItemMetadataError::ReleaseDateFormat`] when the shape does not match,
-    /// or [`ItemMetadataError::ReleaseDateInvalid`] when a `YYYY-MM-DD` calendar date does not exist.
     pub fn parse(value: &str) -> Result<Self, ItemMetadataError> {
         let bytes = value.as_bytes();
         if bytes.len() == 4 && bytes.iter().all(u8::is_ascii_digit) {
@@ -165,18 +152,12 @@ fn is_leap_year(year: u32) -> bool {
     (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
 }
 
-/// A validated poster image location: either an `https://` URL or a `/\S+` provider path.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PosterPath(String);
 
 impl PosterPath {
     const PREVIEW_TMDB_PREFIX: &'static str = "https://image.tmdb.org/t/p/w500";
 
-    /// Parses an allowlisted `https://` URL or provider path starting with `/`.
-    ///
-    /// # Errors
-    /// Returns [`ItemMetadataError::PosterPathSpaces`] for a `/` path containing whitespace
-    /// or no path characters, or [`ItemMetadataError::PosterPathScheme`] otherwise.
     pub fn parse(value: &str) -> Result<Self, ItemMetadataError> {
         if value.starts_with('/') {
             if value.len() > 1 && !value.chars().any(char::is_whitespace) {
@@ -263,7 +244,6 @@ fn is_valid_optional_port(port: &str) -> bool {
         || (port.bytes().all(|byte| byte.is_ascii_digit()) && port.parse::<u16>().is_ok())
 }
 
-/// A validated non-empty metadata patch for one watchlist item.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WatchlistItemChanges {
     watchlist_id: i64,
@@ -274,10 +254,6 @@ pub struct WatchlistItemChanges {
 }
 
 impl WatchlistItemChanges {
-    /// Constructs a validated non-empty item metadata patch.
-    ///
-    /// # Errors
-    /// Returns [`ItemMetadataError::NoFieldsToUpdate`] when every field is omitted.
     pub fn new(
         watchlist_id: i64,
         item_id: i64,
@@ -439,14 +415,6 @@ impl Watchlists {
         Ok(UpdateOutcome::Updated)
     }
 
-    /// Applies a validated partial metadata patch to one watchlist item in a single
-    /// atomic `UPDATE ... RETURNING id` statement.
-    ///
-    /// Leaves identifiers, watched state, custom rank, `added_at`, and watchlist
-    /// rotation/timestamps untouched.
-    ///
-    /// # Errors
-    /// Returns database failures, including lock contention and constraint errors.
     pub async fn edit_watchlist_item(
         &self,
         changes: WatchlistItemChanges,

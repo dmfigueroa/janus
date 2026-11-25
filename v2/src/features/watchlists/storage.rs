@@ -57,7 +57,6 @@ pub(super) async fn headers<C: ConnectionTrait>(
         .collect()
 }
 
-/// Reads and decodes one item belonging to a specific watchlist.
 pub(super) async fn item_in_watchlist<C: ConnectionTrait>(
     database: &C,
     watchlist_id: i64,
