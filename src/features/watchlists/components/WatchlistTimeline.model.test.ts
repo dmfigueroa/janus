@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { WatchlistItem } from "@/db/Schema";
-import { buildTimelineRuns, buildWatchlistTimelineBlocks } from "./WatchlistTimeline.model";
+import {
+  buildTimelineRuns,
+  buildWatchlistTimelineBlocks,
+  buildWatchlistTimelineGroups,
+} from "./WatchlistTimeline.model";
 
 const items = [false, true, true, false, true].map(
   (isWatched, id) => ({ id, isWatched }) as WatchlistItem,
@@ -112,5 +116,43 @@ describe("watchlist timeline blocks", () => {
     });
 
     expect(blockSummary(blocks)).toEqual(["item:1"]);
+  });
+});
+
+describe("buildWatchlistTimelineGroups", () => {
+  it("returns an empty list for empty release-mode items", () => {
+    expect(buildWatchlistTimelineGroups([], "release")).toEqual([]);
+  });
+
+  it("groups consecutive release years including TBA items while preserving order", () => {
+    const groups = buildWatchlistTimelineGroups(
+      [
+        timelineItem(1, { releaseDate: "2024-01-01" }),
+        timelineItem(2, { releaseDate: "2024-09-01" }),
+        timelineItem(3, { releaseDate: "2025-05-01" }),
+        { id: 4, isWatched: false, releaseDate: null, title: "Item 4" } as WatchlistItem,
+      ],
+      "release",
+    );
+
+    expect(groups.map((group) => [group.year, group.items.map((item) => item.id)])).toEqual([
+      ["2024", [1, 2]],
+      ["2025", [3]],
+      ["TBA", [4]],
+    ]);
+  });
+
+  it("groups large single-year lists without quadratic copying", () => {
+    const largeList = Array.from({ length: 5000 }, (_, index) =>
+      timelineItem(index + 1, { releaseDate: "2024-06-01" }),
+    );
+
+    const groups = buildWatchlistTimelineGroups(largeList, "release");
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.year).toBe("2024");
+    expect(groups[0]?.items).toHaveLength(5000);
+    expect(groups[0]?.items[0]?.id).toBe(1);
+    expect(groups[0]?.items.at(-1)?.id).toBe(5000);
   });
 });
