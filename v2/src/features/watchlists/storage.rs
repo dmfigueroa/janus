@@ -57,6 +57,22 @@ pub(super) async fn headers<C: ConnectionTrait>(
         .collect()
 }
 
+pub(super) async fn item_in_watchlist<C: ConnectionTrait>(
+    database: &C,
+    watchlist_id: i64,
+    item_id: i64,
+) -> Result<Option<WatchlistItem>, DbErr> {
+    database
+        .query_one_raw(statement(
+            "SELECT * FROM watchlist_items WHERE id = ? AND watchlist_id = ?",
+            vec![item_id.into(), watchlist_id.into()],
+        ))
+        .await?
+        .as_ref()
+        .map(item)
+        .transpose()
+}
+
 /// Reads one watchlist's items in its stored order.
 pub(super) async fn items<C: ConnectionTrait>(
     database: &C,

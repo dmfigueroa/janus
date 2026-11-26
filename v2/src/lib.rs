@@ -70,6 +70,14 @@ pub fn database_router(database: sea_orm::DatabaseConnection) -> Router {
             "/v2/watchlists/{id}/reorder",
             axum::routing::post(features::watchlists::web::reorder),
         )
+        .route(
+            "/v2/watchlists/{id}/items/{item_id}/edit",
+            get(features::watchlists::web::edit_item_form),
+        )
+        .route(
+            "/v2/watchlists/{id}/items/{item_id}",
+            axum::routing::post(features::watchlists::web::edit_item),
+        )
         .with_state(state.clone())
         .merge(base_router(true))
         .nest_service(

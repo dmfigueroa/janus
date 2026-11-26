@@ -115,6 +115,19 @@ impl Watchlists {
         storage::watchlist(&self.0, id).await
     }
 
+    /// Reads one stored item belonging to a specific watchlist.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DbErr`] when the database read or stored-value decoding fails.
+    pub async fn item(
+        &self,
+        watchlist_id: i64,
+        item_id: i64,
+    ) -> Result<Option<WatchlistItem>, DbErr> {
+        storage::item_in_watchlist(&self.0, watchlist_id, item_id).await
+    }
+
     /// Reads every watchlist summary in one consistent snapshot.
     ///
     /// # Errors

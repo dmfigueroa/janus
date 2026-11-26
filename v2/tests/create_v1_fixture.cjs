@@ -10,6 +10,7 @@ const {
   addUnrankedInRelease,
   checkOrderModeV1Read,
 } = require("./order-mode-fixtures.cjs");
+const { rejectItemTitle, editItemFromV1, checkV2EditedItems } = require("./item-edit-fixtures.cjs");
 const database = new Database(process.argv[2]);
 const customOrder = "ORDER BY custom_rank IS NULL, custom_rank, id";
 const watchlistItemIds = (watchlistId) =>
@@ -31,6 +32,15 @@ const actions = {
     database.exec(
       "CREATE TRIGGER reject_rank BEFORE UPDATE OF custom_rank ON watchlist_items WHEN NEW.id=102 BEGIN SELECT RAISE(ABORT, 'test failure'); END",
     );
+  },
+  "reject-item-title"() {
+    rejectItemTitle(database);
+  },
+  "v1-edit-item"() {
+    editItemFromV1(database);
+  },
+  "check-v2-edited-items"() {
+    checkV2EditedItems(database);
   },
   gapped() {
     database

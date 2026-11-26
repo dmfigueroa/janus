@@ -4,7 +4,10 @@ use super::{McpCallError, object_schema, output_schema};
 use crate::features::watchlists::{
     ItemOrderMode, Watchlists,
     reorder::{Reorder, ReorderOutcome},
-    write::{NewWatchlist, UpdateOutcome, WatchlistChanges},
+    write::{
+        FieldPatch, ItemTitle, NewWatchlist, PosterPath, ReleaseDate, UpdateOutcome,
+        WatchlistChanges, WatchlistItemChanges,
+    },
 };
 use rmcp::model::{Tool, ToolAnnotations};
 use serde_json::{Map, Value, json};
@@ -12,6 +15,7 @@ use std::sync::{Arc, LazyLock};
 
 const REORDER_FIELDS: &[&str] = &["reorders"];
 const WRITE_FIELDS: &[&str] = &["watchlists"];
+const EDIT_ITEM_FIELDS: &[&str] = &["edits"];
 
 pub(super) struct Contract {
     pub(super) name: &'static str,
@@ -108,6 +112,7 @@ enum BatchTool {
     Create,
     Update,
     Reorder,
+    EditItems,
 }
 
 impl BatchTool {
@@ -115,6 +120,7 @@ impl BatchTool {
         match self {
             Self::Create | Self::Update => ("watchlists", "watchlists must be a non-empty array"),
             Self::Reorder => ("reorders", "reorders must be a non-empty array"),
+            Self::EditItems => ("edits", "edits must be a non-empty array"),
         }
     }
 
@@ -122,6 +128,7 @@ impl BatchTool {
         match self {
             Self::Create | Self::Update => "Invalid watchlist input",
             Self::Reorder => "Invalid reorder input",
+            Self::EditItems => "Invalid watchlist item edit input",
         }
     }
 
@@ -130,6 +137,7 @@ impl BatchTool {
             Self::Create => create_shape_is_valid(entry),
             Self::Update => update_shape_is_valid(entry),
             Self::Reorder => reorder_shape_is_valid(entry),
+            Self::EditItems => edit_item_shape_is_valid(entry),
         }
     }
 
@@ -138,6 +146,7 @@ impl BatchTool {
             Self::Create => create_entry(lists, entry, index).await,
             Self::Update => update_entry(lists, entry, index).await,
             Self::Reorder => reorder_entry(lists, entry, index).await,
+            Self::EditItems => edit_item_entry(lists, entry, index).await,
         }
     }
 }
@@ -255,6 +264,44 @@ async fn reorder_entry(lists: &Watchlists, entry: Value, index: usize) -> BatchE
         .fold(outcome, |entry, (key, value)| entry.with(key, value))
 }
 
+async fn edit_item_entry(lists: &Watchlists, entry: Value, index: usize) -> BatchEntry {
+    let changes = match edit_item_input(&entry) {
+        Ok(changes) => changes,
+        Err(message) => {
+            let outcome = BatchEntry::failed("validation_error", message);
+            return attach_edit_item_ids(outcome, &entry);
+        }
+    };
+    let watchlist_id = changes.watchlist_id();
+    let item_id = changes.item_id();
+    match lists.edit_watchlist_item(changes).await {
+        Ok(UpdateOutcome::Updated) => BatchEntry::done("edited", "Watchlist item edited.")
+            .with("watchlistId", json!(watchlist_id))
+            .with("watchlistItemId", json!(item_id)),
+        Ok(UpdateOutcome::NotFound) => BatchEntry::failed("not_found", "Watchlist item not found.")
+            .with("watchlistId", json!(watchlist_id))
+            .with("watchlistItemId", json!(item_id)),
+        Err(error) => {
+            eprintln!(
+                "MCP edit failed for watchlist {watchlist_id}, item {item_id}, batch entry {index}: {error}"
+            );
+            internal_error()
+        }
+    }
+}
+
+fn attach_edit_item_ids(outcome: BatchEntry, entry: &Value) -> BatchEntry {
+    ["watchlistId", "watchlistItemId"]
+        .into_iter()
+        .filter_map(|key| {
+            entry
+                .get(key)
+                .filter(|value| value.is_number())
+                .map(|value| (key, value.clone()))
+        })
+        .fold(outcome, |entry, (key, value)| entry.with(key, value))
+}
+
 fn write_output_schema() -> Arc<Map<String, Value>> {
     let batch = json!({"type":"object","properties":{"index":{"type":"integer","minimum":0},"success":{"type":"boolean"},"code":{"type":"string"},"message":{"type":"string"},"watchlistId":{"type":"number"},"watchlist":{"type":"object","properties":{"id":{"type":"number"},"name":{"type":"string"},"description":{"type":["string","null"]},"itemOrderMode":{"type":"string","enum":["release","custom"]}},"required":["id","name","description","itemOrderMode"]}},"required":["index","success","code","message"]});
     output_schema(
@@ -313,6 +360,58 @@ fn build_contracts() -> Vec<Contract> {
     update.output_schema = Some(write_schema);
     update.annotations = Some(ToolAnnotations::new().read_only(false).destructive(false));
 
+    let mut edit_items = Tool::new(
+        "edit_watchlist_items",
+        "Edit watchlist item metadata",
+        object_schema(
+            json!({
+                "edits": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "watchlistId": {"type": "number", "description": "Stable internal watchlist ID."},
+                            "watchlistItemId": {"type": "number", "description": "Stable internal watchlist item ID."},
+                            "title": {"type": "string", "description": "New title; omit to keep the existing title. Null is not allowed."},
+                            "releaseDate": {"type": ["string", "null"], "description": "New YYYY or YYYY-MM-DD date; omit to keep it, or null to clear it."},
+                            "posterImage": {"type": ["string", "null"], "description": "New HTTPS URL or provider path beginning with /; omit to keep it, or null to clear it."}
+                        }
+                    }
+                }
+            }),
+            json!(["edits"]),
+        ),
+    );
+    edit_items.title = Some("Edit watchlist item metadata".into());
+    edit_items.description = Some("Edit the stored title, release date, and poster image of one or more watchlist items. Each edit targets a stable internal watchlist item ID and is processed independently, returning an ordered result. Omit a field to keep its existing value; use null only to clear release date or poster image. Title cannot be cleared. Each edit must include at least one field to update. Poster image must be an HTTPS URL or a provider path beginning with /. Release date must be YYYY or YYYY-MM-DD.".into());
+    edit_items.output_schema = Some(output_schema(
+        json!({
+            "results": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "index": {"type": "integer", "minimum": 0},
+                        "success": {"type": "boolean"},
+                        "code": {"type": "string"},
+                        "message": {"type": "string"},
+                        "watchlistId": {"type": "number"},
+                        "watchlistItemId": {"type": "number"}
+                    },
+                    "required": ["index", "success", "code", "message"]
+                }
+            }
+        }),
+        Some(json!(["results"])),
+    ));
+    edit_items.annotations = Some(
+        ToolAnnotations::new()
+            .read_only(false)
+            .destructive(false)
+            .idempotent(false),
+    );
+
     vec![
         Contract {
             name: "reorder_watchlist_items",
@@ -331,6 +430,12 @@ fn build_contracts() -> Vec<Contract> {
             tool: update,
             accepted: WRITE_FIELDS,
             kind: BatchTool::Update,
+        },
+        Contract {
+            name: "edit_watchlist_items",
+            tool: edit_items,
+            accepted: EDIT_ITEM_FIELDS,
+            kind: BatchTool::EditItems,
         },
     ]
 }
@@ -386,6 +491,29 @@ fn update_shape_is_valid(entry: &Value) -> bool {
     object
         .get("itemOrderMode")
         .is_none_or(|value| matches!(value.as_str(), Some("release" | "custom")))
+}
+
+fn edit_item_shape_is_valid(entry: &Value) -> bool {
+    let Some(object) = entry.as_object() else {
+        return false;
+    };
+    for key in ["watchlistId", "watchlistItemId"] {
+        if object.get(key).is_some_and(|value| !value.is_number()) {
+            return false;
+        }
+    }
+    if object.get("title").is_some_and(|value| !value.is_string()) {
+        return false;
+    }
+    for key in ["releaseDate", "posterImage"] {
+        if object
+            .get(key)
+            .is_some_and(|value| !value.is_string() && !value.is_null())
+        {
+            return false;
+        }
+    }
+    true
 }
 
 fn type_name(value: &Value) -> &'static str {
@@ -479,6 +607,51 @@ fn update_input(entry: &Value) -> Result<WatchlistChanges, String> {
     })
 }
 
+fn required_integer(object: &Map<String, Value>, key: &str) -> Result<i64, String> {
+    match object.get(key) {
+        None => Err("Required".into()),
+        Some(Value::Number(number)) => number
+            .as_i64()
+            .ok_or_else(|| "Expected integer, received number".to_owned()),
+        Some(value) => Err(format!("Expected number, received {}", type_name(value))),
+    }
+}
+
+fn edit_item_input(entry: &Value) -> Result<WatchlistItemChanges, String> {
+    let object = entry
+        .as_object()
+        .ok_or_else(|| format!("Expected object, received {}", type_name(entry)))?;
+    let watchlist_id = required_integer(object, "watchlistId")?;
+    let item_id = required_integer(object, "watchlistItemId")?;
+
+    let title = match object.get("title") {
+        None => None,
+        Some(Value::String(raw)) => {
+            Some(ItemTitle::parse(raw).map_err(|error| error.message().to_owned())?)
+        }
+        Some(value) => return Err(expected_string(value)),
+    };
+    let release_date = match object.get("releaseDate") {
+        None => FieldPatch::Keep,
+        Some(Value::Null) => FieldPatch::Clear,
+        Some(Value::String(raw)) => FieldPatch::Replace(
+            ReleaseDate::parse(raw).map_err(|error| error.message().to_owned())?,
+        ),
+        Some(value) => return Err(expected_string(value)),
+    };
+    let poster_path = match object.get("posterImage") {
+        None => FieldPatch::Keep,
+        Some(Value::Null) => FieldPatch::Clear,
+        Some(Value::String(raw)) => {
+            FieldPatch::Replace(PosterPath::parse(raw).map_err(|error| error.message().to_owned())?)
+        }
+        Some(value) => return Err(expected_string(value)),
+    };
+
+    WatchlistItemChanges::new(watchlist_id, item_id, title, release_date, poster_path)
+        .map_err(|error| error.message().to_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -532,6 +705,23 @@ mod tests {
             BatchEntry::failed("not_found", "Watchlist not found."),
         ]);
         assert_batch_output("reorder_watchlist_items", &rendered);
+    }
+
+    #[test]
+    fn edit_item_results_satisfy_the_edit_items_schema() {
+        let rendered = render(vec![
+            BatchEntry::done("edited", "Watchlist item edited.")
+                .with("watchlistId", json!(1))
+                .with("watchlistItemId", json!(2)),
+            BatchEntry::failed("not_found", "Watchlist item not found.")
+                .with("watchlistId", json!(1))
+                .with("watchlistItemId", json!(999)),
+            BatchEntry::failed("validation_error", "No fields to update.")
+                .with("watchlistId", json!(1))
+                .with("watchlistItemId", json!(2)),
+            internal_error(),
+        ]);
+        assert_batch_output("edit_watchlist_items", &rendered);
     }
 
     #[test]

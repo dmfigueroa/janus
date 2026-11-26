@@ -50,6 +50,17 @@ class WatchlistReorder extends HTMLElement {
   shouldBlockSwap() {
     return this.dragging || this.busy;
   }
+  setDragging(dragging) {
+    this.dragging = dragging;
+    this.querySelectorAll("[data-item-actions-trigger]").forEach((trigger) => {
+      trigger.disabled = dragging || this.busy;
+    });
+    if (dragging) {
+      this.querySelectorAll(".item-actions-menu").forEach((menu) => {
+        menu.hidePopover?.();
+      });
+    }
+  }
   isOwnRequest(event) {
     const source =
       event.detail?.requestConfig?.elt ??

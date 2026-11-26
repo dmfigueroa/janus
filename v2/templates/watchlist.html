@@ -2,7 +2,7 @@
 <main class="watchlist">
   <header class="watchlist-header">
     <div class="watchlist-title">
-      <h1>{{view.name}}</h1>
+      <h1 tabindex="-1">{{view.name}}</h1>
       {% if view.paused %}<span class="badge" role="status">Paused</span>{% endif %}
       <button
         type="button"
@@ -82,10 +82,10 @@
   id="watchlist-refresh"
   hidden
   hx-get=""
-  hx-trigger="watchlist-saved from:body"
+  hx-trigger="watchlist-saved from:body, watchlist-item-saved from:body"
   hx-target=".watchlist"
   hx-select=".watchlist"
   hx-select-oob="#watchlist-form"
   hx-swap="outerHTML"
 ></span>
-{% include "watchlist-dialog.html" %} {% endblock %}
+{% include "watchlist-dialog.html" %} {% include "item-edit-dialog.html" %} {% endblock %}

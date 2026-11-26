@@ -22,6 +22,8 @@ mod browse;
 
 mod dialog;
 
+mod item_dialog;
+
 pub mod reorder;
 
 mod timeline;

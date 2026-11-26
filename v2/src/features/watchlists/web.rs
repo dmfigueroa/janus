@@ -4,6 +4,10 @@ use super::dialog::{
     self, DialogFailure, DialogRejection, DialogTarget, WatchlistDialogInput, WatchlistForm,
     WatchlistMutation,
 };
+use super::item_dialog::{
+    self, ItemEditEncoding, ItemEditFailure, ItemEditForm, ItemEditInput, ItemEditRejection,
+    RawField,
+};
 use super::timeline::{TimelineFilters, TimelineView};
 use super::write::UpdateOutcome;
 use crate::http::{FormOrJson, Representation, ResponseFormat};
@@ -416,6 +420,217 @@ async fn reorder_result(lists: &Watchlists, id: i64, request: ReorderRequest) ->
         Err(error) => {
             eprintln!("Reorder failed for watchlist {id}: {error}");
             ReorderResponse::rejected("internal_error", "Unable to reorder watchlist items.")
+        }
+    }
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ItemEditFields {
+    #[serde(deserialize_with = "raw_field")]
+    title: RawField,
+    #[serde(deserialize_with = "raw_field")]
+    release_date: RawField,
+    #[serde(deserialize_with = "raw_field")]
+    poster_path: RawField,
+}
+
+fn raw_field<'de, D>(deserializer: D) -> Result<RawField, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(match Option::<String>::deserialize(deserializer)? {
+        None => RawField::Null,
+        Some(value) => RawField::Value(value),
+    })
+}
+
+#[derive(Template)]
+#[template(path = "item-edit-form.html")]
+struct ItemEditFormFragment<'a> {
+    form: &'a ItemEditForm,
+}
+
+fn is_json_content_type(headers: &HeaderMap) -> bool {
+    headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value.starts_with("application/json"))
+}
+
+fn with_write_vary(mut response: Response) -> Response {
+    response
+        .headers_mut()
+        .insert(header::VARY, HeaderValue::from_static(WRITE_VARY));
+    response
+}
+
+fn item_saved_response(watchlist_id: i64, item_id: i64) -> Response {
+    let trigger = serde_json::json!({
+        "watchlist-item-saved": {
+            "watchlistId": watchlist_id,
+            "watchlistItemId": item_id,
+            "message": "Changes saved successfully",
+        }
+    })
+    .to_string();
+    let mut response = StatusCode::NO_CONTENT.into_response();
+    if let Ok(header_value) = HeaderValue::from_str(&trigger) {
+        response
+            .headers_mut()
+            .insert(HeaderName::from_static("hx-trigger"), header_value);
+    }
+    with_write_vary(response)
+}
+
+fn item_form_response(form: ItemEditForm, status: StatusCode) -> Response {
+    match (ItemEditFormFragment { form: &form }).render() {
+        Ok(html) => with_write_vary((status, Html(html)).into_response()),
+        Err(error) => with_write_vary(failure(error).into_response()),
+    }
+}
+
+fn item_rejection_response(
+    htmx: bool,
+    format: ResponseFormat,
+    rejection: ItemEditRejection,
+) -> Response {
+    let ItemEditRejection { failure, form } = rejection;
+    let status = match failure {
+        ItemEditFailure::Validation(_, _) => StatusCode::BAD_REQUEST,
+        ItemEditFailure::NotFound => StatusCode::NOT_FOUND,
+        ItemEditFailure::Internal => StatusCode::INTERNAL_SERVER_ERROR,
+    };
+    if htmx {
+        return item_form_response(*form, StatusCode::OK);
+    }
+    if format.representation() == Representation::Html {
+        return item_form_response(*form, status);
+    }
+    json_response(
+        status,
+        serde_json::json!({
+            "success": false,
+            "code": failure.code(),
+            "message": form.error,
+            "watchlistId": form.watchlist_id,
+            "watchlistItemId": form.item_id,
+        }),
+    )
+}
+
+pub async fn edit_item_form(
+    State(lists): State<Watchlists>,
+    Path((watchlist_id, item_id)): Path<(i64, i64)>,
+    format: ResponseFormat,
+    headers: HeaderMap,
+) -> Result<Response, Failure> {
+    let htmx = htmx_request(&headers);
+    let Some(item) = lists.item(watchlist_id, item_id).await.map_err(failure)? else {
+        return Ok(
+            if !htmx && format.representation() == Representation::Json {
+                json_response(
+                    StatusCode::NOT_FOUND,
+                    serde_json::json!({
+                        "success": false,
+                        "code": "not_found",
+                        "message": "Watchlist item not found.",
+                        "watchlistId": watchlist_id,
+                        "watchlistItemId": item_id,
+                    }),
+                )
+            } else {
+                item_form_response(
+                    ItemEditForm::missing(watchlist_id, item_id),
+                    StatusCode::NOT_FOUND,
+                )
+            },
+        );
+    };
+    if !htmx && format.representation() == Representation::Json {
+        return Ok(json_response(
+            StatusCode::OK,
+            serde_json::json!({
+                "watchlistId": item.watchlist_id,
+                "watchlistItemId": item.id,
+                "title": item.title,
+                "releaseDate": item.release_date,
+                "posterPath": item.poster_path,
+            }),
+        ));
+    }
+    let form = ItemEditForm::for_item(&item);
+    Ok(item_form_response(form, StatusCode::OK))
+}
+
+pub async fn edit_item(
+    State(lists): State<Watchlists>,
+    Path((watchlist_id, item_id)): Path<(i64, i64)>,
+    format: ResponseFormat,
+    headers: HeaderMap,
+    FormOrJson(fields): FormOrJson<ItemEditFields>,
+) -> Result<Response, Failure> {
+    let htmx = htmx_request(&headers);
+    let input = ItemEditInput {
+        title: fields.title,
+        release_date: fields.release_date,
+        poster_path: fields.poster_path,
+        encoding: if is_json_content_type(&headers) {
+            ItemEditEncoding::Json
+        } else {
+            ItemEditEncoding::Form
+        },
+    };
+    let Some(item) = lists.item(watchlist_id, item_id).await.map_err(failure)? else {
+        return Ok(item_rejection_response(
+            htmx,
+            format,
+            ItemEditRejection::missing(watchlist_id, item_id),
+        ));
+    };
+    let changes = match item_dialog::submit(&item, &input) {
+        Ok(changes) => changes,
+        Err(rejection) => return Ok(item_rejection_response(htmx, format, rejection)),
+    };
+    match lists.edit_watchlist_item(changes).await {
+        Ok(UpdateOutcome::Updated) => {
+            if htmx {
+                Ok(item_saved_response(watchlist_id, item_id))
+            } else if format.representation() == Representation::Html {
+                Ok(with_write_vary(
+                    (
+                        StatusCode::SEE_OTHER,
+                        [(header::LOCATION, format!("/v2/watchlists/{watchlist_id}"))],
+                    )
+                        .into_response(),
+                ))
+            } else {
+                Ok(json_response(
+                    StatusCode::OK,
+                    serde_json::json!({
+                        "success": true,
+                        "code": "edited",
+                        "message": "Watchlist item edited.",
+                        "watchlistId": watchlist_id,
+                        "watchlistItemId": item_id,
+                    }),
+                ))
+            }
+        }
+        Ok(UpdateOutcome::NotFound) => Ok(item_rejection_response(
+            htmx,
+            format,
+            item_dialog::rejected(&item, &input, ItemEditFailure::NotFound),
+        )),
+        Err(error) => {
+            eprintln!(
+                "Watchlist item edit failed for watchlist {watchlist_id}, item {item_id}: {error}"
+            );
+            Ok(item_rejection_response(
+                htmx,
+                format,
+                item_dialog::rejected(&item, &input, ItemEditFailure::Internal),
+            ))
         }
     }
 }
