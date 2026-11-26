@@ -1,8 +1,11 @@
 import { Container, Heading, Text, Button } from "@chakra-ui/react";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { NotFound } from "@/components/NotFound";
-import type { LineupData } from "@/features/lineups/manage/Lineups";
-import { lineupsQueryOptions, useLineupData } from "@/features/lineups/read/useLineupData";
+import {
+  ensureCustomLineup,
+  findCustomLineup,
+  useLineupData,
+} from "@/features/lineups/read/useLineupData";
 import { LineupEditor } from "@/features/lineups/components/LineupEditor";
 import { LineupCards } from "@/features/lineups/components/LineupCards";
 
@@ -11,11 +14,7 @@ export const Route = createFileRoute("/rotations/custom/$lineupId")({
   loader: async ({ context, params }) => {
     const id = Number(params.lineupId);
     if (!validLineupId(id)) throw notFound();
-    const data = await context.queryClient.ensureQueryData({
-      ...lineupsQueryOptions(),
-      revalidateIfStale: true,
-    });
-    if (!findCustomLineup(data.lineups, id)) throw notFound();
+    await ensureCustomLineup(context.queryClient, id);
   },
   component: Detail,
 });
@@ -42,12 +41,6 @@ function Detail() {
       )}
     </Container>
   );
-}
-
-function findCustomLineup(lineups: LineupData["lineups"], id: number) {
-  return lineups
-    .filter((entry) => entry.kind === "custom")
-    .find((entry) => entry.reference.id === id);
 }
 
 function validLineupId(id: number) {

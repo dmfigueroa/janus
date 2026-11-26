@@ -6,7 +6,11 @@ import { act, cleanup, render, screen, waitFor } from "@test/utils/Render";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { installForegroundRevalidation } from "@/app/ForegroundRevalidation";
 import type { LineupData } from "@/features/lineups/manage/Lineups";
-import { lineupsQueryOptions, useLineupData } from "@/features/lineups/read/useLineupData";
+import {
+  ensureCustomLineup,
+  lineupsQueryOptions,
+  useLineupData,
+} from "@/features/lineups/read/useLineupData";
 import type { WatchlistHomeData } from "@/features/watchlists/home/WatchlistHome";
 import {
   useWatchlistHomeData,
@@ -186,5 +190,70 @@ describe("overview foreground refresh", () => {
 
     await waitFor(() => expect(screen.getByTestId("home-total").textContent).toBe("5"));
     expect(mocks.getWatchlistHomeData).toHaveBeenCalledTimes(1);
+  });
+});
+
+function customLineupSnapshot(id: number, name: string): LineupData {
+  return {
+    lineups: [
+      ...lineupSnapshot("Movies").lineups,
+      {
+        id,
+        kind: "custom",
+        systemKey: null,
+        name,
+        enabled: true,
+        rank: 1,
+        reference: { kind: "custom", id },
+        configuredWatchlists: [],
+        eligibleWatchlists: [],
+        configuredCount: 0,
+        eligibleCount: 0,
+      },
+    ],
+    watchlists: [],
+  };
+}
+
+describe("ensureCustomLineup", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("awaits a fresh fetch when cached lineups do not include a newly created custom lineup", async () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(lineupsQueryOptions().queryKey, lineupSnapshot("Movies"));
+    mocks.getLineupData.mockResolvedValueOnce(customLineupSnapshot(5, "Weekend"));
+
+    await expect(ensureCustomLineup(queryClient, 5)).resolves.toBeUndefined();
+    expect(mocks.getLineupData).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws notFound after refreshing when the lineup still does not exist", async () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(lineupsQueryOptions().queryKey, lineupSnapshot("Movies"));
+    mocks.getLineupData.mockResolvedValueOnce(lineupSnapshot("Movies"));
+
+    await expect(ensureCustomLineup(queryClient, 99)).rejects.toMatchObject({ isNotFound: true });
+    expect(mocks.getLineupData).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fetch twice on a cold load when the lineup does not exist", async () => {
+    const queryClient = new QueryClient();
+    mocks.getLineupData.mockResolvedValueOnce(lineupSnapshot("Movies"));
+
+    await expect(ensureCustomLineup(queryClient, 99)).rejects.toMatchObject({ isNotFound: true });
+    expect(mocks.getLineupData).toHaveBeenCalledTimes(1);
+  });
+
+  it("deduplicates against an in-flight stale revalidation fetch", async () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(lineupsQueryOptions().queryKey, lineupSnapshot("Movies"), {
+      updatedAt: Date.now() - 10_000,
+    });
+    mocks.getLineupData.mockResolvedValueOnce(customLineupSnapshot(7, "Late Night"));
+
+    await expect(ensureCustomLineup(queryClient, 7)).resolves.toBeUndefined();
+    expect(mocks.getLineupData).toHaveBeenCalledTimes(1);
   });
 });
