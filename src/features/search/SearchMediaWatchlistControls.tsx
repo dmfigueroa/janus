@@ -71,15 +71,13 @@ function InsertionPositionRadio({
   id,
   value,
   label,
-  onInsertionPositionChange,
 }: {
   id: string;
   value: AddToWatchlistInsertionPosition;
   label: string;
-  onInsertionPositionChange: (position: AddToWatchlistInsertionPosition) => void;
 }) {
   return (
-    <RadioGroup.Item key={id} value={value} onClick={() => onInsertionPositionChange(value)}>
+    <RadioGroup.Item key={id} value={value}>
       <RadioGroup.ItemHiddenInput />
       <RadioGroup.ItemControl />
       <RadioGroup.ItemText>{label}</RadioGroup.ItemText>
@@ -87,16 +85,11 @@ function InsertionPositionRadio({
   );
 }
 
-function InsertionPositionOptions({
-  onInsertionPositionChange,
-}: {
-  onInsertionPositionChange: (position: AddToWatchlistInsertionPosition) => void;
-}) {
+function InsertionPositionOptions() {
   const radioProps = insertionPositionOptions.map(([id, value, label]) => ({
     id,
     value,
     label,
-    onInsertionPositionChange,
   }));
 
   return radioProps.map(InsertionPositionRadio);
@@ -133,7 +126,7 @@ function InsertionPositionChoice({
         flexDirection="column"
         gap={2}
       >
-        <InsertionPositionOptions onInsertionPositionChange={onInsertionPositionChange} />
+        <InsertionPositionOptions />
       </RadioGroup.Root>
     </Stack>
   );

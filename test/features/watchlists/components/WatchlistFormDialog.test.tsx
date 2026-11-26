@@ -234,4 +234,22 @@ describe("WatchlistFormDialog", () => {
       });
     });
   });
+
+  it("assigns unique generated field IDs instead of hardcoded global IDs", async () => {
+    render(
+      <>
+        <WatchlistFormDialog mode="create" open />
+        <WatchlistFormDialog mode="create" open />
+      </>,
+    );
+
+    const nameInputs = await screen.findAllByLabelText("Name");
+    const descriptionInputs = screen.getAllByLabelText("Description");
+
+    expect(nameInputs).toHaveLength(2);
+    expect(nameInputs[0]?.id).not.toBe("name");
+    expect(nameInputs[0]?.id).not.toBe(nameInputs[1]?.id);
+    expect(descriptionInputs[0]?.id).not.toBe("description");
+    expect(descriptionInputs[0]?.id).not.toBe(descriptionInputs[1]?.id);
+  });
 });

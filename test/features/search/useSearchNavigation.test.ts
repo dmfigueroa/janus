@@ -4,9 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 
 const navigateMock = vi.fn();
+let isLoadingState = false;
 
 vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => navigateMock,
+  useRouterState: ({ select }: { select: (state: { isLoading: boolean }) => boolean }) =>
+    select({ isLoading: isLoadingState }),
 }));
 
 import { useSearchNavigation } from "@/features/search/useSearchNavigation";
@@ -14,6 +17,7 @@ import { useSearchNavigation } from "@/features/search/useSearchNavigation";
 describe("useSearchNavigation", () => {
   beforeEach(() => {
     navigateMock.mockReset();
+    isLoadingState = false;
   });
 
   it("navigates to search with new query on handleSearch", () => {
@@ -32,5 +36,11 @@ describe("useSearchNavigation", () => {
       to: "/search",
       search: { query: "initial", type: "tv" },
     });
+  });
+
+  it("exposes router loading state as isNavigating", () => {
+    isLoadingState = true;
+    const { result } = renderHook(() => useSearchNavigation("initial", "movie"));
+    expect(result.current.isNavigating).toBe(true);
   });
 });

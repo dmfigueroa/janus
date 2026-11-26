@@ -27,8 +27,10 @@ let capturedOptions: InfiniteQueryOptions | undefined;
 
 const mockReturn = {
   data: undefined as { pages: MediaSearchOutcome[]; pageParams: number[] } | undefined,
+  dataUpdatedAt: 0,
   fetchNextPage: vi.fn(),
   hasNextPage: false,
+  isFetching: false,
   isFetchingNextPage: false,
 };
 
@@ -68,6 +70,9 @@ describe("useSearchResults", () => {
     searchUnifiedFnMock.mockReset();
     capturedOptions = undefined;
     mockReturn.data = undefined;
+    mockReturn.dataUpdatedAt = 0;
+    mockReturn.isFetching = false;
+    mockReturn.isFetchingNextPage = false;
   });
 
   it("requests the shared search boundary even for a blank query", async () => {
@@ -173,5 +178,21 @@ describe("useSearchResults", () => {
         message: "unavailable",
       }),
     ).toBeUndefined();
+  });
+
+  it("reports isLoading only for non-pagination fetches and exposes dataUpdatedAt", () => {
+    mockReturn.dataUpdatedAt = 42;
+    mockReturn.isFetching = true;
+    mockReturn.isFetchingNextPage = false;
+
+    const { result, rerender } = renderHook(() =>
+      useSearchResults({ query: "test", type: "movie", initialData: movieOutcome }),
+    );
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.dataUpdatedAt).toBe(42);
+
+    mockReturn.isFetchingNextPage = true;
+    rerender();
+    expect(result.current.isLoading).toBe(false);
   });
 });

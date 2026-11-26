@@ -104,4 +104,25 @@ describe("CreateCustomItemDialog", () => {
       );
     });
   });
+
+  it("assigns unique generated field IDs and focuses its own title input", async () => {
+    render(
+      <>
+        <CreateCustomItemDialog onCreated={vi.fn()} open />
+        <CreateCustomItemDialog onCreated={vi.fn()} open />
+      </>,
+    );
+
+    const titleInputs = await screen.findAllByLabelText("Title");
+    const typeSelects = screen.getAllByLabelText("Type");
+    const yearInputs = screen.getAllByLabelText("Year (Optional)");
+    const descriptionInputs = screen.getAllByLabelText("Description (Optional)");
+
+    expect(titleInputs).toHaveLength(2);
+    expect(titleInputs[0]?.id).not.toBe("custom-item-title");
+    expect(titleInputs[0]?.id).not.toBe(titleInputs[1]?.id);
+    expect(typeSelects[0]?.id).not.toBe(typeSelects[1]?.id);
+    expect(yearInputs[0]?.id).not.toBe(yearInputs[1]?.id);
+    expect(descriptionInputs[0]?.id).not.toBe(descriptionInputs[1]?.id);
+  });
 });

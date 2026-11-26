@@ -10,7 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { useController, type Control } from "react-hook-form";
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import {
   useWatchlistForm,
   type UseWatchlistFormOptions,
@@ -43,6 +43,8 @@ export function WatchlistFormDialog({
   ...formOptions
 }: WatchlistFormDialogProps) {
   const nameRef = useRef<HTMLDivElement>(null);
+  const nameFieldId = useId();
+  const descriptionFieldId = useId();
   const { open, setOpen } = useDialogOpen(controlledOpen, onOpenChange);
   const { loading, onSubmit, register, control, formState } = useWatchlistForm({
     ...formOptions,
@@ -75,9 +77,9 @@ export function WatchlistFormDialog({
               <Dialog.Body>
                 <Stack gap={4}>
                   <Field.Root required invalid={Boolean(formState.errors.name)}>
-                    <Field.Label htmlFor="name">Name</Field.Label>
+                    <Field.Label htmlFor={nameFieldId}>Name</Field.Label>
                     <Input
-                      id="name"
+                      id={nameFieldId}
                       focusRingColor="pink.500"
                       placeholder="e.g., Marvel Cinematic Universe"
                       {...register("name", {
@@ -87,9 +89,9 @@ export function WatchlistFormDialog({
                     <Field.ErrorText>{formState.errors.name?.message}</Field.ErrorText>
                   </Field.Root>
                   <Field.Root>
-                    <Field.Label htmlFor="description">Description</Field.Label>
+                    <Field.Label htmlFor={descriptionFieldId}>Description</Field.Label>
                     <Textarea
-                      id="description"
+                      id={descriptionFieldId}
                       focusRingColor="pink.500"
                       placeholder="Optional description..."
                       {...register("description")}

@@ -4,9 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "../../utils/Render";
 import { SearchWatchlistSelector } from "@/features/search/SearchWatchlistSelector";
 
-const { createWatchlistFnMock, createWatchlistServerFn } = vi.hoisted(() => ({
+const { createWatchlistFnMock, createWatchlistServerFn, toasterCreateMock } = vi.hoisted(() => ({
   createWatchlistFnMock: vi.fn(),
   createWatchlistServerFn: Symbol("createWatchlist"),
+  toasterCreateMock: vi.fn(),
 }));
 
 vi.mock("@/features/watchlists/create/Mutation", () => ({
@@ -26,13 +27,30 @@ vi.mock("@tanstack/react-start", () => ({
 
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useMutation: ({
+    mutationFn,
+    onSuccess,
+    onError,
+  }: {
+    mutationFn: (name: string) => Promise<unknown>;
+    onSuccess?: (data: unknown) => Promise<void> | void;
+    onError?: (error: unknown) => void;
+  }) => ({
+    isPending: false,
+    mutate: (name: string) => {
+      void Promise.resolve()
+        .then(() => mutationFn(name))
+        .then((result) => onSuccess?.(result))
+        .catch((error) => onError?.(error));
+    },
+  }),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
   useRouter: () => ({ invalidate: vi.fn() }),
 }));
 
-vi.mock("@/app/Toaster", () => ({ toaster: { create: vi.fn() } }));
+vi.mock("@/app/Toaster", () => ({ toaster: { create: toasterCreateMock } }));
 
 const watchlists = [
   { id: 1, name: "Release Queue" },
@@ -42,6 +60,7 @@ const watchlists = [
 describe("SearchWatchlistSelector", () => {
   beforeEach(() => {
     createWatchlistFnMock.mockReset();
+    toasterCreateMock.mockReset();
   });
 
   afterEach(() => {
@@ -107,5 +126,33 @@ describe("SearchWatchlistSelector", () => {
       expect(createWatchlistFnMock).toHaveBeenCalledWith({ data: { name: "New Queue" } });
       expect(onSelect).toHaveBeenCalledWith("3");
     });
+  });
+
+  it("shows an error toast when creating a watchlist fails", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const onSelect = vi.fn();
+    createWatchlistFnMock.mockRejectedValue(new Error("boom"));
+    render(
+      <SearchWatchlistSelector
+        watchlists={watchlists}
+        selectedWatchlistId=""
+        onSelect={onSelect}
+      />,
+    );
+
+    const input = screen.getByRole("combobox");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "Broken Queue" } });
+    fireEvent.click(await screen.findByRole("option", { name: 'Create "Broken Queue"' }));
+
+    await waitFor(() => {
+      expect(toasterCreateMock).toHaveBeenCalledWith({
+        type: "error",
+        title: "Failed to create watchlist",
+      });
+    });
+    expect(onSelect).not.toHaveBeenCalled();
+
+    consoleError.mockRestore();
   });
 });
