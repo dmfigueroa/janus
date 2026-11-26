@@ -1,4 +1,6 @@
-import { requestProviderJson, parseProviderData } from "@/integrations/ProviderRequest.server";
+import { comicVineIdSchema, providerResourceUrl } from "@/integrations/ProviderIds";
+import { parseComicVineResponse } from "@/integrations/comicvine/ParseComicVineResponse.server";
+import { requestProviderJson } from "@/integrations/ProviderRequest.server";
 import { z } from "zod";
 
 const comicVineVolumeSchema = z.object({
@@ -10,19 +12,23 @@ const comicVineVolumeDetailsResponseSchema = z.object({
 });
 
 async function getComicVolumeDetailsRequest(id: string, apiKey: string, signal?: AbortSignal) {
-  const url = new URL(`https://comicvine.gamespot.com/api/volume/4050-${encodeURIComponent(id)}/`);
-  url.search = new URLSearchParams({ api_key: apiKey, format: "json" }).toString();
-
+  const volumeId = comicVineIdSchema.parse(id);
+  const url = providerResourceUrl({
+    prefix: "https://comicvine.gamespot.com/api/volume/",
+    segment: `4050-${volumeId}`,
+    searchParams: new URLSearchParams({ api_key: apiKey, format: "json" }),
+    trailingSlash: true,
+  });
   const context = { provider: "comicvine", operation: "get_volume_details" };
   const rawData = await requestProviderJson(
-    url.toString(),
+    url,
     {
       headers: { "User-Agent": "JanusApp/1.0" },
       signal,
     },
     context,
   );
-  const data = parseProviderData(comicVineVolumeDetailsResponseSchema, rawData, context);
+  const data = parseComicVineResponse(comicVineVolumeDetailsResponseSchema, rawData, context);
 
   return { title: data.results.name || "Unknown Title" };
 }

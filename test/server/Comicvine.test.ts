@@ -1,6 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
+import type { CapturedLogRecord } from "@test/support/LogCapture";
+import { captureServerLogs, restoreServerLogs } from "@test/support/LogCapture";
+import { ProviderRequestError } from "@/integrations/ProviderRequest.server";
 import { getComicIssue } from "@/integrations/comicvine/ComicvineIssueDetail.server";
-import { getComicIssues } from "@/server/providers/Comicvine.server";
+import { getComicVolumeDetails } from "@/integrations/comicvine/ComicvineVolume.server";
+import { getComicIssues, searchComics } from "@/server/providers/Comicvine.server";
 
 vi.stubGlobal("fetch", vi.fn());
 
@@ -44,6 +49,33 @@ function okResponse(results: MockIssue[], total: number) {
 function getFetchedUrl(input: Request | string | URL) {
   return input instanceof Request ? input.url : input.toString();
 }
+
+function isRejectedProviderId(error: unknown) {
+  return error instanceof ZodError || error instanceof ProviderRequestError;
+}
+
+function limitExceededResponse() {
+  return new Response(JSON.stringify({ error: "Limit Exceeded", results: [] }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function expectProviderErrorLog(logs: CapturedLogRecord[], operation: string) {
+  expect(logs.map((record) => record.outcome)).toContain("provider_error");
+  expect(logs.map((record) => record.outcome)).not.toContain("invalid_response");
+  expect(logs).toContainEqual(
+    expect.objectContaining({
+      event: "provider.response.failed",
+      provider: "comicvine",
+      operation,
+      outcome: "provider_error",
+      providerMessage: "Limit Exceeded",
+    }),
+  );
+}
+
+const adversarialComicIds = ["..", "123,name:bar"];
 
 async function waitForCalls(mockedFn: ReturnType<typeof vi.fn>, expectedCalls: number) {
   await vi.waitFor(() => {
@@ -169,5 +201,77 @@ describe("getComicIssue", () => {
     expect(new URL(getFetchedUrl(vi.mocked(fetch).mock.calls[0]?.[0])).pathname).toBe(
       "/api/issue/4000-9001/",
     );
+  });
+});
+
+describe("comicvine provider ids", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it.each(adversarialComicIds)("rejects volume id %s before fetching issues", async (volumeId) => {
+    vi.mocked(fetch).mockResolvedValue(okResponse(makeIssues(1, 1), 1));
+
+    await expect(getComicIssues(volumeId, "api-key")).rejects.toSatisfy(isRejectedProviderId);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(adversarialComicIds)("rejects issue id %s before fetching an issue", async (issueId) => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: "OK",
+          results: {
+            id: 9001,
+            name: "Selected Issue",
+            issue_number: "7",
+            volume: { id: 4050, name: "Canonical Volume" },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await expect(getComicIssue(issueId, "api-key")).rejects.toSatisfy(isRejectedProviderId);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("comicvine error envelopes", () => {
+  let logs: CapturedLogRecord[];
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    logs = captureServerLogs();
+  });
+
+  afterEach(() => {
+    restoreServerLogs();
+  });
+
+  it("rejects a limit-exceeded search envelope", async () => {
+    vi.mocked(fetch).mockResolvedValue(limitExceededResponse());
+
+    await expect(searchComics("watchmen", "api-key")).rejects.toBeInstanceOf(ProviderRequestError);
+    expectProviderErrorLog(logs, "search_comics");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a limit-exceeded volume envelope", async () => {
+    vi.mocked(fetch).mockResolvedValue(limitExceededResponse());
+
+    await expect(getComicVolumeDetails("4050", "api-key")).rejects.toBeInstanceOf(
+      ProviderRequestError,
+    );
+    expectProviderErrorLog(logs, "get_volume_details");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a limit-exceeded issue envelope as a provider error", async () => {
+    vi.mocked(fetch).mockResolvedValue(limitExceededResponse());
+
+    await expect(getComicIssue("9001", "api-key")).rejects.toBeInstanceOf(ProviderRequestError);
+    expectProviderErrorLog(logs, "get_issue_details");
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

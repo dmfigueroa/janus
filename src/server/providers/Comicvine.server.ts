@@ -1,10 +1,7 @@
 import { z } from "zod";
 import pLimit from "p-limit";
-import {
-  parseProviderData,
-  requestProviderJson,
-  rethrowProviderFailure,
-} from "@/integrations/ProviderRequest.server";
+import { parseComicVineResponse } from "@/integrations/comicvine/ParseComicVineResponse.server";
+import { requestProviderJson, rethrowProviderFailure } from "@/integrations/ProviderRequest.server";
 import { API_PAGE_SIZE } from "../Constants";
 import { type UnifiedMedia } from "../Media";
 import {
@@ -31,8 +28,8 @@ const ComicVineVolumeSchema = z.object({
 });
 
 const ComicVineResponseSchema = z.object({
-  results: z.array(ComicVineVolumeSchema).optional(),
-  number_of_total_results: z.number().optional(),
+  results: z.array(ComicVineVolumeSchema),
+  number_of_total_results: z.number(),
 });
 
 const COMICVINE_MAX_CONCURRENCY = 5,
@@ -66,8 +63,8 @@ function mapVolume(item: ComicVineVolume): UnifiedMedia {
 
 function formatComicSearch(data: z.infer<typeof ComicVineResponseSchema>) {
   return {
-    results: (data.results || []).map(mapVolume),
-    totalResults: data.number_of_total_results || 0,
+    results: data.results.map(mapVolume),
+    totalResults: data.number_of_total_results,
   };
 }
 
@@ -174,7 +171,7 @@ async function searchComicsRequest(
   }).toString();
 
   const rawData = await requestComicVineJson(url.toString(), signal);
-  const data = parseProviderData(ComicVineResponseSchema, rawData, searchComicsContext);
+  const data = parseComicVineResponse(ComicVineResponseSchema, rawData, searchComicsContext);
   return formatComicSearch(data);
 }
 

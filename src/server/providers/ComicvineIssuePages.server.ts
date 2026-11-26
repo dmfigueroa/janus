@@ -1,10 +1,7 @@
-import {
-  ProviderRequestError,
-  requestProviderJson,
-  parseProviderData,
-} from "@/integrations/ProviderRequest.server";
+import { comicVineIdSchema } from "@/integrations/ProviderIds";
+import { parseComicVineResponse } from "@/integrations/comicvine/ParseComicVineResponse.server";
+import { requestProviderJson } from "@/integrations/ProviderRequest.server";
 import { z } from "zod";
-import { serverLogger } from "@/shared/logging/ServerLog.server";
 
 const ComicIssueItemSchema = z.object({
   id: z.number(),
@@ -22,9 +19,8 @@ const ComicIssueItemSchema = z.object({
 });
 
 const ComicIssueResponseSchema = z.object({
-  error: z.string(),
-  results: z.array(ComicIssueItemSchema).default([]),
-  number_of_total_results: z.number().default(0),
+  results: z.array(ComicIssueItemSchema),
+  number_of_total_results: z.number(),
 });
 
 const COMICVINE_ISSUES_URL = "https://comicvine.gamespot.com/api/issues/";
@@ -62,8 +58,9 @@ export async function fetchIssuePage(
   direction: ComicIssueSortDirection,
   signal?: AbortSignal,
 ): Promise<ComicIssueResponse> {
+  const parsedVolumeId = comicVineIdSchema.parse(volumeId);
   const context = { provider: "comicvine", operation: "fetch_issue_page" };
-  const url = buildIssuePageUrl(volumeId, apiKey, offset, direction);
+  const url = buildIssuePageUrl(parsedVolumeId, apiKey, offset, direction);
   const rawData = await requestProviderJson(
     url,
     {
@@ -72,15 +69,5 @@ export async function fetchIssuePage(
     },
     context,
   );
-  const data = parseProviderData(ComicIssueResponseSchema, rawData, context);
-  if (data.error !== "OK") {
-    serverLogger("warn", "provider.response.failed", {
-      ...context,
-      outcome: "provider_error",
-      providerMessage: data.error,
-    });
-    throw new ProviderRequestError();
-  }
-
-  return data;
+  return parseComicVineResponse(ComicIssueResponseSchema, rawData, context);
 }
