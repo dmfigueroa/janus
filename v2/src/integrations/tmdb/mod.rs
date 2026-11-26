@@ -329,6 +329,17 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn malformed_movie_json_is_unavailable() {
+        let transport = FixtureTransport::new(vec![FixtureRoute {
+            path_contains: "/movie/404".into(),
+            body: FixtureBody::Json(json!({"invalid": true})),
+        }]);
+        let client = TmdbClient::with_key(transport, Some("key".into()));
+        let error = client.movie(404).await.unwrap_err();
+        assert_eq!(error, TmdbFailure::Unavailable);
+    }
+
+    #[tokio::test]
     async fn malformed_search_json_is_unavailable() {
         let transport = FixtureTransport::new(vec![FixtureRoute {
             path_contains: "/search/tv".into(),

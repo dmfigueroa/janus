@@ -1,9 +1,21 @@
-//! Watchlist addition outcomes. Destination rules are pure. Persistence and
-//! provider calls arrive in later units and stay outside one another's transactions.
+//! Watchlist addition. Destination checks and provider HTTP finish before the
+//! SQLite write transaction opens. Television expansion is still a stub.
 
 mod destination;
+mod movie;
+mod order;
+mod persist;
+mod request;
+mod television;
+
+use crate::features::search::DEPRECATED_MEDIA_MESSAGE;
+use crate::integrations::tmdb::{TmdbCatalog, TmdbFailure};
+use sea_orm::DbErr;
+
+use super::Watchlists;
 
 pub use destination::{DestinationFailure, InsertionPosition, validate_addition_destination};
+pub use request::{InsertionIntent, MediaAddition, ProviderConfig};
 
 /// Success codes that still report `success: true` when nothing new was stored.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -133,6 +145,124 @@ impl WatchlistWriteResult {
 pub enum Unchanged {
     Duplicate(String),
     NoNewItems(String),
+}
+
+/// Adds one parsed provider item.
+///
+/// The watchlist mode is checked before any provider call. Movie metadata is
+/// fetched only after that check and the duplicate read, and the write
+/// transaction opens after the fetch returns.
+pub async fn add_provider_media(
+    lists: &Watchlists,
+    catalog: &dyn TmdbCatalog,
+    config: &ProviderConfig,
+    addition: &MediaAddition,
+) -> WatchlistWriteResult {
+    let mode = match persist::order_mode(lists, addition.watchlist_id()).await {
+        Ok(mode) => mode,
+        Err(error) => return internal_error(error),
+    };
+    if let Err(failure) = validate_addition_destination(mode, addition.insertion().position) {
+        return from_destination(failure);
+    }
+    match addition {
+        MediaAddition::Movie {
+            watchlist_id,
+            tmdb_id,
+            insertion,
+        } => movie::add_movie(lists, catalog, *watchlist_id, *tmdb_id, insertion).await,
+        MediaAddition::Television {
+            watchlist_id,
+            show_id,
+            title,
+            insertion,
+        } => television::add_show(lists, catalog, *watchlist_id, *show_id, title, insertion).await,
+        MediaAddition::Episode {
+            watchlist_id,
+            episode_id,
+            show_id,
+            show_title,
+            insertion,
+        } => {
+            television::add_episode(
+                lists,
+                catalog,
+                *watchlist_id,
+                *episode_id,
+                *show_id,
+                show_title.as_deref(),
+                insertion,
+            )
+            .await
+        }
+        MediaAddition::Game { .. } => stub_provider(config.rawg, StubKind::Rawg),
+        MediaAddition::Book { .. } => stub_provider(config.google_books, StubKind::GoogleBooks),
+        MediaAddition::Comic { .. } => stub_provider(config.comicvine, StubKind::ComicVine),
+        MediaAddition::Deprecated { .. } => WatchlistWriteResult::failed(
+            WriteFailure::Unsupported,
+            format!(
+                "{DEPRECATED_MEDIA_MESSAGE} New anime and manga items cannot be added to watchlists."
+            ),
+        ),
+    }
+}
+
+enum StubKind {
+    Rawg,
+    GoogleBooks,
+    ComicVine,
+}
+
+fn stub_provider(configured: bool, kind: StubKind) -> WatchlistWriteResult {
+    if !configured {
+        let message = match kind {
+            StubKind::Rawg => {
+                "Game additions are unavailable because the RAWG integration is not configured."
+            }
+            StubKind::GoogleBooks => {
+                "Google Books additions are unavailable because the integration is not configured."
+            }
+            StubKind::ComicVine => {
+                "Comic additions are unavailable because the ComicVine integration is not configured."
+            }
+        };
+        return WatchlistWriteResult::failed(WriteFailure::ProviderNotConfigured, message);
+    }
+    let message = match kind {
+        StubKind::Rawg => "RAWG is temporarily unavailable. Please try again later.",
+        StubKind::GoogleBooks => "Google Books is temporarily unavailable. Please try again later.",
+        StubKind::ComicVine => "ComicVine is temporarily unavailable. Please try again later.",
+    };
+    WatchlistWriteResult::failed(WriteFailure::ProviderUnavailable, message)
+}
+
+fn from_destination(failure: DestinationFailure) -> WatchlistWriteResult {
+    let code = match failure {
+        DestinationFailure::NotFound => WriteFailure::NotFound,
+        DestinationFailure::InsertionChoiceRequired => WriteFailure::InsertionChoiceRequired,
+        DestinationFailure::NotCustomMode => WriteFailure::NotCustomMode,
+    };
+    WatchlistWriteResult::failed(code, failure.message())
+}
+
+fn tmdb_failure(failure: TmdbFailure) -> WatchlistWriteResult {
+    match failure {
+        TmdbFailure::NotConfigured => WatchlistWriteResult::failed(
+            WriteFailure::ProviderNotConfigured,
+            "TMDB additions are unavailable because the integration is not configured.",
+        ),
+        TmdbFailure::Unavailable => WatchlistWriteResult::failed(
+            WriteFailure::ProviderUnavailable,
+            "TMDB is temporarily unavailable. Please try again later.",
+        ),
+    }
+}
+
+fn internal_error(_error: DbErr) -> WatchlistWriteResult {
+    WatchlistWriteResult::failed(
+        WriteFailure::InternalError,
+        "The addition failed unexpectedly.",
+    )
 }
 
 #[cfg(test)]

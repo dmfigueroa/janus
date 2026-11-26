@@ -34,6 +34,7 @@ enum Route {
     Paged(&'static paged::Contract),
     Batched(&'static batched::Contract),
     Search,
+    Add,
 }
 
 pub(super) fn object_schema(properties: Value, required: Value) -> Map<String, Value> {
@@ -72,6 +73,9 @@ fn tool(name: &str) -> Option<Tool> {
 fn route(name: &str) -> Option<Route> {
     if media::is_search(name) {
         return Some(Route::Search);
+    }
+    if media::is_add(name) {
+        return Some(Route::Add);
     }
     paged::contract(name)
         .map(Route::Paged)
@@ -129,6 +133,7 @@ impl ServerHandler for WatchlistMcp {
             Route::Paged(contract) => paged::call(&self.lists, contract, arguments).await,
             Route::Batched(contract) => batched::call(&self.lists, contract, arguments).await,
             Route::Search => media::call_search(self.catalog.as_ref(), arguments).await,
+            Route::Add => media::call_add(&self.lists, self.catalog.as_ref(), arguments).await,
         };
         envelope(called)
     }

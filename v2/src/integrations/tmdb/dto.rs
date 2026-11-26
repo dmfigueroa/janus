@@ -19,6 +19,9 @@ pub(super) fn parse_search(body: Value, kind: TmdbKind) -> Result<TmdbSearchPage
 }
 
 pub(super) fn parse_movie(body: Value) -> Result<TmdbMovie, ()> {
+    if body.get("poster_path").is_none() {
+        return Err(());
+    }
     let body: MovieBody = serde_json::from_value(body).map_err(|_| ())?;
     Ok(TmdbMovie {
         title: first_text(body.title, body.name).unwrap_or_else(|| "Unknown".into()),
@@ -100,6 +103,13 @@ fn blank_as_none(value: Option<String>) -> Option<String> {
     value.filter(|text| !text.is_empty())
 }
 
+fn required_nullable<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<String>::deserialize(deserializer)
+}
+
 fn image(path: Option<String>, size: &str) -> Option<String> {
     blank_as_none(path).map(|path| format!("https://image.tmdb.org/t/p/{size}{path}"))
 }
@@ -147,6 +157,8 @@ struct MovieBody {
     title: Option<String>,
     #[serde(default)]
     name: Option<String>,
+    /// Required key. Null is a missing poster, matching v1's nullable schema.
+    #[serde(deserialize_with = "required_nullable")]
     poster_path: Option<String>,
     #[serde(default)]
     release_date: Option<String>,

@@ -63,11 +63,20 @@
         "title": "Search supported media providers",
         "description": "Search TMDB for movies and TV, RAWG for games, Google Books for books, ComicVine for comics, or AniList for anime and manga. Anime and manga search remains unavailable while Janus reviews provider data quality.",
         "annotations": { "readOnlyHint": true, "destructiveHint": false }
+      },
+      {
+        "name": "add_media_to_watchlists",
+        "title": "Add provider-backed media to watchlists",
+        "description": "Add TMDB movies, TV, or individual episodes; RAWG games; Google Books books; or ComicVine volumes or individual issues by provider ID. Janus fetches canonical provider metadata before persisting each addition. TMDB episode additions require their parent show ID. A ComicVine item copied from read tool results (mediaType \"comic\" with its parent volume) adds that single issue; a \"comic\" addition without a parent adds the whole volume. Anime and manga additions remain unavailable. TV additions expand into episodes, and ComicVine volume additions expand into issues, so they are consequential bulk actions requiring confirmation. Each requested addition is processed independently in input order and returns an ordered result.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false
+        }
       }
     ],
     "pending": [
       "add_custom_items_to_watchlists",
-      "add_media_to_watchlists",
       "create_lineups",
       "delete_lineups",
       "delete_watchlists",
