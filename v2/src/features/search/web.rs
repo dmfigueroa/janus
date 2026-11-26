@@ -101,7 +101,7 @@ struct SearchView {
     notice: String,
     status_message: String,
     empty_hint: String,
-    alert: bool,
+    status_role: String,
     hits: Vec<HitView>,
     tabs: Vec<TabView>,
 }
@@ -137,7 +137,7 @@ struct DetailView {
 #[template(path = "search.html")]
 struct SearchPage<'a> {
     view: &'a SearchView,
-    active_nav: &'a str,
+    nav: crate::features::PrimaryNav,
 }
 
 #[derive(Template)]
@@ -183,7 +183,7 @@ pub(crate) async fn search(
             format,
             SearchPage {
                 view: &view,
-                active_nav: "search",
+                nav: crate::features::PrimaryNav::search(),
             },
         ),
         Representation::Html
@@ -298,7 +298,11 @@ fn search_view(
         notice: deprecation_notice(media_type),
         status_message,
         empty_hint,
-        alert: matches!(outcome, MediaSearchOutcome::ProviderUnavailable { .. }),
+        status_role: if matches!(outcome, MediaSearchOutcome::ProviderUnavailable { .. }) {
+            "alert".to_owned()
+        } else {
+            "status".to_owned()
+        },
         hits,
         tabs: tab_views(media_type),
     }

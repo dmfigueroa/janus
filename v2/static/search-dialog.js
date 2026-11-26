@@ -17,6 +17,7 @@ function syncInsertion(dialog) {
   const fieldset = dialog.querySelector("#search-insertion");
   if (!(select instanceof HTMLSelectElement) || !(fieldset instanceof HTMLFieldSetElement)) return;
   const custom = select.selectedOptions[0]?.dataset.order === "custom";
+  fieldset.dataset.custom = custom ? "true" : "false";
   fieldset.hidden = !custom;
   fieldset.disabled = !custom;
   if (custom) return;

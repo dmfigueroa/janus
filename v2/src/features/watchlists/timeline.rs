@@ -98,7 +98,7 @@ impl TimelineView {
             view: self,
             form: &self.form,
             message: "",
-            active_nav: "lists",
+            nav: crate::features::PrimaryNav::lists(),
         }
         .render()
     }
@@ -198,7 +198,7 @@ struct Page<'a> {
     view: &'a TimelineView,
     form: &'a WatchlistForm,
     message: &'a str,
-    active_nav: &'a str,
+    nav: crate::features::PrimaryNav,
 }
 
 #[derive(Template)]

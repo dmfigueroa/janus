@@ -88,14 +88,14 @@ mod tests {
 
     #[derive(Template)]
     #[template(path = "layout.html")]
-    struct LayoutProbe<'a> {
-        active_nav: &'a str,
+    struct LayoutProbe {
+        nav: crate::features::PrimaryNav,
     }
 
     #[test]
     fn shared_layout_references_every_versioned_entry_asset() {
         let layout = LayoutProbe {
-            active_nav: "lists",
+            nav: crate::features::PrimaryNav::lists(),
         }
         .render()
         .unwrap();

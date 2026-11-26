@@ -15,18 +15,7 @@
     </svg>
     <span>Watch Now</span>
   </a>
-  <a
-    class="nav-item"
-    href="/v2/watchlists"
-    {%
-    if
-    active_nav=""
-    ="lists"
-    %}aria-current="page"
-    {%
-    endif
-    %}
-  >
+  <a class="nav-item" href="/v2/watchlists" aria-current="{{ nav.lists }}">
     <svg
       aria-hidden="true"
       viewBox="0 0 24 24"
@@ -47,18 +36,7 @@
     </svg>
     <span>My Lists</span>
   </a>
-  <a
-    class="nav-item"
-    href="/v2/search"
-    {%
-    if
-    active_nav=""
-    ="search"
-    %}aria-current="page"
-    {%
-    endif
-    %}
-  >
+  <a class="nav-item" href="/v2/search" aria-current="{{ nav.search }}">
     <svg
       aria-hidden="true"
       viewBox="0 0 24 24"

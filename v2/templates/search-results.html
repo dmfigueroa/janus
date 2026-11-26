@@ -1,8 +1,6 @@
 <section id="search-results" class="search-results" aria-live="polite">
   {% if view.status_message != "" %}
-  <p class="search-status" {% if view.alert %}role="alert" {% else %}role="status" {% endif %}>
-    {{ view.status_message }}
-  </p>
+  <p class="search-status" role="{{ view.status_role }}">{{ view.status_message }}</p>
   {% endif %} {% if view.empty_hint != "" %}
   <p class="search-status">{{ view.empty_hint }}</p>
   {% endif %} {% if view.hits.len() > 0 %}
@@ -32,7 +30,7 @@
           {% else %}
           <span class="search-poster-empty">No poster</span>
           {% endif %} {% if hit.has_rating %}
-          <span class="search-rating" {% if hit.high_rating %}data-high="true" {% endif %}
+          <span class="search-rating" data-high="{{ hit.high_rating }}"
             >{{ hit.rating_label }}</span
           >
           {% endif %}

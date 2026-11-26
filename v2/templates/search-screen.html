@@ -39,7 +39,7 @@
     {% for tab in view.tabs %}
     <a
       role="tab"
-      aria-selected="{% if tab.selected %}true{% else %}false{% endif %}"
+      aria-selected="{{ tab.selected }}"
       href="/v2/search?query={{ view.query|urlencode }}&amp;type={{ tab.value }}&amp;page=1"
       hx-get="/v2/search?query={{ view.query|urlencode }}&amp;type={{ tab.value }}&amp;page=1"
       hx-target="#search-screen"

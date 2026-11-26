@@ -4,12 +4,7 @@
   commandfor="search-dialog"
   command="request-close"
   aria-label="Close media details"
-  {%
-  if
-  !view.has_lists
-  %}autofocus{%
-  endif
-  %}
+  autofocus
 >
   <svg
     aria-hidden="true"
@@ -54,7 +49,7 @@
     <input type="hidden" name="mediaType" value="{{ view.media_type }}" />
     <input type="hidden" name="title" value="{{ view.title }}" />
     <label class="search-add-label" for="search-watchlist">Add to Watchlist</label>
-    <select id="search-watchlist" name="watchlistId" autofocus>
+    <select id="search-watchlist" name="watchlistId">
       {% for list in view.watchlists %}
       <option
         value="{{ list.id }}"
@@ -64,7 +59,7 @@
       </option>
       {% endfor %}
     </select>
-    <fieldset id="search-insertion" {% if !view.insertion_visible %}hidden disabled{% endif %}>
+    <fieldset id="search-insertion" data-custom="{{ view.insertion_visible }}">
       <legend>Insert in custom order</legend>
       <p>Choose where this item should land in the watchlist's manual sequence.</p>
       <label><input type="radio" name="insertionPosition" value="beginning" /> Beginning</label>

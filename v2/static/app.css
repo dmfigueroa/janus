@@ -1539,6 +1539,10 @@ watchlist-reorder[aria-busy="true"] {
   width: 6rem;
 }
 
+#search-dialog fieldset[data-custom="false"] {
+  display: none;
+}
+
 #search-dialog fieldset {
   display: grid;
   gap: var(--size-2);
