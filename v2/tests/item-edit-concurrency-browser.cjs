@@ -13,7 +13,7 @@ function itemRow(id, title) {
 }
 
 function customOrderPage(rowsHtml) {
-  return `<main class="watchlist"><watchlist-reorder class="timeline" hx-post="/v2/watchlists/41/reorder?query=&unwatched=true" hx-trigger="reorder" hx-target="this" hx-select=".timeline > *" hx-swap="innerHTML" hx-disinherit="hx-select hx-target hx-swap hx-vals" hx-vals='{"movedItemId":"101"}'><p id="reorder-status" role="status"></p>${rowsHtml}</watchlist-reorder></main><dialog id="item-edit-dialog" class="dialog" closedby="any" data-item-edit-dialog><form id="item-edit-form" class="dialog-form"></form></dialog>`;
+  return `<!doctype html><html><head><meta name="htmx-config" content='{"disableInheritance":true}' /></head><body><main class="watchlist"><watchlist-reorder class="timeline" hx-post="/v2/watchlists/41/reorder?query=&unwatched=true" hx-trigger="reorder" hx-target="this" hx-select=".timeline > *" hx-swap="innerHTML" hx-vals='{"movedItemId":"101"}'><p id="reorder-status" role="status"></p>${rowsHtml}</watchlist-reorder></main><dialog id="item-edit-dialog" class="dialog" closedby="any" data-item-edit-dialog><form id="item-edit-form" class="dialog-form"></form></dialog></body></html>`;
 }
 
 function editFormHtml(id, title) {

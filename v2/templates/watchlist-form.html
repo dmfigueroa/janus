@@ -6,7 +6,7 @@
   hx-post="{{form.action}}"
   hx-target="#watchlist-form"
   hx-swap="outerHTML"
-  hx-disabled-elt="find button[type='submit']"
+  hx-disabled-elt="#watchlist-dialog button"
   hx-indicator="#watchlist-form-pending"
   {%
   if
@@ -31,6 +31,7 @@
         placeholder="e.g., Marvel Cinematic Universe"
         autocomplete="off"
         required
+        autofocus
         {%
         if
         form.name_invalid()
@@ -90,7 +91,15 @@
   {% endif %}
   <footer class="dialog-footer">
     <span id="watchlist-form-pending" class="htmx-indicator" role="status">Saving…</span>
-    <button type="button" class="button-secondary" data-watchlist-dialog-close>Cancel</button>
+    <button
+      type="button"
+      class="button-secondary"
+      commandfor="watchlist-dialog"
+      command="request-close"
+      data-watchlist-dialog-close
+    >
+      Cancel
+    </button>
     <button type="submit" class="button-primary">{{form.submit_label}}</button>
   </footer>
 </form>
