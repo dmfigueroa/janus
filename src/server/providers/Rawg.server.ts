@@ -1,3 +1,4 @@
+import { rawgIdSchema, providerResourceUrl } from "@/integrations/ProviderIds";
 import {
   requestProviderJson,
   parseProviderData,
@@ -77,8 +78,13 @@ async function searchGamesRequest(
 }
 
 async function getGameDetailsRequest(id: string, apiKey: string, signal?: AbortSignal) {
+  const gameId = rawgIdSchema.parse(id);
   const context = { provider: "rawg", operation: "get_game_details" };
-  const url = `https://api.rawg.io/api/games/${id}?key=${apiKey}`;
+  const url = providerResourceUrl({
+    prefix: "https://api.rawg.io/api/games/",
+    segment: gameId,
+    searchParams: new URLSearchParams({ key: apiKey }),
+  });
   const item = await requestProviderJson(url, { signal }, context);
   return mapGame(parseProviderData(RawgGameSchema, item, context));
 }

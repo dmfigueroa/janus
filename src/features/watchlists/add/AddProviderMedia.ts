@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  comicVineIdSchema,
+  googleBooksIdSchema,
+  rawgIdSchema,
+  tmdbIdSchema,
+} from "@/integrations/ProviderIds";
 import { addToWatchlistInsertionPositionSchema } from "./Mutation";
 import { anchorInsertionRefinement } from "./InsertionRefinement";
 
@@ -18,12 +24,12 @@ export const providerMediaAdditionSchema = z
   .union([
     providerMediaAdditionBaseSchema.extend({
       provider: z.literal("tmdb"),
-      providerId: z.string().regex(/^\d+$/, "Provider ID must be a TMDB numeric ID."),
+      providerId: tmdbIdSchema,
       mediaType: z.enum(["movie", "tv"]),
     }),
     providerMediaAdditionBaseSchema.extend({
       provider: z.literal("tmdb"),
-      providerId: z.string().regex(/^\d+$/, "Provider ID must be a TMDB numeric ID."),
+      providerId: tmdbIdSchema,
       mediaType: z.literal("episode"),
       parent: parentSchema.extend({
         providerId: z
@@ -38,19 +44,23 @@ export const providerMediaAdditionSchema = z
     }),
     providerMediaAdditionBaseSchema.extend({
       provider: z.literal("rawg"),
+      providerId: rawgIdSchema,
       mediaType: z.literal("game"),
     }),
     providerMediaAdditionBaseSchema.extend({
       provider: z.literal("google_books"),
+      providerId: googleBooksIdSchema,
       mediaType: z.literal("book"),
     }),
     providerMediaAdditionBaseSchema.extend({
       provider: z.literal("comicvine"),
+      providerId: comicVineIdSchema,
       mediaType: z.literal("comic"),
       parent: parentSchema.optional(),
     }),
     providerMediaAdditionBaseSchema.extend({
       provider: z.literal("comicvine"),
+      providerId: comicVineIdSchema,
       mediaType: z.literal("comic_issue"),
       parent: parentSchema.optional(),
     }),
@@ -61,4 +71,4 @@ export const providerMediaAdditionSchema = z
   ])
   .superRefine(anchorInsertionRefinement);
 
-export type ProviderMediaAddition = z.infer<typeof providerMediaAdditionSchema>;
+export type ProviderMediaAddition = z.input<typeof providerMediaAdditionSchema>;
