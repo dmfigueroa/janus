@@ -217,5 +217,7 @@ export async function mergeWatchlistsMutation(
       message: "Provide either an existing target watchlist ID or a new target name.",
     };
   }
-  return getDb().transaction((transaction) => mergeInTransaction(transaction, input));
+  return getDb().transaction((transaction) => mergeInTransaction(transaction, input), {
+    behavior: "immediate",
+  });
 }

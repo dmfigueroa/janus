@@ -17,8 +17,8 @@ async function createFixture(databasePath) {
     cwd: root,
     stdio: "inherit",
   });
-  const Database = require("better-sqlite3");
-  const database = new Database(databasePath);
+  const { openSqliteConnection } = require("../../src/db/SqliteConnection.server.ts");
+  const database = openSqliteConnection(databasePath);
   try {
     const insertWatchlist = database.prepare(
       "INSERT INTO watchlists(id,name,description,item_order_mode) VALUES(?,?,?, 'release')",

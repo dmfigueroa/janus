@@ -1,9 +1,10 @@
 // Run with the supported Node ABI; production migrations own this fixture schema.
 const assert = require("node:assert/strict");
-const Database = require("better-sqlite3");
-const { drizzle } = require("drizzle-orm/better-sqlite3");
-const { migrate } = require("drizzle-orm/better-sqlite3/migrator");
 const path = require("node:path");
+const {
+  openSqliteConnection,
+  runSqliteMigrations,
+} = require("../../src/db/SqliteConnection.server.ts");
 const { bulkWatchlists } = require("./bulk-watchlists.cjs");
 const {
   releaseTieBreaks,
@@ -11,7 +12,8 @@ const {
   checkOrderModeV1Read,
 } = require("./order-mode-fixtures.cjs");
 const { rejectItemTitle, editItemFromV1, checkV2EditedItems } = require("./item-edit-fixtures.cjs");
-const database = new Database(process.argv[2]);
+const { sqliteContractActions } = require("./sqlite-contract-fixtures.cjs");
+const database = openSqliteConnection(process.argv[2]);
 const customOrder = "ORDER BY custom_rank IS NULL, custom_rank, id";
 const watchlistItemIds = (watchlistId) =>
   database
@@ -125,6 +127,7 @@ const actions = {
   wal() {
     database.pragma("journal_mode = WAL");
   },
+  ...sqliteContractActions(database),
 };
 const requestedAction = process.argv[3];
 const action = actions[requestedAction];
@@ -136,7 +139,7 @@ if (action) {
   database.close();
   process.exit(0);
 }
-migrate(drizzle(database), { migrationsFolder: path.resolve(__dirname, "../../drizzle") });
+runSqliteMigrations(database, path.resolve(__dirname, "../../drizzle"));
 database
   .prepare("INSERT INTO watchlists(id,name,description,item_order_mode) VALUES(41, ?, ?, 'custom')")
   .run("Café 東京 <collection>", "Existing v1 collection");

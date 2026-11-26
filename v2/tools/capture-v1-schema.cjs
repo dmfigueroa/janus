@@ -1,10 +1,11 @@
 // Regenerate only after reconciling a v1 schema change with v2 compatibility.
-const Database = require("better-sqlite3");
-const { drizzle } = require("drizzle-orm/better-sqlite3");
-const { migrate } = require("drizzle-orm/better-sqlite3/migrator");
 const path = require("node:path");
-const database = new Database(":memory:");
-migrate(drizzle(database), { migrationsFolder: path.resolve(__dirname, "../../drizzle") });
+const {
+  openSqliteConnection,
+  runSqliteMigrations,
+} = require("../../src/db/SqliteConnection.server.ts");
+const database = openSqliteConnection(":memory:", { foreignKeys: false });
+runSqliteMigrations(database, path.resolve(__dirname, "../../drizzle"));
 const tables = ["watchlists", "watchlist_items", "lineups", "lineup_watchlists"];
 const schema = Object.fromEntries(
   tables.map((table) => [

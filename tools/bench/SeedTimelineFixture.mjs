@@ -9,12 +9,11 @@
  *
  * Prints the watchlist ids and the sample counts that the measurement script uses.
  */
-import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import path from "node:path";
 import process from "node:process";
 import { parseArgs } from "node:util";
+import { openSqliteConnection, runSqliteMigrations } from "../../src/db/SqliteConnection.server.ts";
 
 const { values } = parseArgs({
   options: {
@@ -51,9 +50,9 @@ const fixtures = [
   },
 ];
 
-const sqlite = new Database(databasePath);
+const sqlite = openSqliteConnection(databasePath, { foreignKeys: false });
 const db = drizzle(sqlite);
-await migrate(db, { migrationsFolder: path.resolve(process.cwd(), "drizzle") });
+runSqliteMigrations(sqlite, path.resolve(process.cwd(), "drizzle"));
 
 sqlite.exec("DELETE FROM watchlist_items; DELETE FROM watchlists;");
 

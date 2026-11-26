@@ -163,13 +163,16 @@ function persistLineup(
 export async function deleteLineup(reference: LineupReference) {
   if (reference.kind === "system")
     return lineupFailure("Automatic lineups cannot be deleted.", { code: "forbidden" });
-  return getDb().transaction((transaction) => {
-    initializeLineups(transaction);
-    const target = configuredLineup(transaction, reference);
-    if (!target) return lineupFailure("Lineup not found.", { code: "not_found" });
-    transaction.delete(lineups).where(eq(lineups.id, target.id)).run();
-    return { success: true as const };
-  });
+  return getDb().transaction(
+    (transaction) => {
+      initializeLineups(transaction);
+      const target = configuredLineup(transaction, reference);
+      if (!target) return lineupFailure("Lineup not found.", { code: "not_found" });
+      transaction.delete(lineups).where(eq(lineups.id, target.id)).run();
+      return { success: true as const };
+    },
+    { behavior: "immediate" },
+  );
 }
 
 export async function reorderLineups(references: LineupReference[]) {
