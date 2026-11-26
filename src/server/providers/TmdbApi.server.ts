@@ -7,32 +7,31 @@ import { z } from "zod";
 import { logMissingProviderConfiguration } from "@/integrations/ProviderLogging.server";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
+const tmdbResourceIdSchema = z.number().int().positive().refine(Number.isSafeInteger);
+const tmdbSeasonNumberSchema = z.number().int().nonnegative().refine(Number.isSafeInteger);
 
-export interface TMDBMedia {
-  id: number;
-  media_type?: "movie" | "tv";
-  title?: string;
-  name?: string;
-  poster_path: string | null;
-  backdrop_path: string | null;
-  release_date?: string;
-  first_air_date?: string;
-  vote_average: number;
-  overview: string;
-}
+const tmdbMediaSchema = z.object({
+  id: z.number(),
+  media_type: z.enum(["movie", "tv"]).optional(),
+  title: z.string().optional(),
+  name: z.string().optional(),
+  poster_path: z.string().nullable(),
+  backdrop_path: z.string().nullable(),
+  release_date: z.string().optional(),
+  first_air_date: z.string().optional(),
+  vote_average: z.number(),
+  overview: z.string(),
+});
 
-export interface TMDBSearchResponse {
-  page: number;
-  results: TMDBMedia[];
-  total_pages: number;
-  total_results: number;
-}
+const tmdbSearchResponseSchema = z.object({
+  page: z.number(),
+  results: z.array(tmdbMediaSchema),
+  total_pages: z.number(),
+  total_results: z.number(),
+});
 
-export interface TMDBErrorResponse {
-  status_code: number;
-  status_message: string;
-  success: boolean;
-}
+export type TMDBMedia = z.infer<typeof tmdbMediaSchema>;
+export type TMDBSearchResponse = z.infer<typeof tmdbSearchResponseSchema>;
 
 const tmdbMovieSchema = z.object({
   title: z.string().optional(),
@@ -104,18 +103,30 @@ export async function fetchTmdbSearch(
   url.searchParams.set("language", "en-US");
 
   const operation = type === "movie" ? "search_movies" : "search_tv";
-  const response = (await fetchWithAuth(url.toString(), operation, signal)) as TMDBSearchResponse;
+  const response = parseProviderData(
+    tmdbSearchResponseSchema,
+    await fetchWithAuth(url.toString(), operation, signal),
+    { provider: "tmdb", operation },
+  );
+  return assignSearchMediaType(response, type);
+}
 
-  response.results = response.results.map((item) => ({
+function assignSearchMediaType(response: TMDBSearchResponse, type: "movie" | "tv") {
+  return {
+    ...response,
+    results: response.results.map((item) => assignMediaType(item, type)),
+  };
+}
+
+function assignMediaType(item: TMDBMedia, type: "movie" | "tv"): TMDBMedia {
+  return {
     ...item,
     media_type: item.media_type || type,
-  }));
-
-  return response;
+  };
 }
 
 export async function fetchTmdbTv(data: { id: number }, signal?: AbortSignal) {
-  const input = z.object({ id: z.number() }).parse(data);
+  const input = z.object({ id: tmdbResourceIdSchema }).parse(data);
   const url = new URL(`${TMDB_BASE_URL}/tv/${input.id}`);
   const context = { provider: "tmdb", operation: "get_tv_details" };
   return parseProviderData(
@@ -129,7 +140,9 @@ export async function fetchTmdbSeason(
   data: { id: number; seasonNumber: number },
   signal?: AbortSignal,
 ) {
-  const input = z.object({ id: z.number(), seasonNumber: z.number() }).parse(data);
+  const input = z
+    .object({ id: tmdbResourceIdSchema, seasonNumber: tmdbSeasonNumberSchema })
+    .parse(data);
   const url = new URL(`${TMDB_BASE_URL}/tv/${input.id}/season/${input.seasonNumber}`);
   const context = { provider: "tmdb", operation: "get_season_details" };
   return parseProviderData(
@@ -140,7 +153,7 @@ export async function fetchTmdbSeason(
 }
 
 export async function fetchTmdbMovie(data: { id: number }, signal?: AbortSignal) {
-  const input = z.object({ id: z.number() }).parse(data);
+  const input = z.object({ id: tmdbResourceIdSchema }).parse(data);
   const url = new URL(`${TMDB_BASE_URL}/movie/${input.id}`);
   const context = { provider: "tmdb", operation: "get_movie_details" };
   return parseProviderData(
