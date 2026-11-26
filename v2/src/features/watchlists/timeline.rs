@@ -139,7 +139,7 @@ impl Row {
             episode: item.episode.clone().unwrap_or_default(),
             year: display_year(&date),
             date,
-            watched: item.is_watched == Some(true),
+            watched: item.is_watched,
             poster: poster(item.poster_path.as_deref().unwrap_or("")),
             media: item.media_type.clone(),
         }
@@ -211,12 +211,7 @@ mod tests {
     use super::*;
     use crate::features::watchlists::{WatchlistRecord, WatchlistStats, WatchlistSummary};
 
-    fn item(
-        id: i64,
-        title: &str,
-        release_date: Option<&str>,
-        watched: Option<bool>,
-    ) -> WatchlistItem {
+    fn item(id: i64, title: &str, release_date: Option<&str>, watched: bool) -> WatchlistItem {
         WatchlistItem {
             id,
             watchlist_id: 1,
@@ -240,10 +235,7 @@ mod tests {
     }
 
     fn detail(mode: ItemOrderMode, items: Vec<WatchlistItem>) -> WatchlistDetail {
-        let watched_items = items
-            .iter()
-            .filter(|item| item.is_watched == Some(true))
-            .count();
+        let watched_items = items.iter().filter(|item| item.is_watched).count();
         WatchlistDetail {
             watchlist: WatchlistSummary {
                 watchlist: WatchlistRecord {
@@ -281,10 +273,10 @@ mod tests {
             &detail(
                 ItemOrderMode::Release,
                 vec![
-                    item(1, "First", Some("2020-01-02"), None),
-                    item(2, "Second", Some("2020-02-02"), Some(true)),
-                    item(3, "Undated", None, None),
-                    item(4, "Older", Some("2019-05-01"), None),
+                    item(1, "First", Some("2020-01-02"), false),
+                    item(2, "Second", Some("2020-02-02"), true),
+                    item(3, "Undated", None, false),
+                    item(4, "Older", Some("2019-05-01"), false),
                 ],
             ),
             &TimelineFilters::default(),
@@ -317,10 +309,10 @@ mod tests {
             &detail(
                 ItemOrderMode::Custom,
                 vec![
-                    item(1, "First", Some("2020-01-02"), Some(true)),
-                    item(2, "Second", Some("2021-02-02"), Some(true)),
-                    item(3, "Third", None, Some(true)),
-                    item(4, "Fourth", Some("2018-03-03"), None),
+                    item(1, "First", Some("2020-01-02"), true),
+                    item(2, "Second", Some("2021-02-02"), true),
+                    item(3, "Third", None, true),
+                    item(4, "Fourth", Some("2018-03-03"), false),
                 ],
             ),
             &TimelineFilters::default(),
@@ -358,8 +350,8 @@ mod tests {
             &detail(
                 ItemOrderMode::Release,
                 vec![
-                    item(1, "First", Some("2020-01-02"), Some(true)),
-                    item(2, "Second", Some("2021-02-02"), Some(true)),
+                    item(1, "First", Some("2020-01-02"), true),
+                    item(2, "Second", Some("2021-02-02"), true),
                 ],
             ),
             &TimelineFilters::default(),
@@ -374,15 +366,15 @@ mod tests {
 
     #[test]
     fn filters_match_titles_parents_and_episodes_and_ignore_watched_runs_when_requested() {
-        let mut episode = item(2, "Episode", None, None);
+        let mut episode = item(2, "Episode", None, false);
         episode.parent_title = Some("A Show".into());
         episode.episode = Some("Pilot".into());
         let snapshot = detail(
             ItemOrderMode::Custom,
             vec![
-                item(1, "First", Some("2020-01-02"), Some(true)),
+                item(1, "First", Some("2020-01-02"), true),
                 episode,
-                item(3, "Last", None, None),
+                item(3, "Last", None, false),
             ],
         );
         for query in ["episode", " SHOW ", "pilot"] {
@@ -405,7 +397,7 @@ mod tests {
         let view = TimelineView::new(
             &detail(
                 ItemOrderMode::Custom,
-                vec![item(1, "First", Some("2020-01-02"), None)],
+                vec![item(1, "First", Some("2020-01-02"), false)],
             ),
             &TimelineFilters::new("missing", true),
         );
@@ -417,16 +409,16 @@ mod tests {
 
     #[test]
     fn rows_resolve_posters_and_keep_metadata() {
-        let mut first = item(1, "First", Some("2020-01-02"), None);
+        let mut first = item(1, "First", Some("2020-01-02"), false);
         first.poster_path = Some("/poster.jpg".into());
         first.parent_title = Some("Parent".into());
         first.episode = Some("2".into());
-        let mut second = item(2, "Second", None, None);
+        let mut second = item(2, "Second", None, false);
         second.poster_path = Some("https://images.example/poster.jpg".into());
         let view = TimelineView::new(
             &detail(
                 ItemOrderMode::Custom,
-                vec![first, second, item(3, "Third", None, None)],
+                vec![first, second, item(3, "Third", None, false)],
             ),
             &TimelineFilters::default(),
         );
@@ -454,7 +446,7 @@ mod tests {
         let view = TimelineView::new(
             &detail(
                 ItemOrderMode::Custom,
-                vec![item(1, "First", Some("2020-01-02"), None)],
+                vec![item(1, "First", Some("2020-01-02"), false)],
             ),
             &TimelineFilters::new("First", true),
         );

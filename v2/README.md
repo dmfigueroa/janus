@@ -111,7 +111,7 @@ use the same SHA-256 input as v1. Existing MCP clients remain on v1.
 `src/database/v1-schema.json` is generated through v1 migrations by
 `node v2/tools/capture-v1-schema.cjs`. It captures column types, defaults, nullability, primary
 keys, foreign keys and indexes. Reconcile v1 changes before regenerating it. V2 only reads
-this contract. Timestamps stay strings; JSON authors and nullable integer booleans preserve
+this contract. Timestamps stay strings; JSON authors and integer booleans preserve
 v1 values. Name search uses NFC plus lowercase; detail text search intentionally retains
 SQLite LIKE's ASCII case behavior and treats wildcard characters literally.
 

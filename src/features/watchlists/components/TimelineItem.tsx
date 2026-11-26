@@ -77,7 +77,7 @@ function WatchedButton({
       onClick={onToggle}
       disabled={disabled}
       aria-label={label}
-      aria-pressed={Boolean(item.isWatched)}
+      aria-pressed={item.isWatched}
       variant="ghost"
       size="sm"
       minW={11}

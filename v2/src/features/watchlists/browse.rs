@@ -348,7 +348,7 @@ mod tests {
             vote_average: None,
             runtime: None,
             custom_rank: None,
-            is_watched: None,
+            is_watched: false,
             authors: None,
             added_at: "2020-01-01 00:00:00".into(),
         }

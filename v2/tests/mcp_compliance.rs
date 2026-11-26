@@ -75,7 +75,7 @@ struct FixtureWatchlistItem {
     vote_average: Option<f64>,
     runtime: Option<i64>,
     custom_rank: Option<i64>,
-    is_watched: Option<i64>,
+    is_watched: i64,
     authors: Option<Vec<String>>,
     added_at: String,
 }
@@ -292,7 +292,7 @@ async fn assert_check_rep(database: &DatabaseConnection, fully_ranked_watchlists
         let media_type = row.try_get::<String>("", "media_type").unwrap();
         let title = row.try_get::<String>("", "title").unwrap();
         let custom_rank = row.try_get::<Option<i64>>("", "custom_rank").unwrap();
-        let is_watched = row.try_get::<Option<i64>>("", "is_watched").unwrap();
+        let is_watched = row.try_get::<i64>("", "is_watched").unwrap();
         let authors = row.try_get::<Option<String>>("", "authors").unwrap();
 
         assert!(
@@ -304,8 +304,8 @@ async fn assert_check_rep(database: &DatabaseConnection, fully_ranked_watchlists
         );
         assert!(!title.trim().is_empty(), "item {id} has empty title");
         assert!(
-            matches!(is_watched, None | Some(0 | 1)),
-            "item {id} invalid is_watched {is_watched:?}"
+            matches!(is_watched, 0 | 1),
+            "item {id} invalid is_watched {is_watched}"
         );
         if let Some(raw_authors) = authors {
             let parsed: Vec<String> = serde_json::from_str(&raw_authors)

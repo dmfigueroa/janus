@@ -107,7 +107,7 @@ export function TimelineItemActionMenu({
         <Popover.Positioner>
           <Popover.Content w="min(20rem, calc(100vw - 2rem))" p={1}>
             <Stack gap={1}>
-              {item.isWatched !== true ? (
+              {!item.isWatched ? (
                 <ActionButton
                   label="Mark watched without updating list"
                   onSelect={() => selectAction(onMarkWatched)}

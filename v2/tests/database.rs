@@ -917,8 +917,8 @@ async fn typed_reads_decode_stored_values_and_preserve_order_token_semantics() {
     assert_eq!(detail.items[0].custom_rank, Some(1));
     assert_eq!(detail.items[1].custom_rank, Some(2));
     assert_eq!(detail.items[2].custom_rank, None);
-    assert_eq!(detail.items[0].is_watched, Some(true));
-    assert_eq!(detail.items[1].is_watched, Some(false));
+    assert!(detail.items[0].is_watched);
+    assert!(!detail.items[1].is_watched);
     assert_eq!(detail.items[1].parent_title.as_deref(), Some("A Show"));
     assert_eq!(detail.items[2].parent_title, None);
     assert_eq!(detail.items[2].authors, Some(Vec::new()));
@@ -1276,7 +1276,7 @@ async fn item_discovery_returns_typed_order_and_full_next_unwatched() {
     assert_eq!(item.tmdb_id, "ep-1");
     assert_eq!(item.parent_id.as_deref(), Some("show-1"));
     assert_eq!(item.parent_title.as_deref(), Some("A Show"));
-    assert_eq!(item.is_watched, Some(false));
+    assert!(!item.is_watched);
     assert_eq!(
         item.authors.as_deref(),
         Some(&["Écrivain".to_owned(), "著者".to_owned()][..])

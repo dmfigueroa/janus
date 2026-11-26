@@ -183,7 +183,7 @@ fn read_contract(spec: ReadContractSpec) -> Contract {
 }
 
 fn item_schema(media: &Value) -> Value {
-    json!({"type":"object","properties":{"id":{"type":"number"},"watchlistId":{"type":"number"},"provider":{"type":"string"},"providerId":{"type":"string"},"mediaType":media,"title":{"type":"string"},"parent":{"type":"object","properties":{"providerId":{"type":["string","null"]},"title":{"type":["string","null"]}},"required":["providerId","title"]},"episode":{"type":["string","null"]},"isWatched":{"type":["boolean","null"]}},"required":["id","watchlistId","provider","providerId","mediaType","title","parent","episode","isWatched"]})
+    json!({"type":"object","properties":{"id":{"type":"number"},"watchlistId":{"type":"number"},"provider":{"type":"string"},"providerId":{"type":"string"},"mediaType":media,"title":{"type":"string"},"parent":{"type":"object","properties":{"providerId":{"type":["string","null"]},"title":{"type":["string","null"]}},"required":["providerId","title"]},"episode":{"type":["string","null"]},"isWatched":{"type":"boolean"}},"required":["id","watchlistId","provider","providerId","mediaType","title","parent","episode","isWatched"]})
 }
 
 fn title_schema(media: &Value) -> Value {
@@ -415,7 +415,7 @@ mod tests {
             vote_average: Some(7.5),
             runtime: Some(42),
             custom_rank: None,
-            is_watched: None,
+            is_watched: false,
             authors: None,
             added_at: "2020-01-02 00:00:00".into(),
         }

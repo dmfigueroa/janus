@@ -85,10 +85,7 @@ function loadSummarySelections(db: ReturnType<typeof getDb>, listIds: number[]) 
     .where(
       or(
         eq(rankedSummaryItems.coverRank, 1),
-        and(
-          sql`COALESCE(${rankedSummaryItems.isWatched}, 0) = 0`,
-          eq(rankedSummaryItems.unwatchedRank, 1),
-        ),
+        and(eq(rankedSummaryItems.isWatched, false), eq(rankedSummaryItems.unwatchedRank, 1)),
       ),
     );
 }
@@ -122,5 +119,5 @@ function assignCoverItem(entry: SummarySelection, item: WatchlistItem, coverRank
 }
 
 function assignNextUnwatched(entry: SummarySelection, item: WatchlistItem, unwatchedRank: number) {
-  if (item.isWatched !== true && unwatchedRank === 1) entry.nextUnwatched = item;
+  if (!item.isWatched && unwatchedRank === 1) entry.nextUnwatched = item;
 }

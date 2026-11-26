@@ -36,7 +36,7 @@ interface WatchlistItemRow {
   vote_average: number | null;
   runtime: number | null;
   custom_rank: number | null;
-  is_watched: number | null;
+  is_watched: number;
   authors: string | null;
   added_at: string;
 }
@@ -96,7 +96,7 @@ function assertWatchlistItemRowInvariants(item: WatchlistItemRow): void {
   );
   assert.ok(item.title.trim().length > 0, `item ${item.id} title must be non-empty`);
   assert.ok(
-    item.is_watched === null || item.is_watched === 0 || item.is_watched === 1,
+    item.is_watched === 0 || item.is_watched === 1,
     `item ${item.id} invalid is_watched: ${String(item.is_watched)}`,
   );
   assertOptionalReleaseDate(item.release_date, item.id);

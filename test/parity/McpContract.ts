@@ -41,7 +41,7 @@ export interface FixtureWatchlistItem {
   vote_average: number | null;
   runtime: number | null;
   custom_rank: number | null;
-  is_watched: number | null;
+  is_watched: number;
   authors: string[] | null;
   added_at: string;
 }
