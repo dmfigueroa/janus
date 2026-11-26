@@ -21,7 +21,7 @@ export const itemOutputSchema = z.object({
   title: z.string(),
   parent: z.object({ providerId: z.string().nullable(), title: z.string().nullable() }),
   episode: z.string().nullable(),
-  isWatched: z.boolean().nullable(),
+  isWatched: z.boolean(),
 });
 
 export const titleOutputSchema = z.object({

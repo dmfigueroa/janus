@@ -19,11 +19,6 @@ it("marks the displayed next item and restores both watched state and rotation o
     await import("@/features/watchlists/rotation/CardRotation.server");
   const watchlist = await createWatchlist({ name: "Card action" });
   const item = await createTestWatchlistItem(database.db, { watchlistId: watchlist.id });
-  database.db
-    .update(watchlistItems)
-    .set({ isWatched: null })
-    .where(eq(watchlistItems.id, item.id))
-    .run();
   const result = applyCardRotation({
     watchlistId: watchlist.id,
     itemId: item.id,

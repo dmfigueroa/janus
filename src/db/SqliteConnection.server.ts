@@ -65,9 +65,20 @@ export function formatForeignKeyViolations(violations: ForeignKeyViolation[]): s
   return `SQLite foreign_key_check found ${violations.length} violation(s): ${summary}`;
 }
 
+function backfillNullIsWatched(sqlite: Database.Database): void {
+  const columns = sqlite.pragma("table_info('watchlist_items')") as Array<{
+    name: string;
+    notnull: number;
+  }>;
+  if (columns.some((column) => column.name === "is_watched" && column.notnull === 0)) {
+    sqlite.prepare("UPDATE watchlist_items SET is_watched = 0 WHERE is_watched IS NULL").run();
+  }
+}
+
 export function runSqliteMigrations(sqlite: Database.Database, migrationsFolder: string): void {
   sqlite.pragma("foreign_keys = OFF");
   try {
+    backfillNullIsWatched(sqlite);
     migrate(drizzle(sqlite), { migrationsFolder });
     const violations = checkForeignKeys(sqlite);
     if (violations.length > 0) {

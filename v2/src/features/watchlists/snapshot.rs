@@ -27,7 +27,7 @@ pub struct WatchlistRecord {
     pub paused_at: Option<String>,
 }
 
-/// One stored watchlist item with nullable watched state and metadata decoded.
+/// One stored watchlist item with watched state and metadata decoded.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WatchlistItem {
     pub id: i64,
@@ -45,16 +45,15 @@ pub struct WatchlistItem {
     pub vote_average: Option<f64>,
     pub runtime: Option<i64>,
     pub custom_rank: Option<i64>,
-    pub is_watched: Option<bool>,
+    pub is_watched: bool,
     pub authors: Option<Vec<String>>,
     pub added_at: String,
 }
 
 impl WatchlistItem {
-    /// Whether this item is still waiting to be watched. Nullable watched state
-    /// counts as unwatched.
+    /// Whether this item is still waiting to be watched.
     pub fn is_unwatched(&self) -> bool {
-        self.is_watched != Some(true)
+        !self.is_watched
     }
 
     /// Matches the item's title, parent title or episode against a lowercase query.

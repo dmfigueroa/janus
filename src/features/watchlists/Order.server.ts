@@ -13,9 +13,9 @@ export const customRankOrder = [
   ...releaseDateOrder,
 ] as const;
 
-export const isUnwatchedExpression = sql<boolean>`COALESCE(${watchlistItems.isWatched}, 0) = 0`;
+export const isUnwatchedExpression = sql<boolean>`${watchlistItems.isWatched} = 0`;
 export const watchedItemsExpression = sql<number>`sum(case when ${watchlistItems.isWatched} then 1 else 0 end)`;
-export const isWatchedOrderExpression = sql<number>`CASE WHEN COALESCE(${watchlistItems.isWatched}, 0) = 1 THEN 1 ELSE 0 END`;
+export const isWatchedOrderExpression = sql<number>`CASE WHEN ${watchlistItems.isWatched} = 1 THEN 1 ELSE 0 END`;
 
 export const activeItemOrderExpression = sql`
   CASE WHEN ${watchlists.itemOrderMode} = 'custom' AND ${watchlistItems.customRank} IS NULL THEN 1 ELSE 0 END,

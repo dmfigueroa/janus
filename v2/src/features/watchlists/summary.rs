@@ -63,10 +63,7 @@ pub(super) fn build_stats(
 
 /// Derives summary state from an already loaded detail item snapshot.
 pub(super) fn stats_from_items(items: &[WatchlistItem]) -> WatchlistStats {
-    let watched_items = items
-        .iter()
-        .filter(|item| item.is_watched == Some(true))
-        .count();
+    let watched_items = items.iter().filter(|item| item.is_watched).count();
     let next_unwatched = items.iter().find(|item| item.is_unwatched()).cloned();
     build_stats(
         items.len(),
@@ -91,7 +88,7 @@ fn progress(total_items: usize, watched_items: usize) -> u64 {
 mod tests {
     use super::*;
 
-    fn item(id: i64, watched: Option<bool>, poster: Option<&str>, media: &str) -> WatchlistItem {
+    fn item(id: i64, watched: bool, poster: Option<&str>, media: &str) -> WatchlistItem {
         WatchlistItem {
             id,
             watchlist_id: 1,
@@ -133,9 +130,9 @@ mod tests {
     #[test]
     fn detail_stats_prefer_next_unwatched_then_first_item_for_the_cover() {
         let items = vec![
-            item(1, Some(true), Some("/watched.jpg"), "movie"),
-            item(2, None, None, "episode"),
-            item(3, None, Some("/later.jpg"), "book"),
+            item(1, true, Some("/watched.jpg"), "movie"),
+            item(2, false, None, "episode"),
+            item(3, false, Some("/later.jpg"), "book"),
         ];
         let stats = stats_from_items(&items);
         assert_eq!(stats.total_items, 3);
@@ -145,7 +142,7 @@ mod tests {
         assert_eq!(stats.cover_image, None);
         assert_eq!(stats.cover_media_type.as_deref(), Some("episode"));
 
-        let watched = vec![item(1, Some(true), Some("/first.jpg"), "movie")];
+        let watched = vec![item(1, true, Some("/first.jpg"), "movie")];
         let completed = stats_from_items(&watched);
         assert_eq!(completed.progress, 100);
         assert!(completed.next_unwatched.is_none());
@@ -154,8 +151,8 @@ mod tests {
 
     #[test]
     fn summary_builds_cover_from_the_selected_item_without_extra_state() {
-        let next = item(2, None, Some("/next.jpg"), "episode");
-        let first = item(3, None, None, "book");
+        let next = item(2, false, Some("/next.jpg"), "episode");
+        let first = item(3, false, None, "book");
         let stats = build_stats(3, 1, SummarySelection::new(Some(next), Some(&first)));
         assert_eq!(stats.progress, 33);
         assert_eq!(stats.cover_image.as_deref(), Some("/next.jpg"));

@@ -140,18 +140,17 @@ pub(super) async fn summary_selections<C: ConnectionTrait>(
     }
     let placeholders = vec!["?"; watchlist_ids.len()].join(",");
     let order = mode.order_sql();
-    // `COALESCE(is_watched,0)=0` must stay equivalent to `WatchlistItem::is_unwatched`.
     let sql = format!(
         "SELECT * FROM (\
            SELECT watchlist_items.*,\
              row_number() OVER (\
-               PARTITION BY watchlist_id ORDER BY COALESCE(is_watched,0)=1, {order}\
+               PARTITION BY watchlist_id ORDER BY is_watched, {order}\
              ) AS cover_rank,\
              row_number() OVER (\
-               PARTITION BY watchlist_id, COALESCE(is_watched,0)=1 ORDER BY {order}\
+               PARTITION BY watchlist_id, is_watched ORDER BY {order}\
              ) AS unwatched_rank \
            FROM watchlist_items WHERE watchlist_id IN ({placeholders})\
-         ) WHERE cover_rank=1 OR (COALESCE(is_watched,0)=0 AND unwatched_rank=1)"
+         ) WHERE cover_rank=1 OR (is_watched=0 AND unwatched_rank=1)"
     );
     let values = watchlist_ids.iter().map(|id| (*id).into()).collect();
     let selected = database

@@ -102,7 +102,7 @@ async fn validate_schema(database: &DatabaseConnection) -> Result<(), DbErr> {
 async fn validate_values(database: &DatabaseConnection) -> Result<(), DbErr> {
     let checks = [
         "SELECT count(*) AS invalid FROM watchlists WHERE id <= 0 OR typeof(name) != 'text' OR item_order_mode NOT IN ('release','custom') OR typeof(created_at) != 'text' OR typeof(updated_at) NOT IN ('text','null') OR typeof(last_watched_at) NOT IN ('text','null') OR typeof(last_item_added_at) NOT IN ('text','null') OR typeof(paused_at) NOT IN ('text','null')",
-        "SELECT count(*) AS invalid FROM watchlist_items WHERE id <= 0 OR typeof(tmdb_id) != 'text' OR typeof(source) != 'text' OR typeof(title) != 'text' OR media_type NOT IN ('movie','episode','game','book','comic','anime','manga') OR (is_watched IS NOT NULL AND (typeof(is_watched) != 'integer' OR is_watched NOT IN (0,1))) OR typeof(added_at) != 'text' OR (authors IS NOT NULL AND CASE WHEN json_valid(authors) THEN json_type(authors) != 'array' OR EXISTS (SELECT 1 FROM json_each(authors) WHERE type != 'text') ELSE 1 END)",
+        "SELECT count(*) AS invalid FROM watchlist_items WHERE id <= 0 OR typeof(tmdb_id) != 'text' OR typeof(source) != 'text' OR typeof(title) != 'text' OR media_type NOT IN ('movie','episode','game','book','comic','anime','manga') OR typeof(is_watched) != 'integer' OR is_watched NOT IN (0,1) OR typeof(added_at) != 'text' OR (authors IS NOT NULL AND CASE WHEN json_valid(authors) THEN json_type(authors) != 'array' OR EXISTS (SELECT 1 FROM json_each(authors) WHERE type != 'text') ELSE 1 END)",
     ];
     for sql in checks {
         let row = database

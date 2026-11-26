@@ -28,6 +28,9 @@ function sqliteContractActions(database) {
         )
         .run();
     },
+    "invalid-is-watched"() {
+      database.prepare("UPDATE watchlist_items SET is_watched = 2 WHERE id = 101").run();
+    },
     "v1-cascading-deletes"() {
       database
         .prepare("INSERT INTO lineups(id, kind, name, rank) VALUES(10, 'custom', 'Weekend', 0)")

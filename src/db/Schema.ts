@@ -68,7 +68,7 @@ export const watchlistItems = sqliteTable(
     voteAverage: real("vote_average"),
     runtime: integer("runtime"), // In minutes
     customRank: integer("custom_rank"),
-    isWatched: integer("is_watched", { mode: "boolean" }).default(false),
+    isWatched: integer("is_watched", { mode: "boolean" }).notNull().default(false),
     authors: text("authors", { mode: "json" }).$type<string[]>(),
     addedAt: text("added_at")
       .default(sql`(CURRENT_TIMESTAMP)`)

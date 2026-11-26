@@ -192,18 +192,17 @@ describe("getWatchlistDetail", () => {
     expect(detail?.watchlist.stats.nextUnwatched?.title).toBe("Next Up");
   });
 
-  it("treats null isWatched rows as unwatched in detail views", async () => {
-    const [list] = await db.insert(watchlists).values({ name: "Legacy Detail" }).returning();
+  it("defaults omitted isWatched to false in detail views and rejects SQL NULL", async () => {
+    const [list] = await db.insert(watchlists).values({ name: "Default Detail" }).returning();
 
     await db.insert(watchlistItems).values([
       {
         watchlistId: list.id,
-        tmdbId: "legacy-null",
+        tmdbId: "default-unwatched",
         source: "tmdb",
         mediaType: "movie",
-        title: "Legacy Next",
+        title: "Default Next",
         releaseDate: "2024-01-01",
-        isWatched: null,
       },
       {
         watchlistId: list.id,
@@ -221,8 +220,16 @@ describe("getWatchlistDetail", () => {
       unwatchedOnly: true,
     });
 
-    expect(detail?.items.map((item) => item.title)).toEqual(["Legacy Next"]);
-    expect(detail?.watchlist.stats.nextUnwatched?.title).toBe("Legacy Next");
+    expect(detail?.items.map((item) => item.title)).toEqual(["Default Next"]);
+    expect(detail?.items[0]?.isWatched).toBe(false);
+    expect(detail?.watchlist.stats.nextUnwatched?.title).toBe("Default Next");
+    expect(() =>
+      testDb.sqlite
+        .prepare(
+          "INSERT INTO watchlist_items(watchlist_id, tmdb_id, source, media_type, title, is_watched) VALUES(?, 'null-check', 'tmdb', 'movie', 'Null Check', NULL)",
+        )
+        .run(list.id),
+    ).toThrow(/NOT NULL constraint failed/);
   });
 
   it("avoids full watchlist item scans when loading a detail page", async () => {
@@ -350,19 +357,18 @@ describe("listWatchlistSummaries", () => {
     });
   });
 
-  it("treats null isWatched rows as unwatched for summary selection", async () => {
-    const [list] = await db.insert(watchlists).values({ name: "Legacy Imports" }).returning();
+  it("defaults omitted isWatched to false for summary selection", async () => {
+    const [list] = await db.insert(watchlists).values({ name: "Default Imports" }).returning();
 
     await db.insert(watchlistItems).values([
       {
         watchlistId: list.id,
-        tmdbId: "legacy-null",
+        tmdbId: "default-unwatched",
         source: "tmdb",
         mediaType: "movie",
-        title: "Legacy Next",
-        posterPath: "/legacy.jpg",
+        title: "Default Next",
+        posterPath: "/default.jpg",
         releaseDate: "2024-01-01",
-        isWatched: null,
       },
       {
         watchlistId: list.id,
@@ -382,10 +388,11 @@ describe("listWatchlistSummaries", () => {
       totalItems: 2,
       watchedItems: 1,
       progress: 50,
-      coverImage: "/legacy.jpg",
+      coverImage: "/default.jpg",
       coverMediaType: "movie",
     });
-    expect(summary.stats.nextUnwatched?.title).toBe("Legacy Next");
+    expect(summary.stats.nextUnwatched?.title).toBe("Default Next");
+    expect(summary.stats.nextUnwatched?.isWatched).toBe(false);
   });
 
   it("respects supported sort orders", async () => {

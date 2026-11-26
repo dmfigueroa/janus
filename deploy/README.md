@@ -9,7 +9,7 @@ Janus runs as two container images built from the repository root:
 
 Both containers mount the same SQLite storage directory at `/app/storage` (database file `/app/storage/sqlite.db`) so SQLite WAL/SHM sidecar files remain accessible to both processes:
 
-- **V1 owns migrations:** On startup, v1 runs `.output/server/migrate.mjs`, optionally runs `.output/server/seed.mjs` (no-op unless `SEED_ON_STARTUP=true`), and starts the Node server.
+- **V1 owns migrations:** On startup, v1 runs `.output/server/migrate.mjs`, optionally runs `.output/server/seed.mjs` (no-op unless `SEED_ON_STARTUP=true`), and starts the Node server. In `deploy/compose.yaml`, `v2` waits for `v1` (`depends_on: v1: condition: service_healthy`) so migrations complete before v2 validates the schema or opens connections.
 - **V2 validates compatibility without migrating:** V2 opens the existing SQLite file read-write (`create_if_missing(false)`, `read_only(false)`, `foreign_keys(true)`, `busy_timeout(5s)` in `v2/src/database/mod.rs`) and fails startup if the file is missing, fails `PRAGMA foreign_key_check`, or its schema/stored values do not match `v2/src/database/v1-schema.json`.
 - **Two-phase orphan scrub for existing databases:** Before restarting v2 on an existing production database that may contain pre-existing orphaned rows, inspect and scrub orphans with `.output/server/scrub-orphans.mjs` (idempotent; runs `PRAGMA foreign_key_check` before and after):
   - Dry run (read-only): `node .output/server/scrub-orphans.mjs --database /app/storage/sqlite.db`

@@ -130,6 +130,154 @@ describe("merge watchlists mutation", () => {
       items: [expect.objectContaining({ tmdbId: "untouched" })],
     });
   });
+
+  const booleanWatchedStates = [false, true] as const;
+  const booleanWatchedPairs = booleanWatchedStates.flatMap((targetWatched) =>
+    booleanWatchedStates.map((sourceWatched) => ({
+      targetWatched,
+      sourceWatched,
+      expectedWatched: targetWatched || sourceWatched,
+    })),
+  );
+
+  it.each(booleanWatchedPairs)(
+    "enforces join-semilattice watched state on release-order merge (target=$targetWatched, source=$sourceWatched -> $expectedWatched)",
+    async ({ targetWatched, sourceWatched, expectedWatched }) => {
+      const target = await createTestWatchlist(db, { name: "Release Target" });
+      const source = await createTestWatchlist(db, { name: "Release Source" });
+      await createTestWatchlistItem(db, {
+        watchlistId: target.id,
+        tmdbId: "shared-release",
+        title: "Shared Release",
+        isWatched: targetWatched,
+      });
+      await createTestWatchlistItem(db, {
+        watchlistId: source.id,
+        tmdbId: "shared-release",
+        title: "Shared Release",
+        isWatched: sourceWatched,
+      });
+
+      const result = await mergeWatchlistsMutation({
+        target: { kind: "existing", watchlistId: target.id },
+        sourceWatchlistIds: [source.id],
+      });
+
+      expect(result).toEqual({ success: true, targetId: target.id });
+      const detail = await readWatchlistDetail({
+        watchlistId: target.id,
+        unwatchedOnly: false,
+      });
+      expect(detail?.items).toEqual([
+        expect.objectContaining({ tmdbId: "shared-release", isWatched: expectedWatched }),
+      ]);
+    },
+  );
+
+  it.each(booleanWatchedPairs)(
+    "enforces join-semilattice watched state on custom-order merge (target=$targetWatched, source=$sourceWatched -> $expectedWatched)",
+    async ({ targetWatched, sourceWatched, expectedWatched }) => {
+      const target = await createTestWatchlist(db, {
+        name: "Custom Target",
+        itemOrderMode: "custom",
+      });
+      const source = await createTestWatchlist(db, {
+        name: "Custom Source",
+        itemOrderMode: "custom",
+      });
+      await createTestWatchlistItem(db, {
+        watchlistId: target.id,
+        tmdbId: "shared-custom",
+        title: "Shared Custom",
+        customRank: 1,
+        isWatched: targetWatched,
+      });
+      await createTestWatchlistItem(db, {
+        watchlistId: source.id,
+        tmdbId: "shared-custom",
+        title: "Shared Custom",
+        customRank: 1,
+        isWatched: sourceWatched,
+      });
+
+      const result = await mergeWatchlistsMutation({
+        target: { kind: "existing", watchlistId: target.id },
+        sourceWatchlistIds: [source.id],
+      });
+
+      expect(result).toEqual({ success: true, targetId: target.id });
+      const detail = await readWatchlistDetail({
+        watchlistId: target.id,
+        unwatchedOnly: false,
+      });
+      expect(detail?.items).toEqual([
+        expect.objectContaining({ tmdbId: "shared-custom", isWatched: expectedWatched }),
+      ]);
+    },
+  );
+
+  const legacyWatchedStates = [null, 0, 1] as const;
+  const legacyWatchedPairs = legacyWatchedStates.flatMap((targetWatched) =>
+    legacyWatchedStates.map((sourceWatched) => ({
+      targetWatched,
+      sourceWatched,
+      expectedWatched: targetWatched === 1 || sourceWatched === 1,
+    })),
+  );
+
+  it.each(legacyWatchedPairs)(
+    "guards legacy nullable is_watched rows on pre-migration merges (target=$targetWatched, source=$sourceWatched -> $expectedWatched)",
+    async ({ targetWatched, sourceWatched, expectedWatched }) => {
+      const legacyDb = await createIsolatedTestDb({ maxMigrationIndex: 11 });
+      const previousDb = dbState.db;
+      dbState.db = legacyDb.db;
+      try {
+        for (const itemOrderMode of ["release", "custom"] as const) {
+          const target = await createTestWatchlist(legacyDb.db, {
+            name: `Legacy ${itemOrderMode} Target`,
+            itemOrderMode,
+          });
+          const source = await createTestWatchlist(legacyDb.db, {
+            name: `Legacy ${itemOrderMode} Source`,
+            itemOrderMode,
+          });
+          const insert = legacyDb.sqlite.prepare(
+            "INSERT INTO watchlist_items(watchlist_id, tmdb_id, source, media_type, title, custom_rank, is_watched) VALUES(?, ?, 'tmdb', 'movie', ?, ?, ?)",
+          );
+          const rank = itemOrderMode === "custom" ? 1 : null;
+          insert.run(target.id, `shared-${itemOrderMode}`, "Shared Legacy", rank, targetWatched);
+          insert.run(source.id, `shared-${itemOrderMode}`, "Shared Legacy", rank, sourceWatched);
+          insert.run(
+            source.id,
+            `source-only-${itemOrderMode}`,
+            "Source Only Legacy",
+            itemOrderMode === "custom" ? 2 : null,
+            sourceWatched,
+          );
+
+          const result = await mergeWatchlistsMutation({
+            target: { kind: "existing", watchlistId: target.id },
+            sourceWatchlistIds: [source.id],
+          });
+          expect(result).toEqual({ success: true, targetId: target.id });
+
+          const detail = await readWatchlistDetail({
+            watchlistId: target.id,
+            unwatchedOnly: false,
+          });
+          const shared = detail?.items.find((item) => item.tmdbId === `shared-${itemOrderMode}`);
+          const sourceOnly = detail?.items.find(
+            (item) => item.tmdbId === `source-only-${itemOrderMode}`,
+          );
+          expect(shared?.isWatched).toBe(expectedWatched);
+          expect(sourceOnly?.isWatched).toBe(sourceWatched === 1);
+        }
+      } finally {
+        dbState.db = previousDb;
+        legacyDb.close();
+      }
+    },
+  );
 });
 
 describe("new target merge", () => {

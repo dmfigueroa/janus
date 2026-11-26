@@ -269,7 +269,7 @@ mod tests {
             vote_average: None,
             runtime: None,
             custom_rank: Some(7),
-            is_watched: Some(false),
+            is_watched: false,
             authors: None,
             added_at: "2024-01-01 00:00:00".into(),
         }

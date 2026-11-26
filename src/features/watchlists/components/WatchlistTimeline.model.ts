@@ -64,7 +64,7 @@ export function buildTimelineRuns(
   collapseWatched: boolean,
 ): WatchlistTimelineRun[] {
   return items.reduce<WatchlistTimelineRun[]>((runs, item) => {
-    const hidden = [collapseWatched, Boolean(item.isWatched)].every(Boolean);
+    const hidden = [collapseWatched, item.isWatched].every(Boolean);
     const previous = runs.at(-1);
     if ([hidden, previous?.hidden].every(Boolean)) {
       previous!.items.push(item);

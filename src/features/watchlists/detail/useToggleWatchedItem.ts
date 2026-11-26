@@ -19,7 +19,7 @@ export function useToggleWatchedItem(
 ) {
   const queryClient = useQueryClient();
   const setWatchedStateFn = useServerFn(setWatchedState);
-  const previousIsWatched = item.isWatched === true;
+  const previousIsWatched = item.isWatched;
   const nextIsWatched = !previousIsWatched;
 
   return useMutation({
