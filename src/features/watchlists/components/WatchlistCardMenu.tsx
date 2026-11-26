@@ -9,6 +9,7 @@ import {
   useSkipWatchlist,
   useToggleWatchlistPause,
 } from "@/features/watchlists/lifecycle/useWatchlistLifecycleActions";
+import { readWatchlistLifecycle } from "@/features/watchlists/lifecycle/WatchlistLifecycle";
 
 type WatchlistCardMenuProps = {
   watchlist: WatchlistSummary;
@@ -47,11 +48,14 @@ export function WatchlistCardMenu({ watchlist }: WatchlistCardMenuProps) {
     showPauseFeedback(Boolean(watchlist.pausedAt));
   };
 
+  const canSkip =
+    readWatchlistLifecycle(watchlist).eligible && Boolean(watchlist.stats.nextUnwatched);
+
   return (
     <>
       <WatchlistActionMenu
         watchlistName={watchlist.name}
-        hasNextUnwatched={Boolean(watchlist.stats.nextUnwatched)}
+        canSkip={canSkip}
         isPaused={watchlist.pausedAt !== null}
         skipping={skip.isPending}
         pausePending={togglePause.isPending}
@@ -72,7 +76,7 @@ export function WatchlistCardMenu({ watchlist }: WatchlistCardMenuProps) {
 
 type WatchlistActionMenuProps = {
   watchlistName: string;
-  hasNextUnwatched: boolean;
+  canSkip: boolean;
   isPaused: boolean;
   skipping: boolean;
   pausePending: boolean;
@@ -83,7 +87,7 @@ type WatchlistActionMenuProps = {
 
 function WatchlistActionMenu({
   watchlistName,
-  hasNextUnwatched,
+  canSkip,
   isPaused,
   skipping,
   pausePending,
@@ -121,7 +125,7 @@ function WatchlistActionMenu({
       <Portal>
         <Menu.Positioner>
           <Menu.Content onClick={(event) => event.stopPropagation()}>
-            {hasNextUnwatched ? (
+            {canSkip ? (
               <Menu.Item
                 value="skip"
                 disabled={skipping}

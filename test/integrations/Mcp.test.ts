@@ -1764,10 +1764,17 @@ describe("Janus MCP endpoint", () => {
 
   it("skips requested watchlists with Janus's existing recency behavior", async () => {
     const { watchlists } = await import("@/db/Schema");
-    const [watchlist] = await database
+    const [watchlist, pausedWatchlist] = await database
       .getDb()
       .insert(watchlists)
-      .values({ name: "MCP skip", lastWatchedAt: "2000-01-01 00:00:00" })
+      .values([
+        { name: "MCP skip", lastWatchedAt: "2000-01-01 00:00:00" },
+        {
+          name: "MCP paused skip",
+          pausedAt: "2024-06-01 00:00:00",
+          lastWatchedAt: "2000-01-01 00:00:00",
+        },
+      ])
       .returning();
     const tools = await client.listTools();
     const skipWatchlists = tools.tools.find((tool) => tool.name === "skip_watchlists");
@@ -1779,7 +1786,7 @@ describe("Janus MCP endpoint", () => {
 
     const result = await client.callTool({
       name: "skip_watchlists",
-      arguments: { watchlistIds: [watchlist.id, 999_999] },
+      arguments: { watchlistIds: [watchlist.id, pausedWatchlist.id, 999_999] },
     });
 
     expect(result.isError).not.toBe(true);
@@ -1795,6 +1802,13 @@ describe("Janus MCP endpoint", () => {
         {
           index: 1,
           success: false,
+          code: "validation_error",
+          message: "Paused watchlists cannot be skipped.",
+          watchlistId: pausedWatchlist.id,
+        },
+        {
+          index: 2,
+          success: false,
           code: "not_found",
           message: "Watchlist not found.",
           watchlistId: 999_999,
@@ -1808,6 +1822,12 @@ describe("Janus MCP endpoint", () => {
       .from(watchlists)
       .where(eq(watchlists.id, watchlist.id));
     expect(skippedWatchlist?.lastWatchedAt).not.toBe("2000-01-01 00:00:00");
+    const [unchangedPaused] = await database
+      .getDb()
+      .select()
+      .from(watchlists)
+      .where(eq(watchlists.id, pausedWatchlist.id));
+    expect(unchangedPaused?.lastWatchedAt).toBe("2000-01-01 00:00:00");
   });
 
   it("discovers and calls search_watchlists using watchlist names only", async () => {

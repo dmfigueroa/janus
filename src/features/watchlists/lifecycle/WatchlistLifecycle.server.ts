@@ -1,7 +1,13 @@
 import { getDb, type DatabaseTransaction } from "@/db/Db.server";
 import { watchlistItems, watchlists } from "@/db/Schema";
 import type { SetWatchedStateInput } from "../watched/SetWatchedState";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import {
+  initialWatchlistLifecycle,
+  nextRotationPosition,
+} from "./WatchlistRotationPosition.server";
+
+export { initialWatchlistLifecycle, nextRotationPosition };
 
 export async function setWatchedStateMutation({
   itemId,
@@ -42,11 +48,6 @@ function persistWatchedState(
   }
 }
 
-/** New ordinary and merged watchlists join the back of the global rotation. */
-export function initialWatchlistLifecycle() {
-  return { pausedAt: null, lastWatchedAt: nextRotationPosition() };
-}
-
 export async function pauseWatchlistMutation({ watchlistId }: { watchlistId: number }) {
   return updateLifecycle(watchlistId, {
     pausedAt: sql`COALESCE(${watchlists.pausedAt}, CURRENT_TIMESTAMP)`,
@@ -58,7 +59,37 @@ export async function resumeWatchlistMutation({ watchlistId }: { watchlistId: nu
 }
 
 export async function skipWatchlistMutation({ watchlistId }: { watchlistId: number }) {
-  return updateLifecycle(watchlistId, { lastWatchedAt: nextRotationPosition() });
+  return getDb().transaction((transaction) => {
+    const watchlist = transaction
+      .select({ id: watchlists.id, pausedAt: watchlists.pausedAt })
+      .from(watchlists)
+      .where(eq(watchlists.id, watchlistId))
+      .get();
+
+    if (!watchlist) {
+      return {
+        success: false as const,
+        code: "not_found" as const,
+        message: "Watchlist not found.",
+      };
+    }
+
+    if (watchlist.pausedAt !== null) {
+      return {
+        success: false as const,
+        code: "validation_error" as const,
+        message: "Paused watchlists cannot be skipped.",
+      };
+    }
+
+    transaction
+      .update(watchlists)
+      .set({ lastWatchedAt: nextRotationPosition() })
+      .where(and(eq(watchlists.id, watchlistId), isNull(watchlists.pausedAt)))
+      .run();
+
+    return { success: true as const };
+  });
 }
 
 function updateLifecycle(
@@ -74,14 +105,4 @@ function updateLifecycle(
   return updated
     ? { success: true as const }
     : { success: false as const, message: "Watchlist not found." };
-}
-
-// lastWatchedAt is the legacy storage name for rotation position, including skips.
-// Millisecond monotonicity makes separate actions advance even within one clock tick.
-export function nextRotationPosition() {
-  return sql`strftime('%Y-%m-%d %H:%M:%f', MAX(
-    julianday('now'),
-    COALESCE((SELECT MAX(julianday(${watchlists.lastWatchedAt})) FROM ${watchlists}), 0)
-      + 1.0 / 86400000
-  ))`;
 }

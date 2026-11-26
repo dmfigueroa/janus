@@ -75,7 +75,7 @@ async function persistEpisode({
     showTitle(showDetails.name, parent.title),
     showDetails.poster_path,
   );
-  const newEpisodes = await filterNewEpisodes(watchlistId, items);
+  const newEpisodes = await filterNewEpisodes(watchlistId, showId, items);
   return newEpisodes.length === 0
     ? addedItemsResult(0, "Already in watchlist")
     : persistNewEpisode({

@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Provider } from "@/app/Provider";
 import { ReleaseDateField } from "@/features/watchlists/components/ReleaseDateField";
 
 describe("ReleaseDateField", () => {
   afterEach(() => {
+    vi.useRealTimers();
     cleanup();
   });
 
@@ -101,6 +102,21 @@ describe("ReleaseDateField", () => {
     expect(screen.getByRole("application", { name: "calendar" }).hasAttribute("hidden")).toBe(
       false,
     );
+  });
+
+  it("computes the maximum selectable year from the current clock instead of module load time", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2031, 5, 15, 12, 0, 0));
+
+    renderWithProvider(
+      <ReleaseDateField inputId="release-date" inputName="releaseDate" initialReleaseDate="" />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /open date picker/i }));
+
+    const yearDropdown = await screen.findByRole("combobox", { name: /year/i });
+    expect(yearDropdown.querySelector('option[value="2041"]')).not.toBeNull();
+    expect(yearDropdown.querySelector('option[value="2042"]')).toBeNull();
   });
 });
 

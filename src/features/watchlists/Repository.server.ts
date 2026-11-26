@@ -123,7 +123,7 @@ export async function getExistingMovieInWatchlist(watchlistId: number, tmdbId: n
     .limit(1);
 }
 
-export async function getExistingEpisodesInWatchlist(watchlistId: number) {
+export async function getExistingEpisodesInWatchlist(watchlistId: number, showId: number) {
   const db = getDb();
   const rows = await db
     .select({ tmdbId: watchlistItems.tmdbId })
@@ -133,12 +133,13 @@ export async function getExistingEpisodesInWatchlist(watchlistId: number) {
         eq(watchlistItems.watchlistId, watchlistId),
         eq(watchlistItems.mediaType, "episode"),
         eq(watchlistItems.source, "tmdb"),
+        eq(watchlistItems.parentId, `tmdb:${showId}`),
       ),
     );
   return new Set(rows.map((row) => row.tmdbId));
 }
 
-export async function getExistingComicsInWatchlist(watchlistId: number) {
+export async function getExistingComicsInWatchlist(watchlistId: number, volumeId: string) {
   const db = getDb();
   const rows = await db
     .select({ tmdbId: watchlistItems.tmdbId })
@@ -148,6 +149,7 @@ export async function getExistingComicsInWatchlist(watchlistId: number) {
         eq(watchlistItems.watchlistId, watchlistId),
         eq(watchlistItems.mediaType, "comic"),
         eq(watchlistItems.source, "comicvine"),
+        eq(watchlistItems.parentId, `comicvine:${volumeId}`),
       ),
     );
   return new Set(rows.map((row) => row.tmdbId));

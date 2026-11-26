@@ -64,4 +64,13 @@ describe("create watchlist mutation", () => {
     const [summary] = await listWatchlists();
     expect(summary?.lastWatchedAt).toEqual(expect.any(String));
   });
+
+  it("trims names and rejects whitespace-only names at the schema boundary", async () => {
+    const { createWatchlistSchema } = await import("@/features/watchlists/create/Mutation");
+
+    expect(createWatchlistSchema.parse({ name: "  Trimmed List  " })).toEqual({
+      name: "Trimmed List",
+    });
+    expect(createWatchlistSchema.safeParse({ name: "   " }).success).toBe(false);
+  });
 });

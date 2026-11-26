@@ -28,7 +28,7 @@ export async function addTVShowToWatchlist(
         showDetails.name || media.title,
         showDetails.poster_path,
       );
-      return addNewEpisodes(watchlistId, items, insertionPosition, referenceItemId);
+      return addNewEpisodes(watchlistId, tmdbId, items, insertionPosition, referenceItemId);
     },
     (error: unknown) => providerAdditionFailure(error, "TMDB"),
   );
@@ -42,11 +42,12 @@ export async function fetchShowEpisodes(tmdbId: number, signal?: AbortSignal) {
 
 async function addNewEpisodes(
   watchlistId: number,
+  showId: number,
   items: Array<typeof watchlistItems.$inferInsert>,
   insertionPosition?: AddToWatchlistInsertionPosition,
   referenceItemId?: number,
 ): Promise<WatchlistWriteResult> {
-  const newEpisodes = await filterNewEpisodes(watchlistId, items);
+  const newEpisodes = await filterNewEpisodes(watchlistId, showId, items);
   if (newEpisodes.length === 0) {
     return addedItemsResult(0, "No new episodes found for this show", "no_new_items");
   }
@@ -112,10 +113,11 @@ export function mapToWatchlistEpisodes(
 
 export async function filterNewEpisodes(
   watchlistId: number,
+  showId: number,
   episodes: Array<typeof watchlistItems.$inferInsert>,
 ) {
-  const existingIds = await repository.getExistingEpisodesInWatchlist(watchlistId);
-  return episodes.filter((e) => !existingIds.has(e.tmdbId ?? ""));
+  const existingIds = await repository.getExistingEpisodesInWatchlist(watchlistId, showId);
+  return episodes.filter((episode) => !existingIds.has(episode.tmdbId ?? ""));
 }
 
 function episodesAddedResult(count: number): WatchlistWriteResult {

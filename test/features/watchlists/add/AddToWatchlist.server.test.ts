@@ -686,6 +686,64 @@ describe("provider-backed add to watchlist mutation", () => {
     });
   });
 
+  it("scopes existing comic lookups to the requested volume", async () => {
+    const watchlist = await createTestWatchlist(db, { name: "Multi-volume comics" });
+    process.env.COMICVINE_API_KEY = "test-comicvine-key";
+    await createTestWatchlistItem(db, {
+      watchlistId: watchlist.id,
+      tmdbId: "other-vol-issue-1",
+      source: "comicvine",
+      mediaType: "comic",
+      title: "Other Volume Issue",
+      parentId: "comicvine:1000",
+      parentTitle: "Other Volume",
+    });
+    getComicVolumeDetailsMock.mockResolvedValue({ title: "Fresh Volume" });
+    getComicIssuesMock.mockResolvedValue([
+      {
+        id: "fresh-issue-1",
+        title: "Fresh Issue One",
+        issueNumber: "1",
+        poster: null,
+        coverDate: "2024-03-14",
+      },
+    ]);
+
+    const added = await addProviderMediaToWatchlist({
+      watchlistId: watchlist.id,
+      provider: "comicvine",
+      providerId: "4050",
+      mediaType: "comic",
+    });
+
+    expect(added).toEqual({
+      success: true,
+      code: "added",
+      affectedCount: 1,
+      message: "Added 1 issue to watchlist",
+    });
+    expect(getComicIssuesMock).toHaveBeenCalledWith("4050", "test-comicvine-key", {
+      knownIssueIds: new Set(),
+    });
+
+    getComicVolumeDetailsMock.mockResolvedValue({ title: "Empty Volume" });
+    getComicIssuesMock.mockResolvedValue([]);
+
+    const emptyVolume = await addProviderMediaToWatchlist({
+      watchlistId: watchlist.id,
+      provider: "comicvine",
+      providerId: "9999",
+      mediaType: "comic",
+    });
+
+    expect(emptyVolume).toEqual({
+      success: true,
+      code: "no_new_items",
+      affectedCount: 0,
+      message: "No issues found for this volume",
+    });
+  });
+
   it("reports the inserted issue count for bulk ComicVine additions", async () => {
     const watchlist = await createTestWatchlist(db, { name: "Bulk comics" });
     process.env.COMICVINE_API_KEY = "test-comicvine-key";

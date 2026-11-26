@@ -3,6 +3,7 @@ import { CalendarDate, parseDate, type DateValue } from "@internationalized/date
 import { format, isMatch, parse } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useTodayCivilDate } from "./useTodayCivilDate";
 
 type ReleaseDateFieldProps = {
   inputId: string;
@@ -58,13 +59,6 @@ function getDateInputValidationMessage(dateInput: string, releaseDate: string | 
 }
 
 const releaseDateMinimum = new CalendarDate(1440, 1, 1);
-const releaseDateMaximum = new CalendarDate(new Date().getFullYear() + 10, 12, 31);
-const currentDate = new Date();
-const releaseDateToday = new CalendarDate(
-  currentDate.getFullYear(),
-  currentDate.getMonth() + 1,
-  currentDate.getDate(),
-);
 
 function releaseDateOrEmpty(date: DateValue | undefined) {
   return date ? date.toString() : "";
@@ -72,7 +66,7 @@ function releaseDateOrEmpty(date: DateValue | undefined) {
 
 function setFocusedDateIfPresent(
   date: DateValue | undefined,
-  setFocusedDate: (date: DateValue) => void,
+  setFocusedDate: (date: DateValue | undefined) => void,
 ) {
   if (date) {
     setFocusedDate(date);
@@ -81,12 +75,18 @@ function setFocusedDateIfPresent(
 
 function useReleaseDateField(initialReleaseDate: string) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const todayDate = useTodayCivilDate();
+  const releaseDateMaximum = useMemo(
+    () => (todayDate ? new CalendarDate(todayDate.year + 10, 12, 31) : undefined),
+    [todayDate],
+  );
   const [releaseDate, setReleaseDate] = useState(initialReleaseDate);
   const [dateInput, setDateInput] = useState(() => formatDateInput(initialReleaseDate));
   const parsedReleaseDate = useMemo(() => parseReleaseDate(releaseDate), [releaseDate]);
-  const [focusedDate, setFocusedDate] = useState<DateValue>(
-    () => parseReleaseDate(initialReleaseDate) ?? releaseDateToday,
+  const [focusedDateOverride, setFocusedDateOverride] = useState<DateValue | undefined>(() =>
+    parseReleaseDate(initialReleaseDate),
   );
+  const focusedDate = focusedDateOverride ?? parsedReleaseDate ?? todayDate;
   const selectedDates = useMemo(
     () => (parsedReleaseDate ? [parsedReleaseDate] : []),
     [parsedReleaseDate],
@@ -96,7 +96,7 @@ function useReleaseDateField(initialReleaseDate: string) {
     const nextReleaseDate = releaseDateOrEmpty(date);
     setReleaseDate(nextReleaseDate);
     setDateInput(formatDateInput(nextReleaseDate));
-    setFocusedDateIfPresent(date, setFocusedDate);
+    setFocusedDateIfPresent(date, setFocusedDateOverride);
     inputRef.current?.setCustomValidity("");
   };
 
@@ -105,7 +105,7 @@ function useReleaseDateField(initialReleaseDate: string) {
     const nextReleaseDate = parseDateInput(nextDateInput);
     setDateInput(nextDateInput);
     setReleaseDate(nextReleaseDate ?? nextDateInput);
-    setFocusedDateIfPresent(parseReleaseDate(nextReleaseDate ?? ""), setFocusedDate);
+    setFocusedDateIfPresent(parseReleaseDate(nextReleaseDate ?? ""), setFocusedDateOverride);
     event.target.setCustomValidity(getDateInputValidationMessage(nextDateInput, nextReleaseDate));
   };
 
@@ -115,7 +115,8 @@ function useReleaseDateField(initialReleaseDate: string) {
     dateInput,
     selectedDates,
     focusedDate,
-    setFocusedDate,
+    releaseDateMaximum,
+    setFocusedDate: setFocusedDateOverride,
     handleReleaseDateChange,
     handleDateInputChange,
   };
@@ -132,6 +133,7 @@ export function ReleaseDateField({
     dateInput,
     selectedDates,
     focusedDate,
+    releaseDateMaximum,
     setFocusedDate,
     handleReleaseDateChange,
     handleDateInputChange,
