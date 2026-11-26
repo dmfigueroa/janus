@@ -27,9 +27,10 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NITRO_PRESET=node-server
 RUN pnpm run build
-# Compile migration and seed scripts using esbuild.
+# Compile migration, seed, and orphan-scrub scripts using esbuild.
 RUN pnpm exec esbuild src/db/Migrate.ts --bundle --platform=node --format=esm --outfile=.output/server/migrate.mjs --external:better-sqlite3 --external:drizzle-orm \
-  && pnpm exec esbuild src/db/Seed.ts --bundle --platform=node --format=esm --outfile=.output/server/seed.mjs --external:better-sqlite3 --external:drizzle-orm
+  && pnpm exec esbuild src/db/Seed.ts --bundle --platform=node --format=esm --outfile=.output/server/seed.mjs --external:better-sqlite3 --external:drizzle-orm \
+  && pnpm exec esbuild src/db/ScrubOrphans.ts --bundle --platform=node --format=esm --outfile=.output/server/scrub-orphans.mjs --external:better-sqlite3 --external:drizzle-orm
 
 # ---------------------------------------------------------------------------
 # prod-deps — install only the runtime packages the bundled server and the

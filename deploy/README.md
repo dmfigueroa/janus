@@ -10,7 +10,10 @@ Janus runs as two container images built from the repository root:
 Both containers mount the same SQLite storage directory at `/app/storage` (database file `/app/storage/sqlite.db`) so SQLite WAL/SHM sidecar files remain accessible to both processes:
 
 - **V1 owns migrations:** On startup, v1 runs `.output/server/migrate.mjs`, optionally runs `.output/server/seed.mjs` (no-op unless `SEED_ON_STARTUP=true`), and starts the Node server.
-- **V2 validates compatibility without migrating:** V2 opens the existing SQLite file read-write (`create_if_missing(false)`, `read_only(false)` in `v2/src/database/mod.rs`) and fails startup if the file is missing or its schema/stored values do not match `v2/src/database/v1-schema.json`.
+- **V2 validates compatibility without migrating:** V2 opens the existing SQLite file read-write (`create_if_missing(false)`, `read_only(false)`, `foreign_keys(true)`, `busy_timeout(5s)` in `v2/src/database/mod.rs`) and fails startup if the file is missing, fails `PRAGMA foreign_key_check`, or its schema/stored values do not match `v2/src/database/v1-schema.json`.
+- **Two-phase orphan scrub for existing databases:** Before restarting v2 on an existing production database that may contain pre-existing orphaned rows, inspect and scrub orphans with `.output/server/scrub-orphans.mjs` (idempotent; runs `PRAGMA foreign_key_check` before and after):
+  - Dry run (read-only): `node .output/server/scrub-orphans.mjs --database /app/storage/sqlite.db`
+  - Apply cleanup: `node .output/server/scrub-orphans.mjs --database /app/storage/sqlite.db --apply`
 - **Health checks:** `/v2/health/live` checks process liveness; `/v2/health/ready` reports startup schema and compatibility validation.
 - **Reverse proxy routing:** Route `/v2` and `/v2/*` (preserving the `/v2` prefix) to the v2 container on port `3001`, and all other paths to v1 on port `3000`. A v1 `404` on `/v2` indicates the reverse proxy is not routing `/v2` to the v2 container (the local `pnpm run dev` proxy is development-only).
 - **Authentication:** Janus expects an external authentication proxy (such as Cloudflare Access) in front of both web and MCP endpoints rather than managing application user accounts. See [`../docs/mcp.md`](../docs/mcp.md) for Managed OAuth setup.
