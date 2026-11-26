@@ -45,6 +45,25 @@ pub(super) async fn order_mode(
     read_order_mode(&lists.0, watchlist_id).await
 }
 
+pub(super) async fn existing_episode_ids(
+    lists: &Watchlists,
+    watchlist_id: i64,
+    show_id: u64,
+) -> Result<std::collections::HashSet<String>, DbErr> {
+    let parent_id = format!("tmdb:{show_id}");
+    lists
+        .0
+        .query_all_raw(statement(
+            "SELECT tmdb_id FROM watchlist_items \
+             WHERE watchlist_id = ? AND media_type = 'episode' AND source = 'tmdb' AND parent_id = ?",
+            vec![watchlist_id.into(), parent_id.into()],
+        ))
+        .await?
+        .iter()
+        .map(|row| row.try_get::<String>("", "tmdb_id"))
+        .collect()
+}
+
 pub(super) async fn movie_exists(
     lists: &Watchlists,
     watchlist_id: i64,

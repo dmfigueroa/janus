@@ -1,5 +1,5 @@
 //! Watchlist addition. Destination checks and provider HTTP finish before the
-//! SQLite write transaction opens. Television expansion is still a stub.
+//! SQLite write transaction opens.
 
 mod destination;
 mod movie;
