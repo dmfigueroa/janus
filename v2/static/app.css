@@ -1383,8 +1383,7 @@ watchlist-reorder[aria-busy="true"] {
 }
 
 .search-form button,
-.search-tabs a,
-.search-pages a {
+.search-tabs a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1478,16 +1477,16 @@ watchlist-reorder[aria-busy="true"] {
   font-weight: 600;
 }
 
-.search-pages {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: var(--size-3);
+.search-more {
+  grid-column: 1 / -1;
+  display: grid;
+  place-items: center;
+  min-height: var(--size-8);
+  color: var(--fg-muted);
+  font-size: var(--font-size-0);
 }
 
-.search-status,
-.search-pages {
+.search-status {
   margin: 0;
   text-align: center;
 }

@@ -19,6 +19,7 @@
     hx-trigger="submit, input changed delay:300ms from:find input[type='search']"
     hx-push-url="true"
     hx-indicator="#search-indicator"
+    hx-sync="#search-results:abort"
   >
     <label class="visually-hidden" for="search-query">Search</label>
     <input
@@ -47,6 +48,7 @@
       hx-select="#search-screen"
       hx-swap="outerHTML"
       hx-push-url="true"
+      hx-sync="#search-screen:replace"
       >{{ tab.label }}</a
     >
     {% endfor %}

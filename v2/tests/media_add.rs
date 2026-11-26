@@ -354,7 +354,7 @@ async fn movie_add_persists_canonical_metadata_and_a_duplicate_does_not_refetch(
 
     let stamped = query(
         &harness.database,
-        "SELECT last_item_added_at FROM watchlists WHERE id = 42",
+        "SELECT last_item_added_at, updated_at FROM watchlists WHERE id = 42",
         vec![],
     )
     .await;
@@ -363,6 +363,13 @@ async fn movie_add_persists_canonical_metadata_and_a_duplicate_does_not_refetch(
             .try_get::<Option<String>>("", "last_item_added_at")
             .unwrap()
             .is_some()
+    );
+    assert!(
+        stamped[0]
+            .try_get::<Option<String>>("", "updated_at")
+            .unwrap()
+            .is_some(),
+        "additions must advance updated_at like v1's $onUpdate hook"
     );
 
     let duplicate_payload = call(

@@ -270,9 +270,11 @@ async fn stamp_last_added(
     transaction: &impl ConnectionTrait,
     watchlist_id: i64,
 ) -> Result<(), DbErr> {
+    // Match v1: Drizzle `$onUpdate` advances `updated_at` whenever
+    // `last_item_added_at` is written. SeaORM raw SQL must set both.
     transaction
         .execute_raw(statement(
-            "UPDATE watchlists SET last_item_added_at = CURRENT_TIMESTAMP WHERE id = ?",
+            "UPDATE watchlists SET last_item_added_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             vec![watchlist_id.into()],
         ))
         .await?;

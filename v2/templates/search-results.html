@@ -3,8 +3,8 @@
   <p class="search-status" role="{{ view.status_role }}">{{ view.status_message }}</p>
   {% endif %} {% if view.empty_hint != "" %}
   <p class="search-status">{{ view.empty_hint }}</p>
-  {% endif %} {% if view.hits.len() > 0 %}
-  <div class="search-grid">
+  {% endif %} {% if view.hits.len() > 0 || view.has_next %}
+  <div id="search-grid" class="search-grid">
     {% for hit in view.hits %}
     <form class="search-hit">
       <input type="hidden" name="provider" value="{{ hit.provider }}" />
@@ -41,33 +41,22 @@
         {% endif %}
       </button>
     </form>
-    {% endfor %}
-  </div>
-  {% endif %} {% if view.has_previous || view.has_next %}
-  <nav class="search-pages" aria-label="Search pages">
-    {% if view.has_previous %}
-    <a
-      href="/v2/search?query={{ view.query|urlencode }}&amp;type={{ view.media_type }}&amp;page={{ view.previous_page }}"
-      hx-get="/v2/search?query={{ view.query|urlencode }}&amp;type={{ view.media_type }}&amp;page={{ view.previous_page }}"
-      hx-target="#search-results"
-      hx-select="#search-results"
-      hx-swap="outerHTML"
-      hx-push-url="true"
-      >Previous</a
-    >
-    {% endif %}
-    <span>Page {{ view.page }} of {{ view.total_pages }}</span>
-    {% if view.has_next %}
-    <a
-      href="/v2/search?query={{ view.query|urlencode }}&amp;type={{ view.media_type }}&amp;page={{ view.next_page }}"
+    {% endfor %} {% if view.has_next %}
+    <div
+      id="search-more"
+      class="search-more"
       hx-get="/v2/search?query={{ view.query|urlencode }}&amp;type={{ view.media_type }}&amp;page={{ view.next_page }}"
-      hx-target="#search-results"
-      hx-select="#search-results"
+      hx-trigger="revealed"
+      hx-target="this"
       hx-swap="outerHTML"
-      hx-push-url="true"
-      >Next</a
+      hx-select=".search-hit, #search-more"
+      hx-sync="#search-results:abort"
+      role="status"
+      aria-label="Loading more results"
     >
+      <span class="htmx-indicator">Loading more...</span>
+    </div>
     {% endif %}
-  </nav>
+  </div>
   {% endif %}
 </section>

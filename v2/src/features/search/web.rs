@@ -92,11 +92,7 @@ struct TabView {
 struct SearchView {
     query: String,
     media_type: String,
-    page: u32,
-    previous_page: u32,
     next_page: u32,
-    total_pages: u32,
-    has_previous: bool,
     has_next: bool,
     notice: String,
     status_message: String,
@@ -289,11 +285,7 @@ fn search_view(
     SearchView {
         query: query.to_owned(),
         media_type: media_type.as_str().to_owned(),
-        page,
-        previous_page: page.saturating_sub(1).max(1),
         next_page: page.saturating_add(1),
-        total_pages,
-        has_previous: results && page > 1,
         has_next: results && page < total_pages,
         notice: deprecation_notice(media_type),
         status_message,

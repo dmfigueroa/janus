@@ -180,6 +180,7 @@ async fn search_page_renders_hits_and_skips_provider_calls_for_local_outcomes() 
     assert!(page.contains("hx-get=\"/v2/search\""));
     assert!(page.contains("hx-include=\"#search-query\""));
     assert!(page.contains("hx-target=\"#search-results\""));
+    assert!(page.contains("hx-sync=\"#search-screen:replace\""));
     assert!(page.contains("Movies"));
     assert!(page.contains("aria-selected=\"true\""));
     assert!(page.contains("/v2/static/search-dialog.js"));
@@ -200,7 +201,12 @@ async fn search_page_renders_hits_and_skips_provider_calls_for_local_outcomes() 
     assert!(fragment.contains("1999"));
     assert!(fragment.contains("8.4"));
     assert!(fragment.contains("https://image.tmdb.org/t/p/w500/fight-club.jpg"));
-    assert!(fragment.contains("Page 2 of 3"));
+    assert!(fragment.contains("id=\"search-more\""));
+    assert!(fragment.contains("hx-trigger=\"revealed\""));
+    assert!(fragment.contains("hx-select=\".search-hit, #search-more\""));
+    assert!(fragment.contains("page=3"));
+    assert!(!fragment.contains(">Previous<"));
+    assert!(!fragment.contains(">Next<"));
     assert!(fragment.contains("hx-get=\"/v2/search/detail\""));
     assert_eq!(harness.transport.calls().len(), 1);
     assert!(harness.transport.calls()[0].url.contains("page=2"));
