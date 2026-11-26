@@ -40,6 +40,12 @@ impl Fixture {
 impl Drop for Fixture {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.0);
+        let mut wal = self.0.as_os_str().to_os_string();
+        wal.push("-wal");
+        let _ = std::fs::remove_file(wal);
+        let mut shm = self.0.as_os_str().to_os_string();
+        shm.push("-shm");
+        let _ = std::fs::remove_file(shm);
     }
 }
 #[tokio::test]
@@ -619,6 +625,7 @@ async fn exclusive_v1_lock_fails_within_the_configured_startup_bound() {
     use std::io::{BufRead, BufReader};
     use std::process::Stdio;
     let fixture = Fixture::v1();
+    change_v1(&fixture, "rollback-journal");
     let mut writer=Command::new("python3").arg("-c").arg("import sqlite3,sys; connection=sqlite3.connect(sys.argv[1]); connection.execute('BEGIN EXCLUSIVE'); print('locked',flush=True); sys.stdin.read(); connection.rollback()").arg(&fixture.0).stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().unwrap();
     let mut ready = String::new();
     BufReader::new(writer.stdout.take().unwrap())
@@ -626,7 +633,7 @@ async fn exclusive_v1_lock_fails_within_the_configured_startup_bound() {
         .unwrap();
     assert_eq!(ready.trim(), "locked");
     let result = tokio::time::timeout(
-        std::time::Duration::from_secs(7),
+        std::time::Duration::from_secs(8),
         janus_v2::open_database(&fixture.0),
     )
     .await;
@@ -3328,4 +3335,68 @@ async fn mcp_edit_watchlist_items_preserves_schema_annotations_rejection_and_bat
         lists.item(41, 103).await.unwrap().unwrap().title,
         "Survives"
     );
+}
+
+#[tokio::test]
+async fn open_database_enforces_shared_sqlite_pragmas() {
+    use sea_orm::{ConnectionTrait, DbBackend, Statement};
+    let fixture = Fixture::v1();
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+
+    let foreign_keys = database
+        .query_one_raw(Statement::from_string(
+            DbBackend::Sqlite,
+            "PRAGMA foreign_keys".to_owned(),
+        ))
+        .await
+        .unwrap()
+        .unwrap()
+        .try_get_by_index::<i64>(0)
+        .unwrap();
+    let busy_timeout = database
+        .query_one_raw(Statement::from_string(
+            DbBackend::Sqlite,
+            "PRAGMA busy_timeout".to_owned(),
+        ))
+        .await
+        .unwrap()
+        .unwrap()
+        .try_get_by_index::<i64>(0)
+        .unwrap();
+
+    assert_eq!(foreign_keys, 1);
+    assert_eq!(busy_timeout, 5000);
+}
+
+#[tokio::test]
+async fn open_database_rejects_orphaned_foreign_key_rows_in_all_tables() {
+    for action in [
+        "orphan-watchlist-item",
+        "orphan-lineup-watchlist",
+        "orphan-lineup-parent",
+    ] {
+        let fixture = Fixture::v1();
+        change_v1(&fixture, action);
+        let error = janus_v2::open_database(&fixture.0)
+            .await
+            .expect_err(&format!("{action} must fail startup validation"));
+        assert!(
+            error.to_string().contains("Incompatible v1 stored values"),
+            "{action} returned unexpected error: {error}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn open_database_accepts_database_after_v1_cascading_deletes() {
+    let fixture = Fixture::v1();
+    change_v1(&fixture, "v1-cascading-deletes");
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let lists = janus_v2::Watchlists(database);
+    let page = lists
+        .summaries(janus_v2::DiscoveryOperation::List, Default::default())
+        .await
+        .unwrap();
+    assert_eq!(page.watchlists.len(), 1);
+    assert_eq!(page.watchlists[0].watchlist.id, 42);
 }

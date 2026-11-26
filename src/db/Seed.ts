@@ -1,6 +1,7 @@
-import Database from "better-sqlite3";
+import type Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
-import * as schema from "./Schema";
+import * as schema from "./Schema.ts";
+import { openSqliteConnection } from "./SqliteConnection.server.ts";
 
 const { watchlists, watchlistItems } = schema;
 
@@ -151,7 +152,7 @@ function main() {
     return;
   }
 
-  const sqlite = new Database(process.env.DATABASE_URL || "sqlite.db");
+  const sqlite = openSqliteConnection(process.env.DATABASE_URL || "sqlite.db");
   try {
     seedInto(sqlite);
   } finally {
@@ -169,27 +170,29 @@ function seedInto(sqlite: Database.Database) {
     return;
   }
 
-  const created = db.transaction((transaction) =>
-    demoWatchlists.map((demo) => {
-      const inserted = transaction
-        .insert(watchlists)
-        .values({
-          name: demo.name,
-          description: demo.description,
-          itemOrderMode: demo.itemOrderMode,
-        })
-        .returning({ id: watchlists.id })
-        .get();
+  const created = db.transaction(
+    (transaction) =>
+      demoWatchlists.map((demo) => {
+        const inserted = transaction
+          .insert(watchlists)
+          .values({
+            name: demo.name,
+            description: demo.description,
+            itemOrderMode: demo.itemOrderMode,
+          })
+          .returning({ id: watchlists.id })
+          .get();
 
-      const items = demo.items.map((item) => ({
-        ...item,
-        watchlistId: inserted.id,
-        customRank: demo.itemOrderMode === "custom" ? item.customRank : null,
-      }));
-      transaction.insert(watchlistItems).values(items).run();
+        const items = demo.items.map((item) => ({
+          ...item,
+          watchlistId: inserted.id,
+          customRank: demo.itemOrderMode === "custom" ? item.customRank : null,
+        }));
+        transaction.insert(watchlistItems).values(items).run();
 
-      return { id: inserted.id, name: demo.name, items: items.length };
-    }),
+        return { id: inserted.id, name: demo.name, items: items.length };
+      }),
+    { behavior: "immediate" },
   );
 
   console.log(`Seeded ${created.length} watchlist(s):`);

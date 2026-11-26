@@ -71,8 +71,9 @@ fixture dependency only.
 
 `JANUS_V2_BIND` defaults to `127.0.0.1:3001`. `DATABASE_URL` is a required filesystem path,
 as in v1. Missing files, incompatible schema and unsupported stored values fail startup.
-The connection supports create, update and reorder writes, never creates a file, and leaves journal mode unchanged.
-The pool has at most two connections, a five-second connect/acquire timeout and two-second
+The connection supports create, update and reorder writes, never creates a file, enforces
+`foreign_keys = ON` and `PRAGMA foreign_key_check` at startup, and leaves journal mode unchanged.
+The pool has at most two connections, a five-second connect/acquire timeout and five-second
 SQLite busy timeout. V1 alone owns migrations. No schema-sync/migration features are enabled.
 The existing directory must be mounted, including WAL/SHM sidecars.
 

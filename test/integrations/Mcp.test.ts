@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
 import { asc, eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { captureServerLogs, restoreServerLogs } from "@test/support/LogCapture";
@@ -24,7 +23,7 @@ describe("Janus MCP endpoint", () => {
     process.env.DATABASE_URL = path.join(temporaryDirectory, "janus.sqlite");
 
     database = await import("@/db/Db.server");
-    await migrate(database.getDb(), { migrationsFolder: path.resolve("drizzle") });
+    database.migrateDb(path.resolve("drizzle"));
     await database
       .getDb()
       .insert((await import("@/db/Schema")).watchlists)

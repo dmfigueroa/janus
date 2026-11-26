@@ -22,7 +22,8 @@ pub async fn open_database(path: &Path) -> Result<DatabaseConnection, DbErr> {
                 .in_memory(false)
                 .create_if_missing(false)
                 .read_only(false)
-                .busy_timeout(Duration::from_secs(2))
+                .foreign_keys(true)
+                .busy_timeout(Duration::from_secs(5))
         });
     let database = Database::connect(options).await?;
     // Explicit projections reject absent/renamed columns without synchronizing anything.
@@ -102,7 +103,6 @@ async fn validate_values(database: &DatabaseConnection) -> Result<(), DbErr> {
     let checks = [
         "SELECT count(*) AS invalid FROM watchlists WHERE id <= 0 OR typeof(name) != 'text' OR item_order_mode NOT IN ('release','custom') OR typeof(created_at) != 'text' OR typeof(updated_at) NOT IN ('text','null') OR typeof(last_watched_at) NOT IN ('text','null') OR typeof(last_item_added_at) NOT IN ('text','null') OR typeof(paused_at) NOT IN ('text','null')",
         "SELECT count(*) AS invalid FROM watchlist_items WHERE id <= 0 OR typeof(tmdb_id) != 'text' OR typeof(source) != 'text' OR typeof(title) != 'text' OR media_type NOT IN ('movie','episode','game','book','comic','anime','manga') OR (is_watched IS NOT NULL AND (typeof(is_watched) != 'integer' OR is_watched NOT IN (0,1))) OR typeof(added_at) != 'text' OR (authors IS NOT NULL AND CASE WHEN json_valid(authors) THEN json_type(authors) != 'array' OR EXISTS (SELECT 1 FROM json_each(authors) WHERE type != 'text') ELSE 1 END)",
-        "SELECT count(*) AS invalid FROM watchlist_items LEFT JOIN watchlists ON watchlists.id=watchlist_items.watchlist_id WHERE watchlists.id IS NULL",
     ];
     for sql in checks {
         let row = database
@@ -111,10 +111,19 @@ async fn validate_values(database: &DatabaseConnection) -> Result<(), DbErr> {
                 sql.to_owned(),
             ))
             .await?
-            .unwrap();
+            .ok_or_else(|| DbErr::Custom("Incompatible v1 stored values".into()))?;
         if row.try_get::<i64>("", "invalid")? != 0 {
             return Err(DbErr::Custom("Incompatible v1 stored values".into()));
         }
+    }
+    let foreign_key_violations = database
+        .query_all_raw(sea_orm::Statement::from_string(
+            sea_orm::DbBackend::Sqlite,
+            "PRAGMA foreign_key_check".to_owned(),
+        ))
+        .await?;
+    if !foreign_key_violations.is_empty() {
+        return Err(DbErr::Custom("Incompatible v1 stored values".into()));
     }
     Ok(())
 }

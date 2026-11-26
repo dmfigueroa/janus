@@ -12,6 +12,8 @@ count.txt
 .vinxi
 todos.json
 *.db
+*.db-wal
+*.db-shm
 .agents/handoffs/
 
 /v2/target/
