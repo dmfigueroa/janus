@@ -23,8 +23,11 @@
     {% endif %}
     <div class="item-content">
       <h3>{{row.title}}</h3>
+      {% if !row.parent.is_empty() || !row.episode.is_empty() %}
       <p>{{row.parent}} {{row.episode}}</p>
+      {% endif %} {% if !row.date.is_empty() %}
       <p>{{row.date}}</p>
+      {% endif %}
     </div>
     <div class="item-controls">
       <div class="item-actions" data-item-actions="{{row.id}}">

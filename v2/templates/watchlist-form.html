@@ -8,13 +8,7 @@
   hx-swap="outerHTML"
   hx-disabled-elt="#watchlist-dialog button"
   hx-indicator="#watchlist-form-pending"
-  {%
-  if
-  form.error.is_some()
-  %}aria-describedby="watchlist-form-error"
-  {%
-  endif
-  %}
+  {% if form.error.is_some() %}aria-describedby="watchlist-form-error"{% endif %}
 >
   {% if let Some(id) = form.watchlist_id %}
   <input type="hidden" name="watchlistId" value="{{id}}" />
@@ -32,13 +26,7 @@
         autocomplete="off"
         required
         autofocus
-        {%
-        if
-        form.name_invalid()
-        %}aria-invalid="true"
-        {%
-        endif
-        %}
+        {% if form.name_invalid() %}aria-invalid="true"{% endif %}
       />
     </div>
     <div class="form-field">
@@ -48,9 +36,7 @@
         name="description"
         placeholder="Optional description..."
         rows="2"
-      >
-{{form.description}}</textarea
-      >
+      >{{form.description}}</textarea>
     </div>
     <div class="form-field order-field" role="group" aria-labelledby="watchlist-order-label">
       <span id="watchlist-order-label" class="field-label">Order</span>
@@ -60,12 +46,7 @@
             type="radio"
             name="itemOrderMode"
             value="release"
-            {%
-            if
-            form.release_selected()
-            %}checked{%
-            endif
-            %}
+            {% if form.release_selected() %}checked{% endif %}
           />
           Release order
         </label>
@@ -74,12 +55,7 @@
             type="radio"
             name="itemOrderMode"
             value="custom"
-            {%
-            if
-            form.custom_selected()
-            %}checked{%
-            endif
-            %}
+            {% if form.custom_selected() %}checked{% endif %}
           />
           Custom order
         </label>
