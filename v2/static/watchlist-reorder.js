@@ -125,6 +125,7 @@ class WatchlistReorder extends HTMLElement {
       source.addEventListener(
         "htmx:afterRequest",
         (event) => {
+          if (values) source.removeAttribute("hx-vals");
           this.pendingSource = null;
           this.pendingXhr = null;
           if (event.detail.successful) resolve();
