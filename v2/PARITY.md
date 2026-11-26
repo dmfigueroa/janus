@@ -32,7 +32,7 @@ For each later v1 commit, inspect `git diff <baseline>..<new revision> -- src pu
 - [x] Watchlist create and edit (`#257`, `#318`); delete and merge remain outstanding.
 - [x] Existing detail reads, text filters, stored release/custom order, and release-year/watched grouping (`#253`).
 - [x] Hidden-item-safe custom reorder with contiguous full renumbering (`#254`, `#364`).
-- [x] Order-mode changes (`#365`, `#369`): switching `release` → `custom` initializes contiguous custom ranks in v1 release order (`release_date` empty/null last, `release_date ASC`, `id ASC`) only when no saved ranks exist; switching back preserves ranks while release ordering resumes; detail `#watchlist-refresh` reconciles `#watchlist-form` out-of-band (`hx-select-oob="#watchlist-form"`).
+- [x] Order-mode changes (`#365`, `#369`, `#375`): switching `release` → `custom` initializes contiguous custom ranks in v1 release order (`release_date` empty/null last, `release_date ASC`, `id ASC`) atomically in both v1 and v2 when no saved ranks exist (and opportunistically repairs legacy all-NULL custom watchlists when saved in `custom` mode); switching back preserves ranks while release ordering resumes; detail `#watchlist-refresh` reconciles `#watchlist-form` out-of-band (`hx-select-oob="#watchlist-form"`).
 - [ ] Provider search/details/pagination and additions; TV/comic expansions.
 - [ ] Custom additions, anchored insertion, duplicates, and partial outcomes (including `#289` release-mode anchor rejection).
 - [ ] Edited metadata, item/parent removal, and movement.
@@ -52,7 +52,7 @@ For each later v1 commit, inspect `git diff <baseline>..<new revision> -- src pu
 
 ## MCP source inventory
 
-8 of 27 tools are implemented in v2 (`v2/src/features/watchlists/mcp/`); the remaining 19 are unported. Reference contracts live in `src/app/mcp/`.
+8 of 27 tools are implemented in v2 (`v2/src/features/watchlists/mcp/`); the remaining 19 are unported and tracked in the machine-enforced manifest [`contracts/mcp-watchlists.json`](../contracts/mcp-watchlists.json) (gated by `test/integrations/McpCompliance.test.ts`, `v2/tests/mcp_compliance.rs`, and `pnpm run test:parity`). Reference contracts live in `src/app/mcp/`.
 
 - [ ] `add_custom_items_to_watchlists`
 - [ ] `add_media_to_watchlists`
@@ -104,7 +104,8 @@ Sources: `vite.config.ts`, `src/lib/PwaRegistration.ts`, `src/components/PwaUpda
 
 ## Current verification & coverage summary
 
-- **Rust & disposable-SQLite integration (`pnpm run test:v2`):** validates fail-closed startup, schema/byte/WAL preservation, bounded locks, reads after v1 writes, v1 reads after v2 writes, Unicode name matching, bound cursors, order-token SHA-256 parity, create/update defaults & timestamps, release↔custom order-mode transitions (tie-breaks, mixed ranked/unranked preservation, atomic rollback, `orderToken`/`nextUnwatched` updates, and `not_custom_mode` rejection), gapped-rank full renumbering, mid-write rollback, item metadata tri-state merge patch/boundary parsing/atomic writes/content negotiation (`HX-Trigger`, `303` PRG, `Vary: HX-Request, Accept`)/v1↔v2 round trips, and MCP page/batch contract parity (including `edit_watchlist_items`).
+- **Rust & disposable-SQLite integration (`pnpm run test:v2`):** validates fail-closed startup, schema/byte/WAL preservation, bounded locks, reads after v1 writes, v1 reads after v2 writes, Unicode name matching, bound cursors, order-token SHA-256 parity, create/update defaults & timestamps (including Drizzle-matching `updated_at` on create), release↔custom order-mode transitions (tie-breaks, mixed ranked/unranked preservation, atomic rollback, `orderToken`/`nextUnwatched` updates, and `not_custom_mode` rejection), gapped/duplicate/null-rank full renumbering (including opportunistic repair on no-op reorders), mid-write rollback, item metadata tri-state merge patch/boundary parsing/atomic writes/content negotiation (`HX-Trigger`, `303` PRG, `Vary: HX-Request, Accept`)/v1↔v2 round trips, and shared MCP contract compliance + SQLite `checkRep` + pending 19-tool gating (`v2/tests/mcp_compliance.rs`).
+- **Differential & shared-DB stateful MCP gate (`pnpm run test:parity`, `.github/workflows/v2.yml`):** executes [`contracts/mcp-watchlists.json`](../contracts/mcp-watchlists.json) against live v1 and v2 MCP endpoints over identical migrated SQLite fixtures, diffing `tools/list` declarations (metadata + schemas), canonicalized `tools/call` responses (exact `orderToken`, structural cursor payloads, validated timestamps, coercion and error envelopes), SQLite `checkRep` invariants and canonicalized post-state diffs after every mutating case, plus interleaved `v1 → v2 → v1 → v2` sequences against a single shared SQLite database.
 - **DOM & headless browser suites (`.github/workflows/v2.yml`):**
   - `pnpm run test:v2:dom`: jsdom HTMX swaps, `#watchlist-refresh` OOB edit-dialog reconciliation, optimistic keyboard reorder, drop anchors, swap suppression and row action trigger disabling during drags/saves, failed-save reconciliation, item action menu and `#item-edit-dialog` modal/live `no-referrer` poster preview/date clear/`aria-busy`/draft preservation/focus restoration (including filtered-out fallback), and filter/scroll/focus restoration.
   - `v2/tests/watchlist-form-browser.cjs` & `dialog-layout-browser.cjs`: dialog opening/cancel focus restoration, validation, pending/error states, and Chromium/WebKit viewport containment.

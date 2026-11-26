@@ -85,45 +85,50 @@ impl Watchlists {
         if mode != ItemOrderMode::Custom {
             return Ok(ReorderOutcome::Rejected(ReorderFailure::NotCustomMode));
         }
-        let mut item_ids = transaction
+        let mut items = transaction
             .query_all_raw(statement(
                 &format!(
-                    "SELECT id FROM watchlist_items WHERE watchlist_id=? ORDER BY {}",
+                    "SELECT id, custom_rank FROM watchlist_items WHERE watchlist_id=? ORDER BY {}",
                     mode.order_sql()
                 ),
                 vec![id.into()],
             ))
             .await?
             .iter()
-            .map(|row| row.try_get::<i64>("", "id"))
-            .collect::<Result<Vec<_>, _>>()?;
-        let Some(source_index) = item_ids
+            .map(|row| {
+                Ok((
+                    row.try_get::<i64>("", "id")?,
+                    row.try_get::<Option<i64>>("", "custom_rank")?,
+                ))
+            })
+            .collect::<Result<Vec<_>, DbErr>>()?;
+        let Some(source_index) = items
             .iter()
-            .position(|value| *value == input.moved_item_id)
+            .position(|(item_id, _)| *item_id == input.moved_item_id)
         else {
             return Ok(ReorderOutcome::Rejected(ReorderFailure::InvalidItem));
         };
-        item_ids.remove(source_index);
-        let Some(reference_index) = item_ids
+        let moved = items.remove(source_index);
+        let Some(reference_index) = items
             .iter()
-            .position(|value| *value == input.reference_item_id)
+            .position(|(item_id, _)| *item_id == input.reference_item_id)
         else {
             return Ok(ReorderOutcome::Rejected(ReorderFailure::InvalidReference));
         };
         let destination_index =
             reference_index + usize::from(input.position == ReorderPosition::After);
-        item_ids.insert(destination_index, input.moved_item_id);
-        if source_index != destination_index {
-            // Renumber the complete sequence so the stored order stays contiguous even
-            // when deletions left rank gaps. V1 only rewrites the affected slice.
-            for (index, item_id) in item_ids.iter().enumerate() {
-                transaction
-                    .execute_raw(statement(
-                        "UPDATE watchlist_items SET custom_rank=? WHERE watchlist_id=? AND id=?",
-                        vec![((index + 1) as i64).into(), id.into(), (*item_id).into()],
-                    ))
-                    .await?;
+        items.insert(destination_index, moved);
+        for (index, (item_id, current_rank)) in items.iter().enumerate() {
+            let next_rank = (index + 1) as i64;
+            if *current_rank == Some(next_rank) {
+                continue;
             }
+            transaction
+                .execute_raw(statement(
+                    "UPDATE watchlist_items SET custom_rank=? WHERE watchlist_id=? AND id=?",
+                    vec![next_rank.into(), id.into(), (*item_id).into()],
+                ))
+                .await?;
         }
         transaction.commit().await?;
         Ok(ReorderOutcome::Reordered)

@@ -304,9 +304,7 @@ impl Watchlists {
                 let selected = select_exact(items, selector);
                 let results = match view {
                     ResultView::Items => ItemResults::Items(selected),
-                    ResultView::Titles => {
-                        ItemResults::Titles(selected.iter().map(single_title).collect())
-                    }
+                    ResultView::Titles => ItemResults::Titles(grouped_titles(&selected)),
                 };
                 Ok(ItemPage {
                     watchlist: None,
@@ -368,7 +366,8 @@ fn select_exact(items: Vec<WatchlistItem>, selector: ExactSelector) -> Vec<Watch
             .into_iter()
             .filter(|item| {
                 item.source == provider.provider
-                    && item.tmdb_id == provider.provider_id
+                    && (item.tmdb_id == provider.provider_id
+                        || item.parent_id.as_deref() == Some(provider.provider_id.as_str()))
                     && item.media_type == provider.media_type
             })
             .collect(),
@@ -407,17 +406,6 @@ fn grouped_titles(items: &[WatchlistItem]) -> Vec<GroupedTitle> {
             },
         )
         .collect()
-}
-
-fn single_title(item: &WatchlistItem) -> GroupedTitle {
-    let (id, title) = item.group_title();
-    GroupedTitle {
-        source: item.source.clone(),
-        provider_id: id.into(),
-        media_type: item.media_type.clone(),
-        title: title.into(),
-        matching_item_count: 1,
-    }
 }
 
 #[cfg(test)]

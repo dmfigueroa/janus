@@ -70,6 +70,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
         working-directory: .
       - run: cargo test --locked
+      - name: MCP differential and stateful parity tests
+        working-directory: .
+        run: pnpm run test:parity
       - name: Install browsers
         working-directory: .
         run: pnpm exec playwright-core install --with-deps chromium webkit

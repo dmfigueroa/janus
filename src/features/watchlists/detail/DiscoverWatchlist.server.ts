@@ -3,6 +3,7 @@ import { getDb } from "@/db/Db.server";
 import { watchlistItems, type WatchlistItem } from "@/db/Schema";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query";
 import { getWatchlistOrderToken } from "@/features/watchlists/order/SetWatchlistOrder.server";
+import { buildDetailOrderBy } from "@/features/watchlists/Order.server";
 import {
   buildDetailFilters,
   loadWatchlistById,
@@ -152,6 +153,9 @@ export async function findWatchlistItemMatches(
       );
   }
 
+  const watchlist = await loadWatchlistById(selection.watchlistId);
+  if (!watchlist) return [];
+
   return db
     .select()
     .from(watchlistItems)
@@ -165,7 +169,8 @@ export async function findWatchlistItemMatches(
         ),
         eq(watchlistItems.mediaType, selection.mediaType),
       ),
-    );
+    )
+    .orderBy(...buildDetailOrderBy(watchlist.itemOrderMode));
 }
 
 export async function findWatchlistTitleMatches(

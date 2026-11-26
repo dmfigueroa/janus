@@ -415,6 +415,27 @@ async fn mcp_discovers_and_reads_existing_watchlist_with_baseline_envelopes_and_
     assert_eq!(provider["structuredContent"]["items"][0]["id"], 101);
     assert!(provider["structuredContent"].get("watchlist").is_none());
     assert!(provider["structuredContent"].get("nextCursor").is_none());
+    let parent_items=result(rpc(&app,json!({"jsonrpc":"2.0","id":28,"method":"tools/call","params":{"name":"find_watchlist_items","arguments":{"watchlistId":41,"provider":"tmdb","providerId":"show-1","mediaType":"episode"}}}),Some(&session)).await).await;
+    assert_eq!(
+        parent_items["structuredContent"]["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| item["id"].as_i64().unwrap())
+            .collect::<Vec<_>>(),
+        vec![102, 101]
+    );
+    let parent_titles=result(rpc(&app,json!({"jsonrpc":"2.0","id":29,"method":"tools/call","params":{"name":"find_watchlist_items","arguments":{"watchlistId":41,"provider":"tmdb","providerId":"show-1","mediaType":"episode","resultView":"titles"}}}),Some(&session)).await).await;
+    assert_eq!(
+        parent_titles["structuredContent"]["titles"],
+        json!([{
+            "provider": "tmdb",
+            "providerId": "show-1",
+            "mediaType": "episode",
+            "title": "A Show",
+            "matchingItemCount": 2
+        }])
+    );
     let missing=result(rpc(&app,json!({"jsonrpc":"2.0","id":27,"method":"tools/call","params":{"name":"find_watchlist_items","arguments":{"watchlistId":999,"watchlistItemId":101}}}),Some(&session)).await).await;
     assert_eq!(missing["structuredContent"]["items"], json!([]));
     assert!(missing.get("isError").is_none());
@@ -1383,6 +1404,49 @@ async fn reorder_renumbers_the_complete_order_when_v1_ranks_have_gaps() {
 }
 
 #[tokio::test]
+async fn noop_reorder_opportunistically_repairs_gapped_and_null_ranks() {
+    let fixture = Fixture::v1();
+    change_v1(&fixture, "gapped");
+    let database = janus_v2::open_database(&fixture.0).await.unwrap();
+    let app = janus_v2::database_router(database.clone());
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/watchlists/43/reorder")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({"movedItemId": 202, "referenceItemId": 201, "position": "after"})
+                        .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let detail = janus_v2::Watchlists(database)
+        .detail(43)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        detail
+            .items
+            .iter()
+            .map(|item| (item.id, item.custom_rank))
+            .collect::<Vec<_>>(),
+        vec![
+            (201, Some(1)),
+            (202, Some(2)),
+            (203, Some(3)),
+            (204, Some(4)),
+        ]
+    );
+}
+
+#[tokio::test]
 async fn mcp_reorders_are_independent_and_visible_after_reopen() {
     let fixture = Fixture::v1();
     let database = janus_v2::open_database(&fixture.0).await.unwrap();
@@ -1411,15 +1475,19 @@ async fn mcp_reorders_are_independent_and_visible_after_reopen() {
     );
     assert_eq!(
         failed["structuredContent"]["results"][0]["message"],
-        "Unable to reorder watchlist items."
+        "The operation failed unexpectedly. Verify its state before retrying."
+    );
+    assert!(
+        failed["structuredContent"]["results"][0]
+            .get("watchlistId")
+            .is_none()
     );
     assert_eq!(
         failed["structuredContent"]["results"][1]["code"],
         "validation_error"
     );
-    let malformed = rpc(&app,json!({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"reorder_watchlist_items","arguments":{"reorders":[{"watchlistId":41,"movedItemId":101,"referenceItemId":102,"position":"sideways"}]}}}),Some(&session)).await;
-    let malformed: Value = serde_json::from_str(&body(malformed).await).unwrap();
-    assert_eq!(malformed["error"]["code"], -32602);
+    let malformed = result(rpc(&app,json!({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"reorder_watchlist_items","arguments":{"reorders":[{"watchlistId":41,"movedItemId":101,"referenceItemId":102,"position":"sideways"}]}}}),Some(&session)).await).await;
+    assert_eq!(malformed["isError"], true, "{malformed}");
 }
 
 #[tokio::test]
@@ -1714,7 +1782,8 @@ async fn web_create_preserves_validation_defaults_timestamps_and_v1_compatibilit
     let record = &detail.watchlist.watchlist;
     assert_eq!(record.created_at.len(), 19, "{}", record.created_at);
     assert_eq!(record.created_at[4..5], *"-");
-    assert!(record.updated_at.is_none());
+    let created_updated_at = record.updated_at.as_deref().unwrap();
+    assert_eq!(created_updated_at.len(), 19, "{created_updated_at}");
     assert!(record.paused_at.is_none());
     let rotation = record.last_watched_at.as_deref().unwrap();
     assert_eq!(rotation.len(), 23, "{rotation}");
@@ -2615,14 +2684,16 @@ async fn mcp_order_mode_contracts_validate_inputs_preserve_batches_and_sync_read
     let _ = result(initialized).await;
 
     for invalid_mode in [json!("sideways"), Value::Null] {
-        let malformed = rpc(
-            &app,
-            json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"update_watchlists","arguments":{"watchlists":[{"watchlistId":41,"itemOrderMode":invalid_mode}]}}}),
-            Some(&session),
+        let malformed = result(
+            rpc(
+                &app,
+                json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"update_watchlists","arguments":{"watchlists":[{"watchlistId":41,"itemOrderMode":invalid_mode}]}}}),
+                Some(&session),
+            )
+            .await,
         )
         .await;
-        let payload: Value = serde_json::from_str(&body(malformed).await).unwrap();
-        assert_eq!(payload["error"]["code"], -32602, "{payload}");
+        assert_eq!(malformed["isError"], true, "{malformed}");
     }
 
     let before_get = result(
@@ -3190,14 +3261,16 @@ async fn mcp_edit_watchlist_items_preserves_schema_annotations_rejection_and_bat
         json!({"edits": [{"watchlistId": "41", "watchlistItemId": 101, "title": "Bad"}]}),
         json!({"edits": [{"watchlistId": 41, "watchlistItemId": 101, "posterImage": 123}]}),
     ] {
-        let rejected = rpc(
-            &app,
-            json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"edit_watchlist_items","arguments":malformed}}),
-            Some(&session),
+        let rejected = result(
+            rpc(
+                &app,
+                json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"edit_watchlist_items","arguments":malformed}}),
+                Some(&session),
+            )
+            .await,
         )
         .await;
-        let payload: Value = serde_json::from_str(&body(rejected).await).unwrap();
-        assert_eq!(payload["error"]["code"], -32602, "{payload}");
+        assert_eq!(rejected["isError"], true, "{rejected}");
     }
 
     let batch = result(

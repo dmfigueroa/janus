@@ -111,63 +111,74 @@ fn build_contracts() -> Vec<Contract> {
     let detail_page = output_schema(detail_properties, Some(json!(["watchlist"])));
 
     vec![
-        read_contract(
-            "list_watchlists",
-            "List watchlists",
-            list,
-            json!([]),
-            summary_page.clone(),
-            LIST_FIELDS,
-            DiscoveryOperation::List,
-        ),
-        read_contract(
-            "search_watchlists",
-            "Search watchlists",
-            search,
-            json!(["query"]),
-            summary_page,
-            SEARCH_FIELDS,
-            DiscoveryOperation::Search,
-        ),
-        read_contract(
-            "get_watchlist",
-            "Get watchlist",
-            detail,
-            json!(["watchlistId"]),
-            detail_page,
-            GET_FIELDS,
-            DiscoveryOperation::Get,
-        ),
-        read_contract(
-            "find_watchlist_items",
-            "Find watchlist items",
-            find,
-            json!(["watchlistId"]),
-            item_page,
-            FIND_FIELDS,
-            DiscoveryOperation::Find,
-        ),
+        read_contract(ReadContractSpec {
+            name: "list_watchlists",
+            title: "List watchlists",
+            description: "List watchlist summaries using Janus's supported sort order.",
+            properties: list,
+            required: json!([]),
+            output_schema: summary_page.clone(),
+            accepted: LIST_FIELDS,
+            operation: DiscoveryOperation::List,
+        }),
+        read_contract(ReadContractSpec {
+            name: "search_watchlists",
+            title: "Search watchlists",
+            description: "Find watchlist summaries by a case-insensitive partial name.",
+            properties: search,
+            required: json!(["query"]),
+            output_schema: summary_page,
+            accepted: SEARCH_FIELDS,
+            operation: DiscoveryOperation::Search,
+        }),
+        read_contract(ReadContractSpec {
+            name: "get_watchlist",
+            title: "Get watchlist",
+            description: r#"Get one watchlist with summary counts and a cursor-paginated result page. Use resultView: "items" | "titles" to choose individual entries or titles that group all episodes from the same TV show and issues from the same series."#,
+            properties: detail,
+            required: json!(["watchlistId"]),
+            output_schema: detail_page,
+            accepted: GET_FIELDS,
+            operation: DiscoveryOperation::Get,
+        }),
+        read_contract(ReadContractSpec {
+            name: "find_watchlist_items",
+            title: "Find watchlist items",
+            description: r#"Find watchlist items by a Janus watchlist item ID; explicit provider, provider ID, and media type; or case-insensitive title, parent-title, and episode text. Use resultView: "items" | "titles" to choose individual entries or collapsed titles; titles groups all matching episodes from the same TV show, or issues from the same series, into one title result with a matching-item count."#,
+            properties: find,
+            required: json!(["watchlistId"]),
+            output_schema: item_page,
+            accepted: FIND_FIELDS,
+            operation: DiscoveryOperation::Find,
+        }),
     ]
 }
 
-fn read_contract(
+struct ReadContractSpec {
     name: &'static str,
     title: &'static str,
+    description: &'static str,
     properties: Value,
     required: Value,
     output_schema: Arc<Map<String, Value>>,
     accepted: &'static [&'static str],
     operation: DiscoveryOperation,
-) -> Contract {
-    let mut tool = Tool::new(name, title, object_schema(properties, required));
-    tool.title = Some(title.into());
-    tool.output_schema = Some(output_schema);
+}
+
+fn read_contract(spec: ReadContractSpec) -> Contract {
+    let mut tool = Tool::new(
+        spec.name,
+        spec.description,
+        object_schema(spec.properties, spec.required),
+    );
+    tool.title = Some(spec.title.into());
+    tool.output_schema = Some(spec.output_schema);
     tool.annotations = Some(ToolAnnotations::new().read_only(true).destructive(false));
     Contract {
-        name,
+        name: spec.name,
         tool,
-        accepted,
-        operation,
+        accepted: spec.accepted,
+        operation: spec.operation,
     }
 }
 

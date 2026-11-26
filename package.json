@@ -8,6 +8,7 @@
     "preview": "vite preview",
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",
+    "test:parity": "vitest run --config vitest.parity.config.ts",
     "test:v2": "bash tools/pinned-node.sh cargo test --manifest-path v2/Cargo.toml --locked",
     "test:v2:dom": "node --test v2/tests/htmx-browser.cjs v2/tests/reorder-browser.cjs v2/tests/item-edit-browser.cjs v2/tests/item-edit-concurrency-browser.cjs",
     "test:v2:home": "node --test v2/tests/watchlists-home-browser.cjs",
