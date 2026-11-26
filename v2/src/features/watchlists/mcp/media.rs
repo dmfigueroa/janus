@@ -214,17 +214,19 @@ fn search_contract() -> SearchContract {
             "totalPages": {"type": "number"},
             "totalResults": {"type": "number"}
         }),
-        None,
+        Some(json!(["success"])),
     ));
     tool.annotations = Some(ToolAnnotations::new().read_only(true).destructive(false));
     SearchContract { tool }
 }
 
 fn add_contract() -> AddContract {
+    // Match v1 Zod → JSON Schema: watchlistId is `z.number()` (type number);
+    // referenceItemId is `z.number().int().positive()` (integer, minimum 1).
     let entry = json!({
         "type": "object",
         "properties": {
-            "watchlistId": {"type": "integer", "exclusiveMinimum": 0},
+            "watchlistId": {"type": "number"},
             "provider": {"type": "string", "enum": ["tmdb", "rawg", "google_books", "comicvine", "anilist"]},
             "providerId": {"type": "string"},
             "mediaType": {
@@ -239,7 +241,7 @@ fn add_contract() -> AddContract {
                 }
             },
             "insertionPosition": {"type": "string", "enum": ["beginning", "end", "before", "after"]},
-            "referenceItemId": {"type": "integer", "exclusiveMinimum": 0}
+            "referenceItemId": {"type": "integer", "minimum": 1}
         }
     });
     let mut tool = Tool::new(
@@ -271,7 +273,11 @@ fn add_contract() -> AddContract {
                         "watchlistId": {"type": "number"},
                         "provider": {"type": "string", "enum": ["tmdb", "rawg", "google_books", "comicvine", "anilist"]},
                         "providerId": {"type": "string"},
-                        "affectedCount": {"type": "integer", "minimum": 0}
+                        "affectedCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "Number of items added when known; omitted when an unexpected failure leaves the count unknown."
+                        }
                     },
                     "required": ["index", "success", "code", "message"]
                 }
