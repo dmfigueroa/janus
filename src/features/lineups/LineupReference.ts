@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const lineupSystemKeys = ["movie", "television", "game", "book", "comic"] as const;
+export type SystemLineupKey = (typeof lineupSystemKeys)[number];
 
 export const lineupReferenceSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("system"), key: z.enum(lineupSystemKeys) }),

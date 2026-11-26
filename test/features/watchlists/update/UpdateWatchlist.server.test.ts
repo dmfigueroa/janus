@@ -101,4 +101,14 @@ describe("update watchlist mutation", () => {
       }),
     ).resolves.toEqual({ success: false, message: "Watchlist not found." });
   });
+
+  it("trims names and rejects whitespace-only names at the schema boundary", async () => {
+    const { updateWatchlistSchema } = await import("@/features/watchlists/update/Mutation");
+
+    expect(updateWatchlistSchema.parse({ watchlistId: 1, name: "  Renamed  " })).toEqual({
+      watchlistId: 1,
+      name: "Renamed",
+    });
+    expect(updateWatchlistSchema.safeParse({ watchlistId: 1, name: "   " }).success).toBe(false);
+  });
 });

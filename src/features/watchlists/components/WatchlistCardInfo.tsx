@@ -1,6 +1,6 @@
 import { isWatchlistCompleted } from "../lifecycle/WatchlistLifecycle";
 import { Box, Flex, Heading, Text } from "@chakra-ui/react";
-import { format, parseISO } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query";
 import { formatNextItemDetail } from "@/features/watchlists/NextItemLabel";
 
@@ -130,8 +130,16 @@ function PausedSinceLine({ pausedAt }: { pausedAt: string }) {
   );
 }
 
+const TIMEZONE_SUFFIX_PATTERN = /(?:[zZ]|[+-]\d{2}(?::?\d{2})?)$/;
+
+function parseUtcInstant(timestamp: string) {
+  const normalized = TIMEZONE_SUFFIX_PATTERN.test(timestamp) ? timestamp : `${timestamp}Z`;
+  return parseISO(normalized);
+}
+
 function formatUtcTimestamp(timestamp: string, pattern: string) {
-  return format(parseISO(`${timestamp}Z`), pattern);
+  const parsedDate = parseUtcInstant(timestamp);
+  return isValid(parsedDate) ? format(parsedDate, pattern) : timestamp;
 }
 
 function ProgressPercentage({ stats }: { stats: WatchlistSummary["stats"] }) {

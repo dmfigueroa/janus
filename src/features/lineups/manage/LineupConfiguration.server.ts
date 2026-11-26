@@ -1,9 +1,10 @@
 import { asc, eq } from "drizzle-orm";
 import { getDb, type DatabaseTransaction } from "@/db/Db.server";
 import { lineups } from "@/db/Schema";
-import { lineupSystemKeys, type LineupReference } from "@/features/lineups/LineupReference";
+import type { LineupReference, SystemLineupKey } from "@/features/lineups/LineupReference";
 import type { LineupAction } from "@/features/lineups/manage/Lineups";
 import {
+  asLineup,
   findCustomTarget,
   insertLineup,
   lineupFailure,
@@ -13,11 +14,15 @@ import {
   validateLineupUpdate,
   validWatchlists,
   type CustomLineupInput,
+  type CustomLineupRecord,
   type LineupChanges,
   type LineupFailure,
+  type LineupWithReference,
+  type SystemLineupRecord,
 } from "@/features/lineups/manage/LineupWriteRules.server";
 
-type SystemLineupKey = (typeof lineupSystemKeys)[number];
+export type { CustomLineupRecord, LineupWithReference, SystemLineupRecord };
+
 type LineupRecord = typeof lineups.$inferSelect;
 
 const defaults = [
@@ -27,8 +32,6 @@ const defaults = [
   ["book", "Books"],
   ["comic", "Comics"],
 ] as const satisfies ReadonlyArray<readonly [SystemLineupKey, string]>;
-
-export type LineupWithReference = ReturnType<typeof asLineup>;
 
 type LineupChangeResult = { success: true } | LineupFailure;
 type SaveLineupResult = { success: true; id: number } | LineupFailure;
@@ -42,16 +45,6 @@ function initializeLineups(transaction: DatabaseTransaction) {
       .onConflictDoNothing({ target: lineups.systemKey })
       .run();
   });
-}
-
-function asLineup(lineup: LineupRecord): LineupRecord & { reference: LineupReference } {
-  return {
-    ...lineup,
-    reference:
-      lineup.kind === "system"
-        ? { kind: "system", key: lineup.systemKey as SystemLineupKey }
-        : { kind: "custom", id: lineup.id },
-  };
 }
 
 function matchesReference(lineup: LineupWithReference, reference: LineupReference) {

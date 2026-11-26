@@ -275,6 +275,24 @@ describe("WatchlistCard", () => {
     expect(screen.getByRole("menuitem", { name: "Pause watchlist" })).not.toBeNull();
   });
 
+  it("hides skip in the card menu when a watchlist is paused", async () => {
+    renderCard(
+      <WatchlistCard
+        watchlist={createWatchlist({
+          id: 1,
+          name: "Paused Night",
+          pausedAt: "2024-06-01 00:00:00",
+        })}
+        showUpNextBadge={false}
+      />,
+    );
+
+    await openCardMenu("Paused Night");
+
+    expect(screen.queryByRole("menuitem", { name: "Move to back of rotation" })).toBeNull();
+    expect(screen.getByRole("menuitem", { name: "Resume watchlist" })).not.toBeNull();
+  });
+
   it("opens the delete confirmation dialog from the card menu", async () => {
     renderCard(
       <WatchlistCard

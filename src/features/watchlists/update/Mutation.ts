@@ -5,7 +5,7 @@ import { updateWatchlistMutation } from "./Mutation.server";
 export const updateWatchlistSchema = z
   .object({
     watchlistId: z.number(),
-    name: z.string().min(1, "Name is required").optional(),
+    name: z.string().trim().min(1, "Name is required").optional(),
     description: z.string().nullable().optional(),
     itemOrderMode: z.enum(["release", "custom"]).optional(),
   })

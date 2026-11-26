@@ -268,7 +268,7 @@ describe("cascading deletes and IMMEDIATE write transactions", () => {
 
       expect(
         await mergeWatchlistsMutation({
-          targetWatchlistId: keepList.id,
+          target: { kind: "existing", watchlistId: keepList.id },
           sourceWatchlistIds: [mergeSource.id],
         }),
       ).toEqual({ success: true, targetId: keepList.id });
@@ -323,7 +323,7 @@ describe("cascading deletes and IMMEDIATE write transactions", () => {
 
       const firstLock = await holdWriteLockInChildProcess(fileDb.databasePath, 200);
       const mergeResult = await mergeWatchlistsMutation({
-        targetWatchlistId: target.id,
+        target: { kind: "existing", watchlistId: target.id },
         sourceWatchlistIds: [source.id],
       });
       expect(await firstLock.waitForExit()).toBe(0);

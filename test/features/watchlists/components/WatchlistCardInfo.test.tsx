@@ -54,4 +54,15 @@ describe("WatchlistCardInfo", () => {
 
     expect(screen.queryByText(/^Paused since/)).toBeNull();
   });
+
+  it.each(["2024-06-01T12:30:00Z", "2024-06-01T12:30:00+00:00"])(
+    "formats pausedAt timestamp %s that already includes a timezone suffix",
+    (pausedAt) => {
+      render(
+        <WatchlistCardInfo watchlist={watchlistSummary({ pausedAt })} infoVariant="watchlist" />,
+      );
+
+      expect(screen.getByText("Paused since June 1, 2024")).not.toBeNull();
+    },
+  );
 });

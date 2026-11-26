@@ -1,7 +1,9 @@
+import { pathToFileURL } from "node:url";
 import type Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import * as schema from "./Schema.ts";
 import { openSqliteConnection } from "./SqliteConnection.server.ts";
+import { initialWatchlistLifecycle } from "../features/watchlists/lifecycle/WatchlistRotationPosition.server.ts";
 
 const { watchlists, watchlistItems } = schema;
 
@@ -160,7 +162,7 @@ function main() {
   }
 }
 
-function seedInto(sqlite: Database.Database) {
+export function seedInto(sqlite: Database.Database) {
   const db = drizzle(sqlite, { schema });
   const existing = sqlite.prepare("SELECT COUNT(*) AS count FROM watchlists").get() as {
     count: number;
@@ -179,6 +181,7 @@ function seedInto(sqlite: Database.Database) {
             name: demo.name,
             description: demo.description,
             itemOrderMode: demo.itemOrderMode,
+            ...initialWatchlistLifecycle(),
           })
           .returning({ id: watchlists.id })
           .get();
@@ -201,4 +204,6 @@ function seedInto(sqlite: Database.Database) {
   }
 }
 
-main();
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}

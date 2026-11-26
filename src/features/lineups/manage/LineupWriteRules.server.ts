@@ -2,9 +2,41 @@ import { eq, inArray } from "drizzle-orm";
 import type { DatabaseTransaction } from "@/db/Db.server";
 import { lineups, lineupWatchlists, watchlists } from "@/db/Schema";
 import { unicodeCaseFold } from "@/db/UnicodeCaseFold.server";
+import type { LineupReference, SystemLineupKey } from "@/features/lineups/LineupReference";
 
 type LineupRecord = typeof lineups.$inferSelect;
 type LineupIdentity = Pick<LineupRecord, "id" | "kind" | "name">;
+
+export type SystemLineupRecord = Omit<LineupRecord, "kind" | "systemKey"> & {
+  kind: "system";
+  systemKey: SystemLineupKey;
+  reference: Extract<LineupReference, { kind: "system" }>;
+};
+
+export type CustomLineupRecord = Omit<LineupRecord, "kind" | "systemKey"> & {
+  kind: "custom";
+  systemKey: null;
+  reference: Extract<LineupReference, { kind: "custom" }>;
+};
+
+export type LineupWithReference = SystemLineupRecord | CustomLineupRecord;
+
+export function asLineup(lineup: LineupRecord): LineupWithReference {
+  if (lineup.kind === "system" && lineup.systemKey !== null) {
+    return {
+      ...lineup,
+      kind: "system",
+      systemKey: lineup.systemKey,
+      reference: { kind: "system", key: lineup.systemKey },
+    };
+  }
+  return {
+    ...lineup,
+    kind: "custom",
+    systemKey: null,
+    reference: { kind: "custom", id: lineup.id },
+  };
+}
 
 export type LineupFailure = {
   success: false;

@@ -51,7 +51,7 @@ describe("merge watchlists mutation", () => {
     });
     await createTestWatchlistItem(db, { watchlistId: source.id, tmdbId: "source" });
     const existing = await mergeWatchlistsMutation({
-      targetWatchlistId: target.id,
+      target: { kind: "existing", watchlistId: target.id },
       sourceWatchlistIds: [source.id],
     });
     expect(existing).toEqual({ success: true, targetId: target.id });
@@ -61,7 +61,7 @@ describe("merge watchlists mutation", () => {
       lastWatchedAt: target.lastWatchedAt,
     });
     const merged = await mergeWatchlistsMutation({
-      newWatchlistName: "New merge",
+      target: { kind: "new", name: "New merge" },
       sourceWatchlistIds: [target.id],
     });
     const detail = await readWatchlistDetail({ watchlistId: getMergeTargetId(merged) });
@@ -109,7 +109,7 @@ describe("merge watchlists mutation", () => {
     });
 
     const result = await mergeWatchlistsMutation({
-      targetWatchlistId: target.id,
+      target: { kind: "existing", watchlistId: target.id },
       sourceWatchlistIds: [target.id, source.id],
     });
     const targetDetail = await readWatchlistDetail({
@@ -153,7 +153,7 @@ describe("new target merge", () => {
 
     const result = await mergeWatchlistsMutation({
       sourceWatchlistIds: [firstSource.id, secondSource.id],
-      newWatchlistName: "Merged Queue",
+      target: { kind: "new", name: "  Merged Queue  " },
     });
     const targetId = getMergeTargetId(result);
     const detail = await readWatchlistDetail({
@@ -200,7 +200,7 @@ describe("new target merge", () => {
 
     const result = await mergeWatchlistsMutation({
       sourceWatchlistIds: [firstSource.id, secondSource.id],
-      newWatchlistName: "Release Merge",
+      target: { kind: "new", name: "Release Merge" },
     });
     const detail = await readWatchlistDetail({
       watchlistId: getMergeTargetId(result),
@@ -218,9 +218,23 @@ describe("new target merge", () => {
 describe("merge validation", () => {
   it("rejects a merge without source watchlists", async () => {
     await expect(
-      mergeWatchlistsMutation({ sourceWatchlistIds: [], newWatchlistName: "Should Not Exist" }),
+      mergeWatchlistsMutation({
+        sourceWatchlistIds: [],
+        target: { kind: "new", name: "Should Not Exist" },
+      }),
     ).resolves.toMatchObject({ success: false, code: "validation_error" });
     await expect(db.select().from(schema.watchlists)).resolves.toEqual([]);
+  });
+
+  it("rejects a merge with a whitespace-only new target name", async () => {
+    const source = await createTestWatchlist(db, { name: "Source" });
+    await expect(
+      mergeWatchlistsMutation({
+        sourceWatchlistIds: [source.id],
+        target: { kind: "new", name: "   " },
+      }),
+    ).resolves.toMatchObject({ success: false, code: "validation_error" });
+    await expect(readWatchlistDetail({ watchlistId: source.id })).resolves.not.toBeNull();
   });
 });
 
@@ -240,20 +254,26 @@ describe("lineup membership during merge", () => {
       await setLineupWatchlists({ kind: "custom", id: secondLineup.id }, [second.id]);
       const result = await mergeWatchlistsMutation(
         targetKind === "existing"
-          ? { targetWatchlistId: first.id, sourceWatchlistIds: [second.id] }
-          : { newWatchlistName: "Merged", sourceWatchlistIds: [first.id, second.id] },
+          ? {
+              target: { kind: "existing", watchlistId: first.id },
+              sourceWatchlistIds: [second.id],
+            }
+          : {
+              target: { kind: "new", name: "Merged" },
+              sourceWatchlistIds: [first.id, second.id],
+            },
       );
       const targetId = getMergeTargetId(result);
-      const lineups = await readLineups();
+      const customLineups = (await readLineups()).filter((lineup) => lineup.kind === "custom");
       expect(
-        lineups
+        customLineups
           .find((lineup) => lineup.id === firstLineup.id)
-          ?.configuredWatchlists?.map((list) => list.id),
+          ?.configuredWatchlists.map((list) => list.id),
       ).toEqual([targetId]);
       expect(
-        lineups
+        customLineups
           .find((lineup) => lineup.id === secondLineup.id)
-          ?.configuredWatchlists?.map((list) => list.id),
+          ?.configuredWatchlists.map((list) => list.id),
       ).toEqual([targetId]);
     },
   );

@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { LineupData, LineupAction } from "@/features/lineups/manage/Lineups";
 import { useLineupActions } from "@/features/lineups/manage/useLineupActions";
-type Lineup = LineupData["lineups"][number];
-export function useLineupEditor(lineup: Lineup | undefined, watchlists: LineupData["watchlists"]) {
+type CustomLineup = Extract<LineupData["lineups"][number], { kind: "custom" }>;
+export function useLineupEditor(
+  lineup: CustomLineup | undefined,
+  watchlists: LineupData["watchlists"],
+) {
   const [open, setOpenState] = useState(false);
   const initial = editorValues(lineup);
   const [name, setName] = useState(initial.name);
@@ -34,9 +37,7 @@ export function useLineupEditor(lineup: Lineup | undefined, watchlists: LineupDa
       (!selectedOnly || selected.includes(item.id)),
   );
   function toggle(id: number, checked: boolean) {
-    setSelected((current) =>
-      checked ? [...current, id] : current.filter((value) => value !== id),
-    );
+    setSelected((current) => updateSelectedIds(current, id, checked));
   }
   function changeName(value: string) {
     setName(value);
@@ -74,19 +75,22 @@ export function useLineupEditor(lineup: Lineup | undefined, watchlists: LineupDa
     ...actions,
   };
 }
-function editorValues(lineup: Lineup | undefined) {
+function updateSelectedIds(current: number[], id: number, checked: boolean) {
+  if (!checked) return current.filter((value) => value !== id);
+  return current.includes(id) ? current : [...current, id];
+}
+function editorValues(lineup: CustomLineup | undefined) {
   if (!lineup) return { name: "", selected: [] };
   return { name: lineup.name, selected: selectedIds(lineup) };
 }
-function selectedIds(lineup: Lineup) {
-  return lineup.configuredWatchlists?.map((item) => item.id) ?? [];
+function selectedIds(lineup: CustomLineup) {
+  return Array.from(new Set(lineup.configuredWatchlists.map((item) => item.id)));
 }
 function editorAction(
-  lineup: Lineup | undefined,
+  lineup: CustomLineup | undefined,
   name: string,
   watchlistIds: number[],
 ): LineupAction {
-  if (lineup?.reference.kind === "custom")
-    return { action: "edit", reference: lineup.reference, name, watchlistIds };
+  if (lineup) return { action: "edit", reference: lineup.reference, name, watchlistIds };
   return { action: "create", name, watchlistIds };
 }

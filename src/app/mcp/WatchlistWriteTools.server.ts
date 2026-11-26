@@ -205,7 +205,7 @@ async function skipWatchlistResult(watchlistId: number, index: number) {
     return {
       index,
       success: false,
-      code: "not_found",
+      code: result.code,
       message: result.message,
       watchlistId,
     };

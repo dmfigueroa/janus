@@ -24,9 +24,7 @@ it("saves accessible movement controls as a complete order", async () => {
       enabled: true,
       rank: 0,
       reference: { kind: "system", key: "movie" },
-      configuredWatchlists: null,
       eligibleWatchlists: [],
-      configuredCount: null,
       eligibleCount: 0,
     },
     {

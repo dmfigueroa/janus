@@ -80,8 +80,16 @@ describe("lineups", () => {
     expect(await setLineupWatchlists(reference, [active.id, paused.id])).toMatchObject({
       success: true,
     });
-    const lineup = (await readLineups()).find((entry) => entry.id === created.id)!;
-    expect(lineup.configuredWatchlists?.map((entry) => entry.id)).toEqual(
+    const allLineups = await readLineups();
+    const movieLineup = allLineups.find(
+      (entry) => entry.kind === "system" && entry.systemKey === "movie",
+    )!;
+    expect("configuredWatchlists" in movieLineup).toBe(false);
+    expect("configuredCount" in movieLineup).toBe(false);
+    const lineup = allLineups.find((entry) => entry.kind === "custom" && entry.id === created.id)!;
+    expect(lineup.kind).toBe("custom");
+    if (lineup.kind !== "custom") throw new Error("Expected custom lineup");
+    expect(lineup.configuredWatchlists.map((entry) => entry.id)).toEqual(
       expect.arrayContaining([active.id, paused.id]),
     );
     expect(lineup.eligibleWatchlists.map((entry) => entry.id)).toEqual([active.id]);
@@ -139,9 +147,12 @@ describe("lineups", () => {
         code: "validation_error",
         message: "Watchlist IDs must be distinct and exist.",
       });
-      const stored = (await readLineups()).find((entry) => entry.id === created.id)!;
+      const stored = (await readLineups()).find(
+        (entry) => entry.kind === "custom" && entry.id === created.id,
+      )!;
+      if (stored.kind !== "custom") throw new Error("Expected custom lineup");
       expect(stored.name).toBe("Atomic original");
-      expect(stored.configuredWatchlists?.map((entry) => entry.id)).toEqual([member.id]);
+      expect(stored.configuredWatchlists.map((entry) => entry.id)).toEqual([member.id]);
     }
     for (const [name, message] of [
       [" Movies ", "Movies is reserved for an automatic lineup."],
@@ -176,12 +187,14 @@ describe("lineups", () => {
     await setLineupWatchlists({ kind: "custom", id: second.id }, [list.id]);
     expect(
       (await readLineups())
+        .filter((entry) => entry.kind === "custom")
         .filter((entry) => [first.id, second.id].includes(entry.id))
         .map((entry) => entry.configuredCount),
     ).toEqual([1, 1]);
     await testDb.db.delete(watchlists).where(eq(watchlists.id, list.id));
     expect(
       (await readLineups())
+        .filter((entry) => entry.kind === "custom")
         .filter((entry) => [first.id, second.id].includes(entry.id))
         .map((entry) => entry.configuredCount),
     ).toEqual([0, 0]);

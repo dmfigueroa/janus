@@ -30,8 +30,28 @@ describe("skip watchlist mutation", () => {
   it("returns a structured not-found result", async () => {
     await expect(skipWatchlistMutation({ watchlistId: 999_999 })).resolves.toEqual({
       success: false,
+      code: "not_found",
       message: "Watchlist not found.",
     });
+  });
+
+  it("rejects skipping a paused watchlist without changing its rotation position", async () => {
+    const watchlist = await createTestWatchlist(db, {
+      name: "Paused list",
+      pausedAt: "2024-06-01 00:00:00",
+      lastWatchedAt: "2000-01-01 00:00:00",
+    });
+
+    await expect(skipWatchlistMutation({ watchlistId: watchlist.id })).resolves.toEqual({
+      success: false,
+      code: "validation_error",
+      message: "Paused watchlists cannot be skipped.",
+    });
+    const [stored] = await db
+      .select()
+      .from(schema.watchlists)
+      .where(eq(schema.watchlists.id, watchlist.id));
+    expect(stored?.lastWatchedAt).toBe("2000-01-01 00:00:00");
   });
 
   it("updates the watchlist recency", async () => {

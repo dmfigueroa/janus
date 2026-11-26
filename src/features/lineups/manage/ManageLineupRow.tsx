@@ -143,13 +143,13 @@ function LineupName({ lineup }: { lineup: Lineup }) {
   );
 }
 function LineupDescription({ lineup }: { lineup: Lineup }) {
-  if (lineup.reference.kind === "system")
+  if (lineup.kind === "system")
     return (
       <Text fontSize="xs" color="fg.muted">
         Automatic
       </Text>
     );
-  const count = lineup.configuredCount ?? 0;
+  const count = lineup.configuredCount;
   const label = listLabel(count);
   return (
     <Text fontSize="xs" color="fg.muted">
@@ -164,7 +164,7 @@ function CustomActions({
   lineup: Lineup;
   watchlists: LineupData["watchlists"];
 }) {
-  if (lineup.reference.kind !== "custom") return null;
+  if (lineup.kind !== "custom") return null;
   return (
     <>
       <LineupEditor

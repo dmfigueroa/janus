@@ -25,7 +25,7 @@ export async function addComicToWatchlist(
     return rejectAdd(COMICVINE_UNAVAILABLE_MESSAGE, "provider_not_configured");
   }
 
-  const existingIssueIds = await repository.getExistingComicsInWatchlist(watchlistId);
+  const existingIssueIds = await repository.getExistingComicsInWatchlist(watchlistId, volumeId);
   return fetchVolumeIssues(media, volumeId, apiKey, existingIssueIds).then(
     ({ mediaWithTitle, issues }) =>
       persistComicIssues(

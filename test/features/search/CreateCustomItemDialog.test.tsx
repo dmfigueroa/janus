@@ -58,4 +58,50 @@ describe("CreateCustomItemDialog", () => {
     expect(onCreated).not.toHaveBeenCalled();
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
+
+  it("rejects invalid release dates and keeps the dialog open", async () => {
+    const onCreated = vi.fn();
+
+    render(
+      <CreateCustomItemDialog onCreated={onCreated}>
+        <button type="button">Create custom item</button>
+      </CreateCustomItemDialog>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Create custom item" }));
+    await screen.findByRole("dialog");
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Bad Date Story" } });
+    fireEvent.change(screen.getByLabelText("Year (Optional)"), { target: { value: "2026-02-30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create item" }));
+
+    expect(await screen.findByText("Release date must be a valid calendar date.")).not.toBeNull();
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).not.toBeNull();
+  });
+
+  it("accepts a full YYYY-MM-DD release date and derives its year", async () => {
+    const onCreated = vi.fn();
+
+    render(
+      <CreateCustomItemDialog onCreated={onCreated}>
+        <button type="button">Create custom item</button>
+      </CreateCustomItemDialog>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Create custom item" }));
+    await screen.findByRole("dialog");
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "  Dated Story  " } });
+    fireEvent.change(screen.getByLabelText("Year (Optional)"), { target: { value: "2026-05-14" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create item" }));
+
+    await waitFor(() => {
+      expect(onCreated).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Dated Story",
+          year: "2026",
+          releaseDate: "2026-05-14",
+        }),
+      );
+    });
+  });
 });
