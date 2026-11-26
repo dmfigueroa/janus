@@ -17,7 +17,7 @@ The image displayed for a watchlist item, represented by either a provider path 
 _Avoid_: Picture, cover art
 
 **Release date**:
-The complete calendar date associated with an entry, always represented with a year, month, and day.
+The calendar date associated with an entry, recorded as either a complete date (year, month, and day) or a year alone when finer precision is unavailable.
 _Avoid_: Release year
 
 **Rotation**:
