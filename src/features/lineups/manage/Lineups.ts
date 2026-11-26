@@ -21,8 +21,10 @@ const action = z.discriminatedUnion("action", [
 export type LineupAction = z.infer<typeof action>;
 
 export const getLineupData = createServerFn().handler(async () => {
+  const { setResponseHeader } = await import("@tanstack/react-start/server");
   const { readLineups } = await import("@/features/lineups/read/LineupRead.server");
   const { listWatchlistSummaries } = await import("@/features/watchlists/list/Query.server");
+  setResponseHeader("cache-control", "private, no-cache");
   return {
     lineups: await readLineups(),
     watchlists: await listWatchlistSummaries({ orderBy: "recency" }),

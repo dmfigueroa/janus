@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toaster } from "@/app/Toaster";
+import { invalidateWatchlistQueries } from "@/features/watchlists/Cache";
 import type { EnrichedWatchlist } from "@/features/watchlists/components/WatchlistCard";
 import { mergeWatchlists } from "./Mutation";
 import {
@@ -61,6 +63,7 @@ export function MergeWatchlistDialog({
   const [targetId, setTargetId] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderedSourceWatchlistIds, setOrderedSourceWatchlistIds] = useState(selectedWatchlistIds);
+  const queryClient = useQueryClient();
   const router = useRouter();
   const mergeWatchlistsFn = useServerFn(mergeWatchlists);
   const selectedWatchlists = orderedSourceWatchlistIds.flatMap((watchlistId) => {
@@ -112,6 +115,7 @@ export function MergeWatchlistDialog({
 
   const completeMerge = async () => {
     toaster.create({ type: "success", title: "Watchlists merged successfully" });
+    await invalidateWatchlistQueries(queryClient);
     await router.invalidate?.();
     onSuccess?.();
     onOpenChange(false);

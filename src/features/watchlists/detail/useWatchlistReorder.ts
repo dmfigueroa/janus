@@ -14,6 +14,7 @@ import { resolveReorderIntent, type ReorderIntent } from "@/features/watchlists/
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toaster } from "@/app/Toaster";
+import { invalidateWatchlistReorderQueries } from "@/features/watchlists/Cache";
 import {
   optimisticallyReorderWatchlistItems,
   restoreWatchlistDetailSnapshot,
@@ -72,10 +73,7 @@ function useReorderSave({
         title: error instanceof Error ? error.message : "Failed to reorder watchlist",
       });
     },
-    onSettled: () =>
-      queryClient.invalidateQueries({
-        queryKey: ["watchlists", "detail", watchlistId],
-      }),
+    onSettled: () => invalidateWatchlistReorderQueries(queryClient, watchlistId),
   });
 
   return {

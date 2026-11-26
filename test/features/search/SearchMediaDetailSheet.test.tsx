@@ -57,6 +57,9 @@ vi.mock("@/features/watchlists/list/Query", () => ({
 }));
 
 vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({
+    invalidateQueries: vi.fn(),
+  }),
   useQuery: () => ({
     data: [
       {

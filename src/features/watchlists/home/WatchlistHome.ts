@@ -1,6 +1,5 @@
 import { readWatchlistLifecycle } from "../lifecycle/WatchlistLifecycle";
 import { createServerFn } from "@tanstack/react-start";
-import { listWatchlistSummaries } from "@/features/watchlists/list/Query.server";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query";
 
 const HOME_SECTION_ORDER = [
@@ -120,6 +119,9 @@ export function buildWatchlistHome(allWatchlists: WatchlistSummary[]) {
 export type WatchlistHomeData = ReturnType<typeof buildWatchlistHome>;
 
 export const getWatchlistHomeData = createServerFn().handler(async () => {
+  const { setResponseHeader } = await import("@tanstack/react-start/server");
+  const { listWatchlistSummaries } = await import("@/features/watchlists/list/Query.server");
+  setResponseHeader("cache-control", "private, no-cache");
   const allWatchlists = await listWatchlistSummaries({ orderBy: "recency" });
   return buildWatchlistHome(allWatchlists);
 });

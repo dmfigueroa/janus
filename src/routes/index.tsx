@@ -1,8 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { getLineupData } from "@/features/lineups/manage/Lineups";
+import { lineupsQueryOptions, useLineupData } from "@/features/lineups/read/useLineupData";
 import { WatchNow } from "@/features/lineups/read/WatchNow";
-export const Route = createFileRoute("/")({ loader: () => getLineupData(), component: IndexRoute });
+
+export const Route = createFileRoute("/")({
+  headers: () => ({ "Cache-Control": "private, no-cache" }),
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData({ ...lineupsQueryOptions(), revalidateIfStale: true }),
+  component: IndexRoute,
+});
+
 function IndexRoute() {
-  const data = Route.useLoaderData();
+  const { data } = useLineupData();
   return <WatchNow lineups={data.lineups} />;
 }
