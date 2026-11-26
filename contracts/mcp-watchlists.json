@@ -1,0 +1,915 @@
+{
+  "version": 1,
+  "tools": {
+    "ported": [
+      {
+        "name": "list_watchlists",
+        "title": "List watchlists",
+        "description": "List watchlist summaries using Janus's supported sort order.",
+        "annotations": { "readOnlyHint": true, "destructiveHint": false }
+      },
+      {
+        "name": "search_watchlists",
+        "title": "Search watchlists",
+        "description": "Find watchlist summaries by a case-insensitive partial name.",
+        "annotations": { "readOnlyHint": true, "destructiveHint": false }
+      },
+      {
+        "name": "get_watchlist",
+        "title": "Get watchlist",
+        "description": "Get one watchlist with summary counts and a cursor-paginated result page. Use resultView: \"items\" | \"titles\" to choose individual entries or titles that group all episodes from the same TV show and issues from the same series.",
+        "annotations": { "readOnlyHint": true, "destructiveHint": false }
+      },
+      {
+        "name": "find_watchlist_items",
+        "title": "Find watchlist items",
+        "description": "Find watchlist items by a Janus watchlist item ID; explicit provider, provider ID, and media type; or case-insensitive title, parent-title, and episode text. Use resultView: \"items\" | \"titles\" to choose individual entries or collapsed titles; titles groups all matching episodes from the same TV show, or issues from the same series, into one title result with a matching-item count.",
+        "annotations": { "readOnlyHint": true, "destructiveHint": false }
+      },
+      {
+        "name": "create_watchlists",
+        "title": "Create watchlists",
+        "description": "Create one or more watchlists. Each requested watchlist is processed independently and returns an ordered result.",
+        "annotations": { "readOnlyHint": false, "destructiveHint": false }
+      },
+      {
+        "name": "update_watchlists",
+        "title": "Update watchlists",
+        "description": "Update one or more watchlists. Each requested watchlist is processed independently and returns an ordered result. Omit a field to keep its existing value; use null or an empty string only to clear the description. Name cannot be cleared, and each update must include at least one field to update.",
+        "annotations": { "readOnlyHint": false, "destructiveHint": false }
+      },
+      {
+        "name": "reorder_watchlist_items",
+        "title": "Reorder watchlist items",
+        "description": "Reorder one or more watchlist items within a custom-ordered watchlist, moving each item before or after a reference item. Each reorder targets an explicit watchlist, moved item ID, reference item ID, and before-or-after position, is processed independently, and returns an ordered result. Only custom-ordered watchlists accept reorders. This changes the order of items and is consequential, so confirm before applying.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": true,
+          "idempotentHint": false
+        }
+      },
+      {
+        "name": "edit_watchlist_items",
+        "title": "Edit watchlist item metadata",
+        "description": "Edit the stored title, release date, and poster image of one or more watchlist items. Each edit targets a stable internal watchlist item ID and is processed independently, returning an ordered result. Omit a field to keep its existing value; use null only to clear release date or poster image. Title cannot be cleared. Each edit must include at least one field to update. Poster image must be an HTTPS URL or a provider path beginning with /. Release date must be YYYY or YYYY-MM-DD.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false
+        }
+      }
+    ],
+    "pending": [
+      "add_custom_items_to_watchlists",
+      "add_media_to_watchlists",
+      "create_lineups",
+      "delete_lineups",
+      "delete_watchlists",
+      "get_lineup",
+      "list_lineups",
+      "merge_watchlists",
+      "move_watchlist_items",
+      "move_watchlist_parents",
+      "remove_watchlist_items",
+      "remove_watchlist_parents",
+      "reorder_lineups",
+      "search_media",
+      "set_lineup_watchlists",
+      "set_watchlist_items_watched",
+      "set_watchlist_order",
+      "skip_watchlists",
+      "update_lineups"
+    ]
+  },
+  "fixture": {
+    "watchlists": [
+      {
+        "id": 41,
+        "name": "Café 東京 <collection>",
+        "description": "Existing v1 collection",
+        "item_order_mode": "custom",
+        "created_at": "2020-01-01 12:30:00",
+        "updated_at": "2020-01-01T12:30:00.000Z",
+        "last_watched_at": "2020-01-03 10:00:00.000",
+        "last_item_added_at": "2020-01-02 10:00:00",
+        "paused_at": null
+      },
+      {
+        "id": 42,
+        "name": "ΟΣ",
+        "description": null,
+        "item_order_mode": "release",
+        "created_at": "2020-01-02 12:30:00",
+        "updated_at": null,
+        "last_watched_at": null,
+        "last_item_added_at": null,
+        "paused_at": null
+      },
+      {
+        "id": 43,
+        "name": "Release Queue",
+        "description": "Tie-break list",
+        "item_order_mode": "release",
+        "created_at": "2020-01-03 12:30:00",
+        "updated_at": null,
+        "last_watched_at": "2020-01-01 08:00:00.000",
+        "last_item_added_at": "2020-01-04 08:00:00",
+        "paused_at": null
+      }
+    ],
+    "watchlistItems": [
+      {
+        "id": 101,
+        "watchlist_id": 41,
+        "tmdb_id": "ep-1",
+        "source": "tmdb",
+        "media_type": "episode",
+        "title": "Opening <script>",
+        "parent_id": "show-1",
+        "parent_title": "A Show",
+        "season": 1,
+        "episode": "1",
+        "poster_path": null,
+        "release_date": "2020-01-02",
+        "vote_average": null,
+        "runtime": null,
+        "custom_rank": 2,
+        "is_watched": null,
+        "authors": ["Écrivain", "著者"],
+        "added_at": "2020-01-01 12:31:00"
+      },
+      {
+        "id": 102,
+        "watchlist_id": 41,
+        "tmdb_id": "ep-2",
+        "source": "tmdb",
+        "media_type": "episode",
+        "title": "Second",
+        "parent_id": "show-1",
+        "parent_title": "A Show",
+        "season": 1,
+        "episode": "2",
+        "poster_path": "/poster.jpg",
+        "release_date": "2020-02-02",
+        "vote_average": 8.5,
+        "runtime": 45,
+        "custom_rank": 1,
+        "is_watched": 1,
+        "authors": null,
+        "added_at": "2020-01-01 12:32:00"
+      },
+      {
+        "id": 103,
+        "watchlist_id": 41,
+        "tmdb_id": "book-1",
+        "source": "google_books",
+        "media_type": "book",
+        "title": "Last",
+        "parent_id": null,
+        "parent_title": null,
+        "season": null,
+        "episode": null,
+        "poster_path": "https://images.example/poster.jpg",
+        "release_date": null,
+        "vote_average": null,
+        "runtime": null,
+        "custom_rank": 3,
+        "is_watched": 0,
+        "authors": [],
+        "added_at": "2020-01-01 12:33:00"
+      },
+      {
+        "id": 201,
+        "watchlist_id": 43,
+        "tmdb_id": "rel-1",
+        "source": "tmdb",
+        "media_type": "movie",
+        "title": "Tie Alpha",
+        "parent_id": null,
+        "parent_title": null,
+        "season": null,
+        "episode": null,
+        "poster_path": "/alpha.jpg",
+        "release_date": "2020-01-02",
+        "vote_average": null,
+        "runtime": null,
+        "custom_rank": null,
+        "is_watched": 0,
+        "authors": null,
+        "added_at": "2020-01-03 12:31:00"
+      },
+      {
+        "id": 202,
+        "watchlist_id": 43,
+        "tmdb_id": "rel-2",
+        "source": "tmdb",
+        "media_type": "movie",
+        "title": "Tie Beta",
+        "parent_id": null,
+        "parent_title": null,
+        "season": null,
+        "episode": null,
+        "poster_path": null,
+        "release_date": "2020-01-02",
+        "vote_average": null,
+        "runtime": null,
+        "custom_rank": null,
+        "is_watched": 0,
+        "authors": null,
+        "added_at": "2020-01-03 12:32:00"
+      },
+      {
+        "id": 203,
+        "watchlist_id": 43,
+        "tmdb_id": "rel-3",
+        "source": "tmdb",
+        "media_type": "movie",
+        "title": "Later Watched",
+        "parent_id": null,
+        "parent_title": null,
+        "season": null,
+        "episode": null,
+        "poster_path": null,
+        "release_date": "2021-03-03",
+        "vote_average": null,
+        "runtime": null,
+        "custom_rank": null,
+        "is_watched": 1,
+        "authors": null,
+        "added_at": "2020-01-03 12:33:00"
+      },
+      {
+        "id": 204,
+        "watchlist_id": 43,
+        "tmdb_id": "rel-4",
+        "source": "tmdb",
+        "media_type": "movie",
+        "title": "Missing Date",
+        "parent_id": null,
+        "parent_title": null,
+        "season": null,
+        "episode": null,
+        "poster_path": null,
+        "release_date": null,
+        "vote_average": null,
+        "runtime": null,
+        "custom_rank": null,
+        "is_watched": 0,
+        "authors": null,
+        "added_at": "2020-01-03 12:34:00"
+      },
+      {
+        "id": 205,
+        "watchlist_id": 43,
+        "tmdb_id": "rel-5",
+        "source": "tmdb",
+        "media_type": "movie",
+        "title": "Empty Date",
+        "parent_id": null,
+        "parent_title": null,
+        "season": null,
+        "episode": null,
+        "poster_path": null,
+        "release_date": "",
+        "vote_average": null,
+        "runtime": null,
+        "custom_rank": null,
+        "is_watched": 0,
+        "authors": null,
+        "added_at": "2020-01-03 12:35:00"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "list-watchlists-paginated-sort",
+      "description": "list_watchlists supports orderBy/order and cursor continuation",
+      "mutating": false,
+      "steps": [
+        {
+          "tool": "list_watchlists",
+          "arguments": { "orderBy": "createdAt", "order": "asc", "pageSize": 2 },
+          "expect": { "kind": "ok", "hasCursor": true }
+        },
+        {
+          "tool": "list_watchlists",
+          "arguments": {
+            "orderBy": "createdAt",
+            "order": "asc",
+            "pageSize": 2,
+            "cursor": "$prev.nextCursor"
+          },
+          "expect": { "kind": "ok", "hasCursor": false }
+        }
+      ]
+    },
+    {
+      "id": "list-watchlists-last-watched-and-added",
+      "description": "list_watchlists orders by lastWatched and lastAdded consistently",
+      "mutating": false,
+      "steps": [
+        {
+          "tool": "list_watchlists",
+          "arguments": { "orderBy": "lastWatched", "order": "desc" },
+          "expect": { "kind": "ok", "hasCursor": false }
+        },
+        {
+          "tool": "list_watchlists",
+          "arguments": { "orderBy": "lastAdded", "order": "desc" },
+          "expect": { "kind": "ok", "hasCursor": false }
+        }
+      ]
+    },
+    {
+      "id": "search-watchlists-unicode-folding",
+      "description": "search_watchlists matches NFC-decomposed accents and Greek case folding",
+      "mutating": false,
+      "steps": [
+        {
+          "tool": "search_watchlists",
+          "arguments": { "query": "CAFE\u0301" },
+          "expect": { "kind": "ok", "hasCursor": false }
+        },
+        {
+          "tool": "search_watchlists",
+          "arguments": { "query": "ος" },
+          "expect": { "kind": "ok", "hasCursor": false }
+        }
+      ]
+    },
+    {
+      "id": "get-watchlist-items-pagination-and-order-token",
+      "description": "get_watchlist returns exact orderToken and paginates items with bound cursors",
+      "mutating": false,
+      "steps": [
+        {
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": 41, "pageSize": 1 },
+          "expect": { "kind": "ok", "hasCursor": true, "hasOrderToken": true }
+        },
+        {
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": 41, "pageSize": 1, "cursor": "$prev.nextCursor" },
+          "expect": { "kind": "ok", "hasCursor": true, "hasOrderToken": true }
+        },
+        {
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": 41, "pageSize": 2, "cursor": "$prev.nextCursor" },
+          "expect": { "kind": "toolError" }
+        }
+      ]
+    },
+    {
+      "id": "get-watchlist-titles-view",
+      "description": "get_watchlist titles view collapses episodes under shared parentId",
+      "mutating": false,
+      "steps": [
+        {
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": 41, "resultView": "titles" },
+          "expect": { "kind": "ok", "hasCursor": false, "hasOrderToken": false }
+        }
+      ]
+    },
+    {
+      "id": "get-watchlist-coercion-characterization",
+      "description": "get_watchlist coerces watchlistId string/hex/single-array forms and strips unknown keys",
+      "mutating": false,
+      "steps": [
+        {
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": "41.0", "pageSize": 1 },
+          "expect": { "kind": "ok", "hasCursor": true, "hasOrderToken": true }
+        },
+        {
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": "0x29", "pageSize": 1, "ignored": 123 },
+          "expect": { "kind": "ok", "hasCursor": true, "hasOrderToken": true }
+        },
+        {
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": ["41"], "pageSize": 1 },
+          "expect": { "kind": "ok", "hasCursor": true, "hasOrderToken": true }
+        }
+      ]
+    },
+    {
+      "id": "get-watchlist-missing-error",
+      "description": "get_watchlist reports missing watchlist as a tool error",
+      "mutating": false,
+      "steps": [
+        {
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": 999999 },
+          "expect": { "kind": "toolError", "errorContains": "Watchlist 999999 was not found." }
+        }
+      ]
+    },
+    {
+      "id": "find-watchlist-items-by-parent-id-items-and-titles",
+      "description": "find_watchlist_items matches parentId rows in both items and collapsed titles views",
+      "mutating": false,
+      "steps": [
+        {
+          "tool": "find_watchlist_items",
+          "arguments": {
+            "watchlistId": 41,
+            "provider": "tmdb",
+            "providerId": "show-1",
+            "mediaType": "episode"
+          },
+          "expect": { "kind": "ok", "hasCursor": false }
+        },
+        {
+          "tool": "find_watchlist_items",
+          "arguments": {
+            "watchlistId": 41,
+            "provider": "tmdb",
+            "providerId": "show-1",
+            "mediaType": "episode",
+            "resultView": "titles"
+          },
+          "expect": { "kind": "ok", "hasCursor": false }
+        }
+      ]
+    },
+    {
+      "id": "find-watchlist-items-by-item-id-and-tmdb-id",
+      "description": "find_watchlist_items matches by watchlistItemId, tmdbId, and missing watchlist returns empty",
+      "mutating": false,
+      "steps": [
+        {
+          "tool": "find_watchlist_items",
+          "arguments": { "watchlistId": 41, "watchlistItemId": 101 },
+          "expect": { "kind": "ok", "hasCursor": false }
+        },
+        {
+          "tool": "find_watchlist_items",
+          "arguments": {
+            "watchlistId": 41,
+            "provider": "tmdb",
+            "providerId": "ep-1",
+            "mediaType": "episode"
+          },
+          "expect": { "kind": "ok", "hasCursor": false }
+        },
+        {
+          "tool": "find_watchlist_items",
+          "arguments": { "watchlistId": 999999, "watchlistItemId": 101 },
+          "expect": { "kind": "ok", "hasCursor": false }
+        }
+      ]
+    },
+    {
+      "id": "find-watchlist-items-text-search-and-selector-errors",
+      "description": "find_watchlist_items paginates text queries and rejects invalid selector combinations",
+      "mutating": false,
+      "steps": [
+        {
+          "tool": "find_watchlist_items",
+          "arguments": { "watchlistId": 41, "query": "SHOW", "resultView": "titles" },
+          "expect": { "kind": "ok", "hasCursor": false }
+        },
+        {
+          "tool": "find_watchlist_items",
+          "arguments": { "watchlistId": 41, "query": "SHOW", "pageSize": 1 },
+          "expect": { "kind": "ok", "hasCursor": true }
+        },
+        {
+          "tool": "find_watchlist_items",
+          "arguments": {
+            "watchlistId": 41,
+            "query": "SHOW",
+            "pageSize": 1,
+            "cursor": "$prev.nextCursor"
+          },
+          "expect": { "kind": "ok", "hasCursor": false }
+        },
+        {
+          "tool": "find_watchlist_items",
+          "arguments": { "watchlistId": 41, "watchlistItemId": 101, "pageSize": 1 },
+          "expect": {
+            "kind": "toolError",
+            "errorContains": "Provide one valid watchlist item selector."
+          }
+        },
+        {
+          "tool": "find_watchlist_items",
+          "arguments": { "watchlistId": 41, "provider": "tmdb" },
+          "expect": {
+            "kind": "toolError",
+            "errorContains": "Provide one valid watchlist item selector."
+          }
+        }
+      ]
+    },
+    {
+      "id": "create-watchlists-batch-and-validation",
+      "description": "create_watchlists creates valid entries and isolates validation failures",
+      "mutating": true,
+      "steps": [
+        {
+          "tool": "create_watchlists",
+          "arguments": {
+            "watchlists": [
+              { "name": "Created Release" },
+              { "name": "   " },
+              { "name": "Created Custom", "description": "Hand ordered", "itemOrderMode": "custom" }
+            ]
+          },
+          "expect": { "kind": "ok" }
+        }
+      ]
+    },
+    {
+      "id": "update-watchlists-release-to-custom-initializes-ranks",
+      "description": "update_watchlists initializes contiguous 1..N ranks in release order on release -> custom",
+      "mutating": true,
+      "expectFullyRankedWatchlists": [43],
+      "steps": [
+        {
+          "tool": "update_watchlists",
+          "arguments": {
+            "watchlists": [
+              { "watchlistId": 43, "itemOrderMode": "custom" },
+              { "watchlistId": 999999, "name": "Missing" },
+              { "watchlistId": 43 }
+            ]
+          },
+          "expect": { "kind": "ok" }
+        },
+        {
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": 43 },
+          "expect": { "kind": "ok", "hasOrderToken": true }
+        }
+      ]
+    },
+    {
+      "id": "update-watchlists-preserves-ranks-and-clears-description",
+      "description": "update_watchlists preserves saved ranks across custom -> release -> custom and clears descriptions",
+      "mutating": true,
+      "steps": [
+        {
+          "tool": "update_watchlists",
+          "arguments": {
+            "watchlists": [
+              { "watchlistId": 41, "itemOrderMode": "release", "description": "" },
+              { "watchlistId": 43, "description": null }
+            ]
+          },
+          "expect": { "kind": "ok" }
+        },
+        {
+          "tool": "update_watchlists",
+          "arguments": {
+            "watchlists": [{ "watchlistId": 41, "itemOrderMode": "custom", "name": "Renamed List" }]
+          },
+          "expect": { "kind": "ok" }
+        },
+        {
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": 41 },
+          "expect": { "kind": "ok", "hasOrderToken": true }
+        }
+      ]
+    },
+    {
+      "id": "update-watchlists-repairs-legacy-all-null-custom",
+      "description": "update_watchlists opportunistically initializes 1..N ranks on a legacy all-null custom watchlist",
+      "mutating": true,
+      "setupSql": [
+        "INSERT INTO watchlists(id,name,description,item_order_mode,created_at) VALUES(45,'Legacy Custom',NULL,'custom','2020-01-05 12:30:00')",
+        "INSERT INTO watchlist_items(id,watchlist_id,tmdb_id,source,media_type,title,custom_rank,is_watched,release_date,added_at) VALUES(401,45,'leg-1','tmdb','movie','Later',NULL,0,'2021-01-01','2020-01-05 12:31:00')",
+        "INSERT INTO watchlist_items(id,watchlist_id,tmdb_id,source,media_type,title,custom_rank,is_watched,release_date,added_at) VALUES(402,45,'leg-2','tmdb','movie','Earlier',NULL,0,'2020-01-01','2020-01-05 12:32:00')"
+      ],
+      "expectFullyRankedWatchlists": [45],
+      "steps": [
+        {
+          "tool": "update_watchlists",
+          "arguments": {
+            "watchlists": [{ "watchlistId": 45, "itemOrderMode": "custom" }]
+          },
+          "expect": { "kind": "ok" }
+        }
+      ]
+    },
+    {
+      "id": "reorder-watchlist-items-batch-and-rejections",
+      "description": "reorder_watchlist_items applies moves and isolates domain/validation rejections",
+      "mutating": true,
+      "expectFullyRankedWatchlists": [41],
+      "steps": [
+        {
+          "tool": "reorder_watchlist_items",
+          "arguments": {
+            "reorders": [
+              {
+                "watchlistId": 41,
+                "movedItemId": 102,
+                "referenceItemId": 103,
+                "position": "after"
+              },
+              {
+                "watchlistId": 43,
+                "movedItemId": 201,
+                "referenceItemId": 202,
+                "position": "after"
+              },
+              {
+                "watchlistId": 41,
+                "movedItemId": 101,
+                "referenceItemId": 101,
+                "position": "before"
+              },
+              {
+                "watchlistId": 41,
+                "movedItemId": 999,
+                "referenceItemId": 101,
+                "position": "before"
+              },
+              {
+                "watchlistId": 41,
+                "movedItemId": 101,
+                "referenceItemId": 999,
+                "position": "before"
+              },
+              {
+                "watchlistId": 999999,
+                "movedItemId": 101,
+                "referenceItemId": 102,
+                "position": "before"
+              },
+              { "watchlistId": 41 }
+            ]
+          },
+          "expect": { "kind": "ok" }
+        },
+        {
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": 41 },
+          "expect": { "kind": "ok", "hasOrderToken": true }
+        }
+      ]
+    },
+    {
+      "id": "reorder-watchlist-items-noop-repairs-gapped-duplicate-null-ranks",
+      "description": "no-op reorder opportunistically repairs gapped, duplicate, and null custom ranks into contiguous 1..N",
+      "mutating": true,
+      "setupSql": [
+        "INSERT INTO watchlists(id,name,description,item_order_mode,created_at) VALUES(44,'Gapped Custom','Repair me','custom','2020-01-04 12:30:00')",
+        "INSERT INTO watchlist_items(id,watchlist_id,tmdb_id,source,media_type,title,custom_rank,is_watched,release_date,added_at) VALUES(301,44,'g-1','tmdb','movie','First',1,0,'2020-01-01','2020-01-04 12:31:00')",
+        "INSERT INTO watchlist_items(id,watchlist_id,tmdb_id,source,media_type,title,custom_rank,is_watched,release_date,added_at) VALUES(302,44,'g-2','tmdb','movie','Dup Later',10,0,'2020-02-01','2020-01-04 12:32:00')",
+        "INSERT INTO watchlist_items(id,watchlist_id,tmdb_id,source,media_type,title,custom_rank,is_watched,release_date,added_at) VALUES(303,44,'g-3','tmdb','movie','Dup Earlier',10,0,'2020-01-15','2020-01-04 12:33:00')",
+        "INSERT INTO watchlist_items(id,watchlist_id,tmdb_id,source,media_type,title,custom_rank,is_watched,release_date,added_at) VALUES(304,44,'g-4','tmdb','movie','Null Rank',NULL,0,'2020-03-01','2020-01-04 12:34:00')"
+      ],
+      "expectFullyRankedWatchlists": [44],
+      "steps": [
+        {
+          "tool": "reorder_watchlist_items",
+          "arguments": {
+            "reorders": [
+              {
+                "watchlistId": 44,
+                "movedItemId": 303,
+                "referenceItemId": 301,
+                "position": "after"
+              }
+            ]
+          },
+          "expect": { "kind": "ok" }
+        },
+        {
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": 44 },
+          "expect": { "kind": "ok", "hasOrderToken": true }
+        }
+      ]
+    },
+    {
+      "id": "edit-watchlist-items-batch-and-validation",
+      "description": "edit_watchlist_items applies tri-state patches and isolates invalid/missing entries",
+      "mutating": true,
+      "steps": [
+        {
+          "tool": "edit_watchlist_items",
+          "arguments": {
+            "edits": [
+              {
+                "watchlistId": 41,
+                "watchlistItemId": 101,
+                "title": "  Pilot Revised  ",
+                "releaseDate": "2024",
+                "posterImage": "/new-poster.jpg"
+              },
+              {
+                "watchlistId": 41,
+                "watchlistItemId": 102,
+                "releaseDate": null,
+                "posterImage": null
+              },
+              {
+                "watchlistId": 41,
+                "watchlistItemId": 103,
+                "releaseDate": "2025-02-29"
+              },
+              {
+                "watchlistId": 41,
+                "watchlistItemId": 103,
+                "posterImage": "http://insecure.example/p.jpg"
+              },
+              {
+                "watchlistId": 41,
+                "watchlistItemId": 103
+              },
+              {
+                "watchlistId": 41,
+                "watchlistItemId": 999999,
+                "title": "Missing"
+              }
+            ]
+          },
+          "expect": { "kind": "ok" }
+        },
+        {
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": 41 },
+          "expect": { "kind": "ok", "hasOrderToken": true }
+        }
+      ]
+    },
+    {
+      "id": "batch-malformed-params-characterization",
+      "description": "batch tools reject malformed top-level schemas with a tool error envelope",
+      "mutating": false,
+      "steps": [
+        {
+          "tool": "update_watchlists",
+          "arguments": { "watchlists": [{ "watchlistId": 41, "itemOrderMode": "sideways" }] },
+          "expect": { "kind": "toolError" }
+        },
+        {
+          "tool": "reorder_watchlist_items",
+          "arguments": {
+            "reorders": [
+              {
+                "watchlistId": 41,
+                "movedItemId": 101,
+                "referenceItemId": 102,
+                "position": "sideways"
+              }
+            ]
+          },
+          "expect": { "kind": "toolError" }
+        },
+        {
+          "tool": "edit_watchlist_items",
+          "arguments": { "edits": [] },
+          "expect": { "kind": "toolError" }
+        }
+      ]
+    }
+  ],
+  "statefulSequences": [
+    {
+      "id": "v1-v2-v1-order-mode-reorder-edit-roundtrip",
+      "description": "Interleaved v1 -> v2 -> v1 -> v2 writes and reads on one shared SQLite DB preserve invariants and orderToken parity",
+      "steps": [
+        {
+          "actor": "v1",
+          "tool": "update_watchlists",
+          "arguments": { "watchlists": [{ "watchlistId": 43, "itemOrderMode": "custom" }] },
+          "mutating": true,
+          "expectFullyRankedWatchlists": [43]
+        },
+        {
+          "actor": "both",
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": 43 },
+          "mutating": false
+        },
+        {
+          "actor": "v2",
+          "tool": "reorder_watchlist_items",
+          "arguments": {
+            "reorders": [
+              {
+                "watchlistId": 43,
+                "movedItemId": 205,
+                "referenceItemId": 201,
+                "position": "before"
+              }
+            ]
+          },
+          "mutating": true,
+          "expectFullyRankedWatchlists": [43]
+        },
+        {
+          "actor": "both",
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": 43 },
+          "mutating": false
+        },
+        {
+          "actor": "v1",
+          "tool": "edit_watchlist_items",
+          "arguments": {
+            "edits": [
+              {
+                "watchlistId": 43,
+                "watchlistItemId": 205,
+                "title": "Promoted Entry",
+                "releaseDate": "2019-12-31",
+                "posterImage": "https://images.example/promoted.jpg"
+              }
+            ]
+          },
+          "mutating": true
+        },
+        {
+          "actor": "both",
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": 43 },
+          "mutating": false
+        },
+        {
+          "actor": "v1",
+          "tool": "update_watchlists",
+          "arguments": { "watchlists": [{ "watchlistId": 43, "itemOrderMode": "release" }] },
+          "mutating": true
+        },
+        {
+          "actor": "both",
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": 43 },
+          "mutating": false
+        },
+        {
+          "actor": "v2",
+          "tool": "update_watchlists",
+          "arguments": { "watchlists": [{ "watchlistId": 43, "itemOrderMode": "custom" }] },
+          "mutating": true,
+          "expectFullyRankedWatchlists": [43]
+        },
+        {
+          "actor": "both",
+          "tool": "get_watchlist",
+          "arguments": { "watchlistId": 43 },
+          "mutating": false
+        }
+      ]
+    },
+    {
+      "id": "v2-create-v1-update-and-parent-discovery-interleaved",
+      "description": "v2 creates watchlist, v1 updates it, and both agree on parentId discovery and summary pagination",
+      "steps": [
+        {
+          "actor": "v2",
+          "tool": "create_watchlists",
+          "arguments": {
+            "watchlists": [
+              {
+                "name": "Shared Frontier",
+                "description": "Created by v2",
+                "itemOrderMode": "custom"
+              }
+            ]
+          },
+          "mutating": true
+        },
+        {
+          "actor": "both",
+          "tool": "search_watchlists",
+          "arguments": { "query": "shared frontier" },
+          "mutating": false
+        },
+        {
+          "actor": "v1",
+          "tool": "update_watchlists",
+          "arguments": {
+            "watchlists": [{ "watchlistId": 44, "description": "", "name": "Shared Frontier v1" }]
+          },
+          "mutating": true
+        },
+        {
+          "actor": "both",
+          "tool": "list_watchlists",
+          "arguments": { "orderBy": "createdAt", "order": "asc" },
+          "mutating": false
+        },
+        {
+          "actor": "both",
+          "tool": "find_watchlist_items",
+          "arguments": {
+            "watchlistId": 41,
+            "provider": "tmdb",
+            "providerId": "show-1",
+            "mediaType": "episode",
+            "resultView": "titles"
+          },
+          "mutating": false
+        }
+      ]
+    }
+  ]
+}

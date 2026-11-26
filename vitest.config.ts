@@ -16,6 +16,7 @@ export default defineConfig({
     viteReact(),
   ],
   test: {
+    exclude: ["**/node_modules/**", "**/dist/**", "test/parity/**"],
     setupFiles: ["./test/Setup.ts"],
     testTimeout: 15_000,
   },

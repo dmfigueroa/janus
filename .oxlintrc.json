@@ -160,6 +160,7 @@
         "drizzle.config.ts",
         "vite.config.ts",
         "vitest.config.ts",
+        "vitest.parity.config.ts",
         "src/routeTree.gen.ts",
         "src/router.tsx"
       ],
