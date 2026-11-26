@@ -12,6 +12,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { PwaUpdatePrompt } from "@/components/PwaUpdatePrompt";
 
 import { NotFound } from "@/components/NotFound";
+import { RouteError } from "@/components/RouteError";
 import { Provider } from "@/app/Provider";
 import { Toaster as ChakraToaster } from "@/app/Toaster";
 
@@ -56,6 +57,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
   shellComponent: RootDocument,
   notFoundComponent: NotFound,
+  errorComponent: RouteError,
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
