@@ -178,6 +178,7 @@ async fn search_page_renders_hits_and_skips_provider_calls_for_local_outcomes() 
     assert!(page.contains("href=\"/v2/search\""));
     assert!(page.contains("aria-current=\"page\""));
     assert!(page.contains("hx-get=\"/v2/search\""));
+    assert!(page.contains("hx-include=\"#search-query\""));
     assert!(page.contains("hx-target=\"#search-results\""));
     assert!(page.contains("Movies"));
     assert!(page.contains("aria-selected=\"true\""));

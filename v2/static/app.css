@@ -1342,7 +1342,8 @@ watchlist-reorder[aria-busy="true"] {
 .search-notice,
 .search-form {
   width: min(40rem, 100%);
-  margin: 0;
+  margin-inline: auto;
+  justify-self: center;
 }
 
 .search-notice {
