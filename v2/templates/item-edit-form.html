@@ -6,7 +6,7 @@
   hx-post="{{form.action}}"
   hx-target="#item-edit-form"
   hx-swap="outerHTML"
-  hx-disabled-elt="find button[type='submit']"
+  hx-disabled-elt="#item-edit-dialog button"
   hx-indicator="#item-edit-form-pending"
   data-item-id="{{form.item_id}}"
   data-item-title="{{form.item_title}}"
@@ -31,6 +31,14 @@
         required
         {%
         if
+        form.invalid_field.is_none()
+        ||
+        form.title_invalid()
+        %}autofocus{%
+        endif
+        %}
+        {%
+        if
         form.title_invalid()
         %}aria-invalid="true"
         {%
@@ -52,23 +60,13 @@
           {%
           if
           form.release_date_invalid()
-          %}aria-invalid="true"
+          %}autofocus
+          aria-invalid="true"
           {%
           endif
           %}
         />
-        <button
-          type="button"
-          class="field-clear"
-          data-clear-release-date
-          aria-label="Clear date"
-          {%
-          if
-          form.release_date.is_empty()
-          %}hidden{%
-          endif
-          %}
-        >
+        <button type="button" class="field-clear" data-clear-release-date aria-label="Clear date">
           Clear date
         </button>
       </div>
@@ -85,7 +83,8 @@
         {%
         if
         form.poster_invalid()
-        %}aria-invalid="true"
+        %}autofocus
+        aria-invalid="true"
         {%
         endif
         %}
@@ -115,7 +114,15 @@
   </p>
   <footer class="dialog-footer" aria-live="polite">
     <span id="item-edit-form-pending" class="htmx-indicator" role="status">Saving…</span>
-    <button type="button" class="button-secondary" data-item-edit-dialog-close>Cancel</button>
+    <button
+      type="button"
+      class="button-secondary"
+      commandfor="item-edit-dialog"
+      command="request-close"
+      data-item-edit-dialog-close
+    >
+      Cancel
+    </button>
     <button type="submit" class="button-primary">Save</button>
   </footer>
 </form>

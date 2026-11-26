@@ -54,11 +54,10 @@ class WatchlistReorder extends HTMLElement {
     this.dragging = dragging;
     this.querySelectorAll("[data-item-actions-trigger]").forEach((trigger) => {
       trigger.disabled = dragging || this.busy;
-      if (dragging) trigger.setAttribute("aria-expanded", "false");
     });
     if (dragging) {
       this.querySelectorAll(".item-actions-menu").forEach((menu) => {
-        menu.hidden = true;
+        menu.hidePopover?.();
       });
     }
   }

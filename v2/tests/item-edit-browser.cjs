@@ -8,15 +8,15 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 
 function itemRow(id, title) {
-  return `<article data-item-id="${id}"><div class="item-content"><h3>${title}</h3></div><div class="item-controls"><div class="item-actions" data-item-actions="${id}"><button type="button" class="item-actions-trigger" data-item-actions-trigger="${id}" aria-label="More actions for ${title}" aria-haspopup="true" aria-expanded="false" aria-controls="item-actions-menu-${id}">...</button><div id="item-actions-menu-${id}" class="item-actions-menu" hidden><button type="button" class="item-action-button" data-item-edit-open="${id}" hx-get="/v2/watchlists/41/items/${id}/edit" hx-target="#item-edit-form" hx-swap="outerHTML">Edit</button></div></div></div></article>`;
+  return `<article data-item-id="${id}"><div class="item-content"><h3>${title}</h3></div><div class="item-controls"><div class="item-actions" data-item-actions="${id}"><button type="button" class="item-actions-trigger" data-item-actions-trigger="${id}" aria-label="More actions for ${title}" popovertarget="item-actions-menu-${id}">...</button><div id="item-actions-menu-${id}" class="item-actions-menu" popover="auto"><button type="button" class="item-action-button" data-item-edit-open="${id}" popovertarget="item-actions-menu-${id}" popovertargetaction="hide" hx-get="/v2/watchlists/41/items/${id}/edit" hx-target="#item-edit-form" hx-select="#item-edit-form" hx-swap="outerHTML" hx-sync="#item-edit-dialog:replace" hx-vals="unset">Edit</button></div></div></div></article>`;
 }
 
 function detailHtml(rowsHtml, query = "") {
-  return `<main class="watchlist"><header class="watchlist-header"><h1 tabindex="-1">Queue</h1></header><form class="watchlist-toolbar"><input id="query" name="query" value="${query}" /></form><div class="timeline">${rowsHtml}</div></main><span id="watchlist-refresh" hidden hx-get="" hx-trigger="watchlist-saved from:body, watchlist-item-saved from:body" hx-target=".watchlist" hx-select=".watchlist" hx-swap="outerHTML"></span><p id="notification" role="status" hidden></p><dialog id="item-edit-dialog" class="dialog" aria-labelledby="item-edit-dialog-title" aria-describedby="item-edit-dialog-help" data-item-edit-dialog><header class="dialog-header"><h2 id="item-edit-dialog-title">Edit watchlist item</h2><p id="item-edit-dialog-help">Update metadata.</p></header><button type="button" class="dialog-close" data-item-edit-dialog-close aria-label="Close edit dialog">X</button><form id="item-edit-form" class="dialog-form"></form></dialog>`;
+  return `<main class="watchlist"><header class="watchlist-header"><h1 tabindex="-1">Queue</h1></header><form class="watchlist-toolbar"><input id="query" name="query" value="${query}" /></form><div class="timeline">${rowsHtml}</div></main><span id="watchlist-refresh" hidden hx-get="" hx-trigger="watchlist-saved from:body, watchlist-item-saved from:body" hx-target=".watchlist" hx-select=".watchlist" hx-swap="outerHTML"></span><p id="notification" role="status" hidden></p><dialog id="item-edit-dialog" class="dialog" closedby="any" aria-labelledby="item-edit-dialog-title" aria-describedby="item-edit-dialog-help item-edit-form-error" data-item-edit-dialog><header class="dialog-header"><h2 id="item-edit-dialog-title">Edit watchlist item</h2><p id="item-edit-dialog-help">Update metadata.</p></header><button type="button" class="dialog-close" commandfor="item-edit-dialog" command="request-close" data-item-edit-dialog-close aria-label="Close edit dialog">X</button><form id="item-edit-form" class="dialog-form"></form></dialog>`;
 }
 
 function editFormHtml() {
-  return `<form id="item-edit-form" class="dialog-form" method="post" action="/v2/watchlists/41/items/101" hx-post="/v2/watchlists/41/items/101" hx-target="#item-edit-form" hx-swap="outerHTML" data-item-id="101"><input id="item-edit-title" name="title" type="text" value="Movie" required /><input id="item-edit-release-date" name="releaseDate" type="text" value="2024-01-01" /><button type="button" data-clear-release-date>Clear date</button><input id="item-edit-poster" name="posterPath" type="text" value="/current.jpg" /><div data-poster-preview-wrap><img data-poster-preview src="https://image.tmdb.org/t/p/w500/current.jpg" alt="Poster preview for Movie" referrerpolicy="no-referrer" /></div><p id="item-edit-form-error" role="alert"></p><footer class="dialog-footer"><button type="button" data-item-edit-dialog-close>Cancel</button><button type="submit">Save</button></footer></form>`;
+  return `<form id="item-edit-form" class="dialog-form" method="post" action="/v2/watchlists/41/items/101" hx-post="/v2/watchlists/41/items/101" hx-target="#item-edit-form" hx-swap="outerHTML" hx-disabled-elt="#item-edit-dialog button" hx-indicator="#item-edit-form-pending" data-item-id="101"><input id="item-edit-title" name="title" type="text" value="Movie" required autofocus /><input id="item-edit-release-date" name="releaseDate" type="text" value="2024-01-01" placeholder="YYYY-MM-DD or YYYY" /><button type="button" data-clear-release-date>Clear date</button><input id="item-edit-poster" name="posterPath" type="text" value="/current.jpg" /><div data-poster-preview-wrap><img data-poster-preview src="https://image.tmdb.org/t/p/w500/current.jpg" alt="Poster preview for Movie" referrerpolicy="no-referrer" /></div><p id="item-edit-form-error" role="alert"></p><footer class="dialog-footer"><span id="item-edit-form-pending" class="htmx-indicator" role="status">Saving…</span><button type="button" commandfor="item-edit-dialog" command="request-close" data-item-edit-dialog-close>Cancel</button><button type="submit">Save</button></footer></form>`;
 }
 
 function patchDom(window) {
@@ -28,11 +28,16 @@ function patchDom(window) {
   prototype.showModal = function showModal() {
     this.open = true;
     this.setAttribute("open", "");
+    this.querySelector("[autofocus]")?.focus();
   };
   prototype.close = function close() {
     this.open = false;
     this.removeAttribute("open");
     this.dispatchEvent(new window.Event("close"));
+  };
+  prototype.requestClose = function requestClose() {
+    const cancel = new window.Event("cancel", { cancelable: true });
+    if (this.dispatchEvent(cancel)) this.close();
   };
 }
 
@@ -60,24 +65,10 @@ function openStandalone(markup) {
   return { dom, window: dom.window, click, emit };
 }
 
-test("menu opens, closes on Escape, and opens modal dialog with live no-referrer preview and date clear", () => {
+test("edit dialog opens with native autofocus, updates no-referrer preview, clears date, and restores trigger focus", () => {
   const { dom, window, click, emit } = openStandalone(detailHtml(itemRow(101, "Movie")));
   const trigger = window.document.querySelector('[data-item-actions-trigger="101"]');
-  const menu = window.document.getElementById("item-actions-menu-101");
-  trigger.focus();
-  click(trigger);
-  assert.equal(menu.hidden, false);
-  assert.equal(trigger.getAttribute("aria-expanded"), "true");
-
-  window.document.dispatchEvent(
-    new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
-  );
-  assert.equal(menu.hidden, true);
-  assert.equal(window.document.activeElement, trigger);
-
-  click(trigger);
   click(window.document.querySelector('[data-item-edit-open="101"]'));
-  assert.equal(menu.hidden, true);
   window.document.getElementById("item-edit-form").outerHTML = editFormHtml();
   emit("htmx:afterSwap", { target: window.document.getElementById("item-edit-form") });
 
@@ -107,41 +98,38 @@ test("menu opens, closes on Escape, and opens modal dialog with live no-referrer
 
   click(dialog.querySelector("[data-clear-release-date]"));
   assert.equal(window.document.getElementById("item-edit-release-date").value, "");
-  assert.equal(dialog.querySelector("[data-clear-release-date]").hidden, true);
+  assert.equal(window.document.activeElement.id, "item-edit-release-date");
 
-  click(dialog.querySelector(".dialog-footer [data-item-edit-dialog-close]"));
+  dialog.requestClose();
   assert.equal(dialog.open, false);
   assert.equal(window.document.activeElement, trigger);
   dom.window.close();
 });
 
-test("in-flight lock blocks dismissal and transport failure retains drafts with role=alert", () => {
+test("in-flight htmx-request blocks cancel and transport failure retains drafts with role=alert", () => {
   const { dom, window, click, emit } = openStandalone(detailHtml(itemRow(101, "Movie")));
-  click(window.document.querySelector('[data-item-actions-trigger="101"]'));
   click(window.document.querySelector('[data-item-edit-open="101"]'));
   window.document.getElementById("item-edit-form").outerHTML = editFormHtml();
   const form = window.document.getElementById("item-edit-form");
   emit("htmx:afterSwap", { target: form });
 
   const dialog = window.document.getElementById("item-edit-dialog");
+  const pending = window.document.getElementById("item-edit-form-pending");
   window.document.getElementById("item-edit-title").value = "Unsaved Draft";
-  emit("htmx:beforeRequest", { elt: form });
-  assert.equal(dialog.getAttribute("aria-busy"), "true");
-  const cancel = new window.Event("cancel", { bubbles: true, cancelable: true });
-  dialog.dispatchEvent(cancel);
-  assert.equal(cancel.defaultPrevented, true);
-  click(dialog.querySelector(".dialog-close"));
+  pending.classList.add("htmx-request");
+  dialog.requestClose();
   assert.equal(dialog.open, true);
 
+  pending.classList.remove("htmx-request");
   emit("htmx:responseError", { elt: form });
-  emit("htmx:afterRequest", { elt: form, successful: false });
-  assert.equal(dialog.hasAttribute("aria-busy"), false);
   assert.equal(dialog.open, true);
   assert.equal(window.document.getElementById("item-edit-title").value, "Unsaved Draft");
   assert.equal(
     window.document.getElementById("item-edit-form-error").textContent,
     "Failed to save changes. Please try again.",
   );
+  dialog.requestClose();
+  assert.equal(dialog.open, false);
   dom.window.close();
 });
 
@@ -186,7 +174,6 @@ async function runHtmxEdit({ refreshedRows, query, expectedFocusId }) {
     const formSettled = new Promise((resolve) =>
       window.document.addEventListener("htmx:afterSettle", resolve, { once: true }),
     );
-    window.document.querySelector('[data-item-actions-trigger="101"]').click();
     window.document.querySelector('[data-item-edit-open="101"]').click();
     await formSettled;
     assert.equal(window.document.getElementById("item-edit-dialog").open, true);

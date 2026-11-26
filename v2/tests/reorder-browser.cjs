@@ -112,7 +112,7 @@ test("failed reconciliation requests a refresh instead of implying a saved order
 test("active drags block fragment swaps and swaps do not duplicate initialization", () => {
   const markup = page([1, 2]).replace(
     "</article>",
-    '<button type="button" data-item-actions-trigger="1" aria-expanded="true">...</button><div class="item-actions-menu"></div></article>',
+    '<button type="button" data-item-actions-trigger="1" popovertarget="item-actions-menu-1">...</button><div id="item-actions-menu-1" class="item-actions-menu" popover="auto"></div></article>',
   );
   const { dom, window } = openReorderPage(markup, () => {
     throw new Error("No request expected");
@@ -121,10 +121,13 @@ test("active drags block fragment swaps and swaps do not duplicate initializatio
   const sortable = window.Sortable.get(timelineElement);
   const actionTrigger = timelineElement.querySelector('[data-item-actions-trigger="1"]');
   const actionMenu = timelineElement.querySelector(".item-actions-menu");
+  let popoverHidden = false;
+  actionMenu.hidePopover = () => {
+    popoverHidden = true;
+  };
   sortable.options.onStart();
   assert.equal(actionTrigger.disabled, true);
-  assert.equal(actionTrigger.getAttribute("aria-expanded"), "false");
-  assert.equal(actionMenu.hidden, true);
+  assert.equal(popoverHidden, true);
   const duringDrag = new window.CustomEvent("htmx:beforeSwap", {
     detail: { target: timelineElement },
     cancelable: true,

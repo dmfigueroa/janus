@@ -818,10 +818,6 @@ textarea {
     flex-shrink: 0;
   }
 
-  .item-actions {
-    position: relative;
-  }
-
   button.item-actions-trigger {
     display: inline-grid;
     place-items: center;
@@ -840,20 +836,32 @@ textarea {
   }
 
   .item-actions-menu {
-    position: absolute;
-    top: calc(100% + var(--size-1));
-    right: 0;
-    z-index: 45;
-    display: flex;
-    flex-direction: column;
-    gap: var(--size-1);
     min-width: 10rem;
     max-width: min(20rem, calc(100vw - 2rem));
     padding: var(--size-1);
     border: var(--border-size-1) solid var(--border);
     border-radius: var(--size-2);
     background: var(--bg-surface);
+    color: var(--fg-default);
     box-shadow: var(--shadow-lg);
+  }
+
+  .item-actions-menu:popover-open {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-1);
+  }
+
+  @supports (position-area: block-end) {
+    .item-actions-menu {
+      inset: auto;
+      margin: var(--size-1) 0;
+      position-area: block-end span-inline-start;
+      position-try-fallbacks:
+        flip-block,
+        flip-inline,
+        flip-block flip-inline;
+    }
   }
 
   button.item-action-button {
@@ -1141,6 +1149,7 @@ watchlist-reorder[aria-busy="true"] {
     padding: var(--size-2) var(--size-5) var(--size-3);
   }
 
+  :scope:has(.htmx-request) .dialog-fields,
   :scope[aria-busy="true"] .dialog-fields {
     opacity: 0.6;
   }
@@ -1197,6 +1206,10 @@ watchlist-reorder[aria-busy="true"] {
   .date-field-control input[type="text"] {
     flex: 1 1 auto;
     min-width: 0;
+  }
+
+  .date-field-control input:placeholder-shown + .field-clear {
+    display: none;
   }
 
   .field-clear {

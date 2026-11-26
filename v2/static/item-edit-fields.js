@@ -29,37 +29,11 @@ export function syncPosterPreview(dialog, value) {
   wrap.hidden = false;
 }
 
-export function syncClearDateButton(dialog, value) {
-  const button = dialog.querySelector("[data-clear-release-date]");
-  if (button) button.hidden = value.length === 0;
-}
-
 export function clearReleaseDate(dialog) {
   const input = dialog.querySelector("#item-edit-release-date");
   if (!input) return;
   input.value = "";
-  syncClearDateButton(dialog, "");
   input.focus();
-}
-
-export function closeAllItemMenus() {
-  document.querySelectorAll("[data-item-actions-trigger]").forEach((trigger) => {
-    trigger.setAttribute("aria-expanded", "false");
-  });
-  document.querySelectorAll(".item-actions-menu").forEach((menu) => {
-    menu.hidden = true;
-  });
-}
-
-export function toggleItemMenu(trigger) {
-  const menuId = trigger.getAttribute("aria-controls");
-  const menu = menuId ? document.getElementById(menuId) : null;
-  const willOpen = Boolean(menu && menu.hidden);
-  closeAllItemMenus();
-  if (!willOpen || !menu) return;
-  menu.hidden = false;
-  trigger.setAttribute("aria-expanded", "true");
-  menu.querySelector("button")?.focus();
 }
 
 export function expandedWatchedItemIds() {
@@ -84,44 +58,6 @@ export function restoreItemFocus(itemId, expanded) {
   fallback?.focus();
 }
 
-export function syncDialogDescribedBy(dialog) {
-  const error = dialog.querySelector("#item-edit-form-error");
-  const hasError = Boolean(error?.textContent?.trim());
-  dialog.setAttribute(
-    "aria-describedby",
-    hasError ? "item-edit-dialog-help item-edit-form-error" : "item-edit-dialog-help",
-  );
-}
-
-export function focusInitialItemField(dialog) {
-  const target =
-    dialog.querySelector('[aria-invalid="true"]') || dialog.querySelector("#item-edit-title");
-  target?.focus();
-}
-
-export function setDialogBusy(dialog, busy) {
-  if (busy) dialog.setAttribute("aria-busy", "true");
-  else dialog.removeAttribute("aria-busy");
-  const footer = dialog.querySelector(".dialog-footer");
-  if (footer) {
-    if (busy) footer.setAttribute("aria-busy", "true");
-    else footer.removeAttribute("aria-busy");
-  }
-  dialog.querySelectorAll("[data-item-edit-dialog-close]").forEach((control) => {
-    control.disabled = busy;
-  });
-}
-
-export function pointerOutsideDialog(dialog, event) {
-  const bounds = dialog.getBoundingClientRect();
-  return (
-    event.clientX < bounds.left ||
-    event.clientX > bounds.right ||
-    event.clientY < bounds.top ||
-    event.clientY > bounds.bottom
-  );
-}
-
 export function requestElement(event) {
   const element = event.detail?.elt || event.detail?.requestConfig?.elt;
   return element instanceof Element ? element : null;
@@ -138,23 +74,7 @@ export function showItemNotification(message, previousTimeout) {
   }, 4000);
 }
 
-export function handleItemFieldInput(dialog, event) {
-  const target = event.target;
-  if (!(target instanceof Element) || !dialog.contains(target)) return;
-  if (target.id === "item-edit-poster") syncPosterPreview(dialog, target.value);
-  if (target.id === "item-edit-release-date") syncClearDateButton(dialog, target.value);
-}
-
-export function handleMenuEscape(dialog, event) {
-  if (event.key !== "Escape" || dialog.open) return;
-  const openTrigger = document.querySelector('[data-item-actions-trigger][aria-expanded="true"]');
-  if (!openTrigger) return;
-  closeAllItemMenus();
-  openTrigger.focus();
-}
-
-export function showFormError(dialog, form, message) {
+export function showFormError(form, message) {
   const error = form.querySelector("#item-edit-form-error");
   if (error) error.textContent = message;
-  syncDialogDescribedBy(dialog);
 }

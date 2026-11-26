@@ -1,41 +1,30 @@
 import {
   clearReleaseDate,
-  closeAllItemMenus,
   expandedWatchedItemIds,
-  focusInitialItemField,
-  handleItemFieldInput,
-  handleMenuEscape,
-  pointerOutsideDialog,
   requestElement,
   restoreItemFocus,
-  setDialogBusy,
   showFormError,
   showItemNotification,
-  syncDialogDescribedBy,
-  toggleItemMenu,
+  syncPosterPreview,
 } from "@janus/item-edit-fields";
 
 const GENERIC_SAVE_ERROR = "Failed to save changes. Please try again.";
 
 class ItemEditDialog {
-  pendingRequests = new Set();
   returnFocus = null;
   pendingFocus = null;
   openingItem = false;
   activeOpenRequest = null;
-  pressedOutside = false;
   notificationTimeout = 0;
 
   constructor(dialog) {
     this.dialog = dialog;
     this.documentEvents = [
       ["click", this.onClick],
-      ["keydown", this.onKeydown],
       ["input", this.onInput],
       ["watchlist-item-saved", this.onSaved],
       ["htmx:beforeRequest", this.onRequest],
       ["htmx:beforeSwap", this.onBeforeSwap],
-      ["htmx:afterRequest", this.onRequestDone],
       ["htmx:afterSwap", this.onSwap],
       ["htmx:afterSettle", this.onRefreshSettled],
       ["htmx:responseError", this.onTransportError],
@@ -45,8 +34,6 @@ class ItemEditDialog {
     this.dialogEvents = [
       ["cancel", this.onCancel],
       ["close", this.restoreFocus],
-      ["pointerdown", this.onPointerDown],
-      ["pointerup", this.onPointerUp],
     ];
   }
 
@@ -63,26 +50,16 @@ class ItemEditDialog {
     );
     window.clearTimeout(this.notificationTimeout);
     window.removeEventListener("pagehide", this.disconnect);
-    this.pendingRequests.clear();
   };
 
   onClick = (event) => {
     const target = event.target;
     if (!(target instanceof Element)) return;
-    const menuTrigger = target.closest("[data-item-actions-trigger]");
-    if (menuTrigger) {
-      if (!menuTrigger.disabled) {
-        event.preventDefault();
-        toggleItemMenu(menuTrigger);
-      }
-      return;
-    }
     const editOpener = target.closest("[data-item-edit-open]");
     if (editOpener) {
       this.returnFocus =
         editOpener.closest("[data-item-actions]")?.querySelector("[data-item-actions-trigger]") ||
         null;
-      closeAllItemMenus();
       this.openingItem = true;
       this.activeOpenRequest = null;
       return;
@@ -90,19 +67,19 @@ class ItemEditDialog {
     if (target.closest("[data-clear-release-date]")) {
       event.preventDefault();
       clearReleaseDate(this.dialog);
-      return;
     }
-    if (target.closest("[data-item-edit-dialog-close]")) {
-      event.preventDefault();
-      this.close();
-      return;
-    }
-    if (!target.closest(".item-actions-menu")) closeAllItemMenus();
   };
 
-  onKeydown = (event) => handleMenuEscape(this.dialog, event);
-
-  onInput = (event) => handleItemFieldInput(this.dialog, event);
+  onInput = (event) => {
+    const target = event.target;
+    if (
+      target instanceof Element &&
+      this.dialog.contains(target) &&
+      target.id === "item-edit-poster"
+    ) {
+      syncPosterPreview(this.dialog, target.value);
+    }
+  };
 
   onSaved = (event) => {
     const detail = event.detail;
@@ -110,7 +87,7 @@ class ItemEditDialog {
       itemId: detail?.watchlistItemId != null ? String(detail.watchlistItemId) : null,
       expanded: expandedWatchedItemIds(),
     };
-    this.close(true);
+    if (this.dialog.open) this.dialog.close();
     this.notificationTimeout = showItemNotification(
       detail?.message || "Changes saved successfully",
       this.notificationTimeout,
@@ -119,14 +96,7 @@ class ItemEditDialog {
 
   onRequest = (event) => {
     const opener = this.openerFromRequest(event);
-    if (opener) {
-      this.activeOpenRequest = event.detail?.xhr || opener;
-      return;
-    }
-    const form = this.formFromRequest(event);
-    if (!form) return;
-    this.pendingRequests.add(event.detail?.xhr || form);
-    setDialogBusy(this.dialog, true);
+    if (opener) this.activeOpenRequest = event.detail?.xhr || opener;
   };
 
   onBeforeSwap = (event) => {
@@ -136,13 +106,6 @@ class ItemEditDialog {
     if (this.openingItem && (!this.activeOpenRequest || this.activeOpenRequest === token)) return;
     if (event.detail) event.detail.shouldSwap = false;
     event.preventDefault();
-  };
-
-  onRequestDone = (event) => {
-    const form = this.formFromRequest(event);
-    if (!form) return;
-    this.pendingRequests.delete(event.detail?.xhr || form);
-    setDialogBusy(this.dialog, this.pendingRequests.size > 0);
   };
 
   onAbort = (event) => {
@@ -164,7 +127,7 @@ class ItemEditDialog {
       return;
     }
     const form = this.formFromRequest(event);
-    if (form && this.dialog.open) showFormError(this.dialog, form, GENERIC_SAVE_ERROR);
+    if (form && this.dialog.open) showFormError(form, GENERIC_SAVE_ERROR);
   };
 
   onSwap = (event) => {
@@ -175,10 +138,9 @@ class ItemEditDialog {
       this.openingItem = false;
       this.activeOpenRequest = null;
       this.dialog.showModal();
+      return;
     }
-    if (!this.dialog.open) return;
-    syncDialogDescribedBy(this.dialog);
-    focusInitialItemField(this.dialog);
+    if (this.dialog.open) this.dialog.querySelector("[autofocus]")?.focus();
   };
 
   onRefreshSettled = (event) => {
@@ -189,20 +151,7 @@ class ItemEditDialog {
   };
 
   onCancel = (event) => {
-    if (this.isBusy()) event.preventDefault();
-  };
-
-  onPointerDown = (event) => {
-    if (!("closedBy" in HTMLDialogElement.prototype)) {
-      this.pressedOutside = pointerOutsideDialog(this.dialog, event);
-    }
-  };
-
-  onPointerUp = (event) => {
-    if ("closedBy" in HTMLDialogElement.prototype) return;
-    const dismiss = this.pressedOutside && pointerOutsideDialog(this.dialog, event);
-    this.pressedOutside = false;
-    if (dismiss) this.close();
+    if (this.dialog.querySelector(".htmx-request")) event.preventDefault();
   };
 
   restoreFocus = () => {
@@ -210,15 +159,9 @@ class ItemEditDialog {
     this.returnFocus = null;
   };
 
-  close(force = false) {
-    if (this.dialog.open && (force || !this.isBusy())) this.dialog.close();
-  }
-
   openerFromRequest = (event) => requestElement(event)?.closest("[data-item-edit-open]") || null;
 
   formFromRequest = (event) => requestElement(event)?.closest("#item-edit-form") || null;
-
-  isBusy = () => this.dialog.getAttribute("aria-busy") === "true";
 }
 
 const itemEditDialogElement = document.getElementById("item-edit-dialog");

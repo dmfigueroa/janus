@@ -33,9 +33,7 @@
           class="item-actions-trigger"
           data-item-actions-trigger="{{row.id}}"
           aria-label="More actions for {{row.title}}"
-          aria-haspopup="true"
-          aria-expanded="false"
-          aria-controls="item-actions-menu-{{row.id}}"
+          popovertarget="item-actions-menu-{{row.id}}"
         >
           <svg
             aria-hidden="true"
@@ -53,11 +51,13 @@
             <circle cx="5" cy="12" r="1"></circle>
           </svg>
         </button>
-        <div id="item-actions-menu-{{row.id}}" class="item-actions-menu" hidden>
+        <div id="item-actions-menu-{{row.id}}" class="item-actions-menu" popover="auto">
           <button
             type="button"
             class="item-action-button"
             data-item-edit-open="{{row.id}}"
+            popovertarget="item-actions-menu-{{row.id}}"
+            popovertargetaction="hide"
             hx-get="/v2/watchlists/{{view.id}}/items/{{row.id}}/edit"
             hx-target="#item-edit-form"
             hx-select="#item-edit-form"
