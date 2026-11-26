@@ -2,7 +2,7 @@
 
 One Rust crate serves HTML, local assets and MCP. Dialog and layout values use
 [browser-ready Open Props tokens](https://open-props.style/) served from `static/vendor`. V2 owns watchlist reads, create/edit,
-reordering and their MCP tools; v1 remains the application for the remaining writes.
+reordering, TMDB movie and television search and additions, and their MCP tools; v1 remains the application for the remaining writes.
 Requires Rust 1.94.0 and a native C compiler.
 Production needs no Node runtime or frontend build.
 
@@ -97,8 +97,13 @@ The existing directory must be mounted, including WAL/SHM sidecars.
 - `POST /v2/watchlists/{id}`: shared metadata update with v1's timestamp and empty-description
   semantics.
 - `/v2/watchlists/{id}/reorder`: atomic custom-order moves from web drag or keyboard intents.
+- `/v2/search`: movie and television search. Game, book, and comic searches report the provider
+  unavailable, and anime or manga shows the deprecation notice. Tabs, paged results, and the
+  detail sheet are HTMX fragments. `POST /v2/search/add` uses the shared addition operation.
+  HTMX success is `204` with `search-added`; JSON callers receive the write result.
 - `/v2/mcp`: `list_watchlists`, `search_watchlists`, `get_watchlist`, `find_watchlist_items`,
-  `create_watchlists`, `update_watchlists`, `reorder_watchlist_items`.
+  `create_watchlists`, `update_watchlists`, `reorder_watchlist_items`, `edit_watchlist_items`,
+  `search_media`, `add_media_to_watchlists`.
 - `/v2/health/live`: HTTP liveness.
 - `/v2/health/ready`: compatibility-validated application readiness.
 
