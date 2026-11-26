@@ -1,10 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { getLineupData } from "@/features/lineups/manage/Lineups";
+import { lineupsQueryOptions, useLineupData } from "@/features/lineups/read/useLineupData";
 import { ManageLineups } from "@/features/lineups/manage/ManageLineups";
+
 export const Route = createFileRoute("/rotations/")({
-  loader: () => getLineupData(),
+  headers: () => ({ "Cache-Control": "private, no-cache" }),
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData({ ...lineupsQueryOptions(), revalidateIfStale: true }),
   component: RotationsRoute,
 });
+
 function RotationsRoute() {
-  return <ManageLineups data={Route.useLoaderData()} />;
+  const { data } = useLineupData();
+  return <ManageLineups data={data} />;
 }

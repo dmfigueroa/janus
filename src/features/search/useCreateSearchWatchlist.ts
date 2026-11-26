@@ -2,10 +2,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toaster } from "@/app/Toaster";
+import { invalidateWatchlistQueries } from "@/features/watchlists/Cache";
 import { createWatchlist } from "@/features/watchlists/create/Mutation";
-import { watchlistListQueryKey } from "@/features/watchlists/list/Query";
-
-const watchlistSelectorFilters = { orderBy: "lastAdded" } as const;
 
 export interface CreatedSearchWatchlist {
   label: string;
@@ -25,9 +23,7 @@ export function useCreateSearchWatchlist({
     mutationFn: (name: string) => createWatchlistFn({ data: { name } }),
     onSuccess: async (newWatchlist) => {
       onCreated({ label: newWatchlist.name, value: newWatchlist.id.toString() });
-      await queryClient.invalidateQueries({
-        queryKey: watchlistListQueryKey(watchlistSelectorFilters),
-      });
+      await invalidateWatchlistQueries(queryClient);
       await router.invalidate?.();
     },
     onError: (error) => {

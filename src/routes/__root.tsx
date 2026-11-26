@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   HeadContent,
   Scripts,
@@ -8,6 +9,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { pwaInfo } from "virtual:pwa-info";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { installForegroundRevalidation } from "@/app/ForegroundRevalidation";
 import { BottomNav } from "@/components/BottomNav";
 import { PwaUpdatePrompt } from "@/components/PwaUpdatePrompt";
 
@@ -61,8 +63,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
-  const router = useRouter(); // Get router instance to access context
+  const router = useRouter();
   const queryClient = router.options.context.queryClient;
+
+  useEffect(() => installForegroundRevalidation(), []);
 
   return (
     <html lang="en" suppressHydrationWarning>

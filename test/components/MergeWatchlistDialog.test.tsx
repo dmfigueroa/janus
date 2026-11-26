@@ -18,6 +18,12 @@ vi.mock("@/features/watchlists/merge/Mutation", () => ({
   mergeWatchlists: mergeWatchlistsServerFn,
 }));
 
+vi.mock("@tanstack/react-query", () => ({
+  useQueryClient: () => ({
+    invalidateQueries: vi.fn(),
+  }),
+}));
+
 vi.mock("@tanstack/react-router", () => ({
   useRouter: () => ({
     invalidate: invalidateMock,

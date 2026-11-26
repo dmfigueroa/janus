@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useRouter } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { toaster } from "@/app/Toaster";
+import { invalidateWatchlistQueries } from "@/features/watchlists/Cache";
 import type { WatchlistSummary } from "../list/Query";
 import { formatNextItemDetail } from "../NextItemLabel";
 import { rotateWatchlistCard, undoWatchlistCard } from "./CardRotation";
@@ -33,7 +34,7 @@ export function useCardRotation(watchlist: WatchlistSummary) {
         rotate: (input) => rotate({ data: input }),
         undo: (receipt) => undo({ data: receipt }),
         refresh: async () => {
-          await queryClient.invalidateQueries({ queryKey: ["watchlists"] });
+          await invalidateWatchlistQueries(queryClient);
           await router.invalidate();
         },
         notify: ({ title, type, undo: onUndo }) => {

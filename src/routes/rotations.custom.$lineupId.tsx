@@ -1,23 +1,29 @@
 import { Container, Heading, Text, Button } from "@chakra-ui/react";
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { getLineupData } from "@/features/lineups/manage/Lineups";
+import { NotFound } from "@/components/NotFound";
+import {
+  ensureCustomLineup,
+  findCustomLineup,
+  useLineupData,
+} from "@/features/lineups/read/useLineupData";
 import { LineupEditor } from "@/features/lineups/components/LineupEditor";
 import { LineupCards } from "@/features/lineups/components/LineupCards";
+
 export const Route = createFileRoute("/rotations/custom/$lineupId")({
-  loader: async ({ params }) => {
+  headers: () => ({ "Cache-Control": "private, no-cache" }),
+  loader: async ({ context, params }) => {
     const id = Number(params.lineupId);
     if (!validLineupId(id)) throw notFound();
-    const data = await getLineupData();
-    const lineup = data.lineups
-      .filter((entry) => entry.kind === "custom")
-      .find((entry) => entry.reference.id === id);
-    if (!lineup) throw notFound();
-    return { lineup, watchlists: data.watchlists };
+    await ensureCustomLineup(context.queryClient, id);
   },
   component: Detail,
 });
+
 function Detail() {
-  const { lineup, watchlists } = Route.useLoaderData();
+  const { lineupId } = Route.useParams();
+  const { data } = useLineupData();
+  const lineup = findCustomLineup(data.lineups, Number(lineupId));
+  if (!lineup) return <NotFound />;
   return (
     <Container maxW="7xl" py={8} pb={24}>
       <Heading as="h1" mb={4}>
@@ -25,7 +31,7 @@ function Detail() {
       </Heading>
       <LineupEditor
         lineup={lineup}
-        watchlists={watchlists}
+        watchlists={data.watchlists}
         trigger={<Button mb={6}>Edit lineup</Button>}
       />
       {lineup.eligibleWatchlists.length ? (

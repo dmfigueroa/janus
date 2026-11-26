@@ -2,7 +2,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toaster } from "@/app/Toaster";
-import { invalidateLineupQueries } from "@/features/lineups/Cache";
 import { invalidateWatchlistQueries } from "@/features/watchlists/Cache";
 import {
   deleteWatchlist,
@@ -86,10 +85,7 @@ function useSynchronizeLifecycleCaches() {
   const router = useRouter();
 
   return async () => {
-    await Promise.all([
-      invalidateWatchlistQueries(queryClient),
-      invalidateLineupQueries(queryClient),
-    ]);
+    await invalidateWatchlistQueries(queryClient);
     await router.invalidate();
   };
 }

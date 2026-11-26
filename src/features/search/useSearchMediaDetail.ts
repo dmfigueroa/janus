@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toaster } from "@/app/Toaster";
 import type { UnifiedMedia } from "@/server/Media";
+import { invalidateWatchlistQueries } from "@/features/watchlists/Cache";
 import {
   addToWatchlist,
   type AddToWatchlistInsertionPosition,
@@ -67,6 +68,7 @@ export function useSearchMediaDetail({
   const [insertionPosition, setInsertionPosition] = useState<AddToWatchlistInsertionPosition | "">(
     "",
   );
+  const queryClient = useQueryClient();
   const getWatchlistListFn = useServerFn(getWatchlistList);
   const addToWatchlistFn = useServerFn(addToWatchlist);
   const { data: watchlists } = useQuery({
@@ -93,6 +95,7 @@ export function useSearchMediaDetail({
     },
     onSuccess: (data) => {
       if (data?.success) {
+        void invalidateWatchlistQueries(queryClient);
         toaster.create({ type: "success", title: data.message });
         onClose();
       } else {

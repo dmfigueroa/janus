@@ -3,7 +3,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AllWatchlistsSection } from "@/features/watchlists/home/AllWatchlistsSection";
 import { CreateWatchlistFloatingButton } from "@/features/watchlists/home/CreateWatchlistFloatingButton";
 import { HomeHeader } from "@/features/watchlists/home/HomeHeader";
-import { getWatchlistHomeData } from "@/features/watchlists/home/WatchlistHome";
+import type { WatchlistHomeData } from "@/features/watchlists/home/WatchlistHome";
+import {
+  useWatchlistHomeData,
+  watchlistHomeQueryOptions,
+} from "@/features/watchlists/home/useWatchlistHomeData";
 import { WatchlistMergeDialog } from "@/features/watchlists/home/WatchlistMergeDialog";
 import {
   useWatchlistMergeSelectionContext,
@@ -11,18 +15,23 @@ import {
 } from "@/features/watchlists/home/WatchlistMergeSelectionContext";
 
 export const Route = createFileRoute("/watchlists/")({
+  headers: () => ({ "Cache-Control": "private, no-cache" }),
   component: IndexRoute,
-  loader: async () => await getWatchlistHomeData(),
+  loader: ({ context }) =>
+    context.queryClient.ensureQueryData({
+      ...watchlistHomeQueryOptions(),
+      revalidateIfStale: true,
+    }),
 });
 
 function IndexRoute() {
-  const home = Route.useLoaderData();
+  const { data } = useWatchlistHomeData();
 
-  return <WatchlistsHomeRouteContent initialData={home} />;
+  return <WatchlistsHomeRouteContent initialData={data} />;
 }
 
 type WatchlistsHomeRouteContentProps = {
-  initialData: Awaited<ReturnType<typeof getWatchlistHomeData>>;
+  initialData: WatchlistHomeData;
 };
 
 export function WatchlistsHomeRouteContent({ initialData }: WatchlistsHomeRouteContentProps) {

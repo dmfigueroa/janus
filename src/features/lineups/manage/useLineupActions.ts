@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import { invalidateLineupQueries } from "@/features/lineups/Cache";
 import { changeLineup, type LineupAction } from "@/features/lineups/manage/Lineups";
 
 export function useLineupActions() {
   const change = useServerFn(changeLineup);
+  const queryClient = useQueryClient();
   const router = useRouter();
   const [error, setError] = useState("");
   const [errorField, setErrorField] = useState("");
@@ -20,6 +23,7 @@ export function useLineupActions() {
         setErrorField(resultField(result));
         return false;
       }
+      await invalidateLineupQueries(queryClient);
       await router.invalidate();
       return true;
     } catch {
