@@ -57,6 +57,12 @@
           "destructiveHint": false,
           "idempotentHint": false
         }
+      },
+      {
+        "name": "search_media",
+        "title": "Search supported media providers",
+        "description": "Search TMDB for movies and TV, RAWG for games, Google Books for books, ComicVine for comics, or AniList for anime and manga. Anime and manga search remains unavailable while Janus reviews provider data quality.",
+        "annotations": { "readOnlyHint": true, "destructiveHint": false }
       }
     ],
     "pending": [
@@ -73,7 +79,6 @@
       "remove_watchlist_items",
       "remove_watchlist_parents",
       "reorder_lineups",
-      "search_media",
       "set_lineup_watchlists",
       "set_watchlist_items_watched",
       "set_watchlist_order",

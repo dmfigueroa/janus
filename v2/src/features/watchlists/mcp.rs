@@ -1,18 +1,29 @@
 //! MCP adapter: tool routing and protocol envelopes.
 
 use super::Watchlists;
+use crate::integrations::tmdb::TmdbCatalog;
 use rmcp::{ErrorData, RoleServer, ServerHandler, model::*, service::RequestContext};
 use serde_json::{Map, Value};
 use std::sync::Arc;
 
 mod batched;
+mod media;
 mod paged;
 
 #[cfg(test)]
 mod contract_check;
 
 #[derive(Clone)]
-pub struct WatchlistMcp(pub Watchlists);
+pub struct WatchlistMcp {
+    lists: Watchlists,
+    catalog: Arc<dyn TmdbCatalog>,
+}
+
+impl WatchlistMcp {
+    pub fn new(lists: Watchlists, catalog: Arc<dyn TmdbCatalog>) -> Self {
+        Self { lists, catalog }
+    }
+}
 
 pub(super) enum McpCallError {
     InvalidRequest(String),
@@ -22,6 +33,7 @@ pub(super) enum McpCallError {
 enum Route {
     Paged(&'static paged::Contract),
     Batched(&'static batched::Contract),
+    Search,
 }
 
 pub(super) fn object_schema(properties: Value, required: Value) -> Map<String, Value> {
@@ -44,14 +56,23 @@ pub(super) fn output_schema(properties: Value, required: Option<Value>) -> Arc<M
 }
 
 fn tools() -> Vec<Tool> {
-    paged::tools().into_iter().chain(batched::tools()).collect()
+    paged::tools()
+        .into_iter()
+        .chain(media::tools())
+        .chain(batched::tools())
+        .collect()
 }
 
 fn tool(name: &str) -> Option<Tool> {
-    paged::tool(name).or_else(|| batched::tool(name))
+    paged::tool(name)
+        .or_else(|| media::tool(name))
+        .or_else(|| batched::tool(name))
 }
 
 fn route(name: &str) -> Option<Route> {
+    if media::is_search(name) {
+        return Some(Route::Search);
+    }
     paged::contract(name)
         .map(Route::Paged)
         .or_else(|| batched::contract(name).map(Route::Batched))
@@ -105,8 +126,9 @@ impl ServerHandler for WatchlistMcp {
         };
         let arguments = request.arguments.unwrap_or_default();
         let called = match route {
-            Route::Paged(contract) => paged::call(&self.0, contract, arguments).await,
-            Route::Batched(contract) => batched::call(&self.0, contract, arguments).await,
+            Route::Paged(contract) => paged::call(&self.lists, contract, arguments).await,
+            Route::Batched(contract) => batched::call(&self.lists, contract, arguments).await,
+            Route::Search => media::call_search(self.catalog.as_ref(), arguments).await,
         };
         envelope(called)
     }

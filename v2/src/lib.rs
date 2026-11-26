@@ -11,6 +11,7 @@ use axum::{
     http::{StatusCode, header},
     routing::get,
 };
+use integrations::tmdb::{TmdbCatalog, TmdbClient};
 use rmcp::transport::streamable_http_server::{
     StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
 };
@@ -57,6 +58,14 @@ fn base_router(database_ready: bool) -> Router {
 
 /// Construct the feature router only after the existing database passes validation.
 pub fn database_router(database: sea_orm::DatabaseConnection) -> Router {
+    database_router_with(database, Arc::new(TmdbClient::from_env()))
+}
+
+/// Same router as [`database_router`] with a caller-supplied TMDB catalog.
+pub fn database_router_with(
+    database: sea_orm::DatabaseConnection,
+    catalog: Arc<dyn TmdbCatalog>,
+) -> Router {
     let state = features::watchlists::Watchlists(database);
     Router::new()
         .route(
@@ -84,7 +93,12 @@ pub fn database_router(database: sea_orm::DatabaseConnection) -> Router {
         .nest_service(
             "/v2/mcp",
             StreamableHttpService::new(
-                move || Ok(features::watchlists::mcp::WatchlistMcp(state.clone())),
+                move || {
+                    Ok(features::watchlists::mcp::WatchlistMcp::new(
+                        state.clone(),
+                        catalog.clone(),
+                    ))
+                },
                 sessions(),
                 StreamableHttpServerConfig::default().with_json_response(true),
             ),
