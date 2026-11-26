@@ -64,7 +64,7 @@ function mergeSourceItemsIntoTarget(
           voteAverage: watchlistItems.voteAverage,
           runtime: watchlistItems.runtime,
           customRank: sql<number | null>`NULL`.as("customRank"),
-          isWatched: watchlistItems.isWatched,
+          isWatched: sql<boolean>`COALESCE(${watchlistItems.isWatched}, 0)`.as("isWatched"),
           authors: watchlistItems.authors,
           addedAt: watchlistItems.addedAt,
         })
@@ -74,7 +74,7 @@ function mergeSourceItemsIntoTarget(
     .onConflictDoUpdate({
       target: [watchlistItems.watchlistId, watchlistItems.tmdbId, watchlistItems.mediaType],
       set: {
-        isWatched: sql`MAX(${watchlistItems.isWatched}, excluded.is_watched)`,
+        isWatched: sql`MAX(COALESCE(${watchlistItems.isWatched}, 0), COALESCE(excluded.is_watched, 0))`,
       },
     })
     .run();

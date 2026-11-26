@@ -130,6 +130,98 @@ describe("merge watchlists mutation", () => {
       items: [expect.objectContaining({ tmdbId: "untouched" })],
     });
   });
+
+  const watchedStates = [null, false, true] as const;
+  const watchedStatePairs = watchedStates.flatMap((targetWatched) =>
+    watchedStates.map((sourceWatched) => ({
+      targetWatched,
+      sourceWatched,
+      expectedWatched: Boolean(targetWatched) || Boolean(sourceWatched),
+    })),
+  );
+
+  it.each(watchedStatePairs)(
+    "enforces join-semilattice watched state on release-order merge (target=$targetWatched, source=$sourceWatched -> $expectedWatched)",
+    async ({ targetWatched, sourceWatched, expectedWatched }) => {
+      const target = await createTestWatchlist(db, { name: "Release Target" });
+      const source = await createTestWatchlist(db, { name: "Release Source" });
+      await createTestWatchlistItem(db, {
+        watchlistId: target.id,
+        tmdbId: "shared-release",
+        title: "Shared Release",
+        isWatched: targetWatched,
+      });
+      await createTestWatchlistItem(db, {
+        watchlistId: source.id,
+        tmdbId: "shared-release",
+        title: "Shared Release",
+        isWatched: sourceWatched,
+      });
+      await createTestWatchlistItem(db, {
+        watchlistId: source.id,
+        tmdbId: "source-only-null",
+        title: "Source Only",
+        isWatched: sourceWatched,
+      });
+
+      const result = await mergeWatchlistsMutation({
+        target: { kind: "existing", watchlistId: target.id },
+        sourceWatchlistIds: [source.id],
+      });
+
+      expect(result).toEqual({ success: true, targetId: target.id });
+      const detail = await readWatchlistDetail({
+        watchlistId: target.id,
+        unwatchedOnly: false,
+      });
+      const shared = detail?.items.find((item) => item.tmdbId === "shared-release");
+      const sourceOnly = detail?.items.find((item) => item.tmdbId === "source-only-null");
+      expect(shared?.isWatched).toBe(expectedWatched);
+      expect(sourceOnly?.isWatched).toBe(Boolean(sourceWatched));
+    },
+  );
+
+  it.each(watchedStatePairs)(
+    "enforces join-semilattice watched state on custom-order merge (target=$targetWatched, source=$sourceWatched -> $expectedWatched)",
+    async ({ targetWatched, sourceWatched, expectedWatched }) => {
+      const target = await createTestWatchlist(db, {
+        name: "Custom Target",
+        itemOrderMode: "custom",
+      });
+      const source = await createTestWatchlist(db, {
+        name: "Custom Source",
+        itemOrderMode: "custom",
+      });
+      await createTestWatchlistItem(db, {
+        watchlistId: target.id,
+        tmdbId: "shared-custom",
+        title: "Shared Custom",
+        customRank: 1,
+        isWatched: targetWatched,
+      });
+      await createTestWatchlistItem(db, {
+        watchlistId: source.id,
+        tmdbId: "shared-custom",
+        title: "Shared Custom",
+        customRank: 1,
+        isWatched: sourceWatched,
+      });
+
+      const result = await mergeWatchlistsMutation({
+        target: { kind: "existing", watchlistId: target.id },
+        sourceWatchlistIds: [source.id],
+      });
+
+      expect(result).toEqual({ success: true, targetId: target.id });
+      const detail = await readWatchlistDetail({
+        watchlistId: target.id,
+        unwatchedOnly: false,
+      });
+      expect(detail?.items).toEqual([
+        expect.objectContaining({ tmdbId: "shared-custom", isWatched: expectedWatched }),
+      ]);
+    },
+  );
 });
 
 describe("new target merge", () => {

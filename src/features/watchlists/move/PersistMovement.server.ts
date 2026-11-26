@@ -134,7 +134,7 @@ function itemAsInsertFields(item: WatchlistItemRow): GroupItemInsertFields {
     releaseDate: item.releaseDate,
     voteAverage: item.voteAverage,
     runtime: item.runtime,
-    isWatched: item.isWatched,
+    isWatched: Boolean(item.isWatched),
     authors: item.authors,
     addedAt: item.addedAt,
   };

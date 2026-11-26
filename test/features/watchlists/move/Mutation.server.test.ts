@@ -532,6 +532,39 @@ describe("move watchlist item mutation", () => {
       watchedItems: 1,
     });
   });
+
+  it("coerces legacy null isWatched to false when moving an item", async () => {
+    const [source, destination] = await db
+      .insert(watchlists)
+      .values([{ name: "Source" }, { name: "Destination" }])
+      .returning();
+
+    const [legacyItem] = await db
+      .insert(watchlistItems)
+      .values({
+        watchlistId: source.id,
+        tmdbId: "legacy-null-move",
+        source: "tmdb",
+        mediaType: "movie",
+        title: "Legacy Null Item",
+        isWatched: null,
+      })
+      .returning();
+
+    const result = await moveItemToWatchlistMutation({
+      itemId: legacyItem.id,
+      destinationWatchlistId: destination.id,
+    });
+
+    expect(result.success).toBe(true);
+    const destDetail = await readWatchlistDetailScreen({
+      watchlistId: destination.id,
+      unwatchedOnly: false,
+    });
+    expect(destDetail?.items).toEqual([
+      expect.objectContaining({ tmdbId: "legacy-null-move", isWatched: false }),
+    ]);
+  });
 });
 
 describe("move watchlist parent mutation", () => {
