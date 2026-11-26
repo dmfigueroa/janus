@@ -1,8 +1,9 @@
 import { initialWatchlistLifecycle } from "./lifecycle/WatchlistLifecycle.server";
 import { getDb, type DatabaseTransaction } from "@/db/Db.server";
 import { watchlists, watchlistItems } from "@/db/Schema";
-import { and, eq, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
+import { releaseDateOrder } from "@/features/watchlists/Order.server";
 
 type WatchlistDatabase = ReturnType<typeof getDb> | DatabaseTransaction;
 
@@ -56,17 +57,73 @@ export async function updateWatchlist({
   name?: string;
   description?: string | null;
   itemOrderMode?: WatchlistItemOrderMode;
+}): Promise<boolean> {
+  const fieldsToUpdate = buildWatchlistUpdateFields({ name, description, itemOrderMode });
+  const db = getDb();
+
+  return db.transaction((transaction) =>
+    applyWatchlistUpdate(transaction, watchlistId, fieldsToUpdate, itemOrderMode),
+  );
+}
+
+function buildWatchlistUpdateFields({
+  name,
+  description,
+  itemOrderMode,
+}: {
+  name?: string;
+  description?: string | null;
+  itemOrderMode?: WatchlistItemOrderMode;
 }) {
-  const fieldsToUpdate = Object.fromEntries(
+  return Object.fromEntries(
     Object.entries({
       name,
       description: description === "" ? null : description,
       itemOrderMode,
     }).filter(([, value]) => value !== undefined),
   );
+}
 
-  const db = getDb();
-  await db.update(watchlists).set(fieldsToUpdate).where(eq(watchlists.id, watchlistId));
+function applyWatchlistUpdate(
+  transaction: DatabaseTransaction,
+  watchlistId: number,
+  fieldsToUpdate: Record<string, unknown>,
+  itemOrderMode: WatchlistItemOrderMode | undefined,
+): boolean {
+  const watchlist = getWatchlistById(watchlistId, transaction);
+  if (!watchlist) return false;
+
+  if (itemOrderMode === "custom") {
+    initializeCustomRanksIfUnranked(transaction, watchlistId);
+  }
+
+  transaction.update(watchlists).set(fieldsToUpdate).where(eq(watchlists.id, watchlistId)).run();
+  return true;
+}
+
+function initializeCustomRanksIfUnranked(transaction: DatabaseTransaction, watchlistId: number) {
+  const existingRanked = transaction
+    .select({ id: watchlistItems.id })
+    .from(watchlistItems)
+    .where(and(eq(watchlistItems.watchlistId, watchlistId), isNotNull(watchlistItems.customRank)))
+    .limit(1)
+    .all();
+  if (existingRanked.length > 0) return;
+
+  const orderedItems = transaction
+    .select({ id: watchlistItems.id })
+    .from(watchlistItems)
+    .where(eq(watchlistItems.watchlistId, watchlistId))
+    .orderBy(...releaseDateOrder, asc(watchlistItems.id))
+    .all();
+
+  orderedItems.forEach((item, index) => {
+    transaction
+      .update(watchlistItems)
+      .set({ customRank: index + 1 })
+      .where(and(eq(watchlistItems.id, item.id), eq(watchlistItems.watchlistId, watchlistId)))
+      .run();
+  });
 }
 
 export async function insertWatchlistItem(values: typeof watchlistItems.$inferInsert) {

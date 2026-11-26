@@ -250,7 +250,7 @@ async fn reorder_entry(lists: &Watchlists, entry: Value, index: usize) -> BatchE
                 eprintln!(
                     "MCP reorder failed for watchlist {watchlist_id}, batch entry {index}: {error}"
                 );
-                BatchEntry::failed("internal_error", "Unable to reorder watchlist items.")
+                return internal_error();
             }
         },
         _ => BatchEntry::failed(
@@ -351,7 +351,21 @@ fn build_contracts() -> Vec<Contract> {
         "update_watchlists",
         "Update watchlists",
         object_schema(
-            json!({"watchlists":{"type":"array","minItems":1,"items":{"type":"object","properties":{"watchlistId":{"type":"number"},"name":{"type":"string"},"description":{"type":["string","null"]},"itemOrderMode":{"type":"string","enum":["release","custom"]}}}}}),
+            json!({
+                "watchlists": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "watchlistId": {"type": "number", "description": "Stable internal watchlist ID."},
+                            "name": {"type": "string", "description": "New name; omit to keep the existing name. Null is not allowed."},
+                            "description": {"type": ["string", "null"], "description": "New description; omit to keep it, or null or an empty string to clear it."},
+                            "itemOrderMode": {"type": "string", "enum": ["release", "custom"], "description": "New order mode; omit to keep the existing mode."}
+                        }
+                    }
+                }
+            }),
             json!(["watchlists"]),
         ),
     );
