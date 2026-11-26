@@ -19,35 +19,37 @@ class ItemEditDialog {
 
   constructor(dialog) {
     this.dialog = dialog;
-    this.documentEvents = [
-      ["click", this.onClick],
-      ["input", this.onInput],
-      ["watchlist-item-saved", this.onSaved],
-      ["htmx:beforeRequest", this.onRequest],
-      ["htmx:beforeSwap", this.onBeforeSwap],
-      ["htmx:afterSwap", this.onSwap],
-      ["htmx:afterSettle", this.onRefreshSettled],
-      ["htmx:responseError", this.onTransportError],
-      ["htmx:sendError", this.onTransportError],
-      ["htmx:abort", this.onAbort],
-    ];
-    this.dialogEvents = [
-      ["cancel", this.onCancel],
-      ["close", this.restoreFocus],
-    ];
   }
 
   connect() {
-    this.documentEvents.forEach(([type, listener]) => document.addEventListener(type, listener));
-    this.dialogEvents.forEach(([type, listener]) => this.dialog.addEventListener(type, listener));
+    document.addEventListener("click", this.onClick);
+    document.addEventListener("input", this.onInput);
+    document.addEventListener("watchlist-item-saved", this.onSaved);
+    document.addEventListener("htmx:beforeRequest", this.onRequest);
+    document.addEventListener("htmx:beforeSwap", this.onBeforeSwap);
+    document.addEventListener("htmx:afterSwap", this.onSwap);
+    document.addEventListener("htmx:afterSettle", this.onRefreshSettled);
+    document.addEventListener("htmx:responseError", this.onTransportError);
+    document.addEventListener("htmx:sendError", this.onTransportError);
+    document.addEventListener("htmx:abort", this.onAbort);
+    this.dialog.addEventListener("cancel", this.onCancel);
+    this.dialog.addEventListener("close", this.restoreFocus);
     window.addEventListener("pagehide", this.disconnect, { once: true });
   }
 
   disconnect = () => {
-    this.documentEvents.forEach(([type, listener]) => document.removeEventListener(type, listener));
-    this.dialogEvents.forEach(([type, listener]) =>
-      this.dialog.removeEventListener(type, listener),
-    );
+    document.removeEventListener("click", this.onClick);
+    document.removeEventListener("input", this.onInput);
+    document.removeEventListener("watchlist-item-saved", this.onSaved);
+    document.removeEventListener("htmx:beforeRequest", this.onRequest);
+    document.removeEventListener("htmx:beforeSwap", this.onBeforeSwap);
+    document.removeEventListener("htmx:afterSwap", this.onSwap);
+    document.removeEventListener("htmx:afterSettle", this.onRefreshSettled);
+    document.removeEventListener("htmx:responseError", this.onTransportError);
+    document.removeEventListener("htmx:sendError", this.onTransportError);
+    document.removeEventListener("htmx:abort", this.onAbort);
+    this.dialog.removeEventListener("cancel", this.onCancel);
+    this.dialog.removeEventListener("close", this.restoreFocus);
     window.clearTimeout(this.notificationTimeout);
     window.removeEventListener("pagehide", this.disconnect);
   };
