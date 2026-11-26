@@ -110,7 +110,7 @@ describe("MergeWatchlistDialog", () => {
       expect(mergeWatchlistsFnMock).toHaveBeenCalledWith({
         data: {
           sourceWatchlistIds: [1, 2, 3],
-          newWatchlistName: "Merged Queue",
+          target: { kind: "new", name: "Merged Queue" },
         },
       });
     });
@@ -136,7 +136,7 @@ describe("MergeWatchlistDialog", () => {
       expect(mergeWatchlistsFnMock).toHaveBeenCalledWith({
         data: {
           sourceWatchlistIds: [2, 1],
-          targetWatchlistId: 1,
+          target: { kind: "existing", watchlistId: 1 },
         },
       });
     });

@@ -1,8 +1,7 @@
 import { initialWatchlistLifecycle } from "./lifecycle/WatchlistLifecycle.server";
 import { getDb, type DatabaseTransaction } from "@/db/Db.server";
 import { watchlists, watchlistItems } from "@/db/Schema";
-import { and, eq, inArray, sql } from "drizzle-orm";
-import type { MergeWatchlistsInput } from "@/features/watchlists/merge/Mutation";
+import { and, eq, sql } from "drizzle-orm";
 import type { WatchlistItemOrderMode } from "@/features/watchlists/Order";
 
 type WatchlistDatabase = ReturnType<typeof getDb> | DatabaseTransaction;
@@ -37,24 +36,6 @@ export function getWatchlistById(watchlistId: number, database: WatchlistDatabas
     .limit(1)
     .all();
   return watchlist ?? null;
-}
-
-export async function hasCustomOrderMergeParticipant({
-  targetWatchlistId,
-  sourceWatchlistIds,
-}: Pick<MergeWatchlistsInput, "targetWatchlistId" | "sourceWatchlistIds">) {
-  const participantIds = Array.from(
-    new Set(targetWatchlistId ? [...sourceWatchlistIds, targetWatchlistId] : sourceWatchlistIds),
-  );
-
-  const db = getDb();
-  const [customOrderParticipant] = await db
-    .select({ id: watchlists.id })
-    .from(watchlists)
-    .where(and(inArray(watchlists.id, participantIds), eq(watchlists.itemOrderMode, "custom")))
-    .limit(1);
-
-  return customOrderParticipant !== undefined;
 }
 
 export async function markLastItemAdded(watchlistId: number) {

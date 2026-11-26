@@ -86,7 +86,7 @@ export function MergeWatchlistDialog({
     const result = await mergeWatchlistsFn({
       data: {
         sourceWatchlistIds: orderedSourceWatchlistIds,
-        newWatchlistName: newName,
+        target: { kind: "new", name: newName },
       },
     });
     if (!result.success) showMergeError(result.message);
@@ -98,7 +98,7 @@ export function MergeWatchlistDialog({
     const result = await mergeWatchlistsFn({
       data: {
         sourceWatchlistIds: orderedSourceWatchlistIds,
-        targetWatchlistId: parseInt(targetId, 10),
+        target: { kind: "existing", watchlistId: parseInt(targetId, 10) },
       },
     });
     if (!result.success) showMergeError(result.message);

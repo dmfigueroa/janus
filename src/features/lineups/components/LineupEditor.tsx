@@ -2,8 +2,12 @@ import { Dialog, Portal } from "@chakra-ui/react";
 import type { LineupData } from "@/features/lineups/manage/Lineups";
 import { useLineupEditor } from "@/features/lineups/manage/useLineupEditor";
 import { LineupEditorForm } from "@/features/lineups/components/LineupEditorForm";
-type Lineup = LineupData["lineups"][number];
-type Props = { lineup?: Lineup; watchlists: LineupData["watchlists"]; trigger: React.ReactNode };
+type CustomLineup = Extract<LineupData["lineups"][number], { kind: "custom" }>;
+type Props = {
+  lineup?: CustomLineup;
+  watchlists: LineupData["watchlists"];
+  trigger: React.ReactNode;
+};
 export function LineupEditor({ lineup, watchlists, trigger }: Props) {
   const editor = useLineupEditor(lineup, watchlists);
   return (

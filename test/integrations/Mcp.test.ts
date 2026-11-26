@@ -310,6 +310,7 @@ describe("Janus MCP endpoint", () => {
             newWatchlistName: "Invalid",
           },
           { sourceWatchlistIds: [target.id], targetWatchlistId: "invalid" },
+          { sourceWatchlistIds: [target.id], newWatchlistName: "   " },
         ],
       },
     });
@@ -330,6 +331,7 @@ describe("Janus MCP endpoint", () => {
         },
         { index: 3, success: false, code: "validation_error" },
         { index: 4, success: false, code: "validation_error" },
+        { index: 5, success: false, code: "validation_error" },
       ],
     });
     const items = await database

@@ -8,9 +8,9 @@ export const Route = createFileRoute("/rotations/custom/$lineupId")({
     const id = Number(params.lineupId);
     if (!validLineupId(id)) throw notFound();
     const data = await getLineupData();
-    const lineup = data.lineups.find(
-      (entry) => entry.reference.kind === "custom" && entry.reference.id === id,
-    );
+    const lineup = data.lineups
+      .filter((entry) => entry.kind === "custom")
+      .find((entry) => entry.reference.id === id);
     if (!lineup) throw notFound();
     return { lineup, watchlists: data.watchlists };
   },

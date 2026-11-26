@@ -1,7 +1,7 @@
 import { readWatchlistLifecycle } from "@/features/watchlists/lifecycle/WatchlistLifecycle";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db/Db.server";
-import { lineupWatchlists } from "@/db/Schema";
+import { lineupWatchlists, type WatchlistItem } from "@/db/Schema";
 import {
   listWatchlistSummaries,
   type WatchlistSummary,
@@ -9,11 +9,27 @@ import {
 import {
   findLineup,
   listLineups,
+  type CustomLineupRecord,
   type LineupWithReference,
+  type SystemLineupRecord,
 } from "@/features/lineups/manage/LineupConfiguration.server";
-import type { LineupReference } from "@/features/lineups/LineupReference";
+import type { LineupReference, SystemLineupKey } from "@/features/lineups/LineupReference";
 
-const mediaKeys: Record<string, string> = {
+export type SystemLineup = SystemLineupRecord & {
+  eligibleWatchlists: WatchlistSummary[];
+  eligibleCount: number;
+};
+
+export type CustomLineup = CustomLineupRecord & {
+  configuredWatchlists: WatchlistSummary[];
+  configuredCount: number;
+  eligibleWatchlists: WatchlistSummary[];
+  eligibleCount: number;
+};
+
+export type Lineup = SystemLineup | CustomLineup;
+
+const mediaKeys: Record<WatchlistItem["mediaType"], SystemLineupKey> = {
   movie: "movie",
   episode: "television",
   anime: "television",
@@ -23,7 +39,7 @@ const mediaKeys: Record<string, string> = {
   manga: "comic",
 };
 
-export async function readLineups() {
+export async function readLineups(): Promise<Lineup[]> {
   const [configuration, summaries] = await Promise.all([
     listLineups(),
     listWatchlistSummaries({ orderBy: "recency" }),
@@ -40,7 +56,7 @@ export async function readLineups() {
   );
 }
 
-export async function readLineup(reference: LineupReference) {
+export async function readLineup(reference: LineupReference): Promise<Lineup | undefined> {
   const [lineup, summaries] = await Promise.all([
     findLineup(reference),
     listWatchlistSummaries({ orderBy: "recency" }),
@@ -59,30 +75,54 @@ function buildLineup(
   lineup: LineupWithReference,
   summaries: WatchlistSummary[],
   memberIds: number[],
-) {
-  const configuredWatchlists =
-    lineup.kind === "custom" ? summaries.filter((summary) => memberIds.includes(summary.id)) : null;
-  const eligibleWatchlists = summaries.filter(
-    (summary) => isEligible(summary) && belongs(lineup, summary, memberIds),
+): Lineup {
+  switch (lineup.kind) {
+    case "system":
+      return buildSystemLineup(lineup, summaries);
+    case "custom":
+      return buildCustomLineup(lineup, summaries, memberIds);
+  }
+}
+
+function buildSystemLineup(
+  lineup: SystemLineupRecord,
+  summaries: WatchlistSummary[],
+): SystemLineup {
+  const eligibleWatchlists = summaries.filter((summary) =>
+    isEligibleSystemWatchlist(summary, lineup.systemKey),
   );
   return {
     ...lineup,
-    configuredWatchlists,
     eligibleWatchlists,
-    configuredCount: configuredCount(configuredWatchlists),
     eligibleCount: eligibleWatchlists.length,
   };
 }
 
-function configuredCount(watchlists: WatchlistSummary[] | null) {
-  return watchlists?.length ?? null;
+function buildCustomLineup(
+  lineup: CustomLineupRecord,
+  summaries: WatchlistSummary[],
+  memberIds: number[],
+): CustomLineup {
+  const configuredWatchlists = summaries.filter((summary) => memberIds.includes(summary.id));
+  const eligibleWatchlists = configuredWatchlists.filter(isEligibleWatchlist);
+  return {
+    ...lineup,
+    configuredWatchlists,
+    configuredCount: configuredWatchlists.length,
+    eligibleWatchlists,
+    eligibleCount: eligibleWatchlists.length,
+  };
 }
 
-function isEligible(summary: WatchlistSummary) {
+function isEligibleWatchlist(summary: WatchlistSummary) {
   return readWatchlistLifecycle(summary).eligible && summary.stats.nextUnwatched !== null;
 }
 
-function belongs(lineup: LineupWithReference, summary: WatchlistSummary, memberIds: number[]) {
-  if (lineup.kind === "custom") return memberIds.includes(summary.id);
-  return mediaKeys[summary.stats.nextUnwatched!.mediaType] === lineup.systemKey;
+function isEligibleSystemWatchlist(summary: WatchlistSummary, systemKey: SystemLineupKey) {
+  const nextUnwatched = summary.stats.nextUnwatched;
+  return (
+    readWatchlistLifecycle(summary).eligible &&
+    nextUnwatched !== null &&
+    mediaKeys[nextUnwatched.mediaType] === systemKey
+  );
 }

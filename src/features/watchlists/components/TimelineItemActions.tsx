@@ -2,19 +2,11 @@ import { useState } from "react";
 import type { WatchlistItem } from "@/db/Schema";
 import { useToggleWatchedItem } from "@/features/watchlists/detail/useToggleWatchedItem";
 import { getTimelineItemActionLabels, TimelineItemActionMenu } from "./TimelineItemActionMenu";
-import { TimelineItemDialogs, type OpenDialogs } from "./TimelineItemDialogs";
+import { TimelineItemDialogs, type ActiveItemDialog } from "./TimelineItemDialogs";
 
 type TimelineItemActionsProps = {
   item: WatchlistItem;
   interactionDisabled?: boolean;
-};
-
-const noDialogsOpen: OpenDialogs = {
-  edit: false,
-  removeItem: false,
-  removeParent: false,
-  moveItem: false,
-  moveParent: false,
 };
 
 export function TimelineItemActions({
@@ -22,13 +14,10 @@ export function TimelineItemActions({
   interactionDisabled = false,
 }: TimelineItemActionsProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [openDialogs, setOpenDialogs] = useState<OpenDialogs>(noDialogsOpen);
+  const [activeDialog, setActiveDialog] = useState<ActiveItemDialog | null>(null);
   const labels = getTimelineItemActionLabels(item);
   const quietWatchMutation = useToggleWatchedItem(item, { updateWatchlistRecency: false });
   const isBusy = [interactionDisabled, quietWatchMutation.isPending].some(Boolean);
-  const openDialog = (dialogs: Partial<OpenDialogs>) => {
-    setOpenDialogs({ ...noDialogsOpen, ...dialogs });
-  };
 
   return (
     <>
@@ -39,18 +28,18 @@ export function TimelineItemActions({
         disabled={isBusy}
         onOpenChange={setMenuOpen}
         onMarkWatched={quietWatchMutation.mutate}
-        onEdit={() => openDialog({ edit: true })}
-        onRemoveItem={() => openDialog({ removeItem: true })}
-        onRemoveParent={() => openDialog({ removeParent: true })}
-        onMoveItem={() => openDialog({ moveItem: true })}
-        onMoveParent={() => openDialog({ moveParent: true })}
+        onEdit={() => setActiveDialog("edit")}
+        onRemoveItem={() => setActiveDialog("removeItem")}
+        onRemoveParent={() => setActiveDialog("removeParent")}
+        onMoveItem={() => setActiveDialog("moveItem")}
+        onMoveParent={() => setActiveDialog("moveParent")}
       />
 
       <TimelineItemDialogs
         item={item}
         labels={labels}
-        openDialogs={openDialogs}
-        onOpenChange={openDialog}
+        activeDialog={activeDialog}
+        onClose={() => setActiveDialog(null)}
       />
     </>
   );

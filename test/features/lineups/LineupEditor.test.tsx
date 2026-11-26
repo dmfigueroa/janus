@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { Button } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@test/utils/Render";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@test/utils/Render";
 import { afterEach, expect, it, vi } from "vitest";
 import { LineupEditor } from "@/features/lineups/components/LineupEditor";
+import { useLineupEditor } from "@/features/lineups/manage/useLineupEditor";
 import type { LineupData } from "@/features/lineups/manage/Lineups";
 
 const submit = vi.fn().mockResolvedValue(true);
@@ -143,4 +144,21 @@ it("preselects configured edit members and does not submit when searching with E
       watchlistIds: [7],
     }),
   );
+});
+
+it("deduplicates repeated watchlist selections in useLineupEditor", () => {
+  const { result } = renderHook(() => useLineupEditor(undefined, []));
+
+  act(() => {
+    result.current.toggle(42, true);
+    result.current.toggle(42, true);
+  });
+
+  expect(result.current.selected).toEqual([42]);
+
+  act(() => {
+    result.current.toggle(42, false);
+  });
+
+  expect(result.current.selected).toEqual([]);
 });
