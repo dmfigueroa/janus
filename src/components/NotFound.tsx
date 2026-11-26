@@ -1,7 +1,9 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { Button, HStack, Stack, Text } from "@chakra-ui/react";
 
 export function NotFound() {
+  const router = useRouter();
+
   return (
     <Stack minH="50vh" align="center" justify="center" gap={4} p={4} textAlign="center">
       <Text
@@ -24,8 +26,8 @@ export function NotFound() {
         >
           <Link to="/">Go Home</Link>
         </Button>
-        <Button asChild variant="subtle">
-          <Link to="..">Go Back</Link>
+        <Button type="button" variant="subtle" onClick={() => router.history.back()}>
+          Go Back
         </Button>
       </HStack>
     </Stack>

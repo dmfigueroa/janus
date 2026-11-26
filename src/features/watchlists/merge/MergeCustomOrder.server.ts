@@ -30,11 +30,11 @@ function loadMergeParticipants(transaction: DatabaseTransaction, orderedWatchlis
   );
   const itemsByWatchlistId = participantItems.reduce<
     Map<number, Array<typeof watchlistItems.$inferSelect>>
-  >((acc, item) => {
-    const items = acc.get(item.watchlistId) ?? [];
+  >((itemsByWatchlist, item) => {
+    const items = itemsByWatchlist.get(item.watchlistId) ?? [];
     items.push(item);
-    acc.set(item.watchlistId, items);
-    return acc;
+    itemsByWatchlist.set(item.watchlistId, items);
+    return itemsByWatchlist;
   }, new Map());
 
   return orderedWatchlistIds.flatMap((watchlistId) => {

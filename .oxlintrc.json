@@ -81,6 +81,7 @@
     "oxc/double-comparisons": "warn",
     "oxc/erasing-op": "warn",
     "oxc/missing-throw": "warn",
+    "oxc/no-accumulating-spread": "error",
     "oxc/number-arg-out-of-range": "warn",
     "oxc/only-used-in-recursion": "warn",
     "oxc/uninvoked-array-callback": "warn",

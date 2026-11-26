@@ -96,20 +96,23 @@ function loadSummarySelections(db: ReturnType<typeof getDb>, listIds: number[]) 
 function indexSummaryCounts(
   rows: Array<{ watchlistId: number; totalItems: number; watchedItems: number }>,
 ) {
-  return rows.reduce<Record<number, SummaryCounts>>((acc, row) => {
-    acc[row.watchlistId] = { totalItems: row.totalItems, watchedItems: row.watchedItems };
-    return acc;
+  return rows.reduce<Record<number, SummaryCounts>>((countsByWatchlist, row) => {
+    countsByWatchlist[row.watchlistId] = {
+      totalItems: row.totalItems,
+      watchedItems: row.watchedItems,
+    };
+    return countsByWatchlist;
   }, {});
 }
 
 function indexSummarySelections(
   rows: Array<WatchlistItem & { watchlistId: number; coverRank: number; unwatchedRank: number }>,
 ) {
-  return rows.reduce<Record<number, SummarySelection>>((acc, item) => {
-    const entry = (acc[item.watchlistId] ??= { ...emptySummarySelection });
+  return rows.reduce<Record<number, SummarySelection>>((selectionsByWatchlist, item) => {
+    const entry = (selectionsByWatchlist[item.watchlistId] ??= { ...emptySummarySelection });
     assignCoverItem(entry, item);
     assignNextUnwatched(entry, item);
-    return acc;
+    return selectionsByWatchlist;
   }, {});
 }
 

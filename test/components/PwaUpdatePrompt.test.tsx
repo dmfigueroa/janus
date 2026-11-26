@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { StrictMode } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Provider } from "@/app/Provider";
@@ -257,5 +258,50 @@ describe("PwaUpdatePrompt", () => {
     expect(screen.queryByText("Update available")).toBeNull();
 
     consoleError.mockRestore();
+  });
+
+  it("ignores async registration resolution after unmount", async () => {
+    let resolveRegistration: ((value: PwaRegistrationModule) => void) | undefined;
+    const registerSW = vi.fn(() => vi.fn().mockResolvedValue(undefined)) as RegisterSW;
+
+    mockedLoadPwaRegistration.mockReturnValue(
+      new Promise<PwaRegistrationModule>((resolve) => {
+        resolveRegistration = resolve;
+      }),
+    );
+
+    const { unmount } = render(PwaPromptTestHarness());
+    unmount();
+
+    resolveRegistration?.(createPwaRegistrationModule(registerSW));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(registerSW).not.toHaveBeenCalled();
+    expect(screen.queryByText("Update available")).toBeNull();
+  });
+
+  it("shows the update prompt cleanly under React StrictMode", async () => {
+    const updateServiceWorker = vi.fn().mockResolvedValue(undefined);
+    const registration = createServiceWorkerRegistration({
+      waiting: {} as ServiceWorker,
+      update: vi.fn().mockResolvedValue(undefined),
+    });
+    const registerSW = vi.fn((options) => {
+      options?.onRegisteredSW?.("/sw.js", registration);
+      return updateServiceWorker;
+    }) as RegisterSW;
+
+    mockedLoadPwaRegistration.mockResolvedValue(createPwaRegistrationModule(registerSW));
+
+    render(
+      <StrictMode>
+        <PwaPromptTestHarness />
+      </StrictMode>,
+    );
+
+    await screen.findByText("Update available");
+    expect(registerSW).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByRole("button", { name: "Update" })).toHaveLength(1);
   });
 });

@@ -1,11 +1,7 @@
 import { useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
-import { toaster } from "@/app/Toaster";
-import { createWatchlist } from "@/features/watchlists/create/Mutation";
-import { watchlistListQueryKey, type WatchlistSummary } from "@/features/watchlists/list/Query";
+import type { WatchlistSummary } from "@/features/watchlists/list/Query";
 import { SearchWatchlistCombobox } from "./SearchWatchlistCombobox";
+import { useCreateSearchWatchlist } from "./useCreateSearchWatchlist";
 
 interface SearchWatchlistSelectorProps {
   watchlists: WatchlistSummary[] | undefined;
@@ -19,8 +15,6 @@ export interface SearchWatchlistSelectorItem {
   value: string;
   isCreateOption?: boolean;
 }
-
-const watchlistSelectorFilters = { orderBy: "lastAdded" } as const;
 
 type SelectorItem = SearchWatchlistSelectorItem;
 
@@ -101,10 +95,13 @@ export function SearchWatchlistSelector({
 }: SearchWatchlistSelectorProps) {
   const [inputValue, setInputValue] = useState("");
   const [createdWatchlist, setCreatedWatchlist] = useState<SelectorItem | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const createWatchlistFn = useServerFn(createWatchlist);
-  const queryClient = useQueryClient();
-  const router = useRouter();
+  const { createWatchlist, isCreating } = useCreateSearchWatchlist({
+    onCreated: (watchlist) => {
+      setCreatedWatchlist(watchlist);
+      setInputValue("");
+      onSelect(watchlist.value);
+    },
+  });
   const selectedWatchlistName = getSelectedWatchlistName(
     watchlists,
     selectedWatchlistId,
@@ -114,26 +111,6 @@ export function SearchWatchlistSelector({
     () => getSelectorItems(watchlists, inputValue, createdWatchlist),
     [createdWatchlist, inputValue, watchlists],
   );
-
-  const createNewWatchlist = async (name: string) => {
-    setIsCreating(true);
-    try {
-      const newWatchlist = await createWatchlistFn({ data: { name } });
-      const newWatchlistId = newWatchlist.id.toString();
-      setCreatedWatchlist({ label: newWatchlist.name, value: newWatchlistId });
-      setInputValue("");
-      onSelect(newWatchlistId);
-      await queryClient.invalidateQueries({
-        queryKey: watchlistListQueryKey(watchlistSelectorFilters),
-      });
-      await router.invalidate?.();
-    } catch (error) {
-      console.error(error);
-      toaster.create({ type: "error", title: "Failed to create watchlist" });
-    } finally {
-      setIsCreating(false);
-    }
-  };
 
   return (
     <SearchWatchlistCombobox
@@ -146,7 +123,7 @@ export function SearchWatchlistSelector({
         setInputValue("");
         onSelect("");
       }}
-      onCreate={(name) => void createNewWatchlist(name)}
+      onCreate={createWatchlist}
       onSelect={onSelect}
       onInputValueChange={setInputValue}
     />

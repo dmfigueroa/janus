@@ -13,6 +13,8 @@ vi.mock("@/features/search/useSearchResults", () => ({
     allResults: [],
     status: "empty_query",
     message: "Enter a search term to find media.",
+    dataUpdatedAt: 0,
+    isLoading: false,
     fetchNextPage: vi.fn(),
     hasNextPage: false,
     isFetchingNextPage: false,
@@ -23,12 +25,17 @@ vi.mock("@/features/search/useSearchNavigation", () => ({
   useSearchNavigation: vi.fn(() => ({
     handleSearch: vi.fn(),
     handleTabChange: vi.fn(),
+    isNavigating: false,
   })),
 }));
 
 vi.mock("@/features/search/SearchInput", () => ({
-  SearchInput: ({ defaultValue }: { defaultValue: string }) => (
-    <input data-testid="search-input" defaultValue={defaultValue} />
+  SearchInput: ({ defaultValue, isLoading }: { defaultValue: string; isLoading?: boolean }) => (
+    <input
+      data-testid="search-input"
+      data-loading={String(Boolean(isLoading))}
+      defaultValue={defaultValue}
+    />
   ),
 }));
 
@@ -65,11 +72,17 @@ const deprecatedOutcome: MediaSearchOutcome = {
   message: "Anime and manga categories are deprecated while we revisit provider data quality.",
 };
 
-function mockSearchResults(outcome: MediaSearchOutcome, allResults: unknown[] = []) {
+function mockSearchResults(
+  outcome: MediaSearchOutcome,
+  allResults: unknown[] = [],
+  options: { isLoading?: boolean; dataUpdatedAt?: number } = {},
+) {
   vi.mocked(useSearchResults).mockReturnValue({
     allResults: allResults as never,
     status: outcome.status,
     message: outcome.message,
+    dataUpdatedAt: options.dataUpdatedAt ?? 0,
+    isLoading: options.isLoading ?? false,
     fetchNextPage: vi.fn(),
     hasNextPage: false,
     isFetchingNextPage: false,
@@ -87,6 +100,7 @@ describe("SearchDiscoveryScreen behavior", () => {
     vi.mocked(useSearchNavigation).mockReturnValue({
       handleSearch: vi.fn(),
       handleTabChange: vi.fn(),
+      isNavigating: false,
     });
   });
 
@@ -154,31 +168,59 @@ describe("SearchDiscoveryScreen behavior", () => {
     expect(screen.getByText("1 result(s)")).not.toBeNull();
   });
 
-  it("shows the deprecated search message returned by the search boundary", () => {
+  it("shows a single deprecated search banner on deprecated media routes", () => {
     mockSearchResults(deprecatedOutcome);
 
     render(<SearchDiscoveryScreen query="naruto" type="anime" initialData={deprecatedOutcome} />);
     const deprecatedMessages = screen.getAllByText(/Anime and manga categories are deprecated/);
-    expect(deprecatedMessages.length).toBeGreaterThanOrEqual(2);
+    expect(deprecatedMessages).toHaveLength(1);
+    expect(
+      screen.getByText(/Please switch to Movies, TV, Games, Books, or Comics\./),
+    ).not.toBeNull();
     expect(toasterCreateMock).not.toHaveBeenCalled();
   });
 
-  it("toasts the provider-unavailable message returned by the search boundary", () => {
+  it("wires live loading state from search results and navigation into SearchInput", () => {
+    mockSearchResults(emptyOutcome, [], { isLoading: true });
+
+    const { rerender } = render(
+      <SearchDiscoveryScreen query="dune" type="book" initialData={emptyOutcome} />,
+    );
+    expect(screen.getByTestId("search-input").getAttribute("data-loading")).toBe("true");
+
+    mockSearchResults(emptyOutcome, [], { isLoading: false });
+    vi.mocked(useSearchNavigation).mockReturnValue({
+      handleSearch: vi.fn(),
+      handleTabChange: vi.fn(),
+      isNavigating: true,
+    });
+    rerender(<SearchDiscoveryScreen query="dune" type="book" initialData={emptyOutcome} />);
+    expect(screen.getByTestId("search-input").getAttribute("data-loading")).toBe("true");
+  });
+
+  it("toasts the provider-unavailable message on each distinct failed search attempt", () => {
     const providerUnavailableOutcome: MediaSearchOutcome = {
       status: "provider_unavailable",
       page: 1,
       message: "Search is temporarily unavailable for this media type. Please try again later.",
     };
-    mockSearchResults(providerUnavailableOutcome);
+    mockSearchResults(providerUnavailableOutcome, [], { dataUpdatedAt: 1 });
 
-    render(
+    const { rerender } = render(
       <SearchDiscoveryScreen query="Dune" type="book" initialData={providerUnavailableOutcome} />,
     );
 
+    expect(toasterCreateMock).toHaveBeenCalledTimes(1);
     expect(toasterCreateMock).toHaveBeenCalledWith({
       id: "media-search-provider-unavailable",
       type: "error",
       title: "Search is temporarily unavailable for this media type. Please try again later.",
     });
+
+    const repeatOutcome: MediaSearchOutcome = { ...providerUnavailableOutcome };
+    mockSearchResults(repeatOutcome, [], { dataUpdatedAt: 2 });
+    rerender(<SearchDiscoveryScreen query="Foundation" type="book" initialData={repeatOutcome} />);
+
+    expect(toasterCreateMock).toHaveBeenCalledTimes(2);
   });
 });

@@ -27,6 +27,10 @@ function getCurrentOutcome(pages: MediaSearchOutcome[], initialData: MediaSearch
   return rejection ?? pages.at(0) ?? initialData;
 }
 
+function isInitialSearchFetching(isFetching: boolean, isFetchingNextPage: boolean) {
+  return isFetching && !isFetchingNextPage;
+}
+
 export function useSearchResults({ query, type, initialData }: UseSearchResultsOptions) {
   const searchUnifiedFn = useServerFn(searchUnified);
 
@@ -36,13 +40,14 @@ export function useSearchResults({ query, type, initialData }: UseSearchResultsO
     [query, type, searchUnifiedFn],
   );
 
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
-    queryKey: ["search", query, type],
-    queryFn: fetchPage,
-    initialPageParam: 1,
-    getNextPageParam: getNextMediaSearchPage,
-    initialData: { pages: [initialData], pageParams: [1] },
-  });
+  const { data, dataUpdatedAt, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage } =
+    useInfiniteQuery({
+      queryKey: ["search", query, type],
+      queryFn: fetchPage,
+      initialPageParam: 1,
+      getNextPageParam: getNextMediaSearchPage,
+      initialData: { pages: [initialData], pageParams: [1] },
+    });
 
   const pages = data?.pages ?? [];
   const currentOutcome = getCurrentOutcome(pages, initialData);
@@ -51,6 +56,8 @@ export function useSearchResults({ query, type, initialData }: UseSearchResultsO
     allResults: flattenResults(pages),
     status: currentOutcome.status,
     message: currentOutcome.message,
+    dataUpdatedAt,
+    isLoading: isInitialSearchFetching(isFetching, isFetchingNextPage),
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,

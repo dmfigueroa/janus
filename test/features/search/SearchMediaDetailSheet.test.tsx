@@ -154,7 +154,9 @@ describe("SearchMediaDetailSheet custom-order insertion choices", () => {
     expect(await screen.findByText("Insert in custom order")).not.toBeNull();
     expect(screen.getByText("Selected: 2")).not.toBeNull();
 
-    fireEvent.click(screen.getByText("End"));
+    const endRadio = screen.getByRole("radio", { name: "End" });
+    endRadio.click();
+    await waitFor(() => expect(endRadio).toHaveProperty("checked", true));
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
 
     await waitFor(() => {

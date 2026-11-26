@@ -72,13 +72,13 @@ export async function fetchEpisodesAcrossSeasons(
   seasons: Array<{ season_number: number }> | undefined,
   signal?: AbortSignal,
 ) {
-  const targetSeasons = (seasons || []).filter((s) => s.season_number !== 0);
+  const targetSeasons = (seasons || []).filter((season) => season.season_number !== 0);
 
   const results = await Promise.all(
     targetSeasons.map((season) =>
       limit(() =>
         fetchTmdbSeason({ id: tmdbId, seasonNumber: season.season_number }, signal).then(
-          (sd: { episodes: TMDBEpisode[] }) => sd.episodes,
+          (seasonDetails: { episodes: TMDBEpisode[] }) => seasonDetails.episodes,
         ),
       ),
     ),

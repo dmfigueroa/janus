@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useRef, useState, type RefObject } from "react";
 import type { UnifiedMedia } from "@/server/Media";
 import {
   Button,
@@ -35,6 +35,7 @@ export function CreateCustomItemDialog({
 }: CreateCustomItemDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const [fieldError, setFieldError] = useState<CustomItemFieldError | null>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const isOpen = open ?? internalOpen;
 
   const setIsOpen = (nextOpen: boolean) => {
@@ -59,7 +60,7 @@ export function CreateCustomItemDialog({
 
   return (
     <Dialog.Root
-      initialFocusEl={customTitleInput}
+      initialFocusEl={() => titleInputRef.current}
       open={isOpen}
       onOpenChange={({ open: nextOpen }) => setIsOpen(nextOpen)}
     >
@@ -79,6 +80,7 @@ export function CreateCustomItemDialog({
             </Dialog.Header>
             <CustomItemForm
               fieldError={fieldError}
+              titleInputRef={titleInputRef}
               onClearError={() => setFieldError(null)}
               onCancel={() => setIsOpen(false)}
               onSubmit={handleSubmit}
@@ -92,15 +94,22 @@ export function CreateCustomItemDialog({
 
 function CustomItemForm({
   fieldError,
+  titleInputRef,
   onClearError,
   onCancel,
   onSubmit,
 }: {
   fieldError: CustomItemFieldError | null;
+  titleInputRef: RefObject<HTMLInputElement | null>;
   onClearError: () => void;
   onCancel: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
+  const idPrefix = useId();
+  const titleId = `${idPrefix}-title`;
+  const typeId = `${idPrefix}-type`;
+  const yearId = `${idPrefix}-year`;
+  const overviewId = `${idPrefix}-overview`;
   const titleError = fieldMessage(fieldError, "title");
   const yearError = fieldMessage(fieldError, "year");
 
@@ -109,9 +118,10 @@ function CustomItemForm({
       <Dialog.Body>
         <Stack gap={4}>
           <Field.Root required invalid={Boolean(titleError)}>
-            <Field.Label htmlFor="custom-item-title">Title</Field.Label>
+            <Field.Label htmlFor={titleId}>Title</Field.Label>
             <Input
-              id="custom-item-title"
+              ref={titleInputRef}
+              id={titleId}
               name="title"
               placeholder="e.g. My Favorite obscure movie"
               required
@@ -121,9 +131,9 @@ function CustomItemForm({
           </Field.Root>
           <Stack direction={{ base: "column", sm: "row" }} gap={4}>
             <Field.Root flex={1}>
-              <Field.Label htmlFor="custom-item-type">Type</Field.Label>
+              <Field.Label htmlFor={typeId}>Type</Field.Label>
               <NativeSelect.Root>
-                <NativeSelect.Field id="custom-item-type" name="mediaType" defaultValue="movie">
+                <NativeSelect.Field id={typeId} name="mediaType" defaultValue="movie">
                   <option value="movie">Movie</option>
                   <option value="tv">TV Show</option>
                   <option value="book">Book</option>
@@ -134,18 +144,14 @@ function CustomItemForm({
               </NativeSelect.Root>
             </Field.Root>
             <Field.Root flex={1} invalid={Boolean(yearError)}>
-              <Field.Label htmlFor="custom-item-year">Year (Optional)</Field.Label>
-              <Input id="custom-item-year" name="year" placeholder="YYYY" onChange={onClearError} />
+              <Field.Label htmlFor={yearId}>Year (Optional)</Field.Label>
+              <Input id={yearId} name="year" placeholder="YYYY" onChange={onClearError} />
               <FieldErrorMessage message={yearError} />
             </Field.Root>
           </Stack>
           <Field.Root>
-            <Field.Label htmlFor="custom-item-overview">Description (Optional)</Field.Label>
-            <Textarea
-              id="custom-item-overview"
-              name="overview"
-              placeholder="Brief description..."
-            />
+            <Field.Label htmlFor={overviewId}>Description (Optional)</Field.Label>
+            <Textarea id={overviewId} name="overview" placeholder="Brief description..." />
           </Field.Root>
         </Stack>
       </Dialog.Body>
@@ -164,8 +170,4 @@ function CustomItemForm({
 function FieldErrorMessage({ message }: { message: string }) {
   if (!message) return null;
   return <Field.ErrorText>{message}</Field.ErrorText>;
-}
-
-function customTitleInput() {
-  return document.querySelector<HTMLInputElement>("#custom-item-title");
 }

@@ -10,35 +10,35 @@ export type AnchorRefinementShape = {
 
 export function anchorInsertionRefinement(
   value: AnchorRefinementShape,
-  ctx: z.RefinementCtx,
+  context: z.RefinementCtx,
 ): void {
   if (isAnchorPosition(value.insertionPosition)) {
-    requireReferenceItemId(value, ctx);
+    requireReferenceItemId(value, context);
     return;
   }
-  forbidReferenceItemId(value, ctx);
+  forbidReferenceItemId(value, context);
 }
 
 function isAnchorPosition(position: InsertionPositionInput | undefined): boolean {
   return position === "before" || position === "after";
 }
 
-function requireReferenceItemId(value: AnchorRefinementShape, ctx: z.RefinementCtx): void {
+function requireReferenceItemId(value: AnchorRefinementShape, context: z.RefinementCtx): void {
   if (value.referenceItemId !== undefined) {
     return;
   }
-  ctx.addIssue({
+  context.addIssue({
     code: z.ZodIssueCode.custom,
     path: ["referenceItemId"],
     message: "referenceItemId is required when insertionPosition is before or after.",
   });
 }
 
-function forbidReferenceItemId(value: AnchorRefinementShape, ctx: z.RefinementCtx): void {
+function forbidReferenceItemId(value: AnchorRefinementShape, context: z.RefinementCtx): void {
   if (value.referenceItemId === undefined) {
     return;
   }
-  ctx.addIssue({
+  context.addIssue({
     code: z.ZodIssueCode.custom,
     path: ["referenceItemId"],
     message: "referenceItemId may only be set when insertionPosition is before or after.",

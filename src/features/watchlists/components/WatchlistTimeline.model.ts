@@ -32,22 +32,10 @@ export function buildWatchlistTimelineGroups(
     return [{ year: "custom", items }];
   }
 
-  const grouped: WatchlistTimelineGroup[] = [];
-  let currentYear = "";
-  let currentGroup: WatchlistItem[] = [];
-
-  items.forEach((item) => {
-    const year = getReleaseYear(item);
-    const nextGroup = appendTimelineItem(grouped, currentYear, currentGroup, year, item);
-    currentYear = nextGroup.year;
-    currentGroup = nextGroup.items;
-  });
-
-  if (currentGroup.length > 0) {
-    grouped.push({ year: currentYear, items: currentGroup });
-  }
-
-  return grouped;
+  return items.reduce<WatchlistTimelineGroup[]>((groups, item) => {
+    appendTimelineItem(groups, getReleaseYear(item), item);
+    return groups;
+  }, []);
 }
 
 /**
@@ -148,27 +136,12 @@ function getReleaseYear(item: WatchlistItem) {
   return item.releaseDate ? item.releaseDate.split("-")[0] : "TBA";
 }
 
-function appendTimelineItem(
-  grouped: WatchlistTimelineGroup[],
-  currentYear: string,
-  currentItems: WatchlistItem[],
-  itemYear: string,
-  item: WatchlistItem,
-) {
-  if (itemYear === currentYear) {
-    return { year: currentYear, items: [...currentItems, item] };
+function appendTimelineItem(groups: WatchlistTimelineGroup[], year: string, item: WatchlistItem) {
+  const previous = groups.at(-1);
+  if (previous?.year === year) {
+    previous.items.push(item);
+    return;
   }
 
-  appendCompletedGroup(grouped, currentYear, currentItems);
-  return { year: itemYear, items: [item] };
-}
-
-function appendCompletedGroup(
-  grouped: WatchlistTimelineGroup[],
-  year: string,
-  items: WatchlistItem[],
-) {
-  if (items.length > 0) {
-    grouped.push({ year, items });
-  }
+  groups.push({ year, items: [item] });
 }

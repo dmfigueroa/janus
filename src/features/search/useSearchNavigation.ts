@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   searchableMediaTypes,
   type SearchableMediaType,
@@ -7,6 +7,7 @@ import {
 
 export function useSearchNavigation(query: string, type: SearchableMediaType) {
   const navigate = useNavigate();
+  const isNavigating = useRouterState({ select: (state) => state.isLoading });
 
   const handleSearch = useCallback(
     (newQuery: string) => {
@@ -39,5 +40,5 @@ export function useSearchNavigation(query: string, type: SearchableMediaType) {
     [navigate, query],
   );
 
-  return { handleSearch, handleTabChange };
+  return { handleSearch, handleTabChange, isNavigating };
 }

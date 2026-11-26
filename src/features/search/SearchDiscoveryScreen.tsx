@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Box, Container, Heading, Stack, Tabs, Text } from "@chakra-ui/react";
 import { toaster } from "@/app/Toaster";
 import { SearchResults } from "@/features/search/SearchResults";
@@ -36,25 +36,34 @@ function getActiveTab(type: SearchableMediaType) {
   return searchableMediaTabs.find((tab) => tab.value === type)?.value ?? "movie";
 }
 
-function DeprecatedSearchNotice({ message }: { message?: string }) {
-  if (!message) return null;
-  return (
-    <Box
-      maxW="3xl"
-      mx="auto"
-      mt={8}
-      rounded="md"
-      borderWidth="1px"
-      borderColor="orange.muted"
-      bg="orange.subtle"
-      color="orange.fg"
-      px={4}
-      py={3}
-      fontSize="sm"
-    >
-      {message} Please switch to Movies, TV, Games, Books, or Comics.
-    </Box>
-  );
+function getDeprecationNoticeText(isDeprecated: boolean, message: string | undefined) {
+  if (isDeprecated && message) {
+    return `${message} Please switch to Movies, TV, Games, Books, or Comics.`;
+  }
+
+  return DEPRECATED_MEDIA_MESSAGE;
+}
+
+function buildProviderFailure({
+  status,
+  message,
+  query,
+  type,
+  initialData,
+  dataUpdatedAt,
+}: {
+  status: MediaSearchOutcome["status"];
+  message: string | undefined;
+  query: string;
+  type: SearchableMediaType;
+  initialData: MediaSearchOutcome;
+  dataUpdatedAt: number;
+}) {
+  if (status !== "provider_unavailable" || !message) {
+    return null;
+  }
+
+  return { message, query, type, initialData, dataUpdatedAt };
 }
 
 export function SearchDiscoveryScreen({
@@ -62,25 +71,39 @@ export function SearchDiscoveryScreen({
   type,
   initialData,
 }: SearchDiscoveryScreenProperties) {
-  const { allResults, status, message, fetchNextPage, hasNextPage, isFetchingNextPage } =
-    useSearchResults({
-      query,
-      type,
-      initialData,
-    });
-  const { handleSearch, handleTabChange } = useSearchNavigation(query, type);
+  const {
+    allResults,
+    status,
+    message,
+    dataUpdatedAt,
+    isLoading: isSearching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useSearchResults({
+    query,
+    type,
+    initialData,
+  });
+  const { handleSearch, handleTabChange, isNavigating } = useSearchNavigation(query, type);
   const isDeprecated = status === "deprecated_media_type";
+  const isLoading = isSearching || isNavigating;
   const activeTab = getActiveTab(type);
+  const deprecationNotice = getDeprecationNoticeText(isDeprecated, message);
+  const providerFailure = useMemo(
+    () => buildProviderFailure({ status, message, query, type, initialData, dataUpdatedAt }),
+    [status, message, query, type, initialData, dataUpdatedAt],
+  );
 
   useEffect(() => {
-    if (status !== "provider_unavailable" || !message) return;
+    if (!providerFailure) return;
 
     toaster.create({
       id: PROVIDER_UNAVAILABLE_TOAST_ID,
       type: "error",
-      title: message,
+      title: providerFailure.message,
     });
-  }, [status, message]);
+  }, [providerFailure]);
 
   return (
     <Box minH="100vh" pb={24}>
@@ -115,10 +138,10 @@ export function SearchDiscoveryScreen({
             textAlign="center"
             fontSize="sm"
           >
-            {DEPRECATED_MEDIA_MESSAGE}
+            {deprecationNotice}
           </Text>
 
-          <SearchInput onSearch={handleSearch} defaultValue={query} isLoading={false} />
+          <SearchInput onSearch={handleSearch} defaultValue={query} isLoading={isLoading} />
 
           <Tabs.Root
             value={activeTab}
@@ -132,8 +155,6 @@ export function SearchDiscoveryScreen({
             </Tabs.List>
           </Tabs.Root>
         </Stack>
-
-        <DeprecatedSearchNotice message={isDeprecated ? message : undefined} />
 
         <Box mt={8}>
           <SearchResults

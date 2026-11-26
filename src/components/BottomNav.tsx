@@ -1,5 +1,5 @@
 import { Search, List as ListIcon, Play, type LucideIcon } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import { Link, type LinkProps } from "@tanstack/react-router";
 import { HStack, Link as ChakraLink, Stack, Text } from "@chakra-ui/react";
 
 export function BottomNav() {
@@ -44,7 +44,7 @@ function BottomNavItem({ item }: { item: NavItem }) {
           py={2}
           rounded="lg"
           _hover={{ color: "fg.default", bg: "bg.subtle" }}
-          transition="all 0.3s ease-out"
+          transition="color 0.3s ease-out, background-color 0.3s ease-out"
         >
           <item.icon size={24} aria-hidden="true" />
           <Text fontSize="xs" fontWeight="medium" letterSpacing="wide">
@@ -56,4 +56,4 @@ function BottomNavItem({ item }: { item: NavItem }) {
   );
 }
 
-type NavItem = { icon: LucideIcon; label: string; to: string };
+type NavItem = { icon: LucideIcon; label: string; to: NonNullable<LinkProps["to"]> };
