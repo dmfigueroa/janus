@@ -12,6 +12,8 @@ mod snapshot;
 mod storage;
 mod summary;
 
+pub mod addition;
+
 pub mod web;
 
 pub mod mcp;

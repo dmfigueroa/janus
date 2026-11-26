@@ -1,5 +1,6 @@
 mod assets;
 mod database;
+pub mod integrations;
 pub use assets::{EmbeddedAsset, asset_url, static_assets};
 pub use database::open_database;
 mod features;
@@ -161,6 +162,8 @@ async fn legacy_json_response(response: axum::response::Response) -> axum::respo
     axum::response::Response::from_parts(parts, axum::body::Body::from(message.to_string()))
 }
 
+pub use features::search;
+pub use features::watchlists::addition;
 pub use features::watchlists::{
     ItemOrderMode, WatchlistDetail, WatchlistItem, WatchlistRecord, WatchlistStats,
     WatchlistSummary, Watchlists,
