@@ -534,36 +534,38 @@ describe("move watchlist item mutation", () => {
   });
 
   it("coerces legacy null isWatched to false when moving an item", async () => {
-    const [source, destination] = await db
-      .insert(watchlists)
-      .values([{ name: "Source" }, { name: "Destination" }])
-      .returning();
+    const legacyDb = await createIsolatedTestDb({ maxMigrationIndex: 11 });
+    const previousDb = dbState.db;
+    dbState.db = legacyDb.db;
+    try {
+      const [source, destination] = await legacyDb.db
+        .insert(watchlists)
+        .values([{ name: "Source" }, { name: "Destination" }])
+        .returning();
 
-    const [legacyItem] = await db
-      .insert(watchlistItems)
-      .values({
-        watchlistId: source.id,
-        tmdbId: "legacy-null-move",
-        source: "tmdb",
-        mediaType: "movie",
-        title: "Legacy Null Item",
-        isWatched: null,
-      })
-      .returning();
+      const inserted = legacyDb.sqlite
+        .prepare(
+          "INSERT INTO watchlist_items(watchlist_id, tmdb_id, source, media_type, title, is_watched) VALUES(?, 'legacy-null-move', 'tmdb', 'movie', 'Legacy Null Item', NULL)",
+        )
+        .run(source.id);
 
-    const result = await moveItemToWatchlistMutation({
-      itemId: legacyItem.id,
-      destinationWatchlistId: destination.id,
-    });
+      const result = await moveItemToWatchlistMutation({
+        itemId: Number(inserted.lastInsertRowid),
+        destinationWatchlistId: destination.id,
+      });
 
-    expect(result.success).toBe(true);
-    const destDetail = await readWatchlistDetailScreen({
-      watchlistId: destination.id,
-      unwatchedOnly: false,
-    });
-    expect(destDetail?.items).toEqual([
-      expect.objectContaining({ tmdbId: "legacy-null-move", isWatched: false }),
-    ]);
+      expect(result.success).toBe(true);
+      const destDetail = await readWatchlistDetailScreen({
+        watchlistId: destination.id,
+        unwatchedOnly: false,
+      });
+      expect(destDetail?.items).toEqual([
+        expect.objectContaining({ tmdbId: "legacy-null-move", isWatched: false }),
+      ]);
+    } finally {
+      dbState.db = previousDb;
+      legacyDb.close();
+    }
   });
 });
 

@@ -31,6 +31,9 @@ services:
     build:
       context: ..
       dockerfile: v2/Dockerfile
+    depends_on:
+      v1:
+        condition: service_healthy
     restart: unless-stopped
     environment:
       JANUS_V2_BIND: 0.0.0.0:3001

@@ -162,7 +162,7 @@ insert.run(
   "A Show",
   "1",
   2,
-  null,
+  0,
   JSON.stringify(["Écrivain", "著者"]),
   "2020-01-02",
   null,

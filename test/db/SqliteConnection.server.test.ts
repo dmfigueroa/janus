@@ -215,6 +215,50 @@ describe("shared SQLite connection contract", () => {
       testDb.close();
     }
   });
+
+  it("backfills legacy null is_watched rows before tightening watchlist_items to NOT NULL", async () => {
+    const legacyDb = await createIsolatedTestDb({ maxMigrationIndex: 11 });
+    try {
+      legacyDb.sqlite.prepare("INSERT INTO watchlists(id, name) VALUES(1, 'Legacy List')").run();
+      const insert = legacyDb.sqlite.prepare(
+        "INSERT INTO watchlist_items(id, watchlist_id, tmdb_id, source, media_type, title, is_watched) VALUES(?, 1, ?, 'tmdb', 'movie', ?, ?)",
+      );
+      insert.run(10, "legacy-null", "Legacy Null", null);
+      insert.run(11, "legacy-false", "Legacy False", 0);
+      insert.run(12, "legacy-true", "Legacy True", 1);
+
+      runSqliteMigrations(legacyDb.sqlite, path.resolve(process.cwd(), "drizzle"));
+
+      const rows = legacyDb.sqlite
+        .prepare("SELECT id, is_watched FROM watchlist_items ORDER BY id ASC")
+        .all();
+      expect(rows).toEqual([
+        { id: 10, is_watched: 0 },
+        { id: 11, is_watched: 0 },
+        { id: 12, is_watched: 1 },
+      ]);
+
+      const columns = legacyDb.sqlite.pragma("table_info('watchlist_items')") as Array<{
+        name: string;
+        notnull: number;
+        dflt_value: string | null;
+      }>;
+      const isWatchedColumn = columns.find((column) => column.name === "is_watched");
+      expect(isWatchedColumn).toMatchObject({ notnull: 1, dflt_value: "false" });
+      expect(() =>
+        legacyDb.sqlite
+          .prepare(
+            "INSERT INTO watchlist_items(id, watchlist_id, tmdb_id, source, media_type, title, is_watched) VALUES(13, 1, 'reject-null', 'tmdb', 'movie', 'Reject Null', NULL)",
+          )
+          .run(),
+      ).toThrow(/NOT NULL constraint failed/);
+
+      runSqliteMigrations(legacyDb.sqlite, path.resolve(process.cwd(), "drizzle"));
+      expect(checkForeignKeys(legacyDb.sqlite)).toEqual([]);
+    } finally {
+      legacyDb.close();
+    }
+  });
 });
 
 describe("cascading deletes and IMMEDIATE write transactions", () => {

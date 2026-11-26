@@ -32,7 +32,7 @@ const checkV2EditedItems = (database) => {
   assert.equal(item101.source, "tmdb");
   assert.equal(item101.media_type, "episode");
   assert.equal(item101.custom_rank, 2);
-  assert.equal(item101.is_watched, null);
+  assert.equal(item101.is_watched, 0);
   assert.equal(item101.authors, JSON.stringify(["Écrivain", "著者"]));
 
   const item102 = database

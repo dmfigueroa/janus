@@ -134,7 +134,7 @@
         "vote_average": null,
         "runtime": null,
         "custom_rank": 2,
-        "is_watched": null,
+        "is_watched": 0,
         "authors": ["Écrivain", "著者"],
         "added_at": "2020-01-01 12:31:00"
       },

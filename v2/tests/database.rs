@@ -392,7 +392,7 @@ async fn mcp_discovers_and_reads_existing_watchlist_with_baseline_envelopes_and_
     assert!(data["orderToken"].as_str().unwrap().starts_with("sha256:"));
     let second=result(rpc(&app,json!({"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_watchlist","arguments":{"watchlistId":41,"pageSize":1,"cursor":data["nextCursor"]}}}),Some(&session)).await).await;
     assert_eq!(second["structuredContent"]["items"][0]["id"], 101);
-    assert!(second["structuredContent"]["items"][0]["isWatched"].is_null());
+    assert_eq!(second["structuredContent"]["items"][0]["isWatched"], false);
     let search=result(rpc(&app,json!({"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"search_watchlists","arguments":{"query":"CAFÉ"}}}),Some(&session)).await).await;
     assert_eq!(search["structuredContent"]["watchlists"][0]["id"], 41);
     let titles=result(rpc(&app,json!({"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"get_watchlist","arguments":{"watchlistId":41,"resultView":"titles"}}}),Some(&session)).await).await;
@@ -918,7 +918,7 @@ async fn typed_reads_decode_stored_values_and_preserve_order_token_semantics() {
     assert_eq!(detail.items[1].custom_rank, Some(2));
     assert_eq!(detail.items[2].custom_rank, None);
     assert_eq!(detail.items[0].is_watched, Some(true));
-    assert_eq!(detail.items[1].is_watched, None);
+    assert_eq!(detail.items[1].is_watched, Some(false));
     assert_eq!(detail.items[1].parent_title.as_deref(), Some("A Show"));
     assert_eq!(detail.items[2].parent_title, None);
     assert_eq!(detail.items[2].authors, Some(Vec::new()));
@@ -1276,7 +1276,7 @@ async fn item_discovery_returns_typed_order_and_full_next_unwatched() {
     assert_eq!(item.tmdb_id, "ep-1");
     assert_eq!(item.parent_id.as_deref(), Some("show-1"));
     assert_eq!(item.parent_title.as_deref(), Some("A Show"));
-    assert_eq!(item.is_watched, None);
+    assert_eq!(item.is_watched, Some(false));
     assert_eq!(
         item.authors.as_deref(),
         Some(&["Écrivain".to_owned(), "著者".to_owned()][..])
@@ -3458,6 +3458,19 @@ async fn open_database_rejects_orphaned_foreign_key_rows_in_all_tables() {
             "{action} returned unexpected error: {error}"
         );
     }
+}
+
+#[tokio::test]
+async fn open_database_rejects_invalid_is_watched_values() {
+    let fixture = Fixture::v1();
+    change_v1(&fixture, "invalid-is-watched");
+    let error = janus_v2::open_database(&fixture.0)
+        .await
+        .expect_err("invalid is_watched value must fail startup validation");
+    assert!(
+        error.to_string().contains("Incompatible v1 stored values"),
+        "unexpected error: {error}"
+    );
 }
 
 #[tokio::test]

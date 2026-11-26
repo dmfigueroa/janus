@@ -85,6 +85,13 @@
       "when": 1793922435956,
       "tag": "0011_flaky_wither",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1795730723799,
+      "tag": "0012_tighten_watchlist_items_is_watched_not_null",
+      "breakpoints": true
     }
   ]
 }
