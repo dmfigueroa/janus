@@ -1,8 +1,8 @@
 //! Shared watchlist metadata writes.
 //!
 //! Web and MCP validate their own transport values, then call these operations.
-//! Inserts keep v1's lifecycle and timestamp defaults; updates preserve v1's
-//! application-side `updated_at` behavior, which SeaORM does not emulate.
+//! Inserts and updates preserve v1's lifecycle defaults and Drizzle's
+//! application-side `updated_at` timestamp, which SeaORM does not emulate.
 
 use super::{ItemOrderMode, WatchlistRecord, Watchlists};
 use sea_orm::sea_query::Value;
@@ -303,8 +303,8 @@ impl Watchlists {
         let (sql, values) = match input.item_order_mode {
             Some(mode) => (
                 format!(
-                    "INSERT INTO watchlists (name, description, item_order_mode, last_watched_at) \
-                     VALUES (?, ?, ?, {NEXT_ROTATION_POSITION}) RETURNING *"
+                    "INSERT INTO watchlists (name, description, item_order_mode, updated_at, last_watched_at) \
+                     VALUES (?, ?, ?, CURRENT_TIMESTAMP, {NEXT_ROTATION_POSITION}) RETURNING *"
                 ),
                 vec![
                     input.name.into(),
@@ -314,8 +314,8 @@ impl Watchlists {
             ),
             None => (
                 format!(
-                    "INSERT INTO watchlists (name, description, last_watched_at) \
-                     VALUES (?, ?, {NEXT_ROTATION_POSITION}) RETURNING *"
+                    "INSERT INTO watchlists (name, description, updated_at, last_watched_at) \
+                     VALUES (?, ?, CURRENT_TIMESTAMP, {NEXT_ROTATION_POSITION}) RETURNING *"
                 ),
                 vec![input.name.into(), input.description.into()],
             ),

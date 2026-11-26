@@ -96,7 +96,7 @@ const actions = {
     assert.equal(row.description, "");
     assert.equal(row.item_order_mode, "release");
     assert.equal(row.paused_at, null);
-    assert.equal(row.updated_at, null);
+    assert.match(row.updated_at, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
     assert.match(row.created_at, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
     assert.match(row.last_watched_at, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/);
     const htmx = database.prepare("SELECT * FROM watchlists WHERE name = 'HTMX created'").get();

@@ -66,8 +66,7 @@ fn envelope(called: Result<Value, McpCallError>) -> Result<CallToolResponse, Err
             response.is_error = None;
             Ok(response.into())
         }
-        Err(McpCallError::InvalidRequest(message)) => Err(ErrorData::invalid_params(message, None)),
-        Err(McpCallError::Failure(message)) => {
+        Err(McpCallError::InvalidRequest(message) | McpCallError::Failure(message)) => {
             let mut response = CallToolResult::error(vec![ContentBlock::text(message)]);
             response.result_type = None;
             Ok(response.into())

@@ -560,8 +560,13 @@ fn create_input(entry: &Value) -> Result<NewWatchlist, String> {
         .ok_or_else(|| format!("Expected object, received {}", type_name(entry)))?;
     let name = match object.get("name") {
         None | Some(Value::Null) => return Err("Name is required".into()),
-        Some(Value::String(name)) if name.is_empty() => return Err("Name is required".into()),
-        Some(Value::String(name)) => name.clone(),
+        Some(Value::String(name)) => {
+            let trimmed = name.trim();
+            if trimmed.is_empty() {
+                return Err("Name is required".into());
+            }
+            trimmed.to_owned()
+        }
         Some(value) => return Err(expected_string(value)),
     };
     let description = match object.get("description") {
@@ -599,8 +604,13 @@ fn update_input(entry: &Value) -> Result<WatchlistChanges, String> {
     }
     let name = match object.get("name") {
         None => None,
-        Some(Value::String(name)) if name.is_empty() => return Err("Name is required".into()),
-        Some(Value::String(name)) => Some(name.clone()),
+        Some(Value::String(name)) => {
+            let trimmed = name.trim();
+            if trimmed.is_empty() {
+                return Err("Name is required".into());
+            }
+            Some(trimmed.to_owned())
+        }
         Some(value) => return Err(expected_string(value)),
     };
     let description = match object.get("description") {

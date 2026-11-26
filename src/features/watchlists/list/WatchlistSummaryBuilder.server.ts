@@ -108,21 +108,19 @@ function indexSummaryCounts(
 function indexSummarySelections(
   rows: Array<WatchlistItem & { watchlistId: number; coverRank: number; unwatchedRank: number }>,
 ) {
-  return rows.reduce<Record<number, SummarySelection>>((selectionsByWatchlist, item) => {
+  return rows.reduce<Record<number, SummarySelection>>((selectionsByWatchlist, row) => {
+    const { coverRank, unwatchedRank, ...item } = row;
     const entry = (selectionsByWatchlist[item.watchlistId] ??= { ...emptySummarySelection });
-    assignCoverItem(entry, item);
-    assignNextUnwatched(entry, item);
+    assignCoverItem(entry, item, coverRank);
+    assignNextUnwatched(entry, item, unwatchedRank);
     return selectionsByWatchlist;
   }, {});
 }
 
-function assignCoverItem(entry: SummarySelection, item: WatchlistItem & { coverRank: number }) {
-  if (item.coverRank === 1) entry.coverItem = item;
+function assignCoverItem(entry: SummarySelection, item: WatchlistItem, coverRank: number) {
+  if (coverRank === 1) entry.coverItem = item;
 }
 
-function assignNextUnwatched(
-  entry: SummarySelection,
-  item: WatchlistItem & { unwatchedRank: number },
-) {
-  if (item.isWatched !== true && item.unwatchedRank === 1) entry.nextUnwatched = item;
+function assignNextUnwatched(entry: SummarySelection, item: WatchlistItem, unwatchedRank: number) {
+  if (item.isWatched !== true && unwatchedRank === 1) entry.nextUnwatched = item;
 }
