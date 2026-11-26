@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { ZodError } from "zod";
+import { ProviderRequestError } from "@/integrations/ProviderRequest.server";
 import { getBookDetails, searchBooks } from "@/server/providers/GoogleBooks.server";
 
 vi.stubGlobal("fetch", vi.fn());
@@ -14,6 +16,12 @@ function getFetchedUrl(call: unknown[]) {
   const input = call[0] as Request | string | URL;
   return input instanceof Request ? input.url : input.toString();
 }
+
+function isRejectedProviderId(error: unknown) {
+  return error instanceof ZodError || error instanceof ProviderRequestError;
+}
+
+const adversarialBookIds = ["..", "../foo", "?key=x", "../volumes/other-endpoint"];
 
 describe("google-books searchBooks", () => {
   beforeEach(() => {
@@ -78,29 +86,33 @@ describe("google-books getBookDetails", () => {
     );
   });
 
-  it("should encode malicious ID to prevent path traversal/injection (Negative Test/Security)", async () => {
+  it("should request stored book id book-42 under the volumes path", async () => {
     vi.mocked(fetch).mockResolvedValue(
       jsonResponse({
-        id: "id",
-        volumeInfo: {},
+        id: "book-42",
+        volumeInfo: { title: "Canonical Book" },
       }),
     );
 
-    const maliciousId = "../volumes/other-endpoint";
-    await getBookDetails(maliciousId);
-
-    const urlObj = new URL(getFetchedUrl(vi.mocked(fetch).mock.calls[0] ?? []));
-
-    // If encoded, the .. and / should be escaped
-    // The path should be /books/v1/volumes/..%2Fvolumes%2Fother-endpoint
-    expect(urlObj.pathname).toBe("/books/v1/volumes/..%2Fvolumes%2Fother-endpoint");
-    // It should NOT be normalized to /books/v1/volumes/other-endpoint
-    expect(urlObj.pathname).not.toBe("/books/v1/volumes/other-endpoint");
-
-    // Full URL check including API key
-    expect(urlObj.toString()).toBe(
-      "https://www.googleapis.com/books/v1/volumes/..%2Fvolumes%2Fother-endpoint?key=test-api-key",
+    await expect(getBookDetails("book-42")).resolves.toMatchObject({
+      id: "book-42",
+      title: "Canonical Book",
+    });
+    expect(getFetchedUrl(vi.mocked(fetch).mock.calls[0] ?? [])).toBe(
+      "https://www.googleapis.com/books/v1/volumes/book-42?key=test-api-key",
     );
+  });
+
+  it.each(adversarialBookIds)("rejects book id %s before calling Google Books", async (bookId) => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({
+        id: "zyTCAlFPjgYC",
+        volumeInfo: { title: "Test Book" },
+      }),
+    );
+
+    await expect(getBookDetails(bookId)).rejects.toSatisfy(isRejectedProviderId);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("should return authors from API response", async () => {

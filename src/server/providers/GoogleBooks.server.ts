@@ -1,3 +1,4 @@
+import { googleBooksIdSchema, providerResourceUrl } from "@/integrations/ProviderIds";
 import {
   ProviderRequestError,
   requestProviderJson,
@@ -95,11 +96,14 @@ async function searchBooksRequest(query: string, page: number, signal?: AbortSig
 }
 
 async function getBookDetailsRequest(id: string, signal?: AbortSignal) {
+  const bookId = googleBooksIdSchema.parse(id);
   const context = { provider: "google_books", operation: "get_book_details" };
   const apiKey = getGoogleBooksApiKey(context.operation);
-  const encodedId = encodeURIComponent(id);
-  const url = new URL(`https://www.googleapis.com/books/v1/volumes/${encodedId}`);
-  url.search = new URLSearchParams({ key: apiKey }).toString();
+  const url = providerResourceUrl({
+    prefix: "https://www.googleapis.com/books/v1/volumes/",
+    segment: bookId,
+    searchParams: new URLSearchParams({ key: apiKey }),
+  });
 
   const item = await requestProviderJson(url.toString(), { signal }, context);
   return mapBook(parseProviderData(GoogleBookItemSchema, item, context));

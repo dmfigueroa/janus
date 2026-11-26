@@ -581,10 +581,10 @@ describe("Janus MCP endpoint", () => {
         );
       }
       if (url.includes("/volume/")) {
-        return new Response(JSON.stringify({ results: { id: 4050, name: "Canonical Volume" } }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ error: "OK", results: { id: 4050, name: "Canonical Volume" } }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
       }
       return new Response(
         JSON.stringify({
@@ -2593,6 +2593,7 @@ describe("Janus MCP endpoint", () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
+            error: "OK",
             number_of_total_results: 1,
             results: [
               {

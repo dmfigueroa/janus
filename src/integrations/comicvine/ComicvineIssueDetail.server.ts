@@ -1,10 +1,7 @@
-import {
-  ProviderRequestError,
-  requestProviderJson,
-  parseProviderData,
-} from "@/integrations/ProviderRequest.server";
+import { comicVineIdSchema, providerResourceUrl } from "@/integrations/ProviderIds";
+import { parseComicVineResponse } from "@/integrations/comicvine/ParseComicVineResponse.server";
+import { requestProviderJson } from "@/integrations/ProviderRequest.server";
 import { z } from "zod";
-import { serverLogger } from "@/shared/logging/ServerLog.server";
 import {
   mapIssueToComicIssue,
   type ComicIssue,
@@ -26,8 +23,7 @@ const ComicVineIssueDetailSchema = z.object({
   volume: z.object({ id: z.number(), name: z.string().nullable().optional() }),
 });
 
-const ComicVineIssueDetailResponseSchema = z.object({
-  error: z.string(),
+const comicVineIssueDetailResponseSchema = z.object({
   results: ComicVineIssueDetailSchema,
 });
 
@@ -40,29 +36,23 @@ export async function getComicIssue(
   apiKey: string,
   signal?: AbortSignal,
 ): Promise<ComicIssueDetail> {
-  const url = new URL(`https://comicvine.gamespot.com/api/issue/4000-${issueId}/`);
-  url.search = new URLSearchParams({
-    api_key: apiKey,
-    format: "json",
-  }).toString();
+  const parsedIssueId = comicVineIdSchema.parse(issueId);
+  const url = providerResourceUrl({
+    prefix: "https://comicvine.gamespot.com/api/issue/",
+    segment: `4000-${parsedIssueId}`,
+    searchParams: new URLSearchParams({ api_key: apiKey, format: "json" }),
+    trailingSlash: true,
+  });
   const context = { provider: "comicvine", operation: "get_issue_details" };
   const rawData = await requestProviderJson(
-    url.toString(),
+    url,
     {
       headers: { "User-Agent": "JanusApp/1.0" },
       signal,
     },
     context,
   );
-  const data = parseProviderData(ComicVineIssueDetailResponseSchema, rawData, context);
-  if (data.error !== "OK") {
-    serverLogger("warn", "provider.response.failed", {
-      ...context,
-      outcome: "provider_error",
-      providerMessage: data.error,
-    });
-    throw new ProviderRequestError();
-  }
+  const data = parseComicVineResponse(comicVineIssueDetailResponseSchema, rawData, context);
 
   return {
     ...mapIssueToComicIssue(data.results),
