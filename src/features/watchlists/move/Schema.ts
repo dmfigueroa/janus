@@ -11,34 +11,34 @@ function isAnchorPosition(position: AnchorShape["position"]): boolean {
   return position === "before" || position === "after";
 }
 
-function requireReferenceItemId(value: AnchorShape, ctx: z.RefinementCtx): void {
+function requireReferenceItemId(value: AnchorShape, context: z.RefinementCtx): void {
   if (value.referenceItemId !== undefined) {
     return;
   }
-  ctx.addIssue({
+  context.addIssue({
     code: z.ZodIssueCode.custom,
     path: ["referenceItemId"],
     message: "referenceItemId is required when position is before or after.",
   });
 }
 
-function forbidReferenceItemId(value: AnchorShape, ctx: z.RefinementCtx): void {
+function forbidReferenceItemId(value: AnchorShape, context: z.RefinementCtx): void {
   if (value.referenceItemId === undefined) {
     return;
   }
-  ctx.addIssue({
+  context.addIssue({
     code: z.ZodIssueCode.custom,
     path: ["referenceItemId"],
     message: "referenceItemId may only be set when position is before or after.",
   });
 }
 
-export function anchorReferenceRefinement(value: AnchorShape, ctx: z.RefinementCtx): void {
+export function anchorReferenceRefinement(value: AnchorShape, context: z.RefinementCtx): void {
   if (isAnchorPosition(value.position)) {
-    requireReferenceItemId(value, ctx);
+    requireReferenceItemId(value, context);
     return;
   }
-  forbidReferenceItemId(value, ctx);
+  forbidReferenceItemId(value, context);
 }
 
 export const moveItemToWatchlistSchema = z

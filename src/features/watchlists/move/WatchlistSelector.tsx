@@ -6,7 +6,7 @@ import { WatchlistOption, type WatchlistOptionProps } from "./WatchlistOption";
 function filterWatchlists(watchlists: WatchlistSummary[], query: string) {
   if (!query) return watchlists;
   const normalized = query.toLowerCase();
-  return watchlists.filter((wl) => wl.name.toLowerCase().includes(normalized));
+  return watchlists.filter((watchlist) => watchlist.name.toLowerCase().includes(normalized));
 }
 
 function suppressEnterSubmit(event: KeyboardEvent) {

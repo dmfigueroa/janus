@@ -30,12 +30,12 @@ export function compareReleaseDates(
 }
 
 function compareNullableReleaseDates(left: string | null, right: string | null): number {
-  const leftNorm = normalizeReleaseDate(left);
-  const rightNorm = normalizeReleaseDate(right);
+  const normalizedLeft = normalizeReleaseDate(left);
+  const normalizedRight = normalizeReleaseDate(right);
 
-  if (leftNorm === null) return compareMissingLeftValue(rightNorm);
-  if (rightNorm === null) return -1;
-  return leftNorm.localeCompare(rightNorm);
+  if (normalizedLeft === null) return compareMissingLeftValue(normalizedRight);
+  if (normalizedRight === null) return -1;
+  return normalizedLeft.localeCompare(normalizedRight);
 }
 
 function normalizeReleaseDate(releaseDate: string | null | undefined) {
@@ -82,11 +82,12 @@ export function computeItemInsertionOrder(
 }
 
 function sortItemsByCustomOrder(items: ItemWithOrder[]): ItemWithOrder[] {
-  return [...items].sort((a, b) => {
-    const rankComparison = compareSortRanks(a.customRank, b.customRank);
+  return [...items].sort((left, right) => {
+    const rankComparison = compareSortRanks(left.customRank, right.customRank);
     if (rankComparison !== null) return rankComparison;
     return (
-      compareNullableReleaseDates(a.releaseDate, b.releaseDate) || itemIdOrZero(a) - itemIdOrZero(b)
+      compareNullableReleaseDates(left.releaseDate, right.releaseDate) ||
+      itemIdOrZero(left) - itemIdOrZero(right)
     );
   });
 }
@@ -148,7 +149,7 @@ function anchorSpliceIndex(
 }
 
 function renumberOrder<T extends ItemWithOrder>(order: T[]): (T & { newRank: number })[] {
-  return order.map((item, idx) => ({ ...item, newRank: idx + 1 }));
+  return order.map((item, index) => ({ ...item, newRank: index + 1 }));
 }
 
 const positionFunctions = {
@@ -160,13 +161,13 @@ function positionAtBeginning(sorted: ItemWithOrder[], newItem: ItemWithOrder): O
   const rankedNew = [{ ...newItem, newRank: 1 }];
   const rankedExisting = sorted
     .filter((item): item is ItemWithOrder & { id: number } => item.id !== undefined)
-    .map((item, idx) => ({ ...item, newRank: rankedNew.length + idx + 1 }));
+    .map((item, index) => ({ ...item, newRank: rankedNew.length + index + 1 }));
   return [...rankedNew, ...rankedExisting];
 }
 
 function positionAtEnd(sorted: ItemWithOrder[], newItem: ItemWithOrder): OrderedItem[] {
   const rankedExisting = sorted
     .filter((item): item is ItemWithOrder & { id: number } => item.id !== undefined)
-    .map((item, idx) => ({ ...item, newRank: idx + 1 }));
+    .map((item, index) => ({ ...item, newRank: index + 1 }));
   return [...rankedExisting, { ...newItem, newRank: rankedExisting.length + 1 }];
 }
