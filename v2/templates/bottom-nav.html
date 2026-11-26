@@ -15,7 +15,18 @@
     </svg>
     <span>Watch Now</span>
   </a>
-  <a class="nav-item" href="/v2/watchlists" aria-current="page">
+  <a
+    class="nav-item"
+    href="/v2/watchlists"
+    {%
+    if
+    active_nav=""
+    ="lists"
+    %}aria-current="page"
+    {%
+    endif
+    %}
+  >
     <svg
       aria-hidden="true"
       viewBox="0 0 24 24"
@@ -36,7 +47,18 @@
     </svg>
     <span>My Lists</span>
   </a>
-  <a class="nav-item" href="/v2/watchlists#watchlist-search">
+  <a
+    class="nav-item"
+    href="/v2/search"
+    {%
+    if
+    active_nav=""
+    ="search"
+    %}aria-current="page"
+    {%
+    endif
+    %}
+  >
     <svg
       aria-hidden="true"
       viewBox="0 0 24 24"

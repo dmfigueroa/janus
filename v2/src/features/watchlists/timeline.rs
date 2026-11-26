@@ -98,6 +98,7 @@ impl TimelineView {
             view: self,
             form: &self.form,
             message: "",
+            active_nav: "lists",
         }
         .render()
     }
@@ -197,6 +198,7 @@ struct Page<'a> {
     view: &'a TimelineView,
     form: &'a WatchlistForm,
     message: &'a str,
+    active_nav: &'a str,
 }
 
 #[derive(Template)]

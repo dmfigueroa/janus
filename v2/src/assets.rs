@@ -88,11 +88,17 @@ mod tests {
 
     #[derive(Template)]
     #[template(path = "layout.html")]
-    struct LayoutProbe;
+    struct LayoutProbe<'a> {
+        active_nav: &'a str,
+    }
 
     #[test]
     fn shared_layout_references_every_versioned_entry_asset() {
-        let layout = LayoutProbe.render().unwrap();
+        let layout = LayoutProbe {
+            active_nav: "lists",
+        }
+        .render()
+        .unwrap();
         for url in [
             APP_CSS_URL,
             APP_JS_URL,

@@ -1,0 +1,57 @@
+<div id="search-screen" class="search-page">
+  <header class="search-heading">
+    <h1>
+      <span class="search-accent">Discover</span>
+      <span class="search-muted">Everything</span>
+    </h1>
+    <p class="search-lede">Find movies, shows, games, books, and comics.</p>
+    <p class="search-notice">{{ view.notice }}</p>
+  </header>
+  <form
+    id="search-form"
+    class="search-form"
+    action="/v2/search"
+    method="get"
+    hx-get="/v2/search"
+    hx-target="#search-results"
+    hx-select="#search-results"
+    hx-swap="outerHTML"
+    hx-trigger="submit, input changed delay:300ms from:find input[type='search']"
+    hx-push-url="true"
+    hx-indicator="#search-indicator"
+  >
+    <label class="visually-hidden" for="search-query">Search</label>
+    <input
+      id="search-query"
+      type="search"
+      name="query"
+      value="{{ view.query }}"
+      placeholder="Search..."
+      autocomplete="off"
+      enterkeyhint="search"
+    />
+    <input type="hidden" name="type" value="{{ view.media_type }}" />
+    <input type="hidden" name="page" value="1" />
+    <button type="submit">Search</button>
+    <span id="search-indicator" class="htmx-indicator" role="status">Searching...</span>
+  </form>
+  <div class="search-tabs" role="tablist" aria-label="Media type">
+    {% for tab in view.tabs %}
+    <a
+      role="tab"
+      aria-selected="{% if tab.selected %}true{% else %}false{% endif %}"
+      href="/v2/search?query={{ view.query|urlencode }}&amp;type={{ tab.value }}&amp;page=1"
+      hx-get="/v2/search?query={{ view.query|urlencode }}&amp;type={{ tab.value }}&amp;page=1"
+      hx-target="#search-screen"
+      hx-select="#search-screen"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+      >{{ tab.label }}</a
+    >
+    {% endfor %}
+  </div>
+  {% include "search-results.html" %}
+  <dialog id="search-dialog" class="dialog" closedby="any" aria-labelledby="search-dialog-title">
+    <h2 id="search-dialog-title" class="visually-hidden">Media details</h2>
+  </dialog>
+</div>

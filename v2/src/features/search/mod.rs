@@ -7,6 +7,8 @@
 
 use crate::integrations::tmdb::{TmdbCatalog, TmdbFailure, TmdbKind, TmdbSearchHit};
 
+pub mod web;
+
 /// Shown when the trimmed query is empty. No provider is contacted.
 pub const EMPTY_QUERY_MESSAGE: &str = "Enter a search term to find media.";
 

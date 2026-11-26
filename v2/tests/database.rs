@@ -362,7 +362,7 @@ async fn mcp_discovers_and_reads_existing_watchlist_with_baseline_envelopes_and_
         .await,
     )
     .await;
-    assert_eq!(tools["tools"].as_array().unwrap().len(), 8);
+    assert_eq!(tools["tools"].as_array().unwrap().len(), 10);
     let read=result(rpc(&app,json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_watchlist","arguments":{"watchlistId":41,"pageSize":1}}}),Some(&session)).await).await;
     assert!(read.get("resultType").is_none());
     assert!(read.get("isError").is_none());
@@ -2105,7 +2105,7 @@ async fn mcp_create_and_update_keep_ordered_independent_batch_outcomes() {
     )
     .await;
     let tools = tools["tools"].as_array().unwrap();
-    assert_eq!(tools.len(), 8);
+    assert_eq!(tools.len(), 10);
     let create = tools
         .iter()
         .find(|tool| tool["name"] == "create_watchlists")

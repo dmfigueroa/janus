@@ -79,6 +79,7 @@ pub struct ListFilters {
 struct ListPage<'a> {
     view: &'a BrowseView,
     form: &'a WatchlistForm,
+    active_nav: &'a str,
 }
 #[derive(Template)]
 #[template(path = "watchlist-browse.html")]
@@ -111,6 +112,7 @@ pub async fn list(
                 Representation::Page | Representation::Json => ListPage {
                     view: &view,
                     form: &form,
+                    active_nav: "lists",
                 }
                 .render(),
             }

@@ -8,6 +8,7 @@ mod http;
 
 use axum::{
     Router,
+    extract::FromRef,
     http::{StatusCode, header},
     routing::get,
 };
@@ -56,6 +57,19 @@ fn base_router(database_ready: bool) -> Router {
         .fallback(|| async { (StatusCode::NOT_FOUND, "Page not found") })
 }
 
+/// Router state. Watchlist handlers keep using [`Watchlists`] through [`FromRef`].
+#[derive(Clone)]
+pub(crate) struct AppState {
+    pub(crate) lists: features::watchlists::Watchlists,
+    pub(crate) catalog: Arc<dyn TmdbCatalog>,
+}
+
+impl FromRef<AppState> for features::watchlists::Watchlists {
+    fn from_ref(state: &AppState) -> Self {
+        state.lists.clone()
+    }
+}
+
 /// Construct the feature router only after the existing database passes validation.
 pub fn database_router(database: sea_orm::DatabaseConnection) -> Router {
     database_router_with(database, Arc::new(TmdbClient::from_env()))
@@ -66,7 +80,10 @@ pub fn database_router_with(
     database: sea_orm::DatabaseConnection,
     catalog: Arc<dyn TmdbCatalog>,
 ) -> Router {
-    let state = features::watchlists::Watchlists(database);
+    let state = AppState {
+        lists: features::watchlists::Watchlists(database),
+        catalog,
+    };
     Router::new()
         .route(
             "/v2/watchlists",
@@ -88,6 +105,12 @@ pub fn database_router_with(
             "/v2/watchlists/{id}/items/{item_id}",
             axum::routing::post(features::watchlists::web::edit_item),
         )
+        .route("/v2/search", get(features::search::web::search))
+        .route("/v2/search/detail", get(features::search::web::detail))
+        .route(
+            "/v2/search/add",
+            axum::routing::post(features::search::web::add),
+        )
         .with_state(state.clone())
         .merge(base_router(true))
         .nest_service(
@@ -95,8 +118,8 @@ pub fn database_router_with(
             StreamableHttpService::new(
                 move || {
                     Ok(features::watchlists::mcp::WatchlistMcp::new(
-                        state.clone(),
-                        catalog.clone(),
+                        state.lists.clone(),
+                        state.catalog.clone(),
                     ))
                 },
                 sessions(),
