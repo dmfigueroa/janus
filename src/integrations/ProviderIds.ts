@@ -18,6 +18,9 @@ export const comicVineIdSchema = decimalId("Provider ID must be a positive decim
   "ComicVineId",
 );
 export const tmdbIdSchema = decimalId("Provider ID must be a TMDB numeric ID.").brand("TmdbId");
+export const anilistIdSchema = decimalId("Provider ID must be a positive decimal integer.").brand(
+  "AnilistId",
+);
 export const googleBooksIdSchema = z
   .string()
   .regex(/^[A-Za-z0-9_-]+$/, "Provider ID must be a Google Books volume id.")
@@ -26,6 +29,7 @@ export const googleBooksIdSchema = z
 export type RawgId = z.infer<typeof rawgIdSchema>;
 export type ComicVineId = z.infer<typeof comicVineIdSchema>;
 export type TmdbId = z.infer<typeof tmdbIdSchema>;
+export type AnilistId = z.infer<typeof anilistIdSchema>;
 export type GoogleBooksId = z.infer<typeof googleBooksIdSchema>;
 
 type ProviderResourceUrlInput = {

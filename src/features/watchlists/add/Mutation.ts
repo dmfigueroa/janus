@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
+  anilistIdSchema,
   comicVineIdSchema,
   googleBooksIdSchema,
   rawgIdSchema,
@@ -17,18 +18,18 @@ export const addToWatchlistInsertionPositionSchema = z.enum([
   "after",
 ]);
 
-const providerIdSchemaBySource: Partial<Record<string, z.ZodTypeAny>> = {
+const providerIdSchemaBySource = {
   google_books: googleBooksIdSchema,
   rawg: rawgIdSchema,
   comicvine: comicVineIdSchema,
-};
-
-const tmdbTitleMediaTypes = new Set(["movie", "tv"]);
+  tmdb: tmdbIdSchema,
+  anilist: anilistIdSchema,
+  custom: null,
+} as const satisfies Record<z.infer<typeof UnifiedMediaSchema>["source"], z.ZodTypeAny | null>;
 
 type ProviderMediaIdentity = {
   id: string;
-  source: string;
-  mediaType: string;
+  source: z.infer<typeof UnifiedMediaSchema>["source"];
 };
 
 export const addToWatchlistSchema = z
@@ -43,18 +44,8 @@ export const addToWatchlistSchema = z
     refineWatchlistMediaId(value.media, context);
   });
 
-function providerIdSchemaFor(media: ProviderMediaIdentity) {
-  if (media.source === "tmdb") return tmdbMovieOrShowId(media.mediaType);
-  return providerIdSchemaBySource[media.source];
-}
-
-function tmdbMovieOrShowId(mediaType: string) {
-  if (tmdbTitleMediaTypes.has(mediaType)) return tmdbIdSchema;
-  return undefined;
-}
-
 function refineWatchlistMediaId(media: ProviderMediaIdentity, context: z.RefinementCtx) {
-  const schema = providerIdSchemaFor(media);
+  const schema = providerIdSchemaBySource[media.source];
   if (!schema) return;
   rejectInvalidProviderId(schema, media.id, context);
 }

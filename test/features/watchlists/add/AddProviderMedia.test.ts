@@ -8,6 +8,7 @@ const storedProviderIds = [
   { provider: "google_books", mediaType: "book", providerId: "book-1" },
   { provider: "comicvine", mediaType: "comic", providerId: "4050" },
   { provider: "comicvine", mediaType: "comic_issue", providerId: "9001" },
+  { provider: "anilist", mediaType: "anime", providerId: "21" },
 ] as const;
 
 const adversarialProviderIds = [
@@ -22,6 +23,8 @@ const adversarialProviderIds = [
   { provider: "comicvine", mediaType: "comic", providerId: "123,name:bar" },
   { provider: "comicvine", mediaType: "comic_issue", providerId: ".." },
   { provider: "comicvine", mediaType: "comic_issue", providerId: "123,name:bar" },
+  { provider: "anilist", mediaType: "anime", providerId: ".." },
+  { provider: "anilist", mediaType: "manga", providerId: "1?key=x" },
 ] as const;
 
 describe("provider media addition ids", () => {

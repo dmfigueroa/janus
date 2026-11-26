@@ -7,6 +7,15 @@ const storedIds = [
   { source: "google_books", mediaType: "book", id: "book-42" },
   { source: "comicvine", mediaType: "comic", id: "4050" },
   { source: "tmdb", mediaType: "movie", id: "550" },
+  {
+    source: "tmdb",
+    mediaType: "episode",
+    id: "139901",
+    parentId: "1399",
+    parentTitle: "Show",
+    episode: "S01E01",
+  },
+  { source: "anilist", mediaType: "anime", id: "21" },
   { source: "custom", mediaType: "movie", id: "custom-movie-1" },
 ] as const;
 
@@ -22,9 +31,26 @@ const adversarialIds = [
   { source: "comicvine", mediaType: "comic", id: "123,name:bar" },
   { source: "tmdb", mediaType: "movie", id: ".." },
   { source: "tmdb", mediaType: "tv", id: "0" },
+  {
+    source: "tmdb",
+    mediaType: "episode",
+    id: "..",
+    parentId: "1399",
+    parentTitle: "Show",
+    episode: "S01E01",
+  },
+  { source: "anilist", mediaType: "anime", id: ".." },
+  { source: "anilist", mediaType: "manga", id: "1?key=x" },
 ] as const;
 
-function addition(media: { source: string; mediaType: string; id: string }) {
+function addition(media: {
+  source: string;
+  mediaType: string;
+  id: string;
+  parentId?: string;
+  parentTitle?: string;
+  episode?: string;
+}) {
   return {
     watchlistId: 1,
     media: {
@@ -33,6 +59,9 @@ function addition(media: { source: string; mediaType: string; id: string }) {
       mediaType: media.mediaType,
       title: "Title",
       poster: null,
+      parentId: media.parentId,
+      parentTitle: media.parentTitle,
+      episode: media.episode,
     },
   };
 }

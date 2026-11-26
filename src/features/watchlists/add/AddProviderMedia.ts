@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  anilistIdSchema,
   comicVineIdSchema,
   googleBooksIdSchema,
   rawgIdSchema,
@@ -66,6 +67,7 @@ export const providerMediaAdditionSchema = z
     }),
     providerMediaAdditionBaseSchema.extend({
       provider: z.literal("anilist"),
+      providerId: anilistIdSchema,
       mediaType: z.enum(["anime", "manga"]),
     }),
   ])
