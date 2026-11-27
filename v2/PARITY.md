@@ -30,7 +30,7 @@ For each later v1 commit, inspect `git diff <baseline>..<new revision> -- src pu
 
 - [x] Watchlist listing and name search through web/MCP reads (`#253`, `#256`, `#307`).
 - [x] Watchlist create and edit (`#257`, `#318`); delete and merge remain outstanding.
-- [x] Existing detail reads, text filters, stored release/custom order, and release-year/watched grouping (`#253`).
+- [x] Existing detail reads, text filters, stored release/custom order, and release-year/watched grouping (`#253`; detail layout parity verified against live v1 on `/watchlists/1` and `/watchlists/4` at `390x844` and `1280x800` covering header actions popover, search icon spacing, right-aligned `All`/`Unwatched` segmented filter, release vertical timeline spine, poster frame sizing/type markers, runtime metadata, circular watched status indicator, borderless custom drag handles, and endcap pill; measurements and screenshots in `/tmp/janus-detail-parity-final/`).
 - [x] Hidden-item-safe custom reorder with contiguous full renumbering (`#254`, `#364`).
 - [x] Order-mode changes (`#365`, `#369`, `#375`): switching `release` → `custom` initializes contiguous custom ranks in v1 release order (`release_date` empty/null last, `release_date ASC`, `id ASC`) atomically in both v1 and v2 when no saved ranks exist (and opportunistically repairs legacy all-NULL custom watchlists when saved in `custom` mode); switching back preserves ranks while release ordering resumes; detail `#watchlist-refresh` reconciles `#watchlist-form` out-of-band (`hx-select-oob="#watchlist-form"`).
 - [ ] Provider search/details/pagination and additions; TV/comic expansions.

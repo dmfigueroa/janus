@@ -126,10 +126,12 @@ struct Row {
     authors: String,
     sequence: String,
     date: String,
+    runtime: String,
     year: String,
     watched: bool,
     poster: String,
     media: String,
+    media_label: &'static str,
 }
 
 impl Row {
@@ -143,8 +145,10 @@ impl Row {
             sequence: sequence_label(item),
             year: display_year(&raw_date),
             date: format_release_date(&raw_date, custom_order),
+            runtime: format_runtime(item.runtime),
             watched: item.is_watched,
             poster: poster(item.poster_path.as_deref().unwrap_or("")),
+            media_label: media_label(&item.media_type),
             media: item.media_type.clone(),
         }
     }
@@ -259,6 +263,29 @@ fn sequence_label(item: &WatchlistItem) -> String {
     match item.season {
         Some(season) => format!("S{season} E{episode}"),
         None => String::new(),
+    }
+}
+
+fn format_runtime(minutes: Option<i64>) -> String {
+    let Some(minutes) = minutes.filter(|&minutes| minutes > 0) else {
+        return String::new();
+    };
+    let hours = minutes / 60;
+    let remainder = minutes % 60;
+    if hours > 0 {
+        format!("{hours}h {remainder}m")
+    } else {
+        format!("{remainder}m")
+    }
+}
+
+fn media_label(media_type: &str) -> &'static str {
+    match media_type {
+        "movie" => "Movie",
+        "game" => "Game",
+        "book" => "Book",
+        "comic" => "Comic",
+        _ => "",
     }
 }
 
@@ -518,11 +545,12 @@ mod tests {
         first.episode = Some("2".into());
         let mut second = item(2, "Second", None, false);
         second.poster_path = Some("https://images.example/poster.jpg".into());
+        second.runtime = Some(126);
+        let mut third = item(3, "Third", None, false);
+        third.runtime = Some(45);
+        third.media_type = "book".into();
         let view = TimelineView::new(
-            &detail(
-                ItemOrderMode::Custom,
-                vec![first, second, item(3, "Third", None, false)],
-            ),
+            &detail(ItemOrderMode::Custom, vec![first, second, third]),
             &TimelineFilters::default(),
         );
         assert_eq!(
@@ -537,12 +565,21 @@ mod tests {
         assert_eq!(view.runs[0].rows[0].parent, "Parent");
         assert_eq!(view.runs[0].rows[0].sequence, "S1 E2");
         assert_eq!(view.runs[0].rows[0].date, "January 2, 2020");
+        assert_eq!(view.runs[0].rows[0].media_label, "");
+        assert_eq!(view.runs[0].rows[1].media_label, "Movie");
+        assert_eq!(view.runs[0].rows[1].runtime, "2h 6m");
+        assert_eq!(view.runs[0].rows[2].media_label, "Book");
+        assert_eq!(view.runs[0].rows[2].runtime, "45m");
         let html = fragment(&view);
         assert!(
             html.contains("src=\"https://image.tmdb.org/t/p/w200/poster.jpg\""),
             "{html}"
         );
         assert!(html.contains("<div class=\"poster placeholder\""), "{html}");
+        assert!(html.contains(">Movie</span>"), "{html}");
+        assert!(html.contains(">Book</span>"), "{html}");
+        assert!(html.contains("<span>• 2h 6m</span>"), "{html}");
+        assert!(html.contains("<span>• 45m</span>"), "{html}");
     }
 
     #[test]
