@@ -199,6 +199,44 @@ async fn legacy_json_response(response: axum::response::Response) -> axum::respo
     axum::response::Response::from_parts(parts, axum::body::Body::from(message.to_string()))
 }
 
+#[cfg(test)]
+mod legacy_mcp_response_tests {
+    use super::{StatusCode, header, legacy_json_response};
+
+    const EIGHT_MIB: usize = 8 * 1024 * 1024;
+
+    fn event_stream(bytes: Vec<u8>) -> axum::response::Response {
+        axum::response::Response::builder()
+            .header(header::CONTENT_TYPE, "text/event-stream")
+            .body(axum::body::Body::from(bytes))
+            .expect("event stream response")
+    }
+
+    async fn text(response: axum::response::Response) -> String {
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("read test response");
+        String::from_utf8(bytes.to_vec()).expect("utf-8 test response")
+    }
+
+    #[tokio::test]
+    async fn sse_body_over_8_mib_is_rejected() {
+        let response = legacy_json_response(event_stream(vec![b'x'; EIGHT_MIB + 1])).await;
+        let status = response.status();
+        let body = text(response).await;
+        assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE, "{body}");
+    }
+
+    #[tokio::test]
+    async fn sse_body_at_8_mib_is_read_and_not_rejected_for_size() {
+        let response = legacy_json_response(event_stream(vec![b'x'; EIGHT_MIB])).await;
+        let status = response.status();
+        let body = text(response).await;
+        assert_ne!(status, StatusCode::PAYLOAD_TOO_LARGE, "{body}");
+        assert_eq!(body, "Missing MCP response");
+    }
+}
+
 pub use features::search;
 pub use features::watchlists::addition;
 pub use features::watchlists::{
