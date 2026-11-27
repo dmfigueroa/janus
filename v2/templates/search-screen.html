@@ -51,8 +51,10 @@
     </div>
     <input type="hidden" name="type" value="{{ view.media_type }}" />
     <input type="hidden" name="page" value="1" />
-    <button type="submit">Search</button>
-    <span id="search-indicator" class="htmx-indicator" role="status">Searching...</span>
+    <button type="submit">
+      <span class="search-submit-label">Search</span>
+      <span id="search-indicator" class="htmx-indicator" role="status">Searching...</span>
+    </button>
   </form>
   <div class="search-tabs" role="tablist" aria-label="Media type">
     {% for tab in view.tabs %}

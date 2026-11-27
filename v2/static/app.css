@@ -1438,6 +1438,15 @@ watchlist-reorder[aria-busy="true"] {
   transform: scale(0.97);
 }
 
+.search-form.htmx-request .search-submit-label {
+  display: none;
+}
+
+.search-form .htmx-indicator.htmx-request {
+  display: inline;
+  color: inherit;
+}
+
 .search-tabs {
   display: flex;
   flex-wrap: nowrap;
@@ -1647,10 +1656,23 @@ watchlist-reorder[aria-busy="true"] {
   background: var(--accent-strong);
   font-size: 0.875rem;
   font-weight: 500;
+  transition:
+    transform 120ms var(--ease-out),
+    opacity 150ms var(--ease-out),
+    background-color 150ms var(--ease-out),
+    border-color 150ms var(--ease-out);
+}
+
+#search-dialog .button-primary.search-add-submit:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .search-add-form.htmx-request .search-submit-label {
   display: none;
+}
+
+#search-dialog .search-add-submit .htmx-indicator.htmx-request {
+  color: inherit;
 }
 
 @media (min-width: 30rem) {
