@@ -1430,19 +1430,6 @@ watchlist-reorder[aria-busy="true"] {
   border-color: var(--accent);
 }
 
-#search-dialog select {
-  flex: 1 1 auto;
-  width: 100%;
-  min-width: 0;
-  min-height: var(--control-size);
-  height: var(--control-size);
-  padding: 0 var(--size-3);
-  border: var(--border-size-1) solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--bg-surface);
-  font-size: var(--font-size-sm);
-}
-
 .search-form button {
   display: inline-flex;
   flex: 0 0 auto;
@@ -1675,6 +1662,73 @@ watchlist-reorder[aria-busy="true"] {
   flex-direction: column;
   gap: var(--size-3);
   align-items: stretch;
+}
+
+.search-watchlist {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.search-watchlist #search-watchlist-input {
+  width: 100%;
+  min-height: var(--control-size);
+  height: var(--control-size);
+  padding: 0 var(--size-3);
+  border: var(--border-size-1) solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  font-size: var(--font-size-sm);
+}
+
+.search-watchlist-listbox {
+  position: absolute;
+  top: calc(100% + var(--size-1));
+  right: 0;
+  left: 0;
+  z-index: var(--layer-2);
+  max-height: calc(var(--size-12) + var(--size-8));
+  margin: 0;
+  padding: var(--size-1);
+  overflow: auto;
+  border: var(--border-size-1) solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-lg);
+  list-style: none;
+}
+
+.search-watchlist-listbox [role="option"] {
+  padding: var(--size-2) var(--size-3);
+  border-radius: calc(var(--radius-control) - var(--size-1) / 2);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.search-watchlist-listbox [role="option"].is-active,
+.search-watchlist-listbox [role="option"]:hover {
+  background: var(--bg-subtle);
+}
+
+.search-watchlist-listbox [role="option"][aria-selected="true"] {
+  color: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+.search-watchlist-empty {
+  position: absolute;
+  top: calc(100% + var(--size-1));
+  right: 0;
+  left: 0;
+  z-index: var(--layer-2);
+  margin: 0;
+  padding: var(--size-2) var(--size-3);
+  border: var(--border-size-1) solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--bg-surface);
+  color: var(--fg-muted);
+  font-size: var(--font-size-sm);
+  box-shadow: var(--shadow-lg);
 }
 
 #search-dialog .button-primary.search-add-submit {

@@ -321,6 +321,10 @@ async fn detail_sheet_adds_a_movie_and_reports_destination_failures() {
     assert!(detail.contains("all available episodes"));
     assert!(detail.contains("hx-post=\"/v2/search/add\""));
     assert!(detail.contains("commandfor=\"search-dialog\""));
+    assert!(detail.contains("data-watchlist-combobox"));
+    assert!(detail.contains("role=\"combobox\""));
+    assert!(detail.contains("id=\"search-watchlist-listbox\""));
+    assert!(detail.contains("name=\"watchlistId\""));
     assert_eq!(harness.transport.calls().len(), 0);
 
     let (status, _, missing) = send(

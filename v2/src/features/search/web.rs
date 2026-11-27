@@ -106,6 +106,7 @@ struct ListChoice {
     id: i64,
     name: String,
     custom: bool,
+    selected: bool,
 }
 
 struct DetailView {
@@ -355,10 +356,12 @@ fn detail_view(query: &DetailQuery, summaries: &[WatchlistSummary]) -> DetailVie
         .filter(|rating| *rating > 0.0);
     let watchlists = summaries
         .iter()
-        .map(|summary| ListChoice {
+        .enumerate()
+        .map(|(index, summary)| ListChoice {
             id: summary.watchlist.id,
             name: summary.watchlist.name.clone(),
             custom: summary.watchlist.item_order_mode == ItemOrderMode::Custom,
+            selected: index == 0,
         })
         .collect::<Vec<_>>();
     let (notice_media, notice_items) = addition_notice(&query.media_type);

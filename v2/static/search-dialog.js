@@ -1,3 +1,5 @@
+import { bindWatchlistComboboxes } from "@janus/search-watchlist-combobox";
+
 let returnFocus = null;
 
 function searchDialog() {
@@ -12,11 +14,15 @@ function bindDialog(dialog) {
   dialog.addEventListener("cancel", onCancel);
 }
 
+function watchlistValue(dialog) {
+  return dialog.querySelector("#search-watchlist");
+}
+
 function syncInsertion(dialog) {
-  const select = dialog.querySelector("#search-watchlist");
+  const value = watchlistValue(dialog);
   const fieldset = dialog.querySelector("#search-insertion");
-  if (!(select instanceof HTMLSelectElement) || !(fieldset instanceof HTMLFieldSetElement)) return;
-  const custom = select.selectedOptions[0]?.dataset.order === "custom";
+  if (!(value instanceof HTMLInputElement) || !(fieldset instanceof HTMLFieldSetElement)) return;
+  const custom = value.dataset.order === "custom";
   fieldset.dataset.custom = custom ? "true" : "false";
   fieldset.hidden = !custom;
   fieldset.disabled = !custom;
@@ -33,6 +39,7 @@ function onSwap(event) {
   const dialog = searchDialog();
   if (!dialog) return;
   bindDialog(dialog);
+  bindWatchlistComboboxes(dialog, () => syncInsertion(dialog));
   if (!dialog.open) {
     returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialog.showModal();
@@ -44,7 +51,7 @@ function onSwap(event) {
 
 function onChange(event) {
   const target = event.target;
-  if (!(target instanceof HTMLSelectElement) || target.id !== "search-watchlist") return;
+  if (!(target instanceof HTMLInputElement) || target.id !== "search-watchlist") return;
   const dialog = searchDialog();
   if (dialog) syncInsertion(dialog);
 }

@@ -50,17 +50,46 @@
     <input type="hidden" name="title" value="{{ view.title }}" />
     <p class="search-add-label" id="search-watchlist-label">Add to Watchlist</p>
     <div class="search-add-row">
-      <label class="visually-hidden" for="search-watchlist">Watchlist</label>
-      <select id="search-watchlist" name="watchlistId" aria-labelledby="search-watchlist-label">
-        {% for list in view.watchlists %}
-        <option
+      <div class="search-watchlist" data-watchlist-combobox>
+        <label class="visually-hidden" for="search-watchlist-input">Watchlist</label>
+        {% for list in view.watchlists %} {% if list.selected %}
+        <input
+          type="hidden"
+          id="search-watchlist"
+          name="watchlistId"
           value="{{ list.id }}"
           data-order="{% if list.custom %}custom{% else %}release{% endif %}"
-        >
-          {{ list.name }}
-        </option>
-        {% endfor %}
-      </select>
+        />
+        {% endif %} {% endfor %}
+        <input
+          id="search-watchlist-input"
+          type="text"
+          role="combobox"
+          aria-labelledby="search-watchlist-label"
+          aria-autocomplete="list"
+          aria-expanded="false"
+          aria-controls="search-watchlist-listbox"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Select a watchlist..."
+          value="{% for list in view.watchlists %}{% if list.selected %}{{ list.name }}{% endif %}{% endfor %}"
+        />
+        <ul id="search-watchlist-listbox" class="search-watchlist-listbox" role="listbox" hidden>
+          {% for list in view.watchlists %}
+          <li
+            role="option"
+            id="search-watchlist-option-{{ list.id }}"
+            data-value="{{ list.id }}"
+            data-order="{% if list.custom %}custom{% else %}release{% endif %}"
+            data-label="{{ list.name }}"
+            aria-selected="{{ list.selected }}"
+          >
+            {{ list.name }}
+          </li>
+          {% endfor %}
+        </ul>
+        <p class="search-watchlist-empty" hidden>No watchlists match.</p>
+      </div>
       <button type="submit" class="button-primary search-add-submit">
         <span class="search-submit-label">Add</span>
         <span id="search-add-indicator" class="htmx-indicator">Adding...</span>
