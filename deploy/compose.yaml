@@ -1,10 +1,11 @@
-# Transition stack for the existing Janus Coolify application only.
-# Coolify builds these services on its build server and deploys to its deployment server.
+# Production Coolify stack: pull pre-built images from GHCR (pull-to-deploy).
+# Runtime config (DATABASE_URL, provider keys, SEED_ON_STARTUP, binds) is injected
+# by Coolify or the host environment. Never bake secrets into the images.
+# For local or PR-preview source builds, use compose.build.yaml instead.
 services:
   v1:
-    build:
-      context: ..
-      dockerfile: Dockerfile
+    image: ghcr.io/dmfigueroa/janus-v1:latest
+    pull_policy: always
     restart: unless-stopped
     environment:
       DATABASE_URL: /app/storage/sqlite.db
@@ -12,6 +13,7 @@ services:
       COMICVINE_API_KEY: ${COMICVINE_API_KEY:-}
       RAWG_API_KEY: ${RAWG_API_KEY:-}
       GOOGLE_BOOKS_API_KEY: ${GOOGLE_BOOKS_API_KEY:-}
+      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-false}
     volumes:
       - database:/app/storage
     expose:
@@ -28,15 +30,14 @@ services:
       timeout: 5s
       start_period: 30s
   v2:
-    build:
-      context: ..
-      dockerfile: v2/Dockerfile
+    image: ghcr.io/dmfigueroa/janus-v2:next
+    pull_policy: always
     depends_on:
       v1:
         condition: service_healthy
     restart: unless-stopped
     environment:
-      JANUS_V2_BIND: 0.0.0.0:3001
+      JANUS_V2_BIND: ${JANUS_V2_BIND:-0.0.0.0:3001}
       DATABASE_URL: /app/storage/sqlite.db
     volumes:
       - database:/app/storage
