@@ -12,6 +12,102 @@ use std::{
 
 #[test]
 fn sigterm_exits_zero() {
+    let mut server = start_server();
+    send_sigterm(server.child.as_ref().expect("child"), &server.log);
+    let status = wait_for_exit(
+        server.child.as_mut().expect("child"),
+        Duration::from_secs(5),
+        &server.log,
+    );
+    server.child = None;
+    assert_exit_zero(status, &server.log);
+}
+
+#[test]
+fn sigterm_drains_in_flight_request() {
+    let mut server = start_server();
+    let port = server.port;
+    let address = format!("127.0.0.1:{port}").parse().expect("address");
+    let mut held = TcpStream::connect_timeout(&address, Duration::from_secs(2)).expect("hold conn");
+    held.set_read_timeout(Some(Duration::from_secs(5)))
+        .expect("read timeout");
+    held.set_write_timeout(Some(Duration::from_secs(5)))
+        .expect("write timeout");
+    write!(
+        held,
+        "GET /v2/health/live HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n"
+    )
+    .expect("partial headers");
+
+    send_sigterm(server.child.as_ref().expect("child"), &server.log);
+    thread::sleep(Duration::from_millis(400));
+    assert!(
+        server
+            .child
+            .as_mut()
+            .expect("child")
+            .try_wait()
+            .expect("poll")
+            .is_none(),
+        "process should still drain after SIGTERM\n{}",
+        log_text(&server.log)
+    );
+    assert!(
+        TcpStream::connect_timeout(&address, Duration::from_millis(200)).is_err(),
+        "listener should stop accepting during drain\n{}",
+        log_text(&server.log)
+    );
+
+    held.write_all(b"\r\n").expect("finish headers");
+    let mut buffer = Vec::new();
+    held.read_to_end(&mut buffer)
+        .expect("read drained response");
+    let text = String::from_utf8_lossy(&buffer);
+    assert!(
+        text.contains("200") && text.contains("live"),
+        "in-flight request should finish during drain, got {text:?}\n{}",
+        log_text(&server.log)
+    );
+
+    let status = wait_for_exit(
+        server.child.as_mut().expect("child"),
+        Duration::from_secs(5),
+        &server.log,
+    );
+    server.child = None;
+    assert_exit_zero(status, &server.log);
+}
+
+struct Database(PathBuf);
+
+impl Drop for Database {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+        for suffix in ["-wal", "-shm"] {
+            let mut path = self.0.as_os_str().to_os_string();
+            path.push(suffix);
+            let _ = std::fs::remove_file(path);
+        }
+    }
+}
+
+struct RunningServer {
+    child: Option<Child>,
+    port: u16,
+    log: Arc<Mutex<String>>,
+    _database: Database,
+}
+
+impl Drop for RunningServer {
+    fn drop(&mut self) {
+        if let Some(child) = self.child.as_mut() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
+
+fn start_server() -> RunningServer {
     let database = migrated_database();
     let port = reserve_port();
     let log = Arc::new(Mutex::new(String::new()));
@@ -30,58 +126,31 @@ fn sigterm_exits_zero() {
     let stderr = child.stderr.take().expect("stderr");
     drain(stdout, Arc::clone(&log));
     drain(stderr, Arc::clone(&log));
-    let mut server = RunningServer { child: Some(child) };
+    wait_until_live(port, &mut child, &log);
+    RunningServer {
+        child: Some(child),
+        port,
+        log,
+        _database: database,
+    }
+}
 
-    wait_until_live(port, server.child.as_mut().expect("child"), &log);
+fn send_sigterm(child: &Child, log: &Arc<Mutex<String>>) {
     let kill = Command::new("kill")
-        .args([
-            "-s",
-            "TERM",
-            &server.child.as_ref().expect("child").id().to_string(),
-        ])
+        .args(["-s", "TERM", &child.id().to_string()])
         .status()
         .expect("send SIGTERM");
-    assert!(kill.success(), "kill failed\n{}", log_text(&log));
+    assert!(kill.success(), "kill failed\n{}", log_text(log));
+}
 
-    let status = wait_for_exit(
-        server.child.as_mut().expect("child"),
-        Duration::from_secs(5),
-        &log,
-    );
-    server.child = None;
+fn assert_exit_zero(status: ExitStatus, log: &Arc<Mutex<String>>) {
     let observed = shell_exit_code(status);
     assert_eq!(
         observed,
         Some(0),
         "SIGTERM should exit 0, observed {observed:?}\n{}",
-        log_text(&log)
+        log_text(log)
     );
-}
-
-struct Database(PathBuf);
-
-impl Drop for Database {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.0);
-        for suffix in ["-wal", "-shm"] {
-            let mut path = self.0.as_os_str().to_os_string();
-            path.push(suffix);
-            let _ = std::fs::remove_file(path);
-        }
-    }
-}
-
-struct RunningServer {
-    child: Option<Child>,
-}
-
-impl Drop for RunningServer {
-    fn drop(&mut self) {
-        if let Some(child) = self.child.as_mut() {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
-    }
 }
 
 fn migrated_database() -> Database {
