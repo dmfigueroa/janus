@@ -1,0 +1,80 @@
+<div id="search-screen" class="search-page">
+  <header class="search-heading">
+    <h1>
+      <span class="search-accent">Discover</span>
+      <span class="search-muted">Everything</span>
+    </h1>
+    <p class="search-lede">Find movies, shows, games, books, and comics.</p>
+    <p class="search-notice">{{ view.notice }}</p>
+  </header>
+  <form
+    id="search-form"
+    class="search-form"
+    action="/v2/search"
+    method="get"
+    hx-get="/v2/search"
+    hx-target="#search-results"
+    hx-select="#search-results"
+    hx-swap="outerHTML"
+    hx-trigger="submit, input changed delay:300ms from:find input[type='search']"
+    hx-push-url="true"
+    hx-indicator="#search-indicator"
+    hx-sync="#search-results:abort"
+  >
+    <label class="visually-hidden" for="search-query">Search media</label>
+    <div class="search-field">
+      <svg
+        class="search-icon"
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        width="16"
+        height="16"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <circle cx="11" cy="11" r="7"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input
+        id="search-query"
+        type="search"
+        name="query"
+        value="{{ view.query }}"
+        placeholder="Search..."
+        autocomplete="off"
+        enterkeyhint="search"
+        aria-label="Search media"
+      />
+    </div>
+    <input type="hidden" name="type" value="{{ view.media_type }}" />
+    <input type="hidden" name="page" value="1" />
+    <button type="submit">
+      <span class="search-submit-label">Search</span>
+      <span id="search-indicator" class="htmx-indicator" role="status">Searching...</span>
+    </button>
+  </form>
+  <div class="search-tabs" role="tablist" aria-label="Media type">
+    {% for tab in view.tabs %}
+    <a
+      role="tab"
+      aria-selected="{{ tab.selected }}"
+      href="/v2/search?query={{ view.query|urlencode }}&amp;type={{ tab.value }}&amp;page=1"
+      hx-get="/v2/search?type={{ tab.value }}&amp;page=1"
+      hx-include="#search-query"
+      hx-target="#search-screen"
+      hx-select="#search-screen"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+      hx-sync="#search-screen:replace"
+      >{{ tab.label }}</a
+    >
+    {% endfor %}
+  </div>
+  {% include "search-results.html" %}
+  <dialog id="search-dialog" class="dialog" closedby="any" aria-labelledby="search-dialog-title">
+    <h2 id="search-dialog-title" class="visually-hidden">Media details</h2>
+  </dialog>
+</div>

@@ -11,7 +11,16 @@ base64 = "0.22"
 sha2 = "0.10"
 unicode-normalization = "0.1"
 axum = "=0.8.9"
-tokio = { version = "=1.54.1", features = ["macros", "rt-multi-thread", "net", "signal"] }
+tokio = { version = "=1.54.1", features = [
+  "macros",
+  "rt-multi-thread",
+  "net",
+  "signal",
+  "sync",
+  "time",
+] }
+futures = { version = "0.3", default-features = false, features = ["std"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 askama = "=0.16.1"
 sea-orm = { version = "=2.0.4", default-features = false, features = [
   "sqlx-sqlite",

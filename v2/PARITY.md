@@ -34,7 +34,9 @@ For each later v1 commit, inspect `git diff <baseline>..<new revision> -- src pu
 - [x] Hidden-item-safe custom reorder with contiguous full renumbering (`#254`, `#364`).
 - [x] Order-mode changes (`#365`, `#369`, `#375`): switching `release` → `custom` initializes contiguous custom ranks in v1 release order (`release_date` empty/null last, `release_date ASC`, `id ASC`) atomically in both v1 and v2 when no saved ranks exist (and opportunistically repairs legacy all-NULL custom watchlists when saved in `custom` mode); switching back preserves ranks while release ordering resumes; detail `#watchlist-refresh` reconciles `#watchlist-form` out-of-band (`hx-select-oob="#watchlist-form"`).
 - [ ] Provider search/details/pagination and additions; TV/comic expansions.
+  - [x] TMDB movie and TV search, detail, pagination, and episode expansion (`#269`). ComicVine expansion remains outstanding.
 - [ ] Custom additions, anchored insertion, duplicates, and partial outcomes (including `#289` release-mode anchor rejection).
+  - [x] TMDB additions cover duplicates, `no_new_items`, destination failures, and a failed season that does not insert (`#269`). Custom-item creation remains outstanding. The search sheet offers beginning and end on custom lists; MCP still accepts `before` and `after`.
 - [ ] Edited metadata, item/parent removal, and movement.
   - [x] Watchlist item metadata editing (`#260`): shared domain primitives (`ItemTitle`, `ReleaseDate`, `PosterPath`, `FieldPatch`, `WatchlistItemChanges`) and atomic `UPDATE watchlist_items ... WHERE id = ? AND watchlist_id = ? RETURNING id` write serving both content-negotiated web endpoints (`GET /v2/watchlists/{id}/items/{item_id}/edit`, `POST /v2/watchlists/{id}/items/{item_id}`) and MCP `edit_watchlist_items`; v1-matching row action trigger (`More actions for <title>` → `Edit`, `44x44` on both v1 and v2), native modal `<dialog id="item-edit-dialog">` with live `no-referrer` poster preview, `YYYY`/`YYYY-MM-DD` date entry and clear, `aria-busy` locking, draft retention on failure, detail reconciliation via `HX-Trigger`, and focus restoration (with `#query` fallback when filtered out). Measured against live v1 and v2 on `/watchlists/1` (`/v2/watchlists/1`) at `390x844` (v1 dialog `358x498`, v2 dialog `356x442`) and `1280x800` (v1 dialog `512x422`, v2 dialog `384x442`), screenshots in `/tmp/janus-issue260-evidence/`. Item/parent removal (`#265`) and movement (`#266`) remain outstanding.
 - [ ] Watch, quiet watch, unwatch, idempotence, and rotation recency.
@@ -52,10 +54,10 @@ For each later v1 commit, inspect `git diff <baseline>..<new revision> -- src pu
 
 ## MCP source inventory
 
-8 of 27 tools are implemented in v2 (`v2/src/features/watchlists/mcp/`); the remaining 19 are unported and tracked in the machine-enforced manifest [`contracts/mcp-watchlists.json`](../contracts/mcp-watchlists.json) (gated by `test/integrations/McpCompliance.test.ts`, `v2/tests/mcp_compliance.rs`, and `pnpm run test:parity`). Reference contracts live in `src/app/mcp/`.
+10 of 27 tools are implemented in v2 (`v2/src/features/watchlists/mcp/`); the remaining 17 are unported and tracked in the machine-enforced manifest [`contracts/mcp-watchlists.json`](../contracts/mcp-watchlists.json) (gated by `test/integrations/McpCompliance.test.ts`, `v2/tests/mcp_compliance.rs`, and `pnpm run test:parity`). Reference contracts live in `src/app/mcp/`.
 
 - [ ] `add_custom_items_to_watchlists`
-- [ ] `add_media_to_watchlists`
+- [x] `add_media_to_watchlists`
 - [ ] `create_lineups`
 - [x] `create_watchlists`
 - [ ] `delete_lineups`
@@ -73,7 +75,7 @@ For each later v1 commit, inspect `git diff <baseline>..<new revision> -- src pu
 - [ ] `remove_watchlist_parents`
 - [ ] `reorder_lineups`
 - [x] `reorder_watchlist_items`
-- [ ] `search_media`
+- [x] `search_media`
 - [x] `search_watchlists`
 - [ ] `set_lineup_watchlists`
 - [ ] `set_watchlist_items_watched`
@@ -84,9 +86,9 @@ For each later v1 commit, inspect `git diff <baseline>..<new revision> -- src pu
 
 ## Provider inventory at the baseline
 
-Sources: `src/features/search/search/MediaSearch.server.ts`, `src/server/providers/*`, `src/server/Media.ts`, and `src/features/watchlists/add/*`. All provider ports and live-provider evidence remain outstanding.
+Sources: `src/features/search/search/MediaSearch.server.ts`, `src/server/providers/*`, `src/server/Media.ts`, and `src/features/watchlists/add/*`. Game, book, and comic search return `provider_unavailable` without HTTP. Additions for those providers return `provider_not_configured` when the key is empty and `provider_unavailable` when a key is present, still without calling the provider. Anime and manga stay unsupported. No live provider was called.
 
-- [ ] TMDB movies and TV: search paging, details, TV-to-episode expansion, poster paths, configured-key failures, duplicate/no-new-item, and partial addition outcomes.
+- [x] TMDB movies and TV (`#269`): fixture-backed search paging with HTMX `revealed` continuation that accumulates hits (no Previous/Next pager), hit detail sheet, TV-to-episode expansion, poster paths, missing-key and malformed-body failures, duplicates, `no_new_items`, and partial season failures. Web `/v2/search` and MCP `search_media` / `add_media_to_watchlists`. Live TMDB was not called. Layout was not measured against v1 at `390x844` or `1280x800`, so visual parity is not claimed. Creating a custom item from search remains outstanding.
 - [ ] RAWG games: configured-key failures, search paging, details, and additions.
 - [ ] Google Books: identifiers/ISBNs, authors, optional metadata, search paging, and additions.
 - [ ] ComicVine: configured-key failures, volumes/issues, paging, and volume expansion.
@@ -104,7 +106,7 @@ Sources: `vite.config.ts`, `src/lib/PwaRegistration.ts`, `src/components/PwaUpda
 
 ## Current verification & coverage summary
 
-- **Rust & disposable-SQLite integration (`pnpm run test:v2`):** validates fail-closed startup, schema/byte/WAL preservation, bounded locks, reads after v1 writes, v1 reads after v2 writes, Unicode name matching, bound cursors, order-token SHA-256 parity, create/update defaults & timestamps (including Drizzle-matching `updated_at` on create), release↔custom order-mode transitions (tie-breaks, mixed ranked/unranked preservation, atomic rollback, `orderToken`/`nextUnwatched` updates, and `not_custom_mode` rejection), gapped/duplicate/null-rank full renumbering (including opportunistic repair on no-op reorders), mid-write rollback, item metadata tri-state merge patch/boundary parsing/atomic writes/content negotiation (`HX-Trigger`, `303` PRG, `Vary: HX-Request, Accept`)/v1↔v2 round trips, and shared MCP contract compliance + SQLite `checkRep` + pending 19-tool gating (`v2/tests/mcp_compliance.rs`).
+- **Rust & disposable-SQLite integration (`pnpm run test:v2`):** validates fail-closed startup, schema/byte/WAL preservation, bounded locks, reads after v1 writes, v1 reads after v2 writes, Unicode name matching, bound cursors, order-token SHA-256 parity, create/update defaults & timestamps (including Drizzle-matching `updated_at` on create), release↔custom order-mode transitions (tie-breaks, mixed ranked/unranked preservation, atomic rollback, `orderToken`/`nextUnwatched` updates, and `not_custom_mode` rejection), gapped/duplicate/null-rank full renumbering (including opportunistic repair on no-op reorders), mid-write rollback, item metadata tri-state merge patch/boundary parsing/atomic writes/content negotiation (`HX-Trigger`, `303` PRG, `Vary: HX-Request, Accept`)/v1↔v2 round trips, and shared MCP contract compliance + SQLite `checkRep` + pending 17-tool gating (`v2/tests/mcp_compliance.rs`). TMDB movie and TV search and additions are covered by fixture transports in `v2/tests/media_search.rs`, `v2/tests/media_add.rs`, `v2/tests/media_tv.rs`, and `v2/tests/search_web.rs`.
 - **Differential & shared-DB stateful MCP gate (`pnpm run test:parity`, `.github/workflows/v2.yml`):** executes [`contracts/mcp-watchlists.json`](../contracts/mcp-watchlists.json) against live v1 and v2 MCP endpoints over identical migrated SQLite fixtures, diffing `tools/list` declarations (metadata + schemas), canonicalized `tools/call` responses (exact `orderToken`, structural cursor payloads, validated timestamps, coercion and error envelopes), SQLite `checkRep` invariants and canonicalized post-state diffs after every mutating case, plus interleaved `v1 → v2 → v1 → v2` sequences against a single shared SQLite database.
 - **DOM & headless browser suites (`.github/workflows/v2.yml`):**
   - `pnpm run test:v2:dom`: jsdom HTMX swaps, `#watchlist-refresh` OOB edit-dialog reconciliation, optimistic keyboard reorder, drop anchors, swap suppression and row action trigger disabling during drags/saves, failed-save reconciliation, item action menu and `#item-edit-dialog` modal/live `no-referrer` poster preview/date clear/`aria-busy`/draft preservation/focus restoration (including filtered-out fallback), and filter/scroll/focus restoration.

@@ -88,11 +88,17 @@ mod tests {
 
     #[derive(Template)]
     #[template(path = "layout.html")]
-    struct LayoutProbe;
+    struct LayoutProbe {
+        nav: crate::features::PrimaryNav,
+    }
 
     #[test]
     fn shared_layout_references_every_versioned_entry_asset() {
-        let layout = LayoutProbe.render().unwrap();
+        let layout = LayoutProbe {
+            nav: crate::features::PrimaryNav::lists(),
+        }
+        .render()
+        .unwrap();
         for url in [
             APP_CSS_URL,
             APP_JS_URL,
@@ -101,6 +107,7 @@ mod tests {
             WATCHLIST_DIALOG_JS_URL,
             ITEM_EDIT_FIELDS_JS_URL,
             ITEM_EDIT_DIALOG_JS_URL,
+            SEARCH_WATCHLIST_COMBOBOX_JS_URL,
             VENDOR_HTMX_MIN_JS_URL,
             VENDOR_SORTABLE_MIN_JS_URL,
             VENDOR_OPEN_PROPS_MIN_CSS_URL,

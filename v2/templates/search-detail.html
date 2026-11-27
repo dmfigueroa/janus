@@ -1,0 +1,122 @@
+<button
+  type="button"
+  class="dialog-close"
+  commandfor="search-dialog"
+  command="request-close"
+  aria-label="Close media details"
+  autofocus
+>
+  <svg
+    aria-hidden="true"
+    viewBox="0 0 24 24"
+    width="16"
+    height="16"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+  >
+    <line x1="6" y1="6" x2="18" y2="18"></line>
+    <line x1="18" y1="6" x2="6" y2="18"></line>
+  </svg>
+</button>
+<div class="search-detail">
+  {% if view.has_backdrop %}
+  <img class="search-backdrop" src="{{ view.backdrop }}" alt="" />
+  {% endif %}
+  <h2 id="search-dialog-title">{{ view.title }}</h2>
+  <p class="search-meta">
+    <span>{{ view.year_label }}</span>
+    <span>{{ view.type_label }}</span>
+    <span>{{ view.rating_label }}</span>
+  </p>
+  {% if view.has_poster && !view.has_backdrop %}
+  <img class="search-detail-poster" src="{{ view.poster }}" alt="" width="96" height="144" />
+  {% endif %} {% if view.overview != "" %}
+  <p>{{ view.overview }}</p>
+  {% endif %} {% if view.has_lists %}
+  <form
+    class="search-add-form dialog-form"
+    hx-post="/v2/search/add"
+    hx-target="#search-add-alert"
+    hx-swap="outerHTML"
+    hx-disabled-elt="find button"
+    hx-indicator="#search-add-indicator"
+  >
+    <p id="search-add-alert" class="search-add-alert" role="alert"></p>
+    <input type="hidden" name="provider" value="{{ view.provider }}" />
+    <input type="hidden" name="providerId" value="{{ view.provider_id }}" />
+    <input type="hidden" name="mediaType" value="{{ view.media_type }}" />
+    <input type="hidden" name="title" value="{{ view.title }}" />
+    <p class="search-add-label" id="search-watchlist-label">Add to Watchlist</p>
+    <div class="search-add-row">
+      <div class="search-watchlist" data-watchlist-combobox>
+        <label class="visually-hidden" for="search-watchlist-input">Watchlist</label>
+        {% for list in view.watchlists %} {% if list.selected %}
+        <input
+          type="hidden"
+          id="search-watchlist"
+          name="watchlistId"
+          value="{{ list.id }}"
+          data-watchlist-value
+          data-order="{% if list.custom %}custom{% else %}release{% endif %}"
+        />
+        {% endif %} {% endfor %}
+        <input
+          id="search-watchlist-input"
+          type="text"
+          role="combobox"
+          data-watchlist-input
+          aria-labelledby="search-watchlist-label"
+          aria-autocomplete="list"
+          aria-expanded="false"
+          aria-controls="search-watchlist-listbox"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Select a watchlist..."
+          value="{% for list in view.watchlists %}{% if list.selected %}{{ list.name }}{% endif %}{% endfor %}"
+        />
+        <ul
+          id="search-watchlist-listbox"
+          class="search-watchlist-listbox"
+          role="listbox"
+          data-watchlist-listbox
+          hidden
+        >
+          {% for list in view.watchlists %}
+          <li
+            role="option"
+            id="search-watchlist-option-{{ list.id }}"
+            data-value="{{ list.id }}"
+            data-order="{% if list.custom %}custom{% else %}release{% endif %}"
+            aria-selected="{{ list.selected }}"
+          >
+            {{ list.name }}
+          </li>
+          {% endfor %}
+        </ul>
+        <p class="search-watchlist-empty" data-watchlist-empty hidden>No watchlists match.</p>
+      </div>
+      <button type="submit" class="button-primary search-add-submit">
+        <span class="search-submit-label">Add</span>
+        <span id="search-add-indicator" class="htmx-indicator">Adding...</span>
+      </button>
+    </div>
+    <fieldset id="search-insertion" data-custom="{{ view.insertion_visible }}">
+      <legend>Insert in custom order</legend>
+      <p>Choose where this item should land in the watchlist's manual sequence.</p>
+      <label><input type="radio" name="insertionPosition" value="beginning" /> Beginning</label>
+      <label><input type="radio" name="insertionPosition" value="end" /> End</label>
+    </fieldset>
+    {% if view.has_notice %}
+    <p class="search-addition-notice">
+      Adding {{ view.notice_media }} will automatically add
+      <strong>all available {{ view.notice_items }}</strong> to your watchlist. This allows you to
+      track your progress step by step.
+    </p>
+    {% endif %}
+  </form>
+  {% else %}
+  <p>Create a watchlist before adding media.</p>
+  {% endif %}
+</div>

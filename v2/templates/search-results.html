@@ -1,0 +1,76 @@
+<section id="search-results" class="search-results" aria-live="polite">
+  {% if view.status_message != "" %}
+  <p class="search-status" role="{{ view.status_role }}">{{ view.status_message }}</p>
+  {% endif %} {% if view.empty_hint != "" %}
+  <p class="search-status">{{ view.empty_hint }}</p>
+  {% endif %} {% if view.hits.len() > 0 || view.has_next %}
+  <div id="search-grid" class="search-grid">
+    {% for hit in view.hits %}
+    <form class="search-hit">
+      <input type="hidden" name="provider" value="{{ hit.provider }}" />
+      <input type="hidden" name="providerId" value="{{ hit.provider_id }}" />
+      <input type="hidden" name="mediaType" value="{{ hit.media_type }}" />
+      <input type="hidden" name="title" value="{{ hit.title }}" />
+      <input type="hidden" name="year" value="{{ hit.year }}" />
+      <input type="hidden" name="overview" value="{{ hit.overview }}" />
+      <input type="hidden" name="poster" value="{{ hit.poster }}" />
+      <input type="hidden" name="backdrop" value="{{ hit.backdrop }}" />
+      <input type="hidden" name="releaseDate" value="{{ hit.release_date }}" />
+      <input type="hidden" name="rating" value="{{ hit.rating_label }}" />
+      <button
+        type="button"
+        hx-get="/v2/search/detail"
+        hx-include="closest form"
+        hx-target="#search-dialog"
+        hx-swap="innerHTML"
+      >
+        <span class="search-poster">
+          {% if hit.has_poster %}
+          <img src="{{ hit.poster }}" alt="" width="500" height="750" loading="lazy" />
+          {% else %}
+          <span class="search-poster-empty">No poster</span>
+          {% endif %} {% if hit.has_rating %}
+          <span class="search-rating" data-high="{{ hit.high_rating }}">
+            {% if hit.high_rating %}
+            <svg
+              class="search-rating-star"
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              width="12"
+              height="12"
+              fill="currentColor"
+            >
+              <path
+                d="M12 2.5l2.83 6.18 6.77.74-5.05 4.6 1.4 6.63L12 17.77 6.05 20.65l1.4-6.63-5.05-4.6 6.77-.74L12 2.5z"
+              ></path>
+            </svg>
+            {% endif %}
+            <span>{{ hit.rating_label }}</span>
+          </span>
+          {% endif %}
+        </span>
+        <span class="search-title">{{ hit.title }}</span>
+        {% if hit.year != "" %}
+        <span class="search-year">{{ hit.year }}</span>
+        {% endif %}
+      </button>
+    </form>
+    {% endfor %} {% if view.has_next %}
+    <div
+      id="search-more"
+      class="search-more"
+      hx-get="/v2/search?query={{ view.query|urlencode }}&amp;type={{ view.media_type }}&amp;page={{ view.next_page }}"
+      hx-trigger="revealed"
+      hx-target="this"
+      hx-swap="outerHTML"
+      hx-select=".search-hit, #search-more"
+      hx-sync="#search-results:abort"
+      role="status"
+      aria-label="Loading more results"
+    >
+      <span class="htmx-indicator">Loading more...</span>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>

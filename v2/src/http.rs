@@ -129,6 +129,11 @@ impl ResponseFormat {
     pub fn representation(self) -> Representation {
         self.representation
     }
+
+    /// `Vary` values for the representation this request selected.
+    pub fn vary(self) -> &'static str {
+        self.vary
+    }
 }
 
 /// Browser navigation defaults to a page and API calls default to JSON.

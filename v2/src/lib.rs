@@ -1,5 +1,6 @@
 mod assets;
 mod database;
+pub mod integrations;
 pub use assets::{EmbeddedAsset, asset_url, static_assets};
 pub use database::open_database;
 mod features;
@@ -7,9 +8,11 @@ mod http;
 
 use axum::{
     Router,
+    extract::FromRef,
     http::{StatusCode, header},
     routing::get,
 };
+use integrations::tmdb::{TmdbCatalog, TmdbClient};
 use rmcp::transport::streamable_http_server::{
     StreamableHttpServerConfig, StreamableHttpService, session::local::LocalSessionManager,
 };
@@ -54,9 +57,33 @@ fn base_router(database_ready: bool) -> Router {
         .fallback(|| async { (StatusCode::NOT_FOUND, "Page not found") })
 }
 
+/// Router state. Watchlist handlers keep using [`Watchlists`] through [`FromRef`].
+#[derive(Clone)]
+pub(crate) struct AppState {
+    pub(crate) lists: features::watchlists::Watchlists,
+    pub(crate) catalog: Arc<dyn TmdbCatalog>,
+}
+
+impl FromRef<AppState> for features::watchlists::Watchlists {
+    fn from_ref(state: &AppState) -> Self {
+        state.lists.clone()
+    }
+}
+
 /// Construct the feature router only after the existing database passes validation.
 pub fn database_router(database: sea_orm::DatabaseConnection) -> Router {
-    let state = features::watchlists::Watchlists(database);
+    database_router_with(database, Arc::new(TmdbClient::from_env()))
+}
+
+/// Same router as [`database_router`] with a caller-supplied TMDB catalog.
+pub fn database_router_with(
+    database: sea_orm::DatabaseConnection,
+    catalog: Arc<dyn TmdbCatalog>,
+) -> Router {
+    let state = AppState {
+        lists: features::watchlists::Watchlists(database),
+        catalog,
+    };
     Router::new()
         .route(
             "/v2/watchlists",
@@ -78,12 +105,23 @@ pub fn database_router(database: sea_orm::DatabaseConnection) -> Router {
             "/v2/watchlists/{id}/items/{item_id}",
             axum::routing::post(features::watchlists::web::edit_item),
         )
+        .route("/v2/search", get(features::search::web::search))
+        .route("/v2/search/detail", get(features::search::web::detail))
+        .route(
+            "/v2/search/add",
+            axum::routing::post(features::search::web::add),
+        )
         .with_state(state.clone())
         .merge(base_router(true))
         .nest_service(
             "/v2/mcp",
             StreamableHttpService::new(
-                move || Ok(features::watchlists::mcp::WatchlistMcp(state.clone())),
+                move || {
+                    Ok(features::watchlists::mcp::WatchlistMcp::new(
+                        state.lists.clone(),
+                        state.catalog.clone(),
+                    ))
+                },
                 sessions(),
                 StreamableHttpServerConfig::default().with_json_response(true),
             ),
@@ -161,6 +199,8 @@ async fn legacy_json_response(response: axum::response::Response) -> axum::respo
     axum::response::Response::from_parts(parts, axum::body::Body::from(message.to_string()))
 }
 
+pub use features::search;
+pub use features::watchlists::addition;
 pub use features::watchlists::{
     ItemOrderMode, WatchlistDetail, WatchlistItem, WatchlistRecord, WatchlistStats,
     WatchlistSummary, Watchlists,
