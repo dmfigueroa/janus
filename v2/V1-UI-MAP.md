@@ -63,6 +63,17 @@ Unported detail controls such as watched toggles, remove/move menu items, and wa
 `src/features/watchlists/components/`; their absence in v2 is an outstanding workflow gap,
 not a styling difference.
 
+## Media search and addition
+
+| What                              | V1 reference                                                                                                          | V2 target                                                                                                                                                    |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Search route and discovery chrome | `src/features/search/SearchDiscoveryScreen.tsx`, `src/features/search/SearchInput.tsx`                                | `v2/templates/search.html`, `v2/templates/search-screen.html`, `v2/static/app.css` `.search-page`, `.search-form`, `.search-field`, `.search-tabs`           |
+| Result grid and continuation      | `src/features/search/SearchResults.tsx`, `src/features/search/SearchMediaCard.tsx`, `useSearchResults.ts`             | `v2/templates/search-results.html`, `v2/static/app.css` `.search-grid`, `.search-hit`, `#search-more`; HTMX `revealed` append (no Previous/Next pager)       |
+| Hit detail sheet and add controls | `src/features/search/SearchMediaDetailSheet.tsx`, `SearchMediaWatchlistControls.tsx`, `SearchMediaAdditionNotice.tsx` | `v2/templates/search-detail.html`, `v2/templates/search-add-alert.html`, `v2/static/search-dialog.js`, `v2/static/app.css` `#search-dialog`, `.search-sheet` |
+| Destination watchlist picker      | `src/features/search/SearchWatchlistSelector.tsx`, `SearchWatchlistCombobox.tsx`                                      | `v2/templates/search-detail.html` combobox markup, `v2/static/search-watchlist-combobox.js`, `v2/static/app.css` `.watchlist-combobox*`                      |
+
+Do not invent search controls without a row above (or an explicit user request). Pagination must accumulate like v1 infinite scroll; destination picking must stay searchable.
+
 ## Finding more
 
 Search a v1 component name inside `v2/templates/` for markup equivalents, and inside
