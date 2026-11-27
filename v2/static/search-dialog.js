@@ -49,6 +49,10 @@ function onChange(event) {
   if (dialog) syncInsertion(dialog);
 }
 
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 function onAdded(event) {
   const dialog = searchDialog();
   if (dialog?.open) dialog.close();
@@ -58,6 +62,18 @@ function onAdded(event) {
   notification.textContent =
     typeof message === "string" && message.length > 0 ? message : "Added to watchlist";
   notification.hidden = false;
+  if (prefersReducedMotion() || typeof notification.animate !== "function") return;
+  notification.animate(
+    [
+      { opacity: 0, transform: "translateY(100%)" },
+      { opacity: 1, transform: "translateY(0)" },
+    ],
+    {
+      duration: 200,
+      easing: "cubic-bezier(0.23, 1, 0.32, 1)",
+      fill: "both",
+    },
+  );
 }
 
 function onClose() {
