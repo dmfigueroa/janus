@@ -1375,13 +1375,20 @@ watchlist-reorder[aria-busy="true"] {
 
 .search-form input[type="search"],
 #search-dialog select {
-  flex: 1 1 12rem;
   width: 100%;
   min-height: 2.75rem;
   padding: var(--size-2) var(--size-3);
   border: var(--border-size-1) solid var(--border);
   border-radius: var(--radius-2);
   background: var(--bg-surface);
+}
+
+.search-form input[type="search"] {
+  flex: 1 1 12rem;
+}
+
+#search-dialog select {
+  flex: 0 0 auto;
 }
 
 .search-form button,
@@ -1540,10 +1547,11 @@ watchlist-reorder[aria-busy="true"] {
 }
 
 #search-dialog {
-  width: min(36rem, 100%);
+  width: 100%;
+  max-width: 100%;
   max-height: min(92dvh, 100%);
   margin-block: auto 0;
-  margin-inline: auto;
+  margin-inline: 0;
   border-radius: var(--size-3) var(--size-3) 0 0;
 }
 
