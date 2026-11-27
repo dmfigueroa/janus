@@ -218,6 +218,17 @@ fn length_limit_exceeded(error: &dyn std::error::Error) -> bool {
     false
 }
 
+pub use features::search;
+pub use features::watchlists::addition;
+pub use features::watchlists::{
+    ItemOrderMode, WatchlistDetail, WatchlistItem, WatchlistRecord, WatchlistStats,
+    WatchlistSummary, Watchlists,
+    discovery::{
+        DiscoveryError, DiscoveryOperation, DiscoveryRequest, GroupedTitle, ItemPage, ItemResults,
+        SummaryPage,
+    },
+};
+
 #[cfg(test)]
 mod legacy_mcp_response_tests {
     use super::{StatusCode, header, legacy_json_response};
@@ -255,14 +266,3 @@ mod legacy_mcp_response_tests {
         assert_eq!(body, "Missing MCP response");
     }
 }
-
-pub use features::search;
-pub use features::watchlists::addition;
-pub use features::watchlists::{
-    ItemOrderMode, WatchlistDetail, WatchlistItem, WatchlistRecord, WatchlistStats,
-    WatchlistSummary, Watchlists,
-    discovery::{
-        DiscoveryError, DiscoveryOperation, DiscoveryRequest, GroupedTitle, ItemPage, ItemResults,
-        SummaryPage,
-    },
-};
