@@ -34,7 +34,7 @@ function setup() {
         itemOrderMode: "custom",
         canReorder: true,
         watchlistId: 1,
-        activeFilters: { watchlistId: 1, itemOrderMode: "custom", unwatchedOnly: false },
+        activeFilters: { watchlistId: 1, unwatchedOnly: false },
       }),
     { wrapper: Wrapper },
   );

@@ -8,21 +8,28 @@ import {
 } from "@/features/lineups/read/useLineupData";
 import { LineupEditor } from "@/features/lineups/components/LineupEditor";
 import { LineupCards } from "@/features/lineups/components/LineupCards";
+import { parsePositiveIntegerParam } from "@/shared/RouteParams";
 
 export const Route = createFileRoute("/rotations/custom/$lineupId")({
   headers: () => ({ "Cache-Control": "private, no-cache" }),
-  loader: async ({ context, params }) => {
-    const id = Number(params.lineupId);
-    if (!validLineupId(id)) throw notFound();
-    await ensureCustomLineup(context.queryClient, id);
+  beforeLoad: ({ params: { lineupId } }) => {
+    const parsedLineupId = parsePositiveIntegerParam(lineupId);
+    if (parsedLineupId === null) {
+      throw notFound();
+    }
+
+    return { lineupId: parsedLineupId };
+  },
+  loader: async ({ context }) => {
+    await ensureCustomLineup(context.queryClient, context.lineupId);
   },
   component: Detail,
 });
 
 function Detail() {
-  const { lineupId } = Route.useParams();
+  const { lineupId } = Route.useRouteContext();
   const { data } = useLineupData();
-  const lineup = findCustomLineup(data.lineups, Number(lineupId));
+  const lineup = findCustomLineup(data.lineups, lineupId);
   if (!lineup) return <NotFound />;
   return (
     <Container maxW="7xl" py={8} pb={24}>
@@ -41,8 +48,4 @@ function Detail() {
       )}
     </Container>
   );
-}
-
-function validLineupId(id: number) {
-  return Number.isInteger(id) && id > 0;
 }

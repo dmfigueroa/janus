@@ -313,7 +313,7 @@ function TimelineHarness({
     itemOrderMode: props.itemOrderMode,
     canReorder: Boolean(canReorder),
     watchlistId: 1,
-    activeFilters: { watchlistId: 1, itemOrderMode: props.itemOrderMode, unwatchedOnly: false },
+    activeFilters: { watchlistId: 1, unwatchedOnly: false },
   });
   return <Timeline {...props} reorder={reorder} />;
 }

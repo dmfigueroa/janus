@@ -211,13 +211,11 @@ describe("watchlist detail optimistic cache", () => {
     const queryClient = new QueryClient();
     const activeFilters = {
       watchlistId: 1,
-      itemOrderMode: "custom" as const,
       unwatchedOnly: true,
       query: "",
     };
     const inactiveFilters = {
       watchlistId: 1,
-      itemOrderMode: "custom" as const,
       unwatchedOnly: false,
       query: "alpha",
     };
@@ -269,14 +267,9 @@ describe("watchlist detail optimistic cache", () => {
   });
 });
 
-function detailKey(overrides: {
-  query?: string;
-  unwatchedOnly?: boolean;
-  itemOrderMode?: "release" | "custom";
-}) {
+function detailKey(overrides: { query?: string; unwatchedOnly?: boolean }) {
   return watchlistDetailQueryKey({
     watchlistId: 1,
-    itemOrderMode: overrides.itemOrderMode ?? "release",
     query: overrides.query ?? "",
     unwatchedOnly: overrides.unwatchedOnly ?? false,
   });

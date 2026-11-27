@@ -1,14 +1,9 @@
 import { useEffect } from "react";
-import {
-  HeadContent,
-  Scripts,
-  createRootRouteWithContext,
-  useRouter,
-} from "@tanstack/react-router";
+import { HeadContent, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import { pwaInfo } from "virtual:pwa-info";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import { installForegroundRevalidation } from "@/app/ForegroundRevalidation";
 import { BottomNav } from "@/components/BottomNav";
 import { PwaUpdatePrompt } from "@/components/PwaUpdatePrompt";
@@ -63,9 +58,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootDocument({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const queryClient = router.options.context.queryClient;
-
   useEffect(() => installForegroundRevalidation(), []);
 
   return (
@@ -75,23 +67,21 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         <Provider>
-          <QueryClientProvider client={queryClient}>
-            <PwaUpdatePrompt />
-            {children}
-            <ChakraToaster />
-            <TanStackDevtools
-              config={{
-                position: "bottom-right",
-              }}
-              plugins={[
-                {
-                  name: "Tanstack Router",
-                  render: <TanStackRouterDevtoolsPanel />,
-                },
-              ]}
-            />
-            <BottomNav />
-          </QueryClientProvider>
+          <PwaUpdatePrompt />
+          {children}
+          <ChakraToaster />
+          <TanStackDevtools
+            config={{
+              position: "bottom-right",
+            }}
+            plugins={[
+              {
+                name: "Tanstack Router",
+                render: <TanStackRouterDevtoolsPanel />,
+              },
+            ]}
+          />
+          <BottomNav />
         </Provider>
         <Scripts />
       </body>
