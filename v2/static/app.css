@@ -148,7 +148,7 @@ textarea {
 
 .home-totals {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
   color: var(--fg-muted);
 }
 
@@ -190,10 +190,10 @@ textarea {
 .watchlist-search input[type="search"] {
   width: 100%;
   min-width: 0;
-  min-height: 2.75rem;
+  min-height: var(--control-size-lg);
   padding: 0.5rem 2.75rem 0.5rem 2.5rem;
   border: var(--border-size-1) solid var(--border);
-  border-radius: 0.75rem;
+  border-radius: var(--radius-control);
   background: var(--bg-surface);
   transition:
     border-color var(--motion-duration) var(--ease-out),
@@ -213,10 +213,10 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2.75rem;
+  min-height: var(--control-size-lg);
   padding: 0.5rem 0.9rem;
   border: var(--border-size-1) solid var(--border);
-  border-radius: 0.75rem;
+  border-radius: var(--radius-control);
   background: var(--bg-surface);
   color: inherit;
   text-decoration: none;
@@ -261,7 +261,7 @@ textarea {
 
 .browse-status,
 .htmx-indicator {
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
   color: var(--fg-muted);
 }
 
@@ -295,7 +295,7 @@ textarea {
 
 .browse-summary {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
   color: var(--fg-muted);
 }
 
@@ -389,7 +389,7 @@ textarea {
   width: 100%;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  border-radius: 0.75rem;
+  border-radius: var(--radius-control);
   box-shadow: 0 0.625rem 0.9375rem -0.1875rem rgb(0 0 0 / 0.5);
 }
 
@@ -476,7 +476,7 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 2.75rem;
+  min-height: var(--control-size-lg);
   padding: 0.5rem 0;
   list-style: none;
   cursor: pointer;
@@ -522,10 +522,10 @@ textarea {
 .pagination a {
   display: inline-flex;
   align-items: center;
-  min-height: 2.75rem;
+  min-height: var(--control-size-lg);
   padding: 0.5rem 0.9rem;
   border: var(--border-size-1) solid var(--border);
-  border-radius: 0.75rem;
+  border-radius: var(--radius-control);
   text-decoration: none;
   transition:
     transform var(--motion-duration-fast) ease-out,
@@ -566,7 +566,7 @@ textarea {
   justify-content: center;
   gap: 0.25rem;
   width: 5rem;
-  min-height: 2.75rem;
+  min-height: var(--control-size-lg);
   padding: 0.5rem 0;
   border-radius: 1rem;
   color: var(--fg-muted);
@@ -633,7 +633,7 @@ textarea {
 
 .watchlist-description {
   margin: 0.5rem 0 0;
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
   color: var(--fg-muted);
   overflow-wrap: anywhere;
@@ -648,7 +648,7 @@ textarea {
   align-items: flex-end;
   justify-content: space-between;
   gap: 0.75rem;
-  font-size: 0.875rem;
+  font-size: var(--font-size-sm);
   font-weight: 500;
 }
 
@@ -705,10 +705,10 @@ textarea {
 .watchlist button,
 .watchlist input[type="search"],
 .watchlist select {
-  min-height: 2.75rem;
+  min-height: var(--control-size-lg);
   padding: 0.5rem;
   border: var(--border-size-1) solid var(--border);
-  border-radius: 0.75rem;
+  border-radius: var(--radius-control);
   background: var(--bg-surface);
   transition:
     transform var(--motion-duration-fast) ease-out,
@@ -754,7 +754,7 @@ textarea {
     margin: 0.5rem 0;
     overflow-wrap: anywhere;
     border: var(--border-size-1) solid var(--border);
-    border-radius: 0.75rem;
+    border-radius: var(--radius-control);
   }
 
   h2 {
@@ -776,7 +776,7 @@ textarea {
   }
 
   article p {
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     color: var(--fg-muted);
   }
 
@@ -807,14 +807,14 @@ textarea {
   summary {
     display: list-item;
     align-content: center;
-    min-height: 2.75rem;
+    min-height: var(--control-size-lg);
     padding-inline: 0.75rem;
     cursor: pointer;
   }
 
   .reorder-handle {
-    min-width: 2.75rem;
-    min-height: 2.75rem;
+    min-width: var(--control-size-lg);
+    min-height: var(--control-size-lg);
     cursor: grab;
     touch-action: none;
   }
@@ -834,8 +834,8 @@ textarea {
   button.item-actions-trigger {
     display: inline-grid;
     place-items: center;
-    min-width: 2.75rem;
-    min-height: 2.75rem;
+    min-width: var(--control-size-lg);
+    min-height: var(--control-size-lg);
     padding: 0;
     border: 0;
     border-radius: var(--radius-round);
@@ -1027,7 +1027,7 @@ watchlist-reorder[aria-busy="true"] {
     border-radius: var(--size-2);
     background: var(--bg-surface);
     color: var(--fg-default);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     line-height: 1.25rem;
     opacity: 0;
     box-shadow: var(--shadow-lg);
@@ -1090,7 +1090,7 @@ watchlist-reorder[aria-busy="true"] {
 
   .dialog-help {
     margin: var(--size-1) 0 0;
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     line-height: var(--size-4);
     color: var(--fg-muted);
   }
@@ -1148,7 +1148,7 @@ watchlist-reorder[aria-busy="true"] {
 
   .form-field > label,
   .order-field .field-label {
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     font-weight: 500;
     line-height: var(--size-4);
   }
@@ -1161,7 +1161,7 @@ watchlist-reorder[aria-busy="true"] {
     border: var(--border-size-1) solid var(--border);
     border-radius: var(--size-2);
     background: var(--bg-canvas);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     line-height: var(--size-4);
   }
 
@@ -1193,7 +1193,7 @@ watchlist-reorder[aria-busy="true"] {
     border: var(--border-size-1) solid var(--border);
     border-radius: var(--size-2);
     background: var(--bg-surface);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     cursor: pointer;
   }
 
@@ -1211,7 +1211,7 @@ watchlist-reorder[aria-busy="true"] {
 
   .form-error {
     margin: 0;
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     line-height: var(--size-4);
     color: var(--danger);
   }
@@ -1231,7 +1231,7 @@ watchlist-reorder[aria-busy="true"] {
     align-items: center;
     gap: calc(var(--size-2) + var(--size-1) * 0.5);
     min-height: var(--size-4);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     line-height: var(--size-4);
   }
 
@@ -1276,7 +1276,7 @@ watchlist-reorder[aria-busy="true"] {
     min-height: var(--control-size-lg);
     padding: 0 var(--size-3);
     border-radius: var(--size-2);
-    font-size: 0.875rem;
+    font-size: var(--font-size-sm);
     font-weight: 500;
     line-height: var(--size-4);
     cursor: pointer;
@@ -1309,12 +1309,12 @@ watchlist-reorder[aria-busy="true"] {
     .dialog-close,
     .form-field input[type="text"],
     .order-field label {
-      min-height: 2.75rem;
+      min-height: var(--control-size-lg);
     }
 
     .dialog-close {
-      width: 2.75rem;
-      height: 2.75rem;
+      width: var(--control-size-lg);
+      height: var(--control-size-lg);
     }
   }
 }
