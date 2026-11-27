@@ -48,17 +48,24 @@
     <input type="hidden" name="providerId" value="{{ view.provider_id }}" />
     <input type="hidden" name="mediaType" value="{{ view.media_type }}" />
     <input type="hidden" name="title" value="{{ view.title }}" />
-    <label class="search-add-label" for="search-watchlist">Add to Watchlist</label>
-    <select id="search-watchlist" name="watchlistId">
-      {% for list in view.watchlists %}
-      <option
-        value="{{ list.id }}"
-        data-order="{% if list.custom %}custom{% else %}release{% endif %}"
-      >
-        {{ list.name }}
-      </option>
-      {% endfor %}
-    </select>
+    <p class="search-add-label" id="search-watchlist-label">Add to Watchlist</p>
+    <div class="search-add-row">
+      <label class="visually-hidden" for="search-watchlist">Watchlist</label>
+      <select id="search-watchlist" name="watchlistId" aria-labelledby="search-watchlist-label">
+        {% for list in view.watchlists %}
+        <option
+          value="{{ list.id }}"
+          data-order="{% if list.custom %}custom{% else %}release{% endif %}"
+        >
+          {{ list.name }}
+        </option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="button-primary search-add-submit">
+        <span class="search-submit-label">Add</span>
+        <span id="search-add-indicator" class="htmx-indicator">Adding...</span>
+      </button>
+    </div>
     <fieldset id="search-insertion" data-custom="{{ view.insertion_visible }}">
       <legend>Insert in custom order</legend>
       <p>Choose where this item should land in the watchlist's manual sequence.</p>
@@ -72,10 +79,6 @@
       track your progress step by step.
     </p>
     {% endif %}
-    <button type="submit" class="button-primary">
-      <span class="search-submit-label">Add</span>
-      <span id="search-add-indicator" class="htmx-indicator">Adding...</span>
-    </button>
   </form>
   {% else %}
   <p>Create a watchlist before adding media.</p>
