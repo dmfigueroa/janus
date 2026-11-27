@@ -125,22 +125,22 @@ Requires [git-cliff](https://git-cliff.org) (or Docker image `orhunp/git-cliff:2
 
 **Commit messages.** Keep conventional commits (`type(scope): summary`). Prefer scopes that name the surface (`v2`, `watchlists`, `providers`, `deploy`). Put the user-visible change in the subject. One logical change per commit.
 
-**Generate notes, then create the GitHub Release** (publish workflows still fire from the git tag push):
+**Push the tag first, then create the GitHub Release** (publish workflows fire from the tag push; `gh release create` must see the remote tag or it will invent one from `main`):
 
 ```bash
-# Preview unreleased notes for a line (since previous same-line tag .. HEAD):
+# Preview unreleased notes for a line (since previous same-line ancestor tag .. HEAD):
 bash tools/release-notes.sh v1
 bash tools/release-notes.sh v2
 
-# Cut v1 1.2.3 with notes since v1/1.1.0 (example):
+# Cut v1 1.2.3 with notes since the prior v1/* tag (example):
 git tag v1/1.2.3
-bash tools/release-notes.sh v1 v1/1.2.3 | gh release create v1/1.2.3 --notes-file -
 git push origin v1/1.2.3
+bash tools/release-notes.sh v1 v1/1.2.3 | gh release create v1/1.2.3 --verify-tag --notes-file -
 
 # Cut v2 2.1.0 → image 2.1.0-beta (prerelease):
 git tag v2/2.1.0
-bash tools/release-notes.sh v2 v2/2.1.0 | gh release create v2/2.1.0 --prerelease --notes-file -
 git push origin v2/2.1.0
+bash tools/release-notes.sh v2 v2/2.1.0 | gh release create v2/2.1.0 --prerelease --verify-tag --notes-file -
 ```
 
 Do not tag `v2/2.x.y-beta` as the git tag: the publish workflow already appends `-beta` to the image tag.

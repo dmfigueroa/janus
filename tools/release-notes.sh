@@ -7,7 +7,7 @@
 # Examples:
 #   bash tools/release-notes.sh v1              # since previous v1/* tag .. HEAD
 #   bash tools/release-notes.sh v2 v2/2.0.0     # notes for that tag since the prior v2/* tag
-#   bash tools/release-notes.sh v1 HEAD | gh release create v1/1.1.0 --notes-file -
+#   bash tools/release-notes.sh v1 v1/1.1.0 | gh release create v1/1.1.0 --verify-tag --notes-file -
 #
 # Path filters match the publish workflows so each line's notes track the
 # commits that affect that image. Requires git-cliff (or Docker).
@@ -30,19 +30,29 @@ if ! git rev-parse --verify "$to_ref" >/dev/null 2>&1; then
   exit 1
 fi
 
-same_line_tags() {
-  git tag -l "${line}/*" --sort=-creatordate
+to_commit="$(git rev-parse "${to_ref}^{commit}")"
+
+# Newest-first same-line tags that are ancestors of to-commit (or equal to it).
+ancestor_same_line_tags() {
+  local tag
+  local tag_commit
+  while IFS= read -r tag; do
+    [[ -z "$tag" ]] && continue
+    tag_commit="$(git rev-parse "${tag}^{commit}")"
+    if [[ "$tag_commit" == "$to_commit" ]] || git merge-base --is-ancestor "$tag_commit" "$to_commit"; then
+      printf '%s\n' "$tag"
+    fi
+  done < <(git tag -l "${line}/*" --sort=-creatordate)
 }
 
-# Previous tag on this line before to-ref.
-# If to-ref is itself a same-line tag name, use the next older tag.
-# Otherwise (HEAD/commit), use the newest same-line tag.
+# Previous tag on this line before to-ref, chosen from to-ref's ancestry.
+# If to-ref is itself a same-line tag, use the next older ancestor tag.
 previous_same_line_tag() {
   local tags=()
   local tag
   while IFS= read -r tag; do
     [[ -n "$tag" ]] && tags+=("$tag")
-  done < <(same_line_tags)
+  done < <(ancestor_same_line_tags)
 
   if ((${#tags[@]} == 0)); then
     return 0
@@ -58,6 +68,9 @@ previous_same_line_tag() {
     fi
   done
 
+  # to-ref is HEAD/commit. If it sits exactly on the newest ancestor tag, that
+  # tag is the previous release (unreleased range is empty). Otherwise use the
+  # newest ancestor tag as the lower bound.
   printf '%s\n' "${tags[0]}"
 }
 
@@ -73,6 +86,7 @@ display_version() {
 }
 
 run_git_cliff() {
+  # Relative config path works for both host git-cliff and the Docker mount at /app.
   if command -v git-cliff >/dev/null 2>&1; then
     git-cliff "$@"
     return
@@ -89,7 +103,6 @@ run_git_cliff() {
 }
 
 previous="$(previous_same_line_tag || true)"
-to_commit="$(git rev-parse "${to_ref}^{commit}")"
 
 include_paths=()
 case "$line" in
@@ -133,7 +146,7 @@ case "$line" in
 esac
 
 cliff_args=(
-  --config "$root/cliff.toml"
+  --config cliff.toml
   --strip all
   "${include_paths[@]}"
 )
