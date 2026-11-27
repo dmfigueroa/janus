@@ -164,15 +164,23 @@ async fn mcp_compatibility(
     response
 }
 
+const MCP_SSE_BODY_LIMIT: usize = 8 * 1024 * 1024;
+
 async fn legacy_json_response(response: axum::response::Response) -> axum::response::Response {
     use axum::response::IntoResponse;
     let (mut parts, body) = response.into_parts();
-    let Ok(bytes) = axum::body::to_bytes(body, usize::MAX).await else {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Unable to read MCP response",
-        )
-            .into_response();
+    let bytes = match axum::body::to_bytes(body, MCP_SSE_BODY_LIMIT).await {
+        Ok(bytes) => bytes,
+        Err(error) if length_limit_exceeded(&error) => {
+            return (StatusCode::PAYLOAD_TOO_LARGE, "MCP response exceeds 8 MiB").into_response();
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Unable to read MCP response",
+            )
+                .into_response();
+        }
     };
     let terminal = String::from_utf8_lossy(&bytes)
         .lines()
@@ -197,6 +205,17 @@ async fn legacy_json_response(response: axum::response::Response) -> axum::respo
         parts.headers.remove(key);
     }
     axum::response::Response::from_parts(parts, axum::body::Body::from(message.to_string()))
+}
+
+fn length_limit_exceeded(error: &dyn std::error::Error) -> bool {
+    let mut source = std::error::Error::source(error);
+    while let Some(current) = source {
+        if current.is::<http_body_util::LengthLimitError>() {
+            return true;
+        }
+        source = current.source();
+    }
+    false
 }
 
 #[cfg(test)]
