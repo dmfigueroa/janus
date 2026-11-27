@@ -1,16 +1,18 @@
 let latestReorder:
   | import("@/features/watchlists/detail/useWatchlistReorder").WatchlistReorder
   | undefined;
+import { Suspense } from "react";
 import { flushSync } from "react-dom";
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, dehydrate, hydrate } from "@tanstack/react-query";
 import { ChakraProvider } from "@chakra-ui/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistItem } from "@/db/Schema";
 import type { WatchlistSummary } from "@/features/watchlists/list/Query.server";
 import {
   getWatchlistDetailPage,
+  watchlistDetailInfiniteQueryOptions,
   watchlistDetailQueryKey,
   type WatchlistDetailPage,
 } from "@/features/watchlists/detail/Query";
@@ -46,7 +48,8 @@ vi.mock("@/features/watchlists/lifecycle/WatchlistLifecycleActions", () => ({
   skipWatchlist: mocks.skip,
   deleteWatchlist: mocks.deleteWatchlist,
 }));
-vi.mock("@tanstack/react-router", () => ({
+vi.mock("@tanstack/react-router", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/react-router")>()),
   useNavigate: () => mocks.navigate,
   useRouter: () => ({ invalidate: mocks.routerInvalidate }),
 }));
@@ -121,9 +124,10 @@ describe("detail lifecycle actions", () => {
     const client = createQueryClient();
     const invalidateQueries = vi.spyOn(client, "invalidateQueries");
     mocks.read.mockResolvedValue(initialData);
-    renderScreen(initialData, client);
+    renderScreen(1, client);
 
     await waitFor(() => expect(mocks.read).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByText("Toggle pause")).not.toBeNull());
     fireEvent.click(screen.getByText("Toggle pause"));
 
     await waitFor(() => expect(mocks.pause).toHaveBeenCalledWith({ data: { watchlistId: 1 } }));
@@ -141,9 +145,10 @@ describe("detail lifecycle actions", () => {
     const client = createQueryClient();
     const invalidateQueries = vi.spyOn(client, "invalidateQueries");
     mocks.read.mockResolvedValue(initialData);
-    renderScreen(initialData, client);
+    renderScreen(1, client);
 
     await waitFor(() => expect(mocks.read).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByText("Toggle pause")).not.toBeNull());
     fireEvent.click(screen.getByText("Toggle pause"));
 
     await waitFor(() => expect(mocks.resume).toHaveBeenCalledWith({ data: { watchlistId: 1 } }));
@@ -159,9 +164,10 @@ describe("detail lifecycle actions", () => {
     const client = createQueryClient();
     const invalidateQueries = vi.spyOn(client, "invalidateQueries");
     mocks.read.mockResolvedValue(initialData);
-    renderScreen(initialData, client);
+    renderScreen(1, client);
 
     await waitFor(() => expect(mocks.read).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByText("Open delete")).not.toBeNull());
     fireEvent.click(screen.getByText("Open delete"));
     fireEvent.click(screen.getByText("Confirm delete"));
 
@@ -182,15 +188,63 @@ function createQueryClient() {
     },
   });
 }
-function renderScreen(initialData: WatchlistDetailPage, client: QueryClient) {
+function renderScreen(watchlistId: number, client: QueryClient) {
   render(
     <ChakraProvider value={janusSystem}>
       <QueryClientProvider client={client}>
-        <WatchlistDetailScreen initialData={initialData} />
+        <Suspense fallback={<div data-testid="detail-suspense">loading</div>}>
+          <WatchlistDetailScreen watchlistId={watchlistId} />
+        </Suspense>
       </QueryClientProvider>
     </ChakraProvider>,
   );
 }
+describe("SSR hydration and canonical detail query", () => {
+  it("hydrates loader-primed detail data without an empty flash or duplicate page-1 request", async () => {
+    const pageOne = createPage({
+      itemOrderMode: "custom",
+      items: [
+        createItem({ id: 1, title: "First", customRank: 1 }),
+        createItem({ id: 2, title: "Second", customRank: 2 }),
+      ],
+    });
+    const serverClient = new QueryClient();
+    const serverFetch = vi.fn().mockResolvedValue(pageOne);
+    await serverClient.ensureInfiniteQueryData(
+      watchlistDetailInfiniteQueryOptions({ watchlistId: 1, unwatchedOnly: false }, serverFetch),
+    );
+
+    const client = new QueryClient();
+    hydrate(client, dehydrate(serverClient));
+
+    renderScreen(1, client);
+
+    expect(screen.queryByTestId("detail-suspense")).toBeNull();
+    expect(screen.getByRole("status").textContent).toBe("1,2");
+    expect(serverFetch).toHaveBeenCalledTimes(1);
+    expect(serverFetch).toHaveBeenCalledWith({
+      data: { watchlistId: 1, pageSize: 50, unwatchedOnly: false, cursor: 1 },
+    });
+    expect(mocks.read).not.toHaveBeenCalled();
+    client.clear();
+  });
+
+  it("forwards normalized pageSize through useServerFn when loading unprimed filters", async () => {
+    const pageOne = createPage({
+      items: [createItem({ id: 1, title: "First" })],
+    });
+    const client = createQueryClient();
+    mocks.read.mockResolvedValue(pageOne);
+
+    renderScreen(1, client);
+
+    await waitFor(() => expect(screen.getByRole("status").textContent).toBe("1"));
+    expect(mocks.read).toHaveBeenCalledWith({
+      data: { watchlistId: 1, pageSize: 50, query: undefined, unwatchedOnly: false, cursor: 1 },
+    });
+    client.clear();
+  });
+});
 describe("custom timeline optimistic query identity", () => {
   it.each(["initial", "search", "all items"])(
     "updates the rendered cache before save completes: %s",
@@ -208,19 +262,13 @@ describe("custom timeline optimistic query identity", () => {
           mutations: { retry: false },
         },
       });
-      client.setQueryData(
-        watchlistDetailQueryKey({ watchlistId: 1, itemOrderMode: "custom", unwatchedOnly: false }),
-        { pages: [initialData], pageParams: [1] },
-      );
+      client.setQueryData(watchlistDetailQueryKey({ watchlistId: 1, unwatchedOnly: false }), {
+        pages: [initialData],
+        pageParams: [1],
+      });
       mocks.read.mockResolvedValue(initialData);
       mocks.save.mockReturnValue(new Promise(() => {}));
-      render(
-        <ChakraProvider value={janusSystem}>
-          <QueryClientProvider client={client}>
-            <WatchlistDetailScreen initialData={initialData} />
-          </QueryClientProvider>
-        </ChakraProvider>,
-      );
+      renderScreen(1, client);
       await waitFor(() => expect(screen.getByRole("status").textContent).toBe("1,2"));
       if (filter === "search") fireEvent.click(screen.getByText("Search"));
       if (filter === "all items") fireEvent.click(screen.getByText("All items"));

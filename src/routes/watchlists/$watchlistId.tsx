@@ -1,41 +1,40 @@
-import {
-  getWatchlistDetailPage,
-  watchlistDetailQueryKey,
-} from "@/features/watchlists/detail/Query";
+import { watchlistDetailInfiniteQueryOptions } from "@/features/watchlists/detail/Query";
 import { WatchlistDetailScreen } from "@/features/watchlists/detail/WatchlistDetailScreen";
+import { parsePositiveIntegerParam } from "@/shared/RouteParams";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/watchlists/$watchlistId")({
-  loader: async ({ context, params: { watchlistId } }) => {
-    const filters = { watchlistId: Number.parseInt(watchlistId, 10), unwatchedOnly: false };
-    const detail = await getWatchlistDetailPage({
-      data: { ...filters, cursor: 1 },
-    });
-
-    if (!detail) {
+  beforeLoad: ({ params: { watchlistId } }) => {
+    const parsedWatchlistId = parsePositiveIntegerParam(watchlistId);
+    if (parsedWatchlistId === null) {
       throw notFound();
     }
 
-    context.queryClient.setQueryData(
-      watchlistDetailQueryKey({
-        ...filters,
-        itemOrderMode: detail.watchlist.itemOrderMode,
+    return { watchlistId: parsedWatchlistId };
+  },
+  loader: async ({ context }) => {
+    const detail = await context.queryClient.ensureInfiniteQueryData({
+      ...watchlistDetailInfiniteQueryOptions({
+        watchlistId: context.watchlistId,
+        unwatchedOnly: false,
       }),
-      {
-        pages: [detail],
-        pageParams: [1],
-      },
-    );
+      revalidateIfStale: true,
+    });
 
-    return detail;
+    const firstPage = detail.pages[0];
+    if (!firstPage) {
+      throw notFound();
+    }
+
+    return { watchlistName: firstPage.watchlist.name };
   },
   head: ({ loaderData }) => ({
-    meta: [{ title: `${loaderData?.watchlist.name ?? "Watchlist"} - Janus` }],
+    meta: [{ title: `${loaderData?.watchlistName ?? "Watchlist"} - Janus` }],
   }),
   component: WatchlistDetail,
 });
 
 export function WatchlistDetail() {
-  const initialData = Route.useLoaderData();
-  return <WatchlistDetailScreen initialData={initialData} />;
+  const { watchlistId } = Route.useRouteContext();
+  return <WatchlistDetailScreen watchlistId={watchlistId} />;
 }

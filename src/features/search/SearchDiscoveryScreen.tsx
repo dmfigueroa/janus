@@ -15,7 +15,6 @@ import { useSearchNavigation } from "./useSearchNavigation";
 interface SearchDiscoveryScreenProperties {
   query: string;
   type: SearchableMediaType;
-  initialData: MediaSearchOutcome;
 }
 
 const PROVIDER_UNAVAILABLE_TOAST_ID = "media-search-provider-unavailable";
@@ -49,28 +48,22 @@ function buildProviderFailure({
   message,
   query,
   type,
-  initialData,
   dataUpdatedAt,
 }: {
   status: MediaSearchOutcome["status"];
   message: string | undefined;
   query: string;
   type: SearchableMediaType;
-  initialData: MediaSearchOutcome;
   dataUpdatedAt: number;
 }) {
   if (status !== "provider_unavailable" || !message) {
     return null;
   }
 
-  return { message, query, type, initialData, dataUpdatedAt };
+  return { message, query, type, dataUpdatedAt };
 }
 
-export function SearchDiscoveryScreen({
-  query,
-  type,
-  initialData,
-}: SearchDiscoveryScreenProperties) {
+export function SearchDiscoveryScreen({ query, type }: SearchDiscoveryScreenProperties) {
   const {
     allResults,
     status,
@@ -83,7 +76,6 @@ export function SearchDiscoveryScreen({
   } = useSearchResults({
     query,
     type,
-    initialData,
   });
   const { handleSearch, handleTabChange, isNavigating } = useSearchNavigation(query, type);
   const isDeprecated = status === "deprecated_media_type";
@@ -91,8 +83,8 @@ export function SearchDiscoveryScreen({
   const activeTab = getActiveTab(type);
   const deprecationNotice = getDeprecationNoticeText(isDeprecated, message);
   const providerFailure = useMemo(
-    () => buildProviderFailure({ status, message, query, type, initialData, dataUpdatedAt }),
-    [status, message, query, type, initialData, dataUpdatedAt],
+    () => buildProviderFailure({ status, message, query, type, dataUpdatedAt }),
+    [status, message, query, type, dataUpdatedAt],
   );
 
   useEffect(() => {

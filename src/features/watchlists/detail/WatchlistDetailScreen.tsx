@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { Box, Container } from "@chakra-ui/react";
-import { useInfiniteQuery, useIsMutating, type InfiniteData } from "@tanstack/react-query";
+import { useIsMutating, useSuspenseInfiniteQuery, type InfiniteData } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { toaster } from "@/app/Toaster";
@@ -19,11 +19,10 @@ import {
 } from "@/features/watchlists/lifecycle/useWatchlistLifecycleActions";
 
 interface WatchlistDetailScreenProps {
-  initialData: WatchlistDetailQueryData;
+  watchlistId: number;
 }
 
-export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProps) {
-  const watchlistId = initialData.watchlist.id;
+export function WatchlistDetailScreen({ watchlistId }: WatchlistDetailScreenProps) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const navigate = useNavigate();
   const [showUnwatchedOnly, setShowUnwatchedOnly] = useState(true);
@@ -34,10 +33,9 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useWatchlistTimelineData(
     watchlistId,
     normalizedSearchQuery,
-    initialData.watchlist.itemOrderMode,
   );
 
-  const { allItems, latestWatchlist } = getCurrentDetailData(data, initialData.watchlist);
+  const { allItems, latestWatchlist } = getCurrentDetailData(data);
   const latestItemOrderMode = latestWatchlist.itemOrderMode;
   const remove = useDeleteWatchlist(watchlistId, {
     onDeleted: async () => {
@@ -67,11 +65,10 @@ export function WatchlistDetailScreen({ initialData }: WatchlistDetailScreenProp
   const activeFilters = useMemo(
     () => ({
       watchlistId,
-      itemOrderMode: initialData.watchlist.itemOrderMode,
       query: normalizedSearchQuery,
       unwatchedOnly: false,
     }),
-    [watchlistId, initialData.watchlist.itemOrderMode, normalizedSearchQuery],
+    [watchlistId, normalizedSearchQuery],
   );
 
   const isWatchedTogglePending =
@@ -131,17 +128,10 @@ function normalizeSearchQuery(searchQuery: string) {
   return searchQuery ? searchQuery : undefined;
 }
 
-function getCurrentDetailData(
-  data: InfiniteData<WatchlistDetailQueryData> | undefined,
-  initialWatchlist: WatchlistDetailQueryData["watchlist"],
-) {
-  if (!data) {
-    return { allItems: [], latestWatchlist: initialWatchlist };
-  }
-
+function getCurrentDetailData(data: InfiniteData<WatchlistDetailQueryData>) {
   const latestPage = data.pages.at(-1);
   if (!latestPage) {
-    return { allItems: [], latestWatchlist: initialWatchlist };
+    throw new Error("Watchlist detail query resolved without any pages");
   }
 
   return {
@@ -158,7 +148,9 @@ function useDebouncedSearchQuery(searchQuery: string) {
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
+      startTransition(() => {
+        setDebouncedSearchQuery(searchQuery);
+      });
     }, 300);
 
     return () => clearTimeout(timer);
@@ -167,35 +159,17 @@ function useDebouncedSearchQuery(searchQuery: string) {
   return debouncedSearchQuery;
 }
 
-function useWatchlistTimelineData(
-  watchlistId: number,
-  normalizedSearchQuery: string | undefined,
-  itemOrderMode: "release" | "custom",
-) {
+function useWatchlistTimelineData(watchlistId: number, normalizedSearchQuery: string | undefined) {
   const getWatchlistDetailPageFn = useServerFn(getWatchlistDetailPage);
 
-  return useInfiniteQuery({
-    ...watchlistDetailInfiniteQueryOptions({
-      watchlistId,
-      query: normalizedSearchQuery,
-      unwatchedOnly: false,
-      itemOrderMode,
-    }),
-    queryFn: async ({ pageParam }) => {
-      const detail = await getWatchlistDetailPageFn({
-        data: {
-          watchlistId,
-          query: normalizedSearchQuery,
-          unwatchedOnly: false,
-          cursor: pageParam,
-        },
-      });
-
-      if (!detail) {
-        throw new Error("Watchlist not found");
-      }
-
-      return detail;
-    },
-  });
+  return useSuspenseInfiniteQuery(
+    watchlistDetailInfiniteQueryOptions(
+      {
+        watchlistId,
+        query: normalizedSearchQuery,
+        unwatchedOnly: false,
+      },
+      getWatchlistDetailPageFn,
+    ),
+  );
 }

@@ -1,25 +1,42 @@
 import { SearchDiscoveryScreen } from "@/features/search/SearchDiscoveryScreen";
 import {
+  normalizeMediaSearchQuery,
   searchableMediaLabels,
   searchableMediaTypes,
-  searchUnified,
   type SearchableMediaType,
 } from "@/features/search/search/MediaSearch";
-import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { searchMediaInfiniteQueryOptions } from "@/features/search/useSearchResults";
+import { createFileRoute, type SearchSchemaInput } from "@tanstack/react-router";
 import { z } from "zod";
 
 const searchSchema = z.object({
-  query: z.string().optional().default(""),
-  page: z.coerce.number().optional().default(1),
-  type: z.enum(searchableMediaTypes).optional().default("movie"),
+  query: z.union([z.string(), z.number().transform(String)]).catch(""),
+  type: z.enum(searchableMediaTypes).catch("movie"),
 });
 
 export type SearchType = SearchableMediaType;
 
+type SearchRouteInput = {
+  query?: string;
+  type?: SearchableMediaType;
+};
+
+function validateSearch(search: SearchRouteInput & SearchSchemaInput) {
+  return searchSchema.parse(search);
+}
+
 export const Route = createFileRoute("/search")({
-  validateSearch: searchSchema,
-  loaderDeps: ({ search: { query, type } }) => ({ query, type }),
-  loader: ({ deps: { query, type } }) => searchUnified({ data: { query, page: 1, type } }),
+  validateSearch,
+  loaderDeps: ({ search: { query, type } }) => ({
+    query: normalizeMediaSearchQuery(query),
+    type,
+  }),
+  loader: async ({ context, deps: { query, type } }) => {
+    await context.queryClient.ensureInfiniteQueryData({
+      ...searchMediaInfiniteQueryOptions({ query, type }),
+      revalidateIfStale: true,
+    });
+  },
   head: ({ match }) => ({
     meta: [{ title: `Search ${searchableMediaLabels[match.search.type]} - Janus` }],
   }),
@@ -27,7 +44,6 @@ export const Route = createFileRoute("/search")({
 });
 
 function Search() {
-  const { query, type } = useSearch({ from: Route.fullPath });
-  const initialData = Route.useLoaderData();
-  return <SearchDiscoveryScreen query={query} type={type} initialData={initialData} />;
+  const { query, type } = Route.useSearch();
+  return <SearchDiscoveryScreen query={query} type={type} />;
 }

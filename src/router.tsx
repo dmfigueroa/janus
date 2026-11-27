@@ -1,11 +1,28 @@
-import { createRouter } from "@tanstack/react-router";
+import { createRouter, isNotFound } from "@tanstack/react-router";
 import { setupRouterSsrQueryIntegration } from "@tanstack/react-router-ssr-query";
 import { QueryClient } from "@tanstack/react-query";
 
 import { routeTree } from "./routeTree.gen";
 
+export const DEFAULT_QUERY_STALE_TIME_MS = 30_000;
+
+export function shouldRetryQuery(failureCount: number, error: unknown) {
+  if (isNotFound(error)) {
+    return false;
+  }
+
+  return failureCount < 3;
+}
+
 export const getRouter = () => {
-  const queryClient = new QueryClient();
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: DEFAULT_QUERY_STALE_TIME_MS,
+        retry: shouldRetryQuery,
+      },
+    },
+  });
 
   const router = createRouter({
     routeTree,
@@ -21,7 +38,7 @@ export const getRouter = () => {
   setupRouterSsrQueryIntegration({
     router,
     queryClient,
-    wrapQueryClient: false,
+    wrapQueryClient: true,
   });
 
   return router;

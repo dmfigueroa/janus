@@ -105,9 +105,7 @@ describe("SearchDiscoveryScreen behavior", () => {
   });
 
   it("renders search input and tabs", () => {
-    const { container } = render(
-      <SearchDiscoveryScreen query="" type="movie" initialData={emptyOutcome} />,
-    );
+    const { container } = render(<SearchDiscoveryScreen query="" type="movie" />);
     expect(screen.getByTestId("search-input")).not.toBeNull();
     expect(screen.getByRole("tablist")).not.toBeNull();
     expect(container.querySelector('[data-scope="tabs"][data-part="indicator"]')).toBeNull();
@@ -119,7 +117,7 @@ describe("SearchDiscoveryScreen behavior", () => {
   });
 
   it("shows 'No results found' when the search is empty", () => {
-    render(<SearchDiscoveryScreen query="" type="movie" initialData={emptyOutcome} />);
+    render(<SearchDiscoveryScreen query="" type="movie" />);
     expect(screen.getByTestId("no-results")).not.toBeNull();
   });
 
@@ -151,19 +149,7 @@ describe("SearchDiscoveryScreen behavior", () => {
       ],
     );
 
-    render(
-      <SearchDiscoveryScreen
-        query="harry potter"
-        type="book"
-        initialData={{
-          status: "ok",
-          results: [],
-          page: 1,
-          totalPages: 1,
-          totalResults: 1,
-        }}
-      />,
-    );
+    render(<SearchDiscoveryScreen query="harry potter" type="book" />);
     expect(screen.getByTestId("has-results")).not.toBeNull();
     expect(screen.getByText("1 result(s)")).not.toBeNull();
   });
@@ -171,7 +157,7 @@ describe("SearchDiscoveryScreen behavior", () => {
   it("shows a single deprecated search banner on deprecated media routes", () => {
     mockSearchResults(deprecatedOutcome);
 
-    render(<SearchDiscoveryScreen query="naruto" type="anime" initialData={deprecatedOutcome} />);
+    render(<SearchDiscoveryScreen query="naruto" type="anime" />);
     const deprecatedMessages = screen.getAllByText(/Anime and manga categories are deprecated/);
     expect(deprecatedMessages).toHaveLength(1);
     expect(
@@ -183,9 +169,7 @@ describe("SearchDiscoveryScreen behavior", () => {
   it("wires live loading state from search results and navigation into SearchInput", () => {
     mockSearchResults(emptyOutcome, [], { isLoading: true });
 
-    const { rerender } = render(
-      <SearchDiscoveryScreen query="dune" type="book" initialData={emptyOutcome} />,
-    );
+    const { rerender } = render(<SearchDiscoveryScreen query="dune" type="book" />);
     expect(screen.getByTestId("search-input").getAttribute("data-loading")).toBe("true");
 
     mockSearchResults(emptyOutcome, [], { isLoading: false });
@@ -194,7 +178,7 @@ describe("SearchDiscoveryScreen behavior", () => {
       handleTabChange: vi.fn(),
       isNavigating: true,
     });
-    rerender(<SearchDiscoveryScreen query="dune" type="book" initialData={emptyOutcome} />);
+    rerender(<SearchDiscoveryScreen query="dune" type="book" />);
     expect(screen.getByTestId("search-input").getAttribute("data-loading")).toBe("true");
   });
 
@@ -206,9 +190,7 @@ describe("SearchDiscoveryScreen behavior", () => {
     };
     mockSearchResults(providerUnavailableOutcome, [], { dataUpdatedAt: 1 });
 
-    const { rerender } = render(
-      <SearchDiscoveryScreen query="Dune" type="book" initialData={providerUnavailableOutcome} />,
-    );
+    const { rerender } = render(<SearchDiscoveryScreen query="Dune" type="book" />);
 
     expect(toasterCreateMock).toHaveBeenCalledTimes(1);
     expect(toasterCreateMock).toHaveBeenCalledWith({
@@ -219,7 +201,7 @@ describe("SearchDiscoveryScreen behavior", () => {
 
     const repeatOutcome: MediaSearchOutcome = { ...providerUnavailableOutcome };
     mockSearchResults(repeatOutcome, [], { dataUpdatedAt: 2 });
-    rerender(<SearchDiscoveryScreen query="Foundation" type="book" initialData={repeatOutcome} />);
+    rerender(<SearchDiscoveryScreen query="Foundation" type="book" />);
 
     expect(toasterCreateMock).toHaveBeenCalledTimes(2);
   });

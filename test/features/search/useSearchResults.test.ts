@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderHook } from "@testing-library/react";
+import { createElement, Suspense, type ReactNode } from "react";
+import { QueryClient, QueryClientProvider, dehydrate, hydrate } from "@tanstack/react-query";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PROVIDER_UNAVAILABLE_MESSAGE,
   type MediaSearchOutcome,
 } from "@/features/search/search/MediaSearch";
 
-const searchUnifiedFnMock = vi.fn();
+const searchUnifiedFnMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@tanstack/react-start", () => ({
   useServerFn: () => searchUnifiedFnMock,
@@ -17,36 +19,16 @@ vi.mock("@tanstack/react-start", () => ({
   },
 }));
 
-type InfiniteQueryOptions = {
-  queryFn?: (context: { pageParam: number }) => Promise<unknown>;
-  getNextPageParam?: (lastPage: MediaSearchOutcome) => number | undefined;
-  initialData?: { pages: MediaSearchOutcome[]; pageParams: number[] };
-};
-
-let capturedOptions: InfiniteQueryOptions | undefined;
-
-const mockReturn = {
-  data: undefined as { pages: MediaSearchOutcome[]; pageParams: number[] } | undefined,
-  dataUpdatedAt: 0,
-  fetchNextPage: vi.fn(),
-  hasNextPage: false,
-  isFetching: false,
-  isFetchingNextPage: false,
-};
-
-vi.mock("@tanstack/react-query", () => ({
-  useInfiniteQuery: (options: InfiniteQueryOptions) => {
-    capturedOptions = options;
-    return mockReturn;
-  },
-}));
-
 vi.mock("@/features/search/search/MediaSearch", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/features/search/search/MediaSearch")>();
   return { ...actual, searchUnified: vi.fn() };
 });
 
-import { useSearchResults } from "@/features/search/useSearchResults";
+import {
+  searchMediaInfiniteQueryOptions,
+  searchMediaQueryKey,
+  useSearchResults,
+} from "@/features/search/useSearchResults";
 
 const emptyOutcome: MediaSearchOutcome = {
   status: "empty_query",
@@ -62,48 +44,111 @@ const movieOutcome: MediaSearchOutcome = {
   ],
   page: 1,
   totalPages: 2,
-  totalResults: 2,
+  totalResults: 3,
 };
+
+function createWrapper(queryClient: QueryClient) {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(Suspense, { fallback: null }, children),
+    );
+  };
+}
 
 describe("useSearchResults", () => {
   beforeEach(() => {
     searchUnifiedFnMock.mockReset();
-    capturedOptions = undefined;
-    mockReturn.data = undefined;
-    mockReturn.dataUpdatedAt = 0;
-    mockReturn.isFetching = false;
-    mockReturn.isFetchingNextPage = false;
   });
 
-  it("requests the shared search boundary even for a blank query", async () => {
-    renderHook(() => useSearchResults({ query: "", type: "movie", initialData: emptyOutcome }));
+  afterEach(() => {
+    cleanup();
+  });
 
-    await capturedOptions!.queryFn!({ pageParam: 1 });
+  it("normalizes query keys and server inputs by trimming whitespace", async () => {
+    expect(searchMediaQueryKey({ query: "  star wars  ", type: "movie" })).toEqual([
+      "search",
+      "star wars",
+      "movie",
+    ]);
 
-    expect(searchUnifiedFnMock).toHaveBeenCalledWith({
-      data: { query: "", page: 1, type: "movie" },
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
     });
-  });
+    searchUnifiedFnMock.mockResolvedValue(movieOutcome);
 
-  it("requests the next page from the shared search boundary", async () => {
-    renderHook(() =>
-      useSearchResults({ query: "star wars", type: "movie", initialData: movieOutcome }),
+    const { result } = renderHook(
+      () => useSearchResults({ query: "  star wars  ", type: "movie" }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
     );
 
-    await capturedOptions!.queryFn!({ pageParam: 2 });
-
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+    expect(searchUnifiedFnMock).toHaveBeenCalledTimes(1);
     expect(searchUnifiedFnMock).toHaveBeenCalledWith({
-      data: { query: "star wars", page: 2, type: "movie" },
+      data: { query: "star wars", page: 1, type: "movie" },
     });
   });
 
-  it("seeds infinite query data with the route loader outcome", () => {
-    renderHook(() => useSearchResults({ query: "", type: "movie", initialData: emptyOutcome }));
+  it("hydrates SSR-primed search data without firing a duplicate page-1 request on mount", async () => {
+    const serverClient = new QueryClient();
+    const serverFetch = vi.fn().mockResolvedValue(movieOutcome);
+    await serverClient.ensureInfiniteQueryData(
+      searchMediaInfiniteQueryOptions({ query: "star wars", type: "movie" }, serverFetch),
+    );
 
-    expect(capturedOptions!.initialData).toEqual({ pages: [emptyOutcome], pageParams: [1] });
+    const clientQueryClient = new QueryClient();
+    hydrate(clientQueryClient, dehydrate(serverClient));
+
+    const { result } = renderHook(() => useSearchResults({ query: " star wars ", type: "movie" }), {
+      wrapper: createWrapper(clientQueryClient),
+    });
+
+    expect(result.current.status).toBe("ok");
+    expect(result.current.allResults.map((media) => media.title)).toEqual(["A", "B"]);
+    expect(result.current.hasNextPage).toBe(true);
+    expect(serverFetch).toHaveBeenCalledTimes(1);
+    expect(searchUnifiedFnMock).not.toHaveBeenCalled();
   });
 
-  it("flattens results from successful pages only", () => {
+  it("does not cache provider_unavailable as fresh and retries on mount", async () => {
+    const unavailableOutcome: MediaSearchOutcome = {
+      status: "provider_unavailable",
+      page: 1,
+      message: PROVIDER_UNAVAILABLE_MESSAGE,
+    };
+    const twoSecondsAgo = Date.now() - 2_000;
+    const clientQueryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    clientQueryClient.setQueryData(
+      searchMediaQueryKey({ query: "dune", type: "book" }),
+      { pages: [unavailableOutcome], pageParams: [1] },
+      { updatedAt: twoSecondsAgo },
+    );
+    clientQueryClient.setQueryData(
+      searchMediaQueryKey({ query: "star wars", type: "movie" }),
+      { pages: [movieOutcome], pageParams: [1] },
+      { updatedAt: twoSecondsAgo },
+    );
+    searchUnifiedFnMock.mockResolvedValue(movieOutcome);
+
+    renderHook(() => useSearchResults({ query: "star wars", type: "movie" }), {
+      wrapper: createWrapper(clientQueryClient),
+    });
+    expect(searchUnifiedFnMock).not.toHaveBeenCalled();
+
+    const { result } = renderHook(() => useSearchResults({ query: "dune", type: "book" }), {
+      wrapper: createWrapper(clientQueryClient),
+    });
+
+    await waitFor(() => expect(searchUnifiedFnMock).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(result.current.status).toBe("ok"));
+  });
+
+  it("requests page 2 through useServerFn and flattens successful pages only", async () => {
     const secondPage: MediaSearchOutcome = {
       status: "ok",
       results: [{ id: "3", title: "C", mediaType: "movie", source: "tmdb", poster: null }],
@@ -111,22 +156,39 @@ describe("useSearchResults", () => {
       totalPages: 2,
       totalResults: 3,
     };
-    mockReturn.data = {
-      pages: [movieOutcome, secondPage],
-      pageParams: [1, 2],
-    };
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    queryClient.setQueryData(searchMediaQueryKey({ query: "star wars", type: "movie" }), {
+      pages: [movieOutcome],
+      pageParams: [1],
+    });
+    searchUnifiedFnMock.mockResolvedValue(secondPage);
 
-    const { result } = renderHook(() =>
-      useSearchResults({ query: "test", type: "movie", initialData: movieOutcome }),
+    const { result } = renderHook(() => useSearchResults({ query: "star wars", type: "movie" }), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    expect(result.current.allResults.map((media) => media.title)).toEqual(["A", "B"]);
+    expect(result.current.hasNextPage).toBe(true);
+
+    await act(async () => {
+      await result.current.fetchNextPage();
+    });
+
+    expect(searchUnifiedFnMock).toHaveBeenCalledTimes(1);
+    expect(searchUnifiedFnMock).toHaveBeenCalledWith({
+      data: { query: "star wars", page: 2, type: "movie" },
+    });
+    await waitFor(() =>
+      expect(result.current.allResults.map((media) => media.title)).toEqual(["A", "B", "C"]),
     );
-
-    expect(result.current.allResults.map((media) => media.title)).toEqual(["A", "B", "C"]);
-    expect(result.current.status).toBe("ok");
-    expect(result.current.message).toBeUndefined();
+    expect(result.current.hasNextPage).toBe(false);
   });
 
-  it("surfaces a rejection from any page", () => {
-    mockReturn.data = {
+  it("surfaces a rejection from any page while preserving earlier results", () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(searchMediaQueryKey({ query: "test", type: "movie" }), {
       pages: [
         movieOutcome,
         {
@@ -136,63 +198,75 @@ describe("useSearchResults", () => {
         },
       ],
       pageParams: [1, 2],
-    };
+    });
+    searchUnifiedFnMock.mockReturnValue(new Promise(() => {}));
 
-    const { result } = renderHook(() =>
-      useSearchResults({ query: "test", type: "movie", initialData: movieOutcome }),
-    );
+    const { result } = renderHook(() => useSearchResults({ query: "test", type: "movie" }), {
+      wrapper: createWrapper(queryClient),
+    });
 
     expect(result.current.status).toBe("provider_unavailable");
     expect(result.current.message).toBe(PROVIDER_UNAVAILABLE_MESSAGE);
     expect(result.current.allResults.map((media) => media.title)).toEqual(["A", "B"]);
   });
 
-  it("exposes the rejection status and message from the first page", () => {
+  it("exposes the rejection status and message from the first page without refetching deterministic rejections", () => {
     const deprecatedOutcome: MediaSearchOutcome = {
       status: "deprecated_media_type",
       page: 1,
       message: "Anime and manga categories are deprecated while we revisit provider data quality.",
     };
-    mockReturn.data = { pages: [deprecatedOutcome], pageParams: [1] };
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(searchMediaQueryKey({ query: "naruto", type: "anime" }), {
+      pages: [deprecatedOutcome],
+      pageParams: [1],
+    });
 
-    const { result } = renderHook(() =>
-      useSearchResults({ query: "naruto", type: "anime", initialData: deprecatedOutcome }),
-    );
+    const { result } = renderHook(() => useSearchResults({ query: "naruto", type: "anime" }), {
+      wrapper: createWrapper(queryClient),
+    });
 
     expect(result.current.status).toBe("deprecated_media_type");
-    expect(result.current.message).toBe(
-      "Anime and manga categories are deprecated while we revisit provider data quality.",
-    );
+    expect(result.current.message).toBe(deprecatedOutcome.message);
     expect(result.current.allResults).toEqual([]);
+    expect(result.current.hasNextPage).toBe(false);
+    expect(searchUnifiedFnMock).not.toHaveBeenCalled();
+  });
+
+  it("delegates blank queries to the shared search boundary when unprimed", async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    searchUnifiedFnMock.mockResolvedValue(emptyOutcome);
+
+    const { result } = renderHook(() => useSearchResults({ query: "", type: "movie" }), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("empty_query"));
+    expect(searchUnifiedFnMock).toHaveBeenCalledWith({
+      data: { query: "", page: 1, type: "movie" },
+    });
   });
 
   it("only paginates successful, unfinished searches", () => {
-    renderHook(() => useSearchResults({ query: "test", type: "movie", initialData: movieOutcome }));
+    const options = searchMediaInfiniteQueryOptions({ query: "test", type: "movie" });
 
-    expect(capturedOptions!.getNextPageParam!(movieOutcome)).toBe(2);
-    expect(capturedOptions!.getNextPageParam!({ ...movieOutcome, page: 2 })).toBeUndefined();
+    expect(options.getNextPageParam(movieOutcome, [movieOutcome], 1, [1])).toBe(2);
     expect(
-      capturedOptions!.getNextPageParam!({
-        status: "provider_unavailable",
-        page: 1,
-        message: "unavailable",
-      }),
+      options.getNextPageParam({ ...movieOutcome, page: 2 }, [movieOutcome], 2, [1, 2]),
     ).toBeUndefined();
-  });
-
-  it("reports isLoading only for non-pagination fetches and exposes dataUpdatedAt", () => {
-    mockReturn.dataUpdatedAt = 42;
-    mockReturn.isFetching = true;
-    mockReturn.isFetchingNextPage = false;
-
-    const { result, rerender } = renderHook(() =>
-      useSearchResults({ query: "test", type: "movie", initialData: movieOutcome }),
-    );
-    expect(result.current.isLoading).toBe(true);
-    expect(result.current.dataUpdatedAt).toBe(42);
-
-    mockReturn.isFetchingNextPage = true;
-    rerender();
-    expect(result.current.isLoading).toBe(false);
+    expect(
+      options.getNextPageParam(
+        {
+          status: "provider_unavailable",
+          page: 1,
+          message: "unavailable",
+        },
+        [],
+        1,
+        [1],
+      ),
+    ).toBeUndefined();
   });
 });
