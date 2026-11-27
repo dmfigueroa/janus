@@ -36,6 +36,30 @@ const TOKENIZED_DECLARATIONS = [
     token: "--font-size-sm",
   },
   {
+    pattern: /\bfont-size:\s*0\.75rem\b/,
+    token: "--font-size-0",
+  },
+  {
+    pattern: /\bfont-weight:\s*500\b/,
+    token: "--font-weight-medium",
+  },
+  {
+    pattern: /\bfont-weight:\s*600\b/,
+    token: "--font-weight-semibold",
+  },
+  {
+    pattern: /\bfont-weight:\s*700\b/,
+    token: "--font-weight-bold",
+  },
+  {
+    pattern: /\bletter-spacing:\s*-0\.025em\b/,
+    token: "--letter-spacing-tight",
+  },
+  {
+    pattern: /\bscale\(\s*0\.97\s*\)/,
+    token: "--press-scale",
+  },
+  {
     pattern: /\b(?:transition|animation)[^;]*\b120ms\b/,
     token: "--motion-duration-fast",
   },
