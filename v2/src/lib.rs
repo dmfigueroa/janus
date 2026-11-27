@@ -164,15 +164,23 @@ async fn mcp_compatibility(
     response
 }
 
+const MCP_SSE_BODY_LIMIT: usize = 8 * 1024 * 1024;
+
 async fn legacy_json_response(response: axum::response::Response) -> axum::response::Response {
     use axum::response::IntoResponse;
     let (mut parts, body) = response.into_parts();
-    let Ok(bytes) = axum::body::to_bytes(body, usize::MAX).await else {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Unable to read MCP response",
-        )
-            .into_response();
+    let bytes = match axum::body::to_bytes(body, MCP_SSE_BODY_LIMIT).await {
+        Ok(bytes) => bytes,
+        Err(error) if length_limit_exceeded(&error) => {
+            return (StatusCode::PAYLOAD_TOO_LARGE, "MCP response exceeds 8 MiB").into_response();
+        }
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Unable to read MCP response",
+            )
+                .into_response();
+        }
     };
     let terminal = String::from_utf8_lossy(&bytes)
         .lines()
@@ -199,6 +207,17 @@ async fn legacy_json_response(response: axum::response::Response) -> axum::respo
     axum::response::Response::from_parts(parts, axum::body::Body::from(message.to_string()))
 }
 
+fn length_limit_exceeded(error: &dyn std::error::Error) -> bool {
+    let mut source = std::error::Error::source(error);
+    while let Some(current) = source {
+        if current.is::<http_body_util::LengthLimitError>() {
+            return true;
+        }
+        source = current.source();
+    }
+    false
+}
+
 pub use features::search;
 pub use features::watchlists::addition;
 pub use features::watchlists::{
@@ -209,3 +228,41 @@ pub use features::watchlists::{
         SummaryPage,
     },
 };
+
+#[cfg(test)]
+mod legacy_mcp_response_tests {
+    use super::{StatusCode, header, legacy_json_response};
+
+    const EIGHT_MIB: usize = 8 * 1024 * 1024;
+
+    fn event_stream(bytes: Vec<u8>) -> axum::response::Response {
+        axum::response::Response::builder()
+            .header(header::CONTENT_TYPE, "text/event-stream")
+            .body(axum::body::Body::from(bytes))
+            .expect("event stream response")
+    }
+
+    async fn text(response: axum::response::Response) -> String {
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .expect("read test response");
+        String::from_utf8(bytes.to_vec()).expect("utf-8 test response")
+    }
+
+    #[tokio::test]
+    async fn sse_body_over_8_mib_is_rejected() {
+        let response = legacy_json_response(event_stream(vec![b'x'; EIGHT_MIB + 1])).await;
+        let status = response.status();
+        let body = text(response).await;
+        assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE, "{body}");
+    }
+
+    #[tokio::test]
+    async fn sse_body_at_8_mib_is_read_and_not_rejected_for_size() {
+        let response = legacy_json_response(event_stream(vec![b'x'; EIGHT_MIB])).await;
+        let status = response.status();
+        let body = text(response).await;
+        assert_ne!(status, StatusCode::PAYLOAD_TOO_LARGE, "{body}");
+        assert_eq!(body, "Missing MCP response");
+    }
+}
