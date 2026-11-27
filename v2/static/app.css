@@ -9,14 +9,17 @@
   --border: #e5e5e5;
   --accent: #ec4899;
   --accent-strong: #db2777;
+  --accent-fg: #a41752;
   --green: #22c55e;
   --danger: #dc2626;
   --overlay-scrim: rgb(0 0 0 / 0.55);
   --rating-scrim: rgb(0 0 0 / 0.6);
+  --poster-label-scrim: rgb(0 0 0 / 0.64);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
   --control-size-lg: calc(var(--size-7) + var(--size-2) + var(--size-1));
   --control-size: calc(var(--size-7) + var(--size-2));
+  --control-size-input: calc(var(--size-7) + var(--size-1));
   --motion-duration-fast: 120ms;
   --motion-duration: 150ms;
   --motion-duration-nav: 300ms;
@@ -35,7 +38,9 @@
   --hover-opacity: 0.9;
   --poster-scrim-opacity: 0.6;
   --enter-offset: calc(var(--size-1) + var(--size-1) / 2);
+  --font-size-badge: 0.625rem;
   --font-size-sm: 0.875rem;
+  --font-size-lg: 1.125rem;
   --font-size-display: calc(var(--font-size-4) + var(--enter-offset));
   --font-weight-medium: var(--font-weight-5);
   --font-weight-semibold: var(--font-weight-6);
@@ -45,16 +50,21 @@
   --opacity-disabled: 0.5;
   --opacity-muted: 0.6;
   --measure-menu: calc(var(--size-12) + var(--size-7));
+  --measure-header-menu: 13.75rem;
   --measure-menu-max: calc(var(--size-12) * 2);
   --measure-search: calc(var(--size-12) * 2 + var(--size-9));
-  --poster-inline: var(--size-10);
-  --poster-block: calc(var(--size-10) + var(--size-7));
-  --poster-inline-compact: var(--size-9);
-  --poster-block-compact: calc(var(--size-9) + var(--size-7));
-  --poster-episode-block: calc(var(--size-8) + var(--size-2));
+  --poster-slot-inline: var(--size-10);
+  --poster-slot-inline-desktop: 7rem;
+  --poster-inline: var(--size-9);
+  --poster-block: 6rem;
+  --poster-inline-desktop: var(--size-10);
+  --poster-block-desktop: 8rem;
+  --poster-episode-block: var(--size-8);
+  --poster-episode-block-desktop: var(--size-9);
   --status-control-size: var(--size-5);
   --radius-control: calc(var(--size-2) + var(--size-1));
   --radius-md: calc(var(--size-3) - var(--size-1));
+  --radius-popover: 0.875rem;
   --radius-field: var(--radius-3);
   --radius-card: calc(var(--size-3) + var(--size-1) / 2);
   --measure-lede: calc(var(--size-15) - var(--size-7));
@@ -79,6 +89,7 @@
     --fg-default: #fafafa;
     --fg-muted: #a8a4af;
     --border: #28242e;
+    --accent-fg: #f9a8d4;
     --shadow-card: 0 var(--border-size-1) 0.125rem rgb(0 0 0 / 0.4);
     --shadow-lg:
       0 0.625rem 0.9375rem -0.1875rem rgb(0 0 0 / 0.5), 0 0.25rem 0.375rem -0.25rem rgb(0 0 0 / 0.4);
@@ -625,7 +636,7 @@ textarea {
 .watchlist {
   max-width: 48rem;
   margin: 0 auto;
-  padding: 1.5rem 1rem 7rem;
+  padding: 1.5rem 1rem 8rem;
 }
 
 @media (min-width: 48rem) {
@@ -635,7 +646,7 @@ textarea {
 }
 
 .watchlist-header {
-  margin: 0 0 var(--size-7);
+  margin: 0;
 }
 
 .watchlist-title {
@@ -648,7 +659,7 @@ textarea {
 .watchlist-description {
   margin: var(--size-2) 0 0;
   font-size: var(--font-size-sm);
-  line-height: var(--font-lineheight-2);
+  line-height: var(--font-lineheight-3);
   color: var(--fg-muted);
   overflow-wrap: anywhere;
 }
@@ -694,26 +705,47 @@ textarea {
   top: 0;
   z-index: 40;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: calc(var(--size-2) + var(--size-1));
   padding: calc(var(--size-2) + var(--size-1)) 0;
   background: var(--bg-canvas);
 }
 
+@media (min-width: 30rem) {
+  .watchlist-toolbar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
 .item-search {
   position: relative;
   display: flex;
-  flex: 1 1 var(--measure-menu);
+  flex: 1 1 auto;
   align-items: center;
   min-width: 0;
   max-width: var(--measure-search);
 }
 
+.item-search .search-icon {
+  left: 0.625rem;
+}
+
 .item-search input[type="search"] {
   width: 100%;
   min-width: 0;
-  padding-left: var(--control-size);
+  height: var(--control-size-input);
+  padding: 0 calc(var(--size-2) + var(--size-1)) 0 var(--control-size-input);
+  border: var(--border-size-1) solid var(--border);
+  border-radius: var(--radius-control);
+  background: transparent;
+  font-size: var(--font-size-sm);
+  line-height: var(--size-4);
+  transition:
+    border-color var(--motion-duration) var(--ease-out),
+    background-color var(--motion-duration) var(--ease-out);
 }
 
 .filter-toggle {
@@ -723,7 +755,7 @@ textarea {
   align-self: flex-start;
   padding: var(--size-1);
   border: var(--border-size-1) solid var(--border);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-field);
   background: color-mix(in srgb, var(--bg-subtle) 30%, transparent);
 }
 
@@ -732,28 +764,32 @@ button.filter-button {
   align-items: center;
   justify-content: center;
   min-height: var(--control-size-lg);
-  padding: var(--size-2) calc(var(--size-3) - var(--size-1) / 2);
-  border: 0;
-  border-radius: calc(var(--radius-control) - var(--border-size-2));
+  padding: 0 0.875rem;
+  border: var(--border-size-1) solid transparent;
+  border-radius: var(--radius-control);
   background: transparent;
-  color: var(--fg-default);
+  color: var(--accent-fg);
   font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--size-4);
   cursor: pointer;
+  transition:
+    transform var(--motion-duration-fast) ease-out,
+    background-color var(--motion-duration) ease;
 }
 
 button.filter-button.is-active {
-  background: var(--accent);
+  background: var(--accent-strong);
   color: var(--fg-on-accent);
 }
 
 @media (hover: hover) and (pointer: fine) {
   button.filter-button:hover {
-    background: var(--bg-subtle);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
   }
 
   button.filter-button.is-active:hover {
-    background: var(--accent-strong);
+    background: color-mix(in srgb, var(--accent-strong) 90%, #000000);
   }
 }
 
@@ -770,17 +806,20 @@ button.watchlist-actions-trigger {
   min-height: var(--control-size-lg);
   padding: 0;
   border: 0;
-  border-radius: var(--radius-round);
+  border-radius: var(--radius-control);
   background: transparent;
-  color: var(--fg-muted);
+  color: var(--fg-default);
+  transition:
+    transform var(--motion-duration-fast) ease-out,
+    background-color var(--motion-duration) ease;
 }
 
 .watchlist-actions-menu {
-  min-width: var(--measure-menu);
+  min-width: var(--measure-header-menu);
   max-width: min(var(--measure-menu-max), calc(100vw - var(--size-7)));
-  padding: var(--size-1);
+  padding: var(--size-2);
   border: var(--border-size-1) solid var(--border);
-  border-radius: var(--size-2);
+  border-radius: var(--radius-field);
   background: var(--bg-surface);
   color: var(--fg-default);
   box-shadow: var(--shadow-lg);
@@ -795,7 +834,7 @@ button.watchlist-actions-trigger {
 @supports (position-area: block-end) {
   .watchlist-actions-menu {
     inset: auto;
-    margin: var(--size-1) 0;
+    margin: var(--enter-offset) 0;
     position-area: block-end span-inline-start;
     position-try-fallbacks:
       flip-block,
@@ -808,25 +847,18 @@ button.watchlist-action-button {
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  gap: calc(var(--size-2) + var(--size-1));
   width: 100%;
-  min-height: var(--control-size);
-  padding: var(--size-2) var(--size-3);
-  border: 0;
-  border-radius: calc(var(--size-2) * 0.75);
-  background: transparent;
-  text-align: left;
-}
-
-.watchlist button,
-.watchlist input[type="search"] {
   min-height: var(--control-size-lg);
-  padding: var(--size-2);
-  border: var(--border-size-1) solid var(--border);
+  padding: var(--enter-offset) calc(var(--size-2) + var(--size-1));
+  border: 0;
   border-radius: var(--radius-control);
-  background: var(--bg-surface);
-  transition:
-    transform var(--motion-duration-fast) ease-out,
-    background-color var(--motion-duration) ease;
+  background: transparent;
+  color: var(--fg-default);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-4);
+  text-align: left;
+  transition: background-color var(--motion-duration) ease;
 }
 
 .watchlist button {
@@ -834,12 +866,10 @@ button.watchlist-action-button {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .watchlist button:hover {
-    background: var(--bg-subtle);
-  }
-
   button.watchlist-actions-trigger:hover,
-  button.item-actions-trigger:hover {
+  button.watchlist-action-button:hover,
+  button.item-actions-trigger:hover,
+  button.item-action-button:hover {
     background: var(--bg-subtle);
   }
 }
@@ -849,31 +879,89 @@ button.watchlist-action-button {
 }
 
 .watchlist h1 {
+  flex: 1;
+  min-width: 0;
   margin: 0;
-  font-size: var(--font-size-4);
+  font-size: var(--font-size-3);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-tight);
-  line-height: var(--font-lineheight-0);
+  line-height: var(--font-lineheight-3);
   overflow-wrap: anywhere;
 }
 
 @media (min-width: 48rem) {
   .watchlist h1 {
     font-size: var(--font-size-display);
+    line-height: var(--size-7);
+  }
+}
+
+.timeline {
+  position: relative;
+  margin-top: var(--size-7);
+  padding-left: var(--size-5);
+}
+
+div.timeline:has(.timeline-year)::before {
+  content: "";
+  position: absolute;
+  top: var(--size-5);
+  bottom: 6rem;
+  left: 1.625rem;
+  width: var(--border-size-2);
+  background: var(--border);
+  pointer-events: none;
+}
+
+@media (min-width: 48rem) {
+  .timeline {
+    padding-left: 0;
+  }
+
+  div.timeline:has(.timeline-year)::before {
+    top: 0;
+    left: var(--size-7);
   }
 }
 
 @scope (.timeline) {
-  article {
+  #reorder-status {
+    margin: 0 0 var(--size-2);
+    font-size: var(--font-size-sm);
+    color: var(--fg-muted);
+  }
+
+  #reorder-status:empty {
+    display: none;
+  }
+
+  .timeline-year {
+    position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--size-3);
-    padding: calc(var(--size-2) + var(--size-1)) var(--size-2);
-    margin: 0;
+    padding: var(--size-2) 0;
+    margin-bottom: var(--size-2);
+    background: var(--bg-canvas);
+  }
+
+  article {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: calc(var(--size-2) + var(--size-1));
+    padding: calc(var(--size-2) + var(--size-1)) var(--size-2) calc(var(--size-2) + var(--size-1)) 0;
+    margin: 0 0 var(--size-2);
     overflow-wrap: anywhere;
     border: 0;
     border-radius: 0;
     background: transparent;
+  }
+
+  article:has(+ .timeline-year),
+  article:has(+ .timeline-endcap) {
+    margin-bottom: var(--size-7);
   }
 
   article.is-watched {
@@ -884,7 +972,7 @@ button.watchlist-action-button {
     display: inline-flex;
     align-items: center;
     height: var(--size-7);
-    margin: var(--size-5) 0 var(--size-2);
+    margin: 0;
     padding: 0 var(--size-3);
     border: var(--border-size-1) solid var(--border);
     border-radius: var(--radius-round);
@@ -901,7 +989,7 @@ button.watchlist-action-button {
   h3 {
     font-size: var(--font-size-1);
     font-weight: var(--font-weight-semibold);
-    line-height: var(--font-lineheight-1);
+    line-height: var(--font-lineheight-3);
   }
 
   .item-parent {
@@ -919,8 +1007,8 @@ button.watchlist-action-button {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: var(--size-2) calc(var(--size-2) + var(--size-1));
-    font-size: var(--font-size-sm);
+    gap: var(--size-2);
+    font-size: var(--font-size-0);
     color: var(--fg-muted);
   }
 
@@ -933,54 +1021,105 @@ button.watchlist-action-button {
     gap: var(--size-1);
   }
 
-  .poster {
+  .poster-slot {
+    display: flex;
+    flex-shrink: 0;
+    justify-content: center;
+    width: var(--poster-slot-inline);
+  }
+
+  .poster-frame {
+    position: relative;
     flex-shrink: 0;
     width: var(--poster-inline);
     height: var(--poster-block);
+    overflow: hidden;
     border: var(--border-size-1) solid var(--border);
-    border-radius: var(--size-2);
-    object-fit: cover;
+    border-radius: var(--radius-field);
     box-shadow: var(--shadow-card);
   }
 
-  .poster.episode {
+  .poster-frame.episode {
+    width: 100%;
     height: var(--poster-episode-block);
+    border-radius: var(--radius-popover);
+  }
+
+  .poster {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .placeholder {
     display: grid;
     place-items: center;
-    font-size: var(--font-size-0);
     background: var(--bg-subtle);
+    color: var(--fg-muted);
+  }
+
+  .poster-label {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    padding: 0.125rem var(--size-1);
+    background: var(--poster-label-scrim);
+    color: var(--fg-on-accent);
+    font-size: var(--font-size-badge);
+    font-weight: var(--font-weight-bold);
+    line-height: var(--font-lineheight-3);
+    letter-spacing: 0.05em;
+    text-align: center;
+    text-transform: uppercase;
+    backdrop-filter: blur(0.125rem);
+  }
+
+  details.watched-run {
+    position: relative;
+    z-index: 1;
+    padding-top: var(--size-2);
+    padding-bottom: var(--size-2);
+  }
+
+  details.watched-run:has(+ .timeline-year),
+  details.watched-run:has(+ .timeline-endcap) {
+    padding-bottom: var(--size-7);
   }
 
   summary {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: var(--enter-offset);
+    gap: var(--size-2);
     min-height: var(--control-size-lg);
-    padding-inline: calc(var(--size-2) + var(--size-1));
+    padding: 0 0.875rem;
+    border-radius: var(--radius-control);
     color: var(--fg-muted);
     font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
     cursor: pointer;
     list-style: none;
+    transition: background-color var(--motion-duration) ease;
   }
 
   summary::-webkit-details-marker {
     display: none;
   }
 
-  summary::before {
-    content: "";
-    width: var(--enter-offset);
-    height: var(--enter-offset);
-    border-right: var(--border-size-1) solid currentColor;
-    border-bottom: var(--border-size-1) solid currentColor;
-    transform: rotate(-45deg);
+  @media (hover: hover) and (pointer: fine) {
+    summary:hover {
+      background: var(--bg-subtle);
+    }
   }
 
-  details[open] > summary::before {
-    transform: rotate(45deg);
+  .watched-run-chevron {
+    flex-shrink: 0;
+    transition: transform var(--motion-duration) var(--ease-out);
+  }
+
+  details[open] > summary .watched-run-chevron {
+    transform: rotate(90deg);
   }
 
   .watched-run-label.is-expanded {
@@ -998,14 +1137,28 @@ button.watchlist-action-button {
   .reorder-handle {
     display: inline-grid;
     place-items: center;
-    min-width: var(--control-size-lg);
-    min-height: var(--control-size-lg);
+    flex-shrink: 0;
+    width: var(--size-7);
+    height: var(--size-7);
+    min-width: var(--size-7);
+    min-height: var(--size-7);
     padding: 0;
     border: 0;
+    border-radius: var(--radius-popover);
     background: transparent;
     color: var(--fg-muted);
     cursor: grab;
     touch-action: none;
+    transition:
+      background-color var(--motion-duration) ease,
+      color var(--motion-duration) ease;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .reorder-handle:hover {
+      background: var(--bg-subtle);
+      color: var(--fg-default);
+    }
   }
 
   .reorder-handle:focus-visible {
@@ -1026,9 +1179,9 @@ button.watchlist-action-button {
     box-sizing: border-box;
     width: var(--status-control-size);
     height: var(--status-control-size);
-    margin-inline: var(--size-2);
+    margin-inline: 0.625rem;
     border: var(--border-size-1) solid var(--border);
-    border-radius: var(--size-1);
+    border-radius: var(--radius-control);
     color: transparent;
     background: transparent;
   }
@@ -1037,15 +1190,6 @@ button.watchlist-action-button {
     border-color: var(--accent);
     background: var(--accent);
     color: var(--fg-on-accent);
-  }
-
-  .item-status.is-watched::before {
-    content: "";
-    width: calc(var(--size-2) - var(--size-1) / 4);
-    height: calc(var(--size-2) + var(--size-1));
-    border-right: var(--border-size-2) solid currentColor;
-    border-bottom: var(--border-size-2) solid currentColor;
-    transform: rotate(45deg) translate(calc(var(--size-1) / -5), calc(var(--size-1) / -2.5));
   }
 
   button.item-actions-trigger {
@@ -1058,6 +1202,9 @@ button.watchlist-action-button {
     border-radius: var(--radius-round);
     background: transparent;
     color: var(--fg-muted);
+    transition:
+      transform var(--motion-duration-fast) ease-out,
+      background-color var(--motion-duration) ease;
   }
 
   button.item-actions-trigger:disabled {
@@ -1070,7 +1217,7 @@ button.watchlist-action-button {
     max-width: min(var(--measure-menu-max), calc(100vw - var(--size-7)));
     padding: var(--size-1);
     border: var(--border-size-1) solid var(--border);
-    border-radius: var(--size-2);
+    border-radius: var(--radius-popover);
     background: var(--bg-surface);
     color: var(--fg-default);
     box-shadow: var(--shadow-lg);
@@ -1098,17 +1245,84 @@ button.watchlist-action-button {
     display: flex;
     align-items: center;
     justify-content: flex-start;
+    gap: var(--size-2);
     width: 100%;
     min-height: var(--control-size);
     padding: var(--size-2) var(--size-3);
     border: 0;
-    border-radius: calc(var(--size-2) * 0.75);
+    border-radius: var(--radius-control);
     background: transparent;
+    color: var(--fg-default);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
     text-align: left;
+    transition: background-color var(--motion-duration) ease;
+  }
+
+  .timeline-endcap {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    margin-top: var(--size-8);
+    margin-left: calc(var(--size-5) * -1);
+    padding-bottom: var(--size-8);
+  }
+
+  .timeline-endcap-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--size-2);
+    height: var(--size-7);
+    padding: 0 var(--size-3);
+    border: var(--border-size-1) solid var(--border);
+    border-radius: var(--radius-round);
+    background: var(--bg-canvas);
+    color: var(--fg-muted);
+    font-size: var(--font-size-0);
+    font-weight: var(--font-weight-medium);
   }
 
   .sortable-ghost {
     opacity: var(--opacity-ghost);
+  }
+
+  @media (min-width: 48rem) {
+    .timeline-endcap {
+      margin-left: 0;
+    }
+
+    h2,
+    .timeline-endcap-pill {
+      margin-left: var(--size-3);
+    }
+
+    article {
+      gap: var(--size-3);
+      padding: var(--size-3) var(--size-3) var(--size-3) 0;
+    }
+
+    h3 {
+      font-size: var(--font-size-lg);
+    }
+
+    .item-meta {
+      gap: calc(var(--size-2) + var(--size-1));
+      font-size: var(--font-size-sm);
+    }
+
+    .poster-slot {
+      width: var(--poster-slot-inline-desktop);
+    }
+
+    .poster-frame {
+      width: var(--poster-inline-desktop);
+      height: var(--poster-block-desktop);
+    }
+
+    .poster-frame.episode {
+      height: var(--poster-episode-block-desktop);
+    }
   }
 }
 
@@ -1134,20 +1348,6 @@ watchlist-reorder[aria-busy="true"] {
 @media (max-width: 30rem) {
   .home {
     padding: var(--size-3) var(--size-3) calc(var(--size-10) + var(--size-7));
-  }
-  .watchlist {
-    padding-inline: var(--size-2);
-  }
-  @scope (.timeline) {
-    article {
-      gap: var(--size-2);
-      padding: calc(var(--size-2) + var(--size-1)) var(--size-1);
-    }
-
-    .poster {
-      width: var(--poster-inline-compact);
-      height: var(--poster-block-compact);
-    }
   }
 }
 
