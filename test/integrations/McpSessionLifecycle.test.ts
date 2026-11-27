@@ -123,6 +123,20 @@ describe("MCP session lifecycle", () => {
     expect((await handleMcpSessionRequest(pingRequest(newest), createServer)).status).toBe(200);
   }, 30_000);
 
+  it("keeps at most 64 sessions under concurrent initialization", async () => {
+    const sessionIds = await Promise.all(
+      Array.from({ length: maxConcurrentSessions + 16 }, () => initializeSession()),
+    );
+    let liveCount = 0;
+    for (const sessionId of sessionIds) {
+      const response = await handleMcpSessionRequest(pingRequest(sessionId), createServer);
+      if (response.status === 200) {
+        liveCount += 1;
+      }
+    }
+    expect(liveCount).toBe(maxConcurrentSessions);
+  }, 60_000);
+
   it("returns JSON-RPC internal error when an established session request throws", async () => {
     const sessionId = await initializeSession();
     const original = WebStandardStreamableHTTPServerTransport.prototype.handleRequest;
