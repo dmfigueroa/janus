@@ -34,6 +34,7 @@ pnpm run visual:compare -- --route /watchlists/1 \
   --scroll 600 \
   --click-v1 "button=Watchlist actions" \
   --click-v1 "menuitem=Edit watchlist" \
+  --click-v2 "button=Watchlist actions" \
   --click-v2 "button=Edit watchlist" \
   --wait "#watchlist-dialog" \
   --assert-in-viewport "#watchlist-dialog"

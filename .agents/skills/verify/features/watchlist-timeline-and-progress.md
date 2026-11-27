@@ -5,7 +5,7 @@ The watchlist detail timeline lets a user view items in release or custom order,
 ## Sub-features
 
 - `timeline-v1-view` displays progress (`6/9 Watched`, `67% Complete`) and unwatched items for `Marvel Cinematic Universe`.
-- `timeline-watched-run` collapses consecutive watched items behind a disclosure (`6 watched items hidden` in v1, `6 watched items` `<summary>` in v2) that expands on click.
+- `timeline-watched-run` collapses consecutive watched items behind a disclosure (`N watched items hidden`) that expands on click.
 - `timeline-search-filter` narrows visible timeline items by title on both v1 and v2.
 - `timeline-toggle-watched` marks an unwatched item watched on v1, updates progress (`7/9 Watched`), persists to SQLite, and reflects on v2.
 
@@ -43,14 +43,13 @@ Preconditions:
   EOF
   ```
   Progress updates from `6/9 Watched` to `7/9 Watched` (`78% Complete`) and the button flips to `Mark Black Panther unwatched`.
-- **Confirm persistence on v2 and filter v2 timeline.** Open `/v2/watchlists/1`, verify `7/9 Watched`, switch `Watched items` to `Show all`, and apply filters. Run:
+- **Confirm persistence on v2 and filter v2 timeline.** Open `/v2/watchlists/1`, verify `7/9 Watched`, then choose `All` to show watched runs inline. Run:
   ```bash
   .agents/skills/verify/scripts/verify-janus drive --run-id timeline --target v2 --viewport 1280x800 --feature watchlist-timeline-and-progress --evidence-name v2-timeline <<'EOF'
   [
     { "op": "goto", "path": "/v2/watchlists/1" },
     { "op": "expectText", "text": "7/9 Watched" },
-    { "op": "select", "target": "label=Watched items", "value": "false" },
-    { "op": "click", "target": "role=button,name=Apply filters" },
+    { "op": "click", "target": "role=button,name=All" },
     { "op": "expectUrl", "contains": "unwatched=false" },
     { "op": "expectText", "text": "Black Panther" },
     { "op": "expectText", "text": "Iron Man" },
@@ -59,7 +58,7 @@ Preconditions:
   ]
   EOF
   ```
-  v2 shows `7/9 Watched` and renders `Iron Man` and `Black Panther` uncollapsed when `Show all` is applied.
+  v2 shows `7/9 Watched` and renders `Iron Man` and `Black Panther` when `All` is selected.
 - **Verify stored row in SQLite.** Run:
   ```bash
   .agents/skills/verify/scripts/verify-janus db --run-id timeline --save watchlist-timeline-and-progress/db-item.json "SELECT id, title, is_watched FROM watchlist_items WHERE watchlist_id = 1 AND title = 'Black Panther'"
@@ -68,6 +67,6 @@ Preconditions:
 
 ## Gotchas
 
-- v2 does not yet render watched-toggle buttons (marking items watched/unwatched is a v1 write workflow). Always test watched toggles on v1 and verify read reflection on v2.
-- v2 detail filters submit via the `Apply filters` button (standard `GET` form), whereas v1 filters update client-side as you type or toggle `All` / `Unwatched`.
-- v1 defaults to showing `All` items with consecutive watched runs collapsed (`6 watched items hidden`). Choosing `Unwatched` hides watched rows completely.
+- v2 does not yet wire watched-toggle buttons (marking items watched/unwatched is a v1 write workflow). The circular status glyph is presentational until that write path lands. Always test watched toggles on v1 and verify read reflection on v2.
+- v2 detail filters use the same `All` / `Unwatched` segmented control as v1. Search updates over HTMX after a short input delay; filter radios apply immediately.
+- Both versions default to `Unwatched`, which collapses consecutive watched runs (`N watched items hidden`). Choosing `All` shows watched rows inline.

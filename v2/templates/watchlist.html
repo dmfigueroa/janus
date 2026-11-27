@@ -4,15 +4,43 @@
     <div class="watchlist-title">
       <h1 tabindex="-1">{{view.name}}</h1>
       {% if view.paused %}<span class="badge" role="status">Paused</span>{% endif %}
-      <button
-        type="button"
-        class="watchlist-edit"
-        data-watchlist-dialog-open="edit"
-        data-watchlist-dialog-trigger="header"
-        aria-label="Edit watchlist"
-      >
-        Edit
-      </button>
+      <div class="watchlist-actions" data-watchlist-actions>
+        <button
+          type="button"
+          class="watchlist-actions-trigger"
+          data-watchlist-actions-trigger
+          aria-label="Watchlist actions"
+          popovertarget="watchlist-actions-menu"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            width="20"
+            height="20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="1"></circle>
+            <circle cx="19" cy="12" r="1"></circle>
+            <circle cx="5" cy="12" r="1"></circle>
+          </svg>
+        </button>
+        <div id="watchlist-actions-menu" class="watchlist-actions-menu" popover="auto">
+          <button
+            type="button"
+            class="watchlist-action-button"
+            data-watchlist-dialog-open="edit"
+            data-watchlist-dialog-trigger="header"
+            popovertarget="watchlist-actions-menu"
+            popovertargetaction="hide"
+          >
+            Edit watchlist
+          </button>
+        </div>
+      </div>
     </div>
     {% if !view.description.is_empty() %}
     <p class="watchlist-description">{{view.description}}</p>
@@ -34,7 +62,18 @@
       </div>
     </div>
   </header>
-  <form class="watchlist-toolbar" method="get" role="search">
+  <form
+    class="watchlist-toolbar"
+    method="get"
+    role="search"
+    hx-get="/v2/watchlists/{{view.id}}"
+    hx-trigger="submit, input changed delay:300ms from:#query"
+    hx-target=".watchlist"
+    hx-select=".watchlist"
+    hx-select-oob="#watchlist-form"
+    hx-swap="outerHTML"
+    hx-push-url="true"
+  >
     <div class="item-search">
       <svg
         class="search-icon"
@@ -50,7 +89,7 @@
         <circle cx="11" cy="11" r="7"></circle>
         <line x1="16" y1="16" x2="21" y2="21"></line>
       </svg>
-      <label class="visually-hidden" for="query">Search items</label>
+      <label class="visually-hidden" for="query">Search titles</label>
       <input
         id="query"
         name="query"
@@ -58,14 +97,47 @@
         type="search"
         placeholder="Search titles..."
         autocomplete="off"
+        aria-label="Search titles"
+      />
+      <input
+        type="hidden"
+        id="unwatched-state"
+        name="unwatched"
+        value="{% if view.unwatched %}true{% else %}false{% endif %}"
       />
     </div>
-    <label class="visually-hidden" for="unwatched">Watched items</label>
-    <select name="unwatched" id="unwatched">
-      <option value="true" {% if view.unwatched %}selected{% endif %}>Collapse watched</option>
-      <option value="false" {% if !view.unwatched %}selected{% endif %}>Show all</option>
-    </select>
-    <button type="submit">Apply filters</button>
+    <div class="filter-toggle" role="group" aria-label="Watched filter">
+      <button
+        type="button"
+        class="filter-button{% if !view.unwatched %} is-active{% endif %}"
+        aria-pressed="{% if !view.unwatched %}true{% else %}false{% endif %}"
+        hx-get="/v2/watchlists/{{view.id}}"
+        hx-include="#query"
+        hx-vals='{"unwatched":"false"}'
+        hx-target=".watchlist"
+        hx-select=".watchlist"
+        hx-select-oob="#watchlist-form"
+        hx-swap="outerHTML"
+        hx-push-url="true"
+      >
+        All
+      </button>
+      <button
+        type="button"
+        class="filter-button{% if view.unwatched %} is-active{% endif %}"
+        aria-pressed="{% if view.unwatched %}true{% else %}false{% endif %}"
+        hx-get="/v2/watchlists/{{view.id}}"
+        hx-include="#query"
+        hx-vals='{"unwatched":"true"}'
+        hx-target=".watchlist"
+        hx-select=".watchlist"
+        hx-select-oob="#watchlist-form"
+        hx-swap="outerHTML"
+        hx-push-url="true"
+      >
+        Unwatched
+      </button>
+    </div>
   </form>
   <span
     id="reorder-recovery"
