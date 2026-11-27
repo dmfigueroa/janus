@@ -109,7 +109,12 @@ function detailPageHtml(mode) {
   };
   const { timelineHtml, releaseChecked, customChecked } = modes[mode];
   return `<main class="watchlist">
-      <button type="button" data-watchlist-dialog-open="edit" data-watchlist-dialog-trigger="header">Edit</button>
+      <div class="watchlist-actions" data-watchlist-actions>
+        <button type="button" class="watchlist-actions-trigger" data-watchlist-actions-trigger aria-label="Watchlist actions">More</button>
+        <div id="watchlist-actions-menu" class="watchlist-actions-menu" popover="auto">
+          <button type="button" class="watchlist-action-button" data-watchlist-dialog-open="edit" data-watchlist-dialog-trigger="header">Edit watchlist</button>
+        </div>
+      </div>
       ${timelineHtml}
     </main>
     <span id="watchlist-refresh" hidden hx-get="" hx-trigger="watchlist-saved from:body" hx-target=".watchlist" hx-select=".watchlist" hx-select-oob="#watchlist-form" hx-swap="outerHTML"></span>
@@ -158,9 +163,9 @@ test("real HTMX detail refresh updates timeline and edit dialog defaults via OOB
     window.eval(fs.readFileSync(path.join(root, "static/vendor/htmx.min.js"), "utf8"));
     window.eval(fs.readFileSync(path.join(root, "static/watchlist-dialog.js"), "utf8"));
     await new Promise((resolve) => window.setTimeout(resolve, 20));
-    const trigger = window.document.querySelector('[data-watchlist-dialog-open="edit"]');
-    trigger.focus();
-    trigger.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
+    const menuItem = window.document.querySelector('[data-watchlist-dialog-open="edit"]');
+    menuItem.focus();
+    menuItem.dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
     const settled = new Promise((resolve) =>
       window.document.addEventListener("htmx:afterSettle", resolve, { once: true }),
     );
@@ -174,10 +179,10 @@ test("real HTMX detail refresh updates timeline and edit dialog defaults via OOB
     await new Promise((resolve) => window.setTimeout(resolve, 20));
     assert.ok(window.document.querySelector("watchlist-reorder"));
     assert.equal(window.document.getElementById("watchlist-dialog").open, false);
-    assert.equal(window.document.activeElement.getAttribute("data-watchlist-dialog-open"), "edit");
-    window.document.activeElement.dispatchEvent(
-      new window.MouseEvent("click", { bubbles: true, cancelable: true }),
-    );
+    assert.ok(window.document.activeElement?.hasAttribute("data-watchlist-actions-trigger"));
+    window.document
+      .querySelector('[data-watchlist-dialog-open="edit"]')
+      .dispatchEvent(new window.MouseEvent("click", { bubbles: true, cancelable: true }));
     assert.equal(window.document.querySelector('input[value="custom"]').checked, true);
     assert.equal(window.document.querySelector('input[value="release"]').checked, false);
   } finally {

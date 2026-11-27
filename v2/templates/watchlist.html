@@ -68,11 +68,11 @@
     role="search"
     hx-get="/v2/watchlists/{{view.id}}"
     hx-trigger="submit, input changed delay:300ms from:#query"
-    hx-target=".watchlist"
-    hx-select=".watchlist"
-    hx-select-oob="#watchlist-form"
+    hx-target=".timeline"
+    hx-select=".timeline"
     hx-swap="outerHTML"
     hx-push-url="true"
+    hx-sync="this:replace"
   >
     <div class="item-search">
       <svg
@@ -110,30 +110,32 @@
       <button
         type="button"
         class="filter-button{% if !view.unwatched %} is-active{% endif %}"
+        data-unwatched="false"
         aria-pressed="{% if !view.unwatched %}true{% else %}false{% endif %}"
         hx-get="/v2/watchlists/{{view.id}}"
         hx-include="#query"
         hx-vals='{"unwatched":"false"}'
-        hx-target=".watchlist"
-        hx-select=".watchlist"
-        hx-select-oob="#watchlist-form"
+        hx-target=".timeline"
+        hx-select=".timeline"
         hx-swap="outerHTML"
         hx-push-url="true"
+        hx-sync=".watchlist-toolbar:replace"
       >
         All
       </button>
       <button
         type="button"
         class="filter-button{% if view.unwatched %} is-active{% endif %}"
+        data-unwatched="true"
         aria-pressed="{% if view.unwatched %}true{% else %}false{% endif %}"
         hx-get="/v2/watchlists/{{view.id}}"
         hx-include="#query"
         hx-vals='{"unwatched":"true"}'
-        hx-target=".watchlist"
-        hx-select=".watchlist"
-        hx-select-oob="#watchlist-form"
+        hx-target=".timeline"
+        hx-select=".timeline"
         hx-swap="outerHTML"
         hx-push-url="true"
+        hx-sync=".watchlist-toolbar:replace"
       >
         Unwatched
       </button>

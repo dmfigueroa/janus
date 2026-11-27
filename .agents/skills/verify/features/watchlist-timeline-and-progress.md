@@ -68,5 +68,5 @@ Preconditions:
 ## Gotchas
 
 - v2 does not yet wire watched-toggle buttons (marking items watched/unwatched is a v1 write workflow). The circular status glyph is presentational until that write path lands. Always test watched toggles on v1 and verify read reflection on v2.
-- v2 detail filters use the same `All` / `Unwatched` segmented control as v1. Search updates over HTMX after a short input delay; filter radios apply immediately.
+- v2 detail filters use the same `All` / `Unwatched` segmented control as v1. Search and filter requests swap only `.timeline` (so `#query` stays live) after a short input delay; filter buttons apply immediately.
 - Both versions default to `Unwatched`, which collapses consecutive watched runs (`N watched items hidden`). Choosing `All` shows watched rows inline.
