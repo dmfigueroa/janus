@@ -17,7 +17,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: dmfigueroa/janus-v2
+  IMAGE_NAME: dmfigueroa/janus
 
 jobs:
   changes:
@@ -70,17 +70,35 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # v2 SemVer image tags are 2.x.y-beta for now (prerelease channel).
+      - name: Parse v2 SemVer tag
+        id: semver
+        if: startsWith(github.ref, 'refs/tags/v2/')
+        run: |
+          version="${GITHUB_REF_NAME#v2/}"
+          case "$version" in
+            2.*.*)
+              echo "tag=${version}-beta" >> "$GITHUB_OUTPUT"
+              echo "minor=${version%.*}-beta" >> "$GITHUB_OUTPUT"
+              echo "major=2-beta" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "v2 SemVer tags must be v2/2.x.y (got v2/${version})" >&2
+              exit 1
+              ;;
+          esac
+
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=sha,prefix=sha-,format=short
+            type=sha,prefix=sha-v2-,format=short
             type=raw,value=next,enable=${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v2/') }}
-            type=match,pattern=^v2/(\d+\.\d+\.\d+)$,group=1
-            type=match,pattern=^v2/(\d+\.\d+)\.\d+$,group=1
-            type=match,pattern=^v2/(\d+)\.\d+\.\d+$,group=1
+            type=raw,value=${{ steps.semver.outputs.tag }},enable=${{ steps.semver.outputs.tag != '' }}
+            type=raw,value=${{ steps.semver.outputs.minor }},enable=${{ steps.semver.outputs.minor != '' }}
+            type=raw,value=${{ steps.semver.outputs.major }},enable=${{ steps.semver.outputs.major != '' }}
 
       - name: Build and push
         uses: docker/build-push-action@v6

@@ -78,11 +78,11 @@ pnpm run test:v2:dom   # Run v2 HTMX/reorder DOM tests
 
 ## Deployment
 
-Janus publishes independently versioned images to GHCR (`ghcr.io/dmfigueroa/janus-v1`, `ghcr.io/dmfigueroa/janus-v2`). Path-filtered GitHub Actions workflows update channel tags (`latest` for v1, `next` for v2); SemVer tags come from git tags `v1/x.y.z` and `v2/x.y.z`. Production Compose pulls those images (`deploy/compose.yaml`); local and PR-preview source builds use `deploy/compose.build.yaml`.
+Janus publishes one GHCR image (`ghcr.io/dmfigueroa/janus`) with independent tags: v1 as `1.x.x` and `latest`, v2 as `2.x.x-beta` (for now) and `next`. Path-filtered workflows update the matching tags. Production Compose pulls channel tags (`deploy/compose.yaml`); local and PR-preview source builds use `deploy/compose.build.yaml`.
 
 ```bash
-docker build -f Dockerfile -t janus-v1 .
-docker build -f v2/Dockerfile -t janus-v2 .
+docker build -f Dockerfile -t ghcr.io/dmfigueroa/janus:latest .
+docker build -f v2/Dockerfile -t ghcr.io/dmfigueroa/janus:next .
 ```
 
 Mount a persistent directory at `/app/storage` (with `DATABASE_URL=/app/storage/sqlite.db`) and provide provider API keys and other config as **runtime** environment variables. Never bake secrets into the image. On startup, the v1 image runs database migrations before starting the server. Set `SEED_ON_STARTUP=true` only on disposable demo or preview instances.

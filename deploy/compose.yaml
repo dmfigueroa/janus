@@ -4,7 +4,7 @@
 # For local or PR-preview source builds, use compose.build.yaml instead.
 services:
   v1:
-    image: ghcr.io/dmfigueroa/janus-v1:latest
+    image: ghcr.io/dmfigueroa/janus:latest
     pull_policy: always
     restart: unless-stopped
     environment:
@@ -30,7 +30,7 @@ services:
       timeout: 5s
       start_period: 30s
   v2:
-    image: ghcr.io/dmfigueroa/janus-v2:next
+    image: ghcr.io/dmfigueroa/janus:next
     pull_policy: always
     depends_on:
       v1:

@@ -1,31 +1,31 @@
 # Deployment
 
-Janus runs as two independently versioned container images built from the repository root and published to GHCR:
+Janus publishes one GHCR image, `ghcr.io/dmfigueroa/janus`, with independently versioned tags for the v1 and v2 builds:
 
-| Component                                   | Dockerfile      | Image                         | Channel tag | SemVer tags              |
-| ------------------------------------------- | --------------- | ----------------------------- | ----------- | ------------------------ |
-| v1 (TanStack Start / Node, port `3000`)     | `Dockerfile`    | `ghcr.io/dmfigueroa/janus-v1` | `latest`    | from git tags `v1/x.y.z` |
-| v2 (Rust / HTMX, port `3001`, `/v2` prefix) | `v2/Dockerfile` | `ghcr.io/dmfigueroa/janus-v2` | `next`      | from git tags `v2/x.y.z` |
+| Component                                   | Dockerfile      | Channel tag | SemVer tags                                                 |
+| ------------------------------------------- | --------------- | ----------- | ----------------------------------------------------------- |
+| v1 (TanStack Start / Node, port `3000`)     | `Dockerfile`    | `latest`    | `1.x.y` from git tags `v1/1.x.y`                            |
+| v2 (Rust / HTMX, port `3001`, `/v2` prefix) | `v2/Dockerfile` | `next`      | `2.x.y-beta` from git tags `v2/2.x.y` (beta suffix for now) |
 
-GitHub Actions workflows [`.github/workflows/publish-v1.yml`](../.github/workflows/publish-v1.yml) and [`.github/workflows/publish-v2.yml`](../.github/workflows/publish-v2.yml) build and push on path-filtered pushes to `main`, on matching SemVer tags, and via `workflow_dispatch`. Every publish also tags `sha-<shortsha>`. PR CI still builds images without pushing (`ci.yml` / `v2.yml`) so a broken Dockerfile fails before merge.
+GitHub Actions workflows [`.github/workflows/publish-v1.yml`](../.github/workflows/publish-v1.yml) and [`.github/workflows/publish-v2.yml`](../.github/workflows/publish-v2.yml) build and push on path-filtered pushes to `main`, on matching SemVer tags, and via `workflow_dispatch`. Every publish also tags `sha-v1-<short>` or `sha-v2-<short>`. PR CI still builds images without pushing (`ci.yml` / `v2.yml`) so a broken Dockerfile fails before merge.
 
 Path filters (shared `.dockerignore` changes publish both):
 
 - **v1:** `Dockerfile`, app manifests, `src/`, `public/`, `drizzle/`, `test/`, `tools/`, and related root build configs.
 - **v2:** `v2/**`.
 
-Both images build with context at the repository root and share the root `.dockerignore`:
+Both builds use the repository root as context and share the root `.dockerignore`:
 
 ```bash
-docker build -f Dockerfile -t janus-v1 .
-docker build -f v2/Dockerfile -t janus-v2 .
+docker build -f Dockerfile -t ghcr.io/dmfigueroa/janus:latest .
+docker build -f v2/Dockerfile -t ghcr.io/dmfigueroa/janus:next .
 ```
 
 Keep `v2/`, `test/`, and `tools/` in the context. Keep `v2/target` ignored.
 
 ## Pull-to-deploy
 
-Production uses `deploy/compose.yaml`, which pulls channel tags (`janus-v1:latest`, `janus-v2:next`) with `pull_policy: always`. Coolify (or any self-host Compose) injects runtime environment variables; nothing application-secret is baked into the images.
+Production uses `deploy/compose.yaml`, which pulls channel tags (`janus:latest` for v1, `janus:next` for v2) with `pull_policy: always`. Coolify (or any self-host Compose) injects runtime environment variables; nothing application-secret is baked into the images.
 
 Local or PR-preview **source builds** use the additive overlay:
 
@@ -90,12 +90,12 @@ SEED_ON_STARTUP=true DATABASE_URL=/tmp/janus-preview.sqlite pnpm run seed
 
 These cannot be applied from the repo alone. David (or whoever operates Coolify) should:
 
-1. **Production app, switch to pull-to-deploy.** For the existing Janus Coolify application that uses `deploy/compose.yaml`, change each service from Dockerfile `build:` mode to Docker Image mode pointing at `ghcr.io/dmfigueroa/janus-v1:latest` and `ghcr.io/dmfigueroa/janus-v2:next`. Redeploying the updated compose file alone also switches services to `image:` pull.
+1. **Production app, switch to pull-to-deploy.** For the existing Janus Coolify application that uses `deploy/compose.yaml`, change each service from Dockerfile `build:` mode to Docker Image mode pointing at `ghcr.io/dmfigueroa/janus:latest` (v1) and `ghcr.io/dmfigueroa/janus:next` (v2). Redeploying the updated compose file alone also switches services to `image:` pull.
 2. **GHCR authentication.** If the packages are private, add a GHCR pull credential (PAT or deploy token with `read:packages`) on Coolify or the host so pulls succeed. Public packages need no auth for pull.
 3. **Keep runtime env.** Confirm `DATABASE_URL`, provider API keys, and optional `SEED_ON_STARTUP` and `JANUS_V2_BIND` remain set on the Coolify service environment, not in the image.
 4. **Preserve coexistence.** Do not change the external volume name `h8gsos0k40kk8s8oo8o4ko0w-DB` or the Traefik `/v2` routing labels unless you are intentionally migrating hosts.
 5. **PR previews.** Leave preview applications on Dockerfile source-build mode. Use `compose.build.yaml` or Coolify build-from-PR. Give each preview its own disposable storage volume and set `SEED_ON_STARTUP=true` only there.
-6. **Cutting a SemVer release.** Tag and push `v1/x.y.z` or `v2/x.y.z` on `main` after the path-filtered publish commit. The matching workflow pushes SemVer tags alongside the channel tag. Re-run `workflow_dispatch` on the publish workflow if a tag push needs a manual retry.
+6. **Cutting a SemVer release.** Tag and push `v1/1.x.y` or `v2/2.x.y` on `main` after the path-filtered publish commit. The matching workflow pushes SemVer image tags (`1.x.y` or `2.x.y-beta`) alongside the channel tag. Re-run `workflow_dispatch` on the publish workflow if a tag push needs a manual retry.
 
 ## Cutting releases
 
@@ -103,9 +103,11 @@ These cannot be applied from the repo alone. David (or whoever operates Coolify)
 # After the desired commit is on main:
 git tag v1/1.2.3
 git push origin v1/1.2.3
+# → ghcr.io/dmfigueroa/janus:1.2.3 and :latest
 
-git tag v2/0.2.0
-git push origin v2/0.2.0
+git tag v2/2.0.0
+git push origin v2/2.0.0
+# → ghcr.io/dmfigueroa/janus:2.0.0-beta and :next
 ```
 
 Channel tags move on every successful path-filtered publish to `main` and on SemVer tag publishes. Pin production to a SemVer digest in Coolify if you need a freeze. Otherwise `latest` and `next` track `main`.

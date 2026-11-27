@@ -17,7 +17,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: dmfigueroa/janus-v1
+  IMAGE_NAME: dmfigueroa/janus
 
 jobs:
   changes:
@@ -87,11 +87,11 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=sha,prefix=sha-,format=short
+            type=sha,prefix=sha-v1-,format=short
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v1/') }}
-            type=match,pattern=^v1/(\d+\.\d+\.\d+)$,group=1
-            type=match,pattern=^v1/(\d+\.\d+)\.\d+$,group=1
-            type=match,pattern=^v1/(\d+)\.\d+\.\d+$,group=1
+            type=match,pattern=^v1/(1\.\d+\.\d+)$,group=1
+            type=match,pattern=^v1/(1\.\d+)\.\d+$,group=1
+            type=match,pattern=^v1/(1)\.\d+\.\d+$,group=1
 
       - name: Build and push
         uses: docker/build-push-action@v6
