@@ -1,0 +1,48 @@
+# git-cliff config for Janus dual SemVer lines (v1/1.x.y and v2/2.x.y → 2.x.y-beta).
+# Path filters and the release heading live in tools/release-notes.sh.
+# https://git-cliff.org/docs/configuration
+
+[changelog]
+header = ""
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim | upper_first }}
+{% for commit in commits %}
+- {% if commit.scope %}**{{ commit.scope }}:** {% endif %}{{ commit.message | split(pat="\n") | first | trim }}
+{% endfor %}
+{% endfor %}
+
+"""
+footer = ""
+trim = true
+render_always = false
+
+[git]
+conventional_commits = true
+filter_unconventional = false
+split_commits = false
+require_conventional = false
+protect_breaking_commits = false
+filter_commits = false
+topo_order = false
+sort_commits = "oldest"
+
+commit_parsers = [
+  { message = "^feat", group = "Features" },
+  { message = "^fix", group = "Bug Fixes" },
+  { message = "^perf", group = "Performance" },
+  { message = "^refactor", group = "Refactor" },
+  { message = "^docs", group = "Documentation" },
+  { message = "^test", group = "Testing" },
+  { message = "^ci", group = "CI" },
+  { message = "^build", group = "Build" },
+  { message = "^chore\\(release\\)", skip = true },
+  { message = "^chore", group = "Miscellaneous" },
+  { message = "^style", group = "Miscellaneous" },
+  { message = ".*", group = "Other" },
+]
+
+commit_preprocessors = [
+  # Drop squash-merge "(#123)" markers; keep the subject focused on the change.
+  { pattern = ' \(#[0-9]+\)', replace = "" },
+]

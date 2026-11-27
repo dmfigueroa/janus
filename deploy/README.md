@@ -95,7 +95,7 @@ These cannot be applied from the repo alone. David (or whoever operates Coolify)
 3. **Keep runtime env.** Confirm `DATABASE_URL`, provider API keys, and optional `SEED_ON_STARTUP` and `JANUS_V2_BIND` remain set on the Coolify service environment, not in the image.
 4. **Preserve coexistence.** Do not change the external volume name `h8gsos0k40kk8s8oo8o4ko0w-DB` or the Traefik `/v2` routing labels unless you are intentionally migrating hosts.
 5. **PR previews.** Leave preview applications on Dockerfile source-build mode. Use `compose.build.yaml` or Coolify build-from-PR. Give each preview its own disposable storage volume and set `SEED_ON_STARTUP=true` only there.
-6. **Cutting a SemVer release.** Tag and push `v1/1.x.y` or `v2/2.x.y` on `main` after the path-filtered publish commit. The matching workflow pushes SemVer image tags (`1.x.y` or `2.x.y-beta`) alongside the channel tag. Re-run `workflow_dispatch` on the publish workflow if a tag push needs a manual retry.
+6. **Cutting a SemVer release.** Tag and push `v1/1.x.y` or `v2/2.x.y` on `main` after the path-filtered publish commit. Generate the GitHub Release body with `bash tools/release-notes.sh` (see below). The matching workflow pushes SemVer image tags (`1.x.y` or `2.x.y-beta`) alongside the channel tag. Re-run `workflow_dispatch` on the publish workflow if a tag push needs a manual retry.
 
 ## Cutting releases
 
@@ -111,3 +111,38 @@ git push origin v2/2.0.0
 ```
 
 Channel tags move on every successful path-filtered publish to `main` and on SemVer tag publishes. Pin production to a SemVer digest in Coolify if you need a freeze. Otherwise `latest` and `next` track `main`.
+
+## Release notes (dual SemVer lines)
+
+Janus keeps **two independent SemVer lines** on one GHCR image. Changelogs follow the same split: path-filtered notes since the previous tag on that line only.
+
+| Line | Git tag    | Image tags           | Notes command                    |
+| ---- | ---------- | -------------------- | -------------------------------- |
+| v1   | `v1/1.x.y` | `1.x.y`, `latest`    | `bash tools/release-notes.sh v1` |
+| v2   | `v2/2.x.y` | `2.x.y-beta`, `next` | `bash tools/release-notes.sh v2` |
+
+Requires [git-cliff](https://git-cliff.org) (or Docker image `orhunp/git-cliff:2.8.0`). Config: [`cliff.toml`](../cliff.toml). Script: [`tools/release-notes.sh`](../tools/release-notes.sh).
+
+**Commit messages.** Keep conventional commits (`type(scope): summary`). Prefer scopes that name the surface (`v2`, `watchlists`, `providers`, `deploy`). Put the user-visible change in the subject. One logical change per commit.
+
+**Generate notes, then create the GitHub Release** (publish workflows still fire from the git tag push):
+
+```bash
+# Preview unreleased notes for a line (since previous same-line tag .. HEAD):
+bash tools/release-notes.sh v1
+bash tools/release-notes.sh v2
+
+# Cut v1 1.2.3 with notes since v1/1.1.0 (example):
+git tag v1/1.2.3
+bash tools/release-notes.sh v1 v1/1.2.3 | gh release create v1/1.2.3 --notes-file -
+git push origin v1/1.2.3
+
+# Cut v2 2.1.0 → image 2.1.0-beta (prerelease):
+git tag v2/2.1.0
+bash tools/release-notes.sh v2 v2/2.1.0 | gh release create v2/2.1.0 --prerelease --notes-file -
+git push origin v2/2.1.0
+```
+
+Do not tag `v2/2.x.y-beta` as the git tag: the publish workflow already appends `-beta` to the image tag.
+
+v1 and v2 version numbers do not need to stay in lockstep. Bump only the line whose paths changed.
