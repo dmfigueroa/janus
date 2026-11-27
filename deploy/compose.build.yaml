@@ -1,0 +1,19 @@
+# Source-build overlay for local stacks and Coolify PR previews.
+# Usage (from repo root):
+#   docker compose -f deploy/compose.yaml -f deploy/compose.build.yaml up --build
+# Production Coolify apps should use compose.yaml alone (pull-to-deploy).
+# Preview apps must mount a disposable database volume and may set
+# SEED_ON_STARTUP=true on v1. Never point a seeded preview at production storage.
+services:
+  v1:
+    image: janus-v1:local
+    pull_policy: build
+    build:
+      context: ..
+      dockerfile: Dockerfile
+  v2:
+    image: janus-v2:local
+    pull_policy: build
+    build:
+      context: ..
+      dockerfile: v2/Dockerfile

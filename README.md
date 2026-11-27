@@ -78,16 +78,16 @@ pnpm run test:v2:dom   # Run v2 HTMX/reorder DOM tests
 
 ## Deployment
 
-Janus ships production Dockerfiles at the repository root (`Dockerfile` for v1 on port `3000`, `v2/Dockerfile` for v2 on port `3001`):
+Janus publishes one GHCR image (`ghcr.io/dmfigueroa/janus`) with independent tags: v1 as `1.x.x` and `latest`, v2 as `2.x.x-beta` (for now) and `next`. Path-filtered workflows update the matching tags. Production Compose pulls channel tags (`deploy/compose.yaml`); local and PR-preview source builds use `deploy/compose.build.yaml`.
 
 ```bash
-docker build -f Dockerfile -t janus-v1 .
-docker build -f v2/Dockerfile -t janus-v2 .
+docker build -f Dockerfile -t ghcr.io/dmfigueroa/janus:latest .
+docker build -f v2/Dockerfile -t ghcr.io/dmfigueroa/janus:next .
 ```
 
-Mount a persistent directory at `/app/storage` (with `DATABASE_URL=/app/storage/sqlite.db`) and provide your provider API keys as environment variables. On startup, the v1 image automatically runs database migrations before starting the server. Set `SEED_ON_STARTUP=true` only on disposable demo/preview instances to populate sample watchlists into an empty database.
+Mount a persistent directory at `/app/storage` (with `DATABASE_URL=/app/storage/sqlite.db`) and provide provider API keys and other config as **runtime** environment variables. Never bake secrets into the image. On startup, the v1 image runs database migrations before starting the server. Set `SEED_ON_STARTUP=true` only on disposable demo or preview instances.
 
-For running v1 and v2 side by side behind a reverse proxy, see [`deploy/README.md`](deploy/README.md). For protecting `/mcp` with Cloudflare Access Managed OAuth, see [`docs/mcp.md`](docs/mcp.md).
+For pull-to-deploy, coexistence routing, preview seeding, and Coolify cutover steps, see [`deploy/README.md`](deploy/README.md). For protecting `/mcp` with Cloudflare Access Managed OAuth, see [`docs/mcp.md`](docs/mcp.md).
 
 ## Project Structure
 
