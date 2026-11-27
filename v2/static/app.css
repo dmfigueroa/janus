@@ -1455,6 +1455,7 @@ watchlist-reorder[aria-busy="true"] {
   transform: scale(var(--press-scale));
 }
 
+.search-form button:has(.htmx-indicator.htmx-request) .search-submit-label,
 .search-form.htmx-request .search-submit-label {
   display: none;
 }
@@ -1751,6 +1752,7 @@ watchlist-reorder[aria-busy="true"] {
   transform: scale(var(--press-scale));
 }
 
+.search-add-form button:has(.htmx-indicator.htmx-request) .search-submit-label,
 .search-add-form.htmx-request .search-submit-label {
   display: none;
 }
