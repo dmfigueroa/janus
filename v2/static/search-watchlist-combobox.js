@@ -1,5 +1,5 @@
-export function optionLabel(option) {
-  return option.dataset.label ?? option.textContent.trim();
+function optionLabel(option) {
+  return option.textContent.trim();
 }
 
 function normalizeQuery(value) {
@@ -112,10 +112,10 @@ function onKeydown(event, input, listbox, options, empty, select) {
 
 function bindWatchlistCombobox(root, onSelect) {
   if (!(root instanceof HTMLElement) || root.dataset.comboboxBound === "true") return;
-  const value = root.querySelector("#search-watchlist");
-  const input = root.querySelector("#search-watchlist-input");
-  const listbox = root.querySelector("#search-watchlist-listbox");
-  const empty = root.querySelector(".search-watchlist-empty");
+  const value = root.querySelector("[data-watchlist-value]");
+  const input = root.querySelector("[data-watchlist-input]");
+  const listbox = root.querySelector("[data-watchlist-listbox]");
+  const empty = root.querySelector("[data-watchlist-empty]");
   if (
     !(value instanceof HTMLInputElement) ||
     !(input instanceof HTMLInputElement) ||
@@ -144,12 +144,11 @@ function bindWatchlistCombobox(root, onSelect) {
     event.preventDefault();
     select(option);
   });
-  input.addEventListener("blur", () => {
-    window.setTimeout(() => {
-      if (root.contains(document.activeElement)) return;
-      restoreInput(input, options);
-      setExpanded(input, listbox, options, false);
-    }, 0);
+  root.addEventListener("focusout", (event) => {
+    const next = event.relatedTarget;
+    if (next instanceof Node && root.contains(next)) return;
+    restoreInput(input, options);
+    setExpanded(input, listbox, options, false);
   });
 }
 

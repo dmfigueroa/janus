@@ -58,6 +58,7 @@
           id="search-watchlist"
           name="watchlistId"
           value="{{ list.id }}"
+          data-watchlist-value
           data-order="{% if list.custom %}custom{% else %}release{% endif %}"
         />
         {% endif %} {% endfor %}
@@ -65,6 +66,7 @@
           id="search-watchlist-input"
           type="text"
           role="combobox"
+          data-watchlist-input
           aria-labelledby="search-watchlist-label"
           aria-autocomplete="list"
           aria-expanded="false"
@@ -74,21 +76,26 @@
           placeholder="Select a watchlist..."
           value="{% for list in view.watchlists %}{% if list.selected %}{{ list.name }}{% endif %}{% endfor %}"
         />
-        <ul id="search-watchlist-listbox" class="search-watchlist-listbox" role="listbox" hidden>
+        <ul
+          id="search-watchlist-listbox"
+          class="search-watchlist-listbox"
+          role="listbox"
+          data-watchlist-listbox
+          hidden
+        >
           {% for list in view.watchlists %}
           <li
             role="option"
             id="search-watchlist-option-{{ list.id }}"
             data-value="{{ list.id }}"
             data-order="{% if list.custom %}custom{% else %}release{% endif %}"
-            data-label="{{ list.name }}"
             aria-selected="{{ list.selected }}"
           >
             {{ list.name }}
           </li>
           {% endfor %}
         </ul>
-        <p class="search-watchlist-empty" hidden>No watchlists match.</p>
+        <p class="search-watchlist-empty" data-watchlist-empty hidden>No watchlists match.</p>
       </div>
       <button type="submit" class="button-primary search-add-submit">
         <span class="search-submit-label">Add</span>
