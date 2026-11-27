@@ -63,7 +63,7 @@ class WatchlistDialog {
     const triggerSelector = trigger
       ? `[data-watchlist-dialog-open="${mode}"][data-watchlist-dialog-trigger="${trigger}"]`
       : `[data-watchlist-dialog-open="${mode}"]`;
-    document.querySelector(triggerSelector)?.focus();
+    this.focusTarget(document.querySelector(triggerSelector))?.focus();
     this.pendingFocus = null;
   };
 
@@ -79,8 +79,14 @@ class WatchlistDialog {
   open(trigger) {
     if (this.dialog.open) return;
     this.resetForm();
-    this.returnFocus = trigger;
+    this.returnFocus = this.focusTarget(trigger);
     this.dialog.showModal();
+  }
+
+  focusTarget(opener) {
+    if (!(opener instanceof Element)) return opener;
+    const actions = opener.closest("[data-watchlist-actions]");
+    return actions?.querySelector("[data-watchlist-actions-trigger]") || opener;
   }
 
   resetForm() {

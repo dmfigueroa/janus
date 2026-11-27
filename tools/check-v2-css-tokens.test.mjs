@@ -38,8 +38,28 @@ describe("V2 CSS semantic token guardrails", () => {
   --font-size-sm: 0.875rem;
   --motion-duration-fast: 120ms;
   --radius-control: calc(var(--size-2) + var(--size-1));
+  --press-scale: 0.97;
+  --letter-spacing-tight: -0.025em;
 }
 `;
     expect(checkCssSource("v2/static/app.css", rootTokens)).toEqual([]);
+  });
+
+  it("rejects bare type and press literals that already have Janus tokens", () => {
+    const pastMistake = `
+.watchlist h1 {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.watchlist button:active {
+  transform: scale(0.97);
+}
+`;
+    const violations = checkCssSource("v2/static/app.css", pastMistake).join("\n");
+    expect(violations).toContain("--font-size-0");
+    expect(violations).toContain("--font-weight-semibold");
+    expect(violations).toContain("--letter-spacing-tight");
+    expect(violations).toContain("--press-scale");
   });
 });

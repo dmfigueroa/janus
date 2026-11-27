@@ -8,14 +8,14 @@ Creating and editing a watchlist lets a user add a new list with a name, optiona
 - `create-v2-mobile` opens the same create dialog from the floating `Create watchlist` button at `390x844`.
 - `create-v1-desktop` opens the Chakra create dialog from `Create New List` on `/watchlists` and saves a new list.
 - `create-cancel` closes the create dialog without inserting a watchlist row.
-- `edit-v2` opens `Edit watchlist` from the v2 detail header `Edit` button, updates metadata and order mode, and refreshes the detail header in place.
+- `edit-v2` opens `Edit watchlist` from the v2 detail header `Watchlist actions` menu, updates metadata and order mode, and refreshes the detail header in place.
 - `edit-v1` opens `Edit watchlist` from `Watchlist actions` -> `Edit watchlist` on a v1 detail page and saves changes.
 
 ## How to get to it (user POV)
 
 - Desktop (`1280x800`): choose the `Create New List` tile on `/watchlists` (v1) or `/v2/watchlists` (v2).
 - Mobile (`390x844`): choose the floating `Create watchlist` button on `/watchlists` (v1) or `/v2/watchlists` (v2).
-- Edit on v2: open `/v2/watchlists/{id}` and choose the `Edit watchlist` button (`Edit`).
+- Edit on v2: open `/v2/watchlists/{id}`, choose `Watchlist actions`, then choose `Edit watchlist`.
 - Edit on v1: open `/watchlists/{id}`, choose `Watchlist actions`, then choose `Edit watchlist`.
 
 ## Driving it with verify-janus
@@ -63,12 +63,13 @@ Preconditions:
   EOF
   ```
   The dialog closes, the grid refreshes via HTMX, and `Sci-Fi Classics` survives a full reload (in the collapsible `Empty` section or visible grid).
-- **Edit the new watchlist on v2.** Open `/v2/watchlists/5`, choose `Edit watchlist`, rename to `Sci-Fi Essentials`, switch description, and save. Run:
+- **Edit the new watchlist on v2.** Open `/v2/watchlists/5`, open `Watchlist actions`, choose `Edit watchlist`, rename to `Sci-Fi Essentials`, switch description, and save. Run:
   ```bash
   .agents/skills/verify/scripts/verify-janus drive --run-id crud --target v2 --viewport 1280x800 --feature create-and-edit-watchlist --evidence-name v2-edit <<'EOF'
   [
     { "op": "goto", "path": "/v2/watchlists/5" },
     { "op": "expectText", "target": "role=heading,name=Sci-Fi Classics", "text": "Sci-Fi Classics" },
+    { "op": "click", "target": "role=button,name=Watchlist actions" },
     { "op": "click", "target": "role=button,name=Edit watchlist" },
     { "op": "wait", "target": "css=#watchlist-dialog", "state": "visible" },
     { "op": "fill", "target": "label=Name", "value": "Sci-Fi Essentials" },

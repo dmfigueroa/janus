@@ -62,17 +62,18 @@ impl TimelineView {
         let list = &detail.watchlist.watchlist;
         let stats = &detail.watchlist.stats;
         let query = filters.normalized_query();
+        let custom = list.item_order_mode == ItemOrderMode::Custom;
         let rows: Vec<Row> = detail
             .items
             .iter()
             .filter(|item| item.matches_text(&query))
-            .map(Row::from_item)
+            .map(|item| Row::from_item(item, custom))
             .collect();
         Self {
             id: list.id,
             name: list.name.clone(),
             description: list.description.clone().unwrap_or_default(),
-            custom: list.item_order_mode == ItemOrderMode::Custom,
+            custom,
             progress: stats.progress,
             watched: stats.watched_items as u64,
             total: stats.total_items as u64,
@@ -122,26 +123,32 @@ struct Row {
     id: i64,
     title: String,
     parent: String,
-    episode: String,
+    authors: String,
+    sequence: String,
     date: String,
+    runtime: String,
     year: String,
     watched: bool,
     poster: String,
     media: String,
+    media_label: &'static str,
 }
 
 impl Row {
-    fn from_item(item: &WatchlistItem) -> Self {
-        let date = item.release_date.clone().unwrap_or_default();
+    fn from_item(item: &WatchlistItem, custom_order: bool) -> Self {
+        let raw_date = item.release_date.clone().unwrap_or_default();
         Self {
             id: item.id,
             title: item.title.clone(),
             parent: item.parent_title.clone().unwrap_or_default(),
-            episode: item.episode.clone().unwrap_or_default(),
-            year: display_year(&date),
-            date,
+            authors: authors_label(item),
+            sequence: sequence_label(item),
+            year: display_year(&raw_date),
+            date: format_release_date(&raw_date, custom_order),
+            runtime: format_runtime(item.runtime),
             watched: item.is_watched,
             poster: poster(item.poster_path.as_deref().unwrap_or("")),
+            media_label: media_label(&item.media_type),
             media: item.media_type.clone(),
         }
     }
@@ -160,6 +167,125 @@ fn display_year(date: &str) -> String {
         "TBA".into()
     } else {
         date.split_once('-').map_or(date, |(year, _)| year).into()
+    }
+}
+
+const MONTHS: [&str; 12] = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+];
+
+/// Formats a stored release date the way v1 `formatReleaseDate` does.
+fn format_release_date(date: &str, include_year: bool) -> String {
+    if date.is_empty() {
+        return String::new();
+    }
+    if let Some((year, month, day)) = parse_ymd(date) {
+        let month_name = MONTHS[month as usize - 1];
+        let day = day.trim_start_matches('0');
+        return if include_year {
+            format!("{month_name} {day}, {year}")
+        } else {
+            format!("{month_name} {day}")
+        };
+    }
+    if let Some((year, month)) = parse_ym(date) {
+        let month_name = MONTHS[month as usize - 1];
+        return if include_year {
+            format!("{month_name} {year}")
+        } else {
+            month_name.into()
+        };
+    }
+    if date.chars().count() == 4 && date.chars().all(|character| character.is_ascii_digit()) {
+        return date.into();
+    }
+    String::new()
+}
+
+fn parse_ymd(date: &str) -> Option<(&str, u8, &str)> {
+    let (year, rest) = date.split_once('-')?;
+    let (month, day) = rest.split_once('-')?;
+    if year.len() != 4 || month.len() != 2 || day.len() != 2 {
+        return None;
+    }
+    let month = month.parse::<u8>().ok()?;
+    if !(1..=12).contains(&month) {
+        return None;
+    }
+    Some((year, month, day))
+}
+
+fn parse_ym(date: &str) -> Option<(&str, u8)> {
+    let (year, month) = date.split_once('-')?;
+    if year.len() != 4 || month.len() != 2 || month.contains('-') {
+        return None;
+    }
+    let month = month.parse::<u8>().ok()?;
+    if !(1..=12).contains(&month) {
+        return None;
+    }
+    Some((year, month))
+}
+
+fn authors_label(item: &WatchlistItem) -> String {
+    if item.media_type != "book" {
+        return String::new();
+    }
+    item.authors
+        .as_ref()
+        .filter(|authors| !authors.is_empty())
+        .map(|authors| authors.join(", "))
+        .unwrap_or_default()
+}
+
+fn sequence_label(item: &WatchlistItem) -> String {
+    let episode = item.episode.as_deref().unwrap_or("");
+    if episode.is_empty() || item.media_type == "movie" {
+        return String::new();
+    }
+    if item.media_type == "comic" || item.media_type == "comic_issue" {
+        return format!("Issue #{episode}");
+    }
+    if item.source == "custom" {
+        return episode.into();
+    }
+    match item.season {
+        Some(season) => format!("S{season} E{episode}"),
+        None => String::new(),
+    }
+}
+
+fn format_runtime(minutes: Option<i64>) -> String {
+    let Some(minutes) = minutes.filter(|&minutes| minutes > 0) else {
+        return String::new();
+    };
+    let hours = minutes / 60;
+    let remainder = minutes % 60;
+    if hours > 0 {
+        format!("{hours}h {remainder}m")
+    } else {
+        format!("{remainder}m")
+    }
+}
+
+fn media_label(media_type: &str) -> &'static str {
+    match media_type {
+        "movie" => "Movie",
+        "game" => "Game",
+        "book" => "Book",
+        "comic" => "Comic",
+        _ => "",
     }
 }
 
@@ -296,13 +422,13 @@ mod tests {
         );
         assert_eq!(view.runs[2].rows[0].year, "TBA");
         assert_eq!(view.runs[2].rows[0].date, "");
-        assert_eq!(view.runs[0].rows[0].date, "2020-01-02");
+        assert_eq!(view.runs[0].rows[0].date, "January 2");
         let html = view.render_page().unwrap();
         assert!(html.contains("<h2>2020</h2>"), "{html}");
         assert_eq!(html.matches("<h2>2020</h2>").count(), 1, "{html}");
         assert!(html.contains("<h2>TBA</h2>"), "{html}");
         assert!(html.contains("<h2>2019</h2>"), "{html}");
-        assert!(html.contains("<p>2020-01-02</p>"), "{html}");
+        assert!(html.contains("<span>January 2</span>"), "{html}");
     }
 
     #[test]
@@ -334,7 +460,7 @@ mod tests {
         assert!(!view.runs[1].collapsed);
         let html = fragment(&view);
         assert_eq!(html.matches("<details class=\"watched-run\">").count(), 1);
-        assert!(html.contains("3 watched items"), "{html}");
+        assert!(html.contains("3 watched items hidden"), "{html}");
         assert!(!html.contains("<h2>"), "{html}");
         assert!(
             html.find("data-item-id=\"1\"").unwrap() < html.find("data-item-id=\"2\"").unwrap()
@@ -414,14 +540,17 @@ mod tests {
         let mut first = item(1, "First", Some("2020-01-02"), false);
         first.poster_path = Some("/poster.jpg".into());
         first.parent_title = Some("Parent".into());
+        first.media_type = "episode".into();
+        first.season = Some(1);
         first.episode = Some("2".into());
         let mut second = item(2, "Second", None, false);
         second.poster_path = Some("https://images.example/poster.jpg".into());
+        second.runtime = Some(126);
+        let mut third = item(3, "Third", None, false);
+        third.runtime = Some(45);
+        third.media_type = "book".into();
         let view = TimelineView::new(
-            &detail(
-                ItemOrderMode::Custom,
-                vec![first, second, item(3, "Third", None, false)],
-            ),
+            &detail(ItemOrderMode::Custom, vec![first, second, third]),
             &TimelineFilters::default(),
         );
         assert_eq!(
@@ -434,13 +563,23 @@ mod tests {
         );
         assert_eq!(view.runs[0].rows[2].poster, "");
         assert_eq!(view.runs[0].rows[0].parent, "Parent");
-        assert_eq!(view.runs[0].rows[0].episode, "2");
+        assert_eq!(view.runs[0].rows[0].sequence, "S1 E2");
+        assert_eq!(view.runs[0].rows[0].date, "January 2, 2020");
+        assert_eq!(view.runs[0].rows[0].media_label, "");
+        assert_eq!(view.runs[0].rows[1].media_label, "Movie");
+        assert_eq!(view.runs[0].rows[1].runtime, "2h 6m");
+        assert_eq!(view.runs[0].rows[2].media_label, "Book");
+        assert_eq!(view.runs[0].rows[2].runtime, "45m");
         let html = fragment(&view);
         assert!(
             html.contains("src=\"https://image.tmdb.org/t/p/w200/poster.jpg\""),
             "{html}"
         );
         assert!(html.contains("<div class=\"poster placeholder\""), "{html}");
+        assert!(html.contains(">Movie</span>"), "{html}");
+        assert!(html.contains(">Book</span>"), "{html}");
+        assert!(html.contains("<span>• 2h 6m</span>"), "{html}");
+        assert!(html.contains("<span>• 45m</span>"), "{html}");
     }
 
     #[test]
